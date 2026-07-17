@@ -1,0 +1,30 @@
+name: Bug report
+description: Something broke or behaves wrong
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expect
+    attributes:
+      label: What did you expect?
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: python3 --version
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      render: shell

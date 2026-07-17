@@ -1,0 +1,7 @@
+# Words lint should not flag as soft issues (very_short, mixed_script, etc.).
+# One word per line; lines starting with # are comments.
+# Customize after `spell-sync init` — do not commit personal entries to public upstream.
+
+# Example short technical tokens (replace with your own):
+js
+py
