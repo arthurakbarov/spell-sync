@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spell-sync"
+version = "0.1.0"
+description = "Sync personal spell-check words across OS, browsers, editors, and Hunspell"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Unlicense"
+license-files = ["LICENSE"]
+authors = [{ name = "Arthur Akbarov" }]
+keywords = ["spellcheck", "spell-check", "dictionary", "sync", "dotfiles", "wordlist", "custom-words"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Text Processing",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/arthurakbarov/spell-sync"
+Repository = "https://github.com/arthurakbarov/spell-sync"
+Issues = "https://github.com/arthurakbarov/spell-sync/issues"
+[project.optional-dependencies]
+dev = ["ruff>=0.4", "mypy>=1.0", "pytest>=7", "pytest-cov>=4"]
+
+[project.scripts]
+spell-sync = "spell_sync.cli:entry_point"
+
+[tool.setuptools.packages.find]
+include = ["spell_sync*"]
+
+[tool.setuptools.package-data]
+spell_sync = ["bundled/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+files = ["spell_sync"]
+
+[tool.coverage.run]
+source = ["spell_sync"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 98
+skip_covered = true

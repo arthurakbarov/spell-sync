@@ -1,0 +1,27 @@
+# Copy to spell-sync.toml (or ~/.config/spell-sync/spell-sync.toml).
+# spell-sync.toml in the repo root overrides ~/.config.
+
+[dictionaries]
+editors = true
+chrome = true
+edge = true
+brave = true
+vivaldi = true
+firefox = true
+neovim = true
+jetbrains = true
+hunspell = true
+obsidian = true
+libreoffice = true
+
+[neovim]
+# mkspell_after_push = true   # regenerate .spl after push (requires nvim on PATH)
+
+[push]
+guard_wordlist_max = 10
+guard_local_min = 20
+# strict = true          # abort push when any dictionary would be skipped
+# max_removals_without_confirm = 50  # manual push prompt above this
+
+[io]
+backup_keep = 3
