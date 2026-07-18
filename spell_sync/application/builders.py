@@ -959,3 +959,55 @@ def build_recovery_operation_report(execution: RecoveryExecution) -> OperationRe
         warnings=execution.warnings,
         recovery_required=True,
     )
+
+
+def build_setup_operation_report(execution) -> OperationReport:
+    from ..project_setup.execute import ProjectSetupOutcome
+
+    prepared = execution.prepared
+    if execution.outcome is ProjectSetupOutcome.COMPLETED:
+        details = [
+            f"Canonical wordlist: {prepared.wordlist_path}",
+            f"Configuration: {prepared.config_path}",
+            f"Enabled targets: {len(prepared.enabled_targets)}",
+            "No application dictionaries were changed.",
+        ]
+        if prepared.existing_wordlist_kept:
+            details.insert(1, "The existing canonical wordlist was kept unchanged.")
+        return OperationReport(
+            operation="setup",
+            outcome=OperationOutcome.COMPLETED,
+            title="Project created",
+            summary=execution.message,
+            details=tuple(details),
+            warnings=execution.warnings,
+        )
+    if execution.outcome is ProjectSetupOutcome.STOPPED_SAFELY:
+        return OperationReport(
+            operation="setup",
+            outcome=OperationOutcome.STOPPED_SAFELY,
+            title="Project creation stopped safely",
+            summary=execution.message,
+            details=("No existing file was overwritten.",),
+            warnings=execution.warnings,
+        )
+    if execution.outcome is ProjectSetupOutcome.SETUP_INCOMPLETE:
+        return OperationReport(
+            operation="setup",
+            outcome=OperationOutcome.FAILED,
+            title="Project setup is incomplete",
+            summary=execution.message,
+            details=(
+                "Some newly created files could not be removed after an error.",
+                "Existing files were not overwritten.",
+            ),
+            warnings=execution.warnings,
+        )
+    return OperationReport(
+        operation="setup",
+        outcome=OperationOutcome.FAILED,
+        title="Project setup failed",
+        summary=execution.message,
+        details=(),
+        warnings=execution.warnings,
+    )

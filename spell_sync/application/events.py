@@ -14,6 +14,7 @@ class OperationKind(str, Enum):
     PUSH = "push"
     DOCTOR = "doctor"
     RECOVER = "recover"
+    SETUP = "setup"
 
 
 class EventLevel(str, Enum):

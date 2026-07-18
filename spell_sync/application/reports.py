@@ -303,3 +303,16 @@ class RecoveryExecution:
     skipped: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
     failed: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProjectSetupExecutionView:
+    prepared_setup_id: str
+    outcome: str
+    message: str
+    created_files: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    wordlist_path: str = ""
+    config_path: str = ""
+    enabled_targets: tuple[str, ...] = ()
+    existing_wordlist_kept: bool = False

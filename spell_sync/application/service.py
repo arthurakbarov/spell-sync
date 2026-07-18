@@ -11,15 +11,20 @@ from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
 from ..operation_lock import read_active_operation_lock
 from ..paths import resolve_wordlist_path
+from ..project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
+from ..project_setup.draft import SetupDraft
+from ..project_setup.execute import ProjectSetupExecution, execute_project_setup
+from ..project_setup.prepare import PreparedProjectSetup, prepare_project_setup
+from ..project_setup.state import ProjectSetupState, inspect_project_setup, validate_setup_wordlist
 from ..push_abort import PushAbort
 from ..push_journal import (
     JournalLoadStatus,
     cleanup_after_successful_recovery,
     discard_completed_journal,
-    discard_journal,
     file_content_hash,
     load_journal_result,
     recover_from_journal,
+    safe_discard_journal_file,
 )
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
 from ..sync_models import PushResult
@@ -34,6 +39,7 @@ from .builders import (
     build_push_preview,
     build_recovery_operation_report,
     build_recovery_preview,
+    build_setup_operation_report,
     build_status_detail_snapshot,
     build_target_updates_from_preview,
 )
@@ -791,7 +797,30 @@ class SpellSyncService:
                     failed=result.failed,
                 )
 
-            cleanup_after_successful_recovery(journal)
+            cleanup_result = cleanup_after_successful_recovery(journal)
+            if not cleanup_result.ok:
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.RECOVER,
+                        "failed",
+                        cleanup_result.detail or "Recovery cleanup incomplete",
+                        level=EventLevel.ERROR,
+                    ),
+                )
+                return RecoveryExecution(
+                    preview=preview,
+                    result=result,
+                    outcome=RecoveryOutcome.RECOVERY_INCOMPLETE,
+                    message=(
+                        cleanup_result.detail or "Recovery succeeded but cleanup artifacts remain."
+                    ),
+                    warnings=preview.warnings,
+                    restored=result.restored,
+                    skipped=result.skipped,
+                    conflicts=result.conflicts,
+                    failed=result.failed,
+                )
             _emit(
                 event_sink,
                 OperationEvent(
@@ -875,7 +904,14 @@ class SpellSyncService:
                     outcome=RecoveryOutcome.FAILED,
                     message="Completed journal is no longer present.",
                 )
-            discard_completed_journal(wordlist)
+            discard_result = discard_completed_journal(wordlist)
+            if not discard_result.ok:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message=discard_result.detail or "Cleanup could not remove recovery artifacts.",
+                )
             _emit(
                 event_sink,
                 OperationEvent(
@@ -928,15 +964,69 @@ class SpellSyncService:
                 )
             wordlist = scope.context.wordlist_file
             if preview.status is RecoveryStatus.CORRUPT_JOURNAL:
-                discard_journal(wordlist)
+                journal_ok, detail = safe_discard_journal_file(wordlist)
+                if not journal_ok:
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.PUSH_ABORT,
+                        outcome=RecoveryOutcome.FAILED,
+                        message=detail or "Discard could not remove recovery metadata.",
+                    )
             else:
-                discard_completed_journal(wordlist)
+                discard_result = discard_completed_journal(wordlist)
+                if not discard_result.ok:
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.PUSH_ABORT,
+                        outcome=RecoveryOutcome.FAILED,
+                        message=discard_result.detail
+                        or "Discard could not remove recovery metadata.",
+                    )
             return RecoveryExecution(
                 preview=preview,
                 result=ExitCode.OK,
                 outcome=RecoveryOutcome.DISCARDED,
                 message="Recovery metadata discarded.",
             )
+
+    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState:
+        return inspect_project_setup(opts)
+
+    def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery:
+        return discover_setup_targets(selected_targets=draft.selected_targets)
+
+    def prepare_project_setup(self, draft: SetupDraft) -> PreparedProjectSetup:
+        return prepare_project_setup(draft)
+
+    def execute_project_setup(
+        self,
+        prepared: PreparedProjectSetup,
+        *,
+        confirmed_setup_id: str,
+        event_sink: EventSink | None = None,
+    ) -> ProjectSetupExecution:
+        def _sink(stage: str, message: str) -> None:
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.SETUP,
+                    stage,
+                    message,
+                    level=EventLevel.SUCCESS if stage == "completed" else EventLevel.INFO,
+                ),
+            )
+
+        return execute_project_setup(
+            prepared,
+            confirmed_setup_id=confirmed_setup_id,
+            event_sink=_sink if event_sink is not None else None,
+        )
+
+    def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:
+        return validate_setup_wordlist(raw_path)
+
+    def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport:
+        return build_setup_operation_report(execution)
 
     def build_push_report(self, execution: PushExecution) -> OperationReport:
         return build_push_operation_report(execution)

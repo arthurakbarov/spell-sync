@@ -12,7 +12,6 @@ from .app_process_check import (
     confirm_obsidian_before_push,
 )
 from .application import SpellSyncService
-from .bundled_files import init_project_directory
 from .cli_options import CliOptions
 from .command_helpers import (
     confirm_push_removals,
@@ -210,25 +209,62 @@ def _cmd_push_locked(opts: CliOptions) -> int:
 
 
 def cmd_init(opts: CliOptions) -> int:
+    from .application import SpellSyncService
+    from .paths import resolve_wordlist_path
+    from .project_setup.discovery import discover_setup_targets
+    from .project_setup.draft import SetupDraft
+
     with quiet_json_output(opts):
         log.section("init: create wordlist and config from bundled examples")
         if opts.wordlist:
-            target = wordlist_file_for(opts).parent
+            wordlist = resolve_wordlist_path(opts.wordlist)
         else:
-            target = Path.cwd()
-        created = init_project_directory(target)
-        if opts.json_output:
-            emit_json({**base_payload("init", exit=int(ExitCode.OK)), "created": created})
-            return int(ExitCode.OK)
-        if created:
-            for name in created:
-                log.done(f"created {name}")
-            log.info("next: edit wordlist.txt, then spell-sync pull or spell-sync push")
-        else:
+            wordlist = Path.cwd() / "wordlist.txt"
+        discovery = discover_setup_targets()
+        draft = SetupDraft(
+            wordlist_path=wordlist,
+            selected_targets=discovery.default_enabled,
+            create_wordlist=not wordlist.is_file(),
+        )
+        service = SpellSyncService()
+        prepared = service.prepare_project_setup(draft)
+        if not prepared.can_execute:
+            if opts.json_output:
+                emit_json(
+                    {
+                        **base_payload("init", exit=int(ExitCode.OK)),
+                        "created": [],
+                        "outcome": "stopped_safely",
+                    }
+                )
+                return int(ExitCode.OK)
             log.info(
                 "nothing to create — wordlist.txt, spell-sync.toml, "
                 "and lint-whitelist.txt already exist."
             )
+            return int(ExitCode.OK)
+        execution = service.execute_project_setup(
+            prepared,
+            confirmed_setup_id=prepared.setup_id,
+        )
+        if opts.json_output:
+            emit_json(
+                {
+                    **base_payload("init", exit=int(ExitCode.OK)),
+                    "created": list(execution.created_files),
+                    "outcome": execution.outcome.value,
+                }
+            )
+            return int(ExitCode.OK)
+        if execution.outcome.value != "completed":
+            log.error(execution.message)
+            return int(ExitCode.PUSH_ABORT)
+        for name in execution.created_files:
+            log.done(f"created {name}")
+        if not execution.created_files:
+            log.info("nothing to create — project files already exist.")
+        else:
+            log.info("next: edit wordlist.txt, then spell-sync pull or spell-sync push")
         return int(ExitCode.OK)
 
 
