@@ -5,7 +5,11 @@ Screen {
 #dashboard-summary,
 #status-content,
 #preview-content,
-#narrow-warning {
+#doctor-content,
+#removals-summary,
+#removals-content,
+#narrow-warning,
+#dashboard-issues {
     height: auto;
     padding: 1 2;
 }

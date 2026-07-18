@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from ..application.reports import DashboardState, PushPreviewSnapshot, StatusSnapshot
+from ..application.reports import (
+    DashboardState,
+    DoctorSnapshot,
+    PushPreview,
+    StatusDetailSnapshot,
+    StatusSnapshot,
+)
 from ..cli_options import CliOptions
 
 
@@ -13,7 +19,11 @@ class TuiService(Protocol):
 
     def load_status(self, opts: CliOptions) -> StatusSnapshot: ...
 
-    def load_push_preview(self, opts: CliOptions) -> PushPreviewSnapshot: ...
+    def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot: ...
+
+    def load_push_preview(self, opts: CliOptions) -> PushPreview: ...
+
+    def load_doctor(self, opts: CliOptions) -> DoctorSnapshot: ...
 
 
 class TuiController:
@@ -27,5 +37,11 @@ class TuiController:
     def status(self) -> StatusSnapshot:
         return self._service.load_status(self.opts)
 
-    def preview(self) -> PushPreviewSnapshot:
+    def status_detail(self) -> StatusDetailSnapshot:
+        return self._service.load_status_detail(self.opts)
+
+    def preview(self) -> PushPreview:
         return self._service.load_push_preview(self.opts)
+
+    def doctor(self) -> DoctorSnapshot:
+        return self._service.load_doctor(self.opts)
