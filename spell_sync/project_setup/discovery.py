@@ -233,6 +233,10 @@ def discover_setup_targets(
 
 
 def config_draft_from_targets(selected_targets: tuple[str, ...]) -> ProjectConfigDraft:
+    allowed = _CONFIG_TARGET_IDS | {"macos_spelling", "win_spelling"}
+    for target in selected_targets:
+        if target not in allowed:
+            raise ValueError(f"Unknown setup target identifier: {target}")
     enabled = tuple(target for target in selected_targets if target in _CONFIG_TARGET_IDS)
     return ProjectConfigDraft(
         schema_version=1,
