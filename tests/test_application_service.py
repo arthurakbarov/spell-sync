@@ -58,7 +58,7 @@ class TestSpellSyncService(unittest.TestCase):
         stages = [event.stage for event in events]
         self.assertEqual(
             stages,
-            ["building_plan", "plan_verified", "creating_snapshots", "completed"],
+            ["building_plan", "verifying_plan", "creating_snapshots", "completed"],
         )
 
     def test_execute_push_uses_prepared_without_replan(self):
@@ -268,6 +268,126 @@ class TestSpellSyncService(unittest.TestCase):
         execute_push.assert_called_once()
         self.assertIs(execution.prepared, prepared)
         self.assertIs(execution.result, push_result)
+
+    def test_prepare_pull_delegates_to_builder(self):
+        from spell_sync.application.reports import PullPreview
+
+        service = SpellSyncService()
+        run = MagicMock()
+        preview = MagicMock(spec=PullPreview)
+        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            with patch(
+                "spell_sync.application.service.build_pull_preview",
+                return_value=preview,
+            ) as builder:
+                result = service.prepare_pull(CliOptions())
+        builder.assert_called_once_with(run)
+        self.assertIs(result, preview)
+
+    def test_execute_pull_plan_mismatch_and_write(self):
+        from spell_sync.application.reports import OperationOutcome, PullPreview
+
+        service = SpellSyncService()
+        preview = PullPreview(
+            wordlist_path="/tmp/w.txt",
+            additions=1,
+            before_count=1,
+            after_count=2,
+            sources_used=("a",),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at="t",
+            plan_identifier="p1",
+            merged_words=("a", "b"),
+            wordlist_fingerprint="abc",
+        )
+        bad = service.execute_pull(CliOptions(), preview, confirmed_plan_id="other")
+        self.assertEqual(bad.outcome, OperationOutcome.FAILED)
+
+        events: list = []
+        with patch(
+            "spell_sync.application.service.command_helpers.mutating_command_scope"
+        ) as scope:
+            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__exit__.return_value = False
+            with patch(
+                "spell_sync.application.service.file_content_hash",
+                return_value="abc",
+            ):
+                with patch(
+                    "spell_sync.application.service.write_text_words",
+                    return_value=True,
+                ) as write:
+                    ok = service.execute_pull(
+                        CliOptions(),
+                        preview,
+                        confirmed_plan_id="p1",
+                        event_sink=events.append,
+                    )
+        write.assert_called_once()
+        self.assertEqual(ok.outcome, OperationOutcome.COMPLETED)
+        self.assertTrue(any(event.stage == "completed" for event in events))
+
+    def test_execute_push_preview_conflict_and_success(self):
+        from spell_sync.application.reports import OperationOutcome, PushPreview
+
+        service = SpellSyncService()
+        prepared = MagicMock(spec=PreparedPush)
+        prepared.targets = ()
+        prepared.wordlist_needs_write = False
+        prepared.ctx = MagicMock(wordlist_str="/tmp/w.txt")
+        preview = PushPreview(
+            prepared=prepared,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p1",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        with patch(
+            "spell_sync.application.service.command_helpers.mutating_command_scope"
+        ) as scope:
+            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__exit__.return_value = False
+            with patch(
+                "spell_sync.application.service.plan_fingerprint_conflict",
+                return_value="chrome",
+            ):
+                conflict = service.execute_push_preview(
+                    CliOptions(),
+                    preview,
+                    confirmed_plan_id="p1",
+                )
+        self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
+        self.assertEqual(conflict.conflict_target, "chrome")
+
+        with patch(
+            "spell_sync.application.service.command_helpers.mutating_command_scope"
+        ) as scope:
+            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__exit__.return_value = False
+            with patch(
+                "spell_sync.application.service.plan_fingerprint_conflict",
+                return_value=None,
+            ):
+                with patch(
+                    "spell_sync.application.service.execute_prepared_push",
+                    return_value=PushResult(word_count=1, written=("demo",)),
+                ):
+                    ok = service.execute_push_preview(
+                        CliOptions(),
+                        preview,
+                        confirmed_plan_id="p1",
+                    )
+        self.assertEqual(ok.outcome, OperationOutcome.COMPLETED)
+        self.assertIs(ok.prepared, prepared)
 
     def test_status_cli_uses_service_snapshot(self):
         import spell_sync.commands as commands_mod

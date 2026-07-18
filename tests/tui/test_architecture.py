@@ -41,12 +41,29 @@ class TestTuiArchitecture(unittest.TestCase):
                     )
 
     def test_tui_does_not_import_low_level_writers(self):
-        banned = ("push_transaction", "push_render", "atomic_write")
+        banned = (
+            "push_transaction",
+            "push_render",
+            "atomic_write",
+            "execute_prepared_push",
+            "PushJournalSession",
+        )
         for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
             module = importlib.import_module(module_info.name)
             source = Path(module.__file__ or "").read_text(encoding="utf-8")
             for token in banned:
                 self.assertNotIn(token, source, msg=f"{module_info.name} references {token}")
+
+    def test_application_does_not_import_textual(self):
+        import spell_sync.application as application_pkg
+
+        for module_info in pkgutil.walk_packages(
+            application_pkg.__path__,
+            application_pkg.__name__ + ".",
+        ):
+            module = importlib.import_module(module_info.name)
+            source = Path(module.__file__ or "").read_text(encoding="utf-8").lower()
+            self.assertNotIn("textual", source, msg=module_info.name)
 
     def test_tui_does_not_shell_out_to_cli(self):
         for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
@@ -88,11 +105,36 @@ class TestTuiArchitecture(unittest.TestCase):
         self.assertTrue(css_path.is_file())
 
     def test_dashboard_loads_via_service_only(self):
-
         controller = TuiController(fake_service(), MagicMock())
         with patch.object(controller._service, "load_dashboard") as load_dashboard:
             controller.dashboard()
         load_dashboard.assert_called_once()
+
+    def test_push_execution_goes_through_service(self):
+        service = fake_service()
+        controller = TuiController(service, MagicMock())
+        preview = service.preview
+        controller._active_push_preview = preview
+        execution = controller.execute_push(preview)
+        self.assertEqual(service.execute_push_calls, 1)
+        self.assertIs(service.last_executed_prepared, preview.prepared)
+        self.assertIs(execution.prepared, preview.prepared)
+
+    def test_confirmation_uses_preview_counts(self):
+        from spell_sync.tui.screens.push_confirm_screen import PushConfirmScreen
+        from tests.tui.fake_service import sample_preview
+
+        preview = sample_preview(removals=6, additions=28)
+        screen = PushConfirmScreen(TuiController(fake_service(), MagicMock()), preview)
+        self.assertEqual(screen._preview.removals, 6)
+        self.assertEqual(screen._preview.additions, 28)
+
+    def test_removal_words_not_in_operation_events(self):
+        from spell_sync.application.events import OperationEvent
+
+        # Event schema has no word payload fields.
+        self.assertNotIn("words", OperationEvent.__annotations__)
+        self.assertNotIn("removal_words", OperationEvent.__annotations__)
 
 
 if __name__ == "__main__":

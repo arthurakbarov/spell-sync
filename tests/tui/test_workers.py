@@ -69,12 +69,15 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
             def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot:
                 raise RuntimeError("boom")
 
+        from tests.tui.fake_service import sample_pull_preview
+
         service = ExplodingService(
             sample_dashboard(),
             sample_status(),
             sample_status_detail(),
             sample_preview(),
             sample_doctor(),
+            sample_pull_preview(),
         )
         controller = TuiController(service, CliOptions())
         app = SpellSyncApp(controller)
