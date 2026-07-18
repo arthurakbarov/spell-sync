@@ -9,7 +9,12 @@ from ..dictionaries import Dictionary
 from ..exit_codes import ExitCode
 from ..health.types import DoctorAction, DoctorCheck, DoctorReport
 from ..operation_lock import OperationLockInfo
-from ..push_journal import JournalLoadStatus, file_content_hash
+from ..push_journal import (
+    JOURNAL_STATE_ROLLBACK_INCOMPLETE,
+    JournalLoadStatus,
+    file_content_hash,
+    plan_recovery_from_journal,
+)
 from ..push_prepared import PreparedPush
 from ..read_outcome import ReadStatus, dictionary_read_result
 from ..settings import ConfigStatus
@@ -29,6 +34,11 @@ from .reports import (
     PullSourcePreview,
     PushExecution,
     PushPreview,
+    RecoveryExecution,
+    RecoveryItemPreview,
+    RecoveryOutcome,
+    RecoveryPreview,
+    RecoveryStatus,
     StatusDetailSnapshot,
     StatusSnapshot,
     TargetPreview,
@@ -727,4 +737,225 @@ def build_pull_operation_report(execution: PullExecution) -> OperationReport:
         details=(f"Wordlist: {preview.wordlist_path}",),
         warnings=execution.warnings,
         plan_identifier=preview.plan_identifier,
+    )
+
+
+def _empty_recovery_preview(
+    *,
+    status: RecoveryStatus,
+    wordlist_path: str,
+    detail: str | None = None,
+    can_discard: bool = False,
+) -> RecoveryPreview:
+    return RecoveryPreview(
+        status=status,
+        transaction_id="",
+        command="",
+        transaction_state="",
+        started_at="",
+        wordlist_path=wordlist_path,
+        snapshot_directory=None,
+        items=(),
+        recoverable_count=0,
+        conflict_count=0,
+        failure_count=0,
+        warnings=(),
+        can_recover=False,
+        can_discard=can_discard,
+        can_cleanup=False,
+        snapshots_valid=True,
+        preview_fingerprint="absent",
+        detail=detail,
+    )
+
+
+def build_recovery_preview(validated: ValidatedRuntime) -> RecoveryPreview:
+    wordlist_path = str(validated.context.wordlist_file)
+    journal_result = validated.journal_result
+    status = journal_result.status
+
+    if status is JournalLoadStatus.ABSENT:
+        return _empty_recovery_preview(
+            status=RecoveryStatus.ABSENT,
+            wordlist_path=wordlist_path,
+            detail="No unfinished transaction was found.",
+        )
+    if status is JournalLoadStatus.CORRUPT:
+        return _empty_recovery_preview(
+            status=RecoveryStatus.CORRUPT_JOURNAL,
+            wordlist_path=wordlist_path,
+            detail=journal_result.detail or status.value,
+            can_discard=True,
+        )
+    if status is JournalLoadStatus.UNSUPPORTED_SCHEMA:
+        return _empty_recovery_preview(
+            status=RecoveryStatus.UNSUPPORTED_SCHEMA,
+            wordlist_path=wordlist_path,
+            detail=journal_result.detail or status.value,
+        )
+
+    journal = journal_result.journal
+    assert journal is not None
+    if status is JournalLoadStatus.VALID_COMPLETED:
+        return RecoveryPreview(
+            status=RecoveryStatus.COMPLETED_CLEANUP_PENDING,
+            transaction_id=journal.transaction_id,
+            command=journal.command,
+            transaction_state=journal.state,
+            started_at=journal.started,
+            wordlist_path=wordlist_path,
+            snapshot_directory=journal.snapshot_dir,
+            items=(),
+            recoverable_count=0,
+            conflict_count=0,
+            failure_count=0,
+            warnings=("The transaction completed successfully, but recovery artifacts remain.",),
+            can_recover=False,
+            can_discard=True,
+            can_cleanup=True,
+            snapshots_valid=True,
+            preview_fingerprint=journal.transaction_id,
+            detail="Only cleanup is required.",
+        )
+
+    plans = plan_recovery_from_journal(journal)
+    items = tuple(
+        RecoveryItemPreview(
+            name=plan.name,
+            path=plan.path,
+            current_state=plan.current_state,
+            recovery_action=plan.recovery_action,
+            status=plan.status,
+            detail=plan.detail,
+            existed_before=plan.existed_before,
+            write_started=plan.write_started,
+            write_completed=plan.write_completed,
+            snapshot_valid=plan.snapshot_valid,
+        )
+        for plan in plans
+    )
+    recoverable_count = sum(1 for item in items if item.status == "ready")
+    conflict_count = sum(1 for item in items if item.status == "conflict")
+    failure_count = sum(1 for item in items if item.status == "failed")
+    snapshots_valid = all(
+        item.snapshot_valid or item.status in {"skipped", "conflict"} for item in items
+    )
+    warnings: list[str] = []
+    if journal.state == JOURNAL_STATE_ROLLBACK_INCOMPLETE:
+        warnings.append("Automatic rollback was incomplete.")
+    if failure_count:
+        warnings.append(f"{failure_count} item(s) have invalid snapshots.")
+    if conflict_count:
+        warnings.append(f"{conflict_count} item(s) have external conflicts.")
+
+    if journal.state == JOURNAL_STATE_ROLLBACK_INCOMPLETE:
+        recovery_status = RecoveryStatus.RECOVERY_IN_PROGRESS
+    elif conflict_count and recoverable_count == 0:
+        recovery_status = RecoveryStatus.CONFLICTED
+    elif conflict_count:
+        recovery_status = RecoveryStatus.CONFLICTED
+    else:
+        recovery_status = RecoveryStatus.RECOVERABLE
+
+    can_recover = recoverable_count > 0 and snapshots_valid and failure_count == 0
+    return RecoveryPreview(
+        status=recovery_status,
+        transaction_id=journal.transaction_id,
+        command=journal.command,
+        transaction_state=journal.state,
+        started_at=journal.started,
+        wordlist_path=wordlist_path,
+        snapshot_directory=journal.snapshot_dir,
+        items=items,
+        recoverable_count=recoverable_count,
+        conflict_count=conflict_count,
+        failure_count=failure_count,
+        warnings=tuple(warnings),
+        can_recover=can_recover,
+        can_discard=False,
+        can_cleanup=False,
+        snapshots_valid=snapshots_valid,
+        preview_fingerprint=journal.transaction_id,
+    )
+
+
+def build_recovery_operation_report(execution: RecoveryExecution) -> OperationReport:
+    outcome = execution.outcome
+    if outcome is RecoveryOutcome.RECOVERED:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.COMPLETED,
+            title="Recovery completed",
+            summary=execution.message,
+            details=(
+                f"Restored: {len(execution.restored)}",
+                f"Skipped: {len(execution.skipped)}",
+                "Recovery metadata: cleaned up",
+            ),
+            warnings=execution.warnings,
+        )
+    if outcome is RecoveryOutcome.RECOVERED_WITH_WARNINGS:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.COMPLETED_WITH_WARNINGS,
+            title="Recovery completed with warnings",
+            summary=execution.message,
+            details=tuple(execution.warnings),
+            warnings=execution.warnings,
+        )
+    if outcome is RecoveryOutcome.CONFLICTED:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.STOPPED_SAFELY,
+            title="Recovery stopped safely",
+            summary=execution.message,
+            details=(
+                "Recovery metadata and snapshots were preserved.",
+                *(f"Conflict: {name}" for name in execution.conflicts),
+            ),
+            warnings=execution.warnings,
+            recovery_required=True,
+        )
+    if outcome is RecoveryOutcome.RECOVERY_INCOMPLETE:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.RECOVERY_REQUIRED,
+            title="Recovery is incomplete",
+            summary=execution.message,
+            details=(
+                "Recovery metadata and snapshots were preserved.",
+                "Run Recovery again after resolving the failure.",
+            ),
+            warnings=execution.warnings,
+            recovery_required=True,
+        )
+    if outcome is RecoveryOutcome.CLEANUP_COMPLETED:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.COMPLETED,
+            title="Transaction cleanup completed",
+            summary=execution.message,
+            details=("Remaining recovery artifacts were removed.",),
+            warnings=execution.warnings,
+        )
+    if outcome is RecoveryOutcome.DISCARDED:
+        return OperationReport(
+            operation="recover",
+            outcome=OperationOutcome.COMPLETED,
+            title="Recovery metadata discarded",
+            summary=execution.message,
+            details=(
+                "No files were restored.",
+                "The current filesystem state was kept.",
+            ),
+            warnings=execution.warnings,
+        )
+    return OperationReport(
+        operation="recover",
+        outcome=OperationOutcome.FAILED,
+        title="Recovery failed",
+        summary=execution.message,
+        details=(),
+        warnings=execution.warnings,
+        recovery_required=True,
     )

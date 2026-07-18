@@ -234,3 +234,72 @@ class PushExecution:
     target_updates: tuple[TargetUpdateReport, ...] = ()
     recovery_required: bool = False
     plan_identifier: str | None = None
+
+
+class RecoveryStatus(str, Enum):
+    ABSENT = "absent"
+    RECOVERABLE = "recoverable"
+    COMPLETED_CLEANUP_PENDING = "completed_cleanup_pending"
+    CONFLICTED = "conflicted"
+    CORRUPT_JOURNAL = "corrupt_journal"
+    UNSUPPORTED_SCHEMA = "unsupported_schema"
+    RECOVERY_IN_PROGRESS = "recovery_in_progress"
+
+
+@dataclass(frozen=True)
+class RecoveryItemPreview:
+    name: str
+    path: str
+    current_state: str
+    recovery_action: str
+    status: str
+    detail: str | None = None
+    existed_before: bool = True
+    write_started: bool = False
+    write_completed: bool = False
+    snapshot_valid: bool = True
+
+
+@dataclass(frozen=True)
+class RecoveryPreview:
+    status: RecoveryStatus
+    transaction_id: str
+    command: str
+    transaction_state: str
+    started_at: str
+    wordlist_path: str
+    snapshot_directory: str | None
+    items: tuple[RecoveryItemPreview, ...]
+    recoverable_count: int
+    conflict_count: int
+    failure_count: int
+    warnings: tuple[str, ...]
+    can_recover: bool
+    can_discard: bool
+    snapshots_valid: bool
+    preview_fingerprint: str
+    can_cleanup: bool = False
+    detail: str | None = None
+
+
+class RecoveryOutcome(str, Enum):
+    RECOVERED = "recovered"
+    RECOVERED_WITH_WARNINGS = "recovered_with_warnings"
+    CONFLICTED = "conflicted"
+    RECOVERY_INCOMPLETE = "recovery_incomplete"
+    CLEANUP_COMPLETED = "cleanup_completed"
+    DISCARDED = "discarded"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class RecoveryExecution:
+    preview: RecoveryPreview
+    result: object
+    outcome: RecoveryOutcome
+    message: str
+    warnings: tuple[str, ...] = ()
+    restored: tuple[str, ...] = ()
+    skipped: tuple[str, ...] = ()
+    conflicts: tuple[str, ...] = ()
+    failed: tuple[str, ...] = ()

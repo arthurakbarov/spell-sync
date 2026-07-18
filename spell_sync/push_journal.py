@@ -90,6 +90,198 @@ class RecoverResult:
     conflicts: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class RecoveryItemPlan:
+    name: str
+    path: str
+    current_state: str
+    recovery_action: str
+    status: str
+    detail: str | None
+    existed_before: bool
+    write_started: bool
+    write_completed: bool
+    snapshot_valid: bool
+
+
+def _snapshot_is_valid(backup: Path | None, hash_before: str | None) -> bool:
+    if backup is None or not backup.is_file():
+        return False
+    if backup.is_symlink():
+        return False
+    if hash_before is None:
+        return True
+    return file_content_hash(backup) == hash_before
+
+
+def _plan_recovery_item(
+    label: str,
+    target: Path,
+    backup: Path | None,
+    *,
+    existed_before: bool,
+    hash_before: str | None,
+    hash_after: str | None,
+    write_started: bool,
+    write_completed: bool,
+) -> RecoveryItemPlan:
+    destination = physical_path(target)
+    snapshot_valid = _snapshot_is_valid(backup, hash_before)
+    if not write_started and not write_completed:
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="Unchanged",
+            recovery_action="No action",
+            status="skipped",
+            detail="Write never started",
+            existed_before=existed_before,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=snapshot_valid,
+        )
+    if not existed_before:
+        if not destination.is_file():
+            return RecoveryItemPlan(
+                name=label,
+                path=str(destination),
+                current_state="Missing",
+                recovery_action="No action",
+                status="skipped",
+                detail="Target was not created",
+                existed_before=False,
+                write_started=write_started,
+                write_completed=write_completed,
+                snapshot_valid=snapshot_valid,
+            )
+        current = file_content_hash(destination)
+        if hash_after is None or current != hash_after:
+            return RecoveryItemPlan(
+                name=label,
+                path=str(destination),
+                current_state="External change",
+                recovery_action="No automatic write",
+                status="conflict",
+                detail="File differs from transaction hash_after",
+                existed_before=False,
+                write_started=write_started,
+                write_completed=write_completed,
+                snapshot_valid=snapshot_valid,
+            )
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="Post-write",
+            recovery_action="Remove created file",
+            status="ready" if snapshot_valid else "failed",
+            detail=None if snapshot_valid else "Snapshot invalid",
+            existed_before=False,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=snapshot_valid,
+        )
+    if backup is None or not Path(backup).is_file():
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="Post-write" if destination.is_file() else "Missing",
+            recovery_action="Restore snapshot",
+            status="failed",
+            detail="Snapshot missing",
+            existed_before=True,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=False,
+        )
+    if not snapshot_valid:
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="Post-write" if destination.is_file() else "Missing",
+            recovery_action="Restore snapshot",
+            status="failed",
+            detail="Snapshot hash mismatch",
+            existed_before=True,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=False,
+        )
+    current = file_content_hash(destination) if destination.is_file() else None
+    if current == hash_before:
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="Original",
+            recovery_action="Already restored",
+            status="skipped",
+            detail=None,
+            existed_before=True,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=True,
+        )
+    if current == hash_after:
+        current_state = "Post-write"
+    elif not destination.is_file():
+        current_state = "Missing"
+    else:
+        return RecoveryItemPlan(
+            name=label,
+            path=str(destination),
+            current_state="External change",
+            recovery_action="No automatic write",
+            status="conflict",
+            detail="File changed outside spell-sync",
+            existed_before=True,
+            write_started=write_started,
+            write_completed=write_completed,
+            snapshot_valid=True,
+        )
+    return RecoveryItemPlan(
+        name=label,
+        path=str(destination),
+        current_state=current_state,
+        recovery_action="Restore snapshot",
+        status="ready",
+        detail=None,
+        existed_before=True,
+        write_started=write_started,
+        write_completed=write_completed,
+        snapshot_valid=True,
+    )
+
+
+def plan_recovery_from_journal(journal: PushJournal) -> tuple[RecoveryItemPlan, ...]:
+    items: list[RecoveryItemPlan] = []
+    wordlist = Path(journal.wordlist)
+    items.append(
+        _plan_recovery_item(
+            "wordlist",
+            wordlist,
+            Path(journal.wordlist_backup_path) if journal.wordlist_backup_path else None,
+            existed_before=journal.wordlist_existed_before,
+            hash_before=journal.wordlist_hash_before,
+            hash_after=journal.wordlist_hash_after,
+            write_started=journal.wordlist_write_started,
+            write_completed=journal.wordlist_write_completed,
+        )
+    )
+    for target in journal.targets:
+        items.append(
+            _plan_recovery_item(
+                target.name,
+                Path(target.path),
+                Path(target.backup_path) if target.backup_path else None,
+                existed_before=target.existed_before,
+                hash_before=target.hash_before,
+                hash_after=target.hash_after,
+                write_started=target.write_started,
+                write_completed=target.write_completed,
+            )
+        )
+    return tuple(items)
+
+
 def journal_path_for_wordlist(wordlist: Path) -> Path:
     return ProjectContext.build(wordlist).project_dir / ".spell-sync.journal.json"
 
