@@ -20,11 +20,26 @@ from spell_sync.sync_run import PushResult, SyncRun
 
 
 class TestCliDispatch(unittest.TestCase):
-    def test_default_command_is_status(self):
-        with patch.dict(cli_mod.COMMANDS, {"status": lambda opts: 42}):
-            with redirect_stdout(io.StringIO()):
+    def test_no_arg_tty_launches_ui(self):
+        with (
+            patch.object(cli_mod.sys.stdin, "isatty", return_value=True),
+            patch.object(cli_mod.sys.stdout, "isatty", return_value=True),
+            patch.object(cli_mod, "cmd_ui", return_value=0) as cmd_ui,
+        ):
+            code = cli_mod.main(["spell-sync"])
+        cmd_ui.assert_called_once()
+        self.assertEqual(code, 0)
+
+    def test_no_arg_non_tty_requires_command(self):
+        with (
+            patch.object(cli_mod.sys.stdin, "isatty", return_value=False),
+            patch.object(cli_mod.sys.stdout, "isatty", return_value=False),
+        ):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
                 code = cli_mod.main(["spell-sync"])
-            self.assertEqual(code, 42)
+        self.assertEqual(code, 2)
+        self.assertIn("requires a command", buf.getvalue())
 
     def test_unknown_command_exit_code(self):
         buf = io.StringIO()

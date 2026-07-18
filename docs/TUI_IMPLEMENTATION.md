@@ -126,7 +126,7 @@ TUI must preserve existing safety properties:
 
 - [x] Phase 0 — baseline
 - [x] Phase 1 — application facade
-- [ ] Phase 2 — TUI shell
+- [x] Phase 2 — TUI shell
 - [ ] Phase 3 — status and plan
 - [ ] Phase 4 — pull and push
 - [ ] Phase 5 — first-run wizard
@@ -136,18 +136,31 @@ TUI must preserve existing safety properties:
 
 ## Current phase
 
-Phase 1 — application facade (complete). Next: Phase 2 — TUI shell.
+Phase 2 — TUI shell (complete). Next: Phase 3 — status and plan screens polish.
 
 ## Last validation
 
 ```bash
 cd ~/code/spell-words/spell-sync
-python3.11 -m ruff check spell_sync/application spell_sync/commands.py tests/test_application_service.py  # exit 0
-python3.11 -m mypy spell_sync/application spell_sync/commands.py  # exit 0
-python3.11 -m pytest tests/test_application_service.py tests/test_commands.py \
-  tests/test_transaction_safety.py tests/test_push_safety_coverage.py tests/test_safety_invariants.py -q  # 115 passed
-scripts/ci.sh  # exit 0 (747 passed, 100% line coverage)
+python3.11 -m pytest tests/tui -q          # 35 passed
+scripts/ci.sh                               # exit 0 — 789 passed, 100% line coverage
+cd ~/code/spell-sync-dev && scripts/health.sh  # 0 fail
 ```
+
+### Phase 2 deliverables
+
+| Component | Path |
+|-----------|------|
+| Dependency | `pyproject.toml` — `textual>=8.2.8,<9` |
+| Routing | `spell_sync/tui/routing.py` — `should_launch_tui()` |
+| Launch | `spell_sync/tui/launch.py` — `cmd_ui` |
+| App shell | `spell_sync/tui/app.py`, `app.tcss`, `controller.py` |
+| Screens | `spell_sync/tui/screens/` — dashboard, status, preview |
+| CLI | `spell_sync/cli.py` — `ui` subcommand; no-arg TTY → TUI; non-TTY → exit 2 |
+| Service | `load_dashboard`, `load_push_preview` on `SpellSyncService` |
+| Tests | `tests/tui/` — 35 headless tests (routing, app, launch) |
+
+Working actions: Status, Preview, Quit, Refresh, Escape-back. Disabled (Phase 4+): Pull, Push, Doctor, Recovery, Logs.
 
 ### Phase 1 deliverables
 
@@ -163,14 +176,4 @@ scripts/ci.sh  # exit 0 (747 passed, 100% line coverage)
 
 ## Remaining issues
 
-None confirmed for Phase 1. Phase 2 adds Textual dependency, `spell-sync ui`, and no-arg TTY routing.
-
-## Phase 2 target files
-
-| Action | Path |
-|--------|------|
-| Add dependency | `pyproject.toml` — `textual>=8.2.8,<9` |
-| Create | `spell_sync/tui/` package (app, controller, screens, widgets, CSS) |
-| Adapt | `spell_sync/cli.py` — `ui` subcommand, `should_launch_tui()`, no-arg routing |
-| Create | `tests/tui/` headless Textual tests |
-| Do not touch yet | pull/push TUI flows (Phase 4), wizard (Phase 5) |
+None confirmed for Phase 2. Phase 3: dashboard blocking states, richer status/preview polish.

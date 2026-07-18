@@ -21,6 +21,22 @@ class StatusSnapshot:
 
 
 @dataclass(frozen=True)
+class DashboardState:
+    wordlist_path: str
+    config_status: str
+    config_valid: bool
+    targets_detected: int
+    snapshot: StatusSnapshot
+
+
+@dataclass(frozen=True)
+class PushPreviewSnapshot:
+    diffs: tuple[DictionaryDiff, ...]
+    plan_result: PushResult | ExitCode | None = None
+    wordlist_error: ExitCode | None = None
+
+
+@dataclass(frozen=True)
 class PushExecution:
     """Outcome of push prepare/execute using one PreparedPush instance."""
 

@@ -8,7 +8,7 @@ from ..exit_codes import ExitCode
 from ..push_prepared import PreparedPush, plan_fingerprint_conflict
 from ..sync_run import PushResult, SyncRun
 from .events import EventLevel, EventSink, OperationEvent, OperationKind
-from .reports import PushExecution, StatusSnapshot
+from .reports import DashboardState, PushExecution, PushPreviewSnapshot, StatusSnapshot
 
 
 def _emit(
@@ -42,6 +42,41 @@ class SpellSyncService:
             destructive_risk=run.destructive_push_risk(),
             empty_wordlist=not words,
         )
+
+    def load_dashboard(self, opts: CliOptions) -> DashboardState:
+        from ..paths import resolve_wordlist_path
+        from ..settings import ConfigStatus
+        from ..validated_runtime import build_validated_runtime
+
+        wordlist = resolve_wordlist_path(opts.wordlist)
+        validated = build_validated_runtime(wordlist)
+        snapshot = self.load_status(opts)
+        config_status = validated.config_result.status
+        config_valid = config_status in (ConfigStatus.VALID, ConfigStatus.ABSENT)
+        return DashboardState(
+            wordlist_path=str(wordlist),
+            config_status=config_status.value,
+            config_valid=config_valid,
+            targets_detected=len(validated.context.dictionaries),
+            snapshot=snapshot,
+        )
+
+    def load_push_preview(self, opts: CliOptions) -> PushPreviewSnapshot:
+        from ..config import push_strict_enabled
+
+        strict = opts.strict or push_strict_enabled()
+        run = command_helpers.sync_run_for(opts, strict_push=strict)
+        wordlist_error = run.check_wordlist()
+        if wordlist_error is not None:
+            return PushPreviewSnapshot(
+                diffs=(),
+                plan_result=wordlist_error,
+                wordlist_error=wordlist_error,
+            )
+        skip_names = command_helpers.push_skip_running_app_dicts(run, opts)
+        diffs = tuple(run.status_diffs(verbose=opts.verbose))
+        plan_result = run.plan_push(skip_names=skip_names)
+        return PushPreviewSnapshot(diffs=diffs, plan_result=plan_result, wordlist_error=None)
 
     def prepare_push(
         self,

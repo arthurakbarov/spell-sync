@@ -15,6 +15,7 @@ from .json_output import base_payload, emit_json
 from .log import log
 from .plan_cmd import cmd_plan
 from .recover_cmd import cmd_recover
+from .tui import cmd_ui, print_non_interactive_usage_error, should_launch_tui
 from .version_cmd import cmd_version
 
 CommandFn = Callable[[CliOptions], int]
@@ -29,6 +30,7 @@ COMMANDS: Dict[str, CommandFn] = {
     "push": cmd_push,
     "recover": cmd_recover,
     "status": cmd_status,
+    "ui": cmd_ui,
     "version": cmd_version,
 }
 
@@ -155,6 +157,15 @@ def _build_parser() -> argparse.ArgumentParser:
     version_p = sub.add_parser("version", help="print installed package version")
     add_common_flags(version_p)
 
+    ui_p = sub.add_parser("ui", help="open interactive TUI dashboard")
+    ui_p.add_argument(
+        "-C",
+        "--wordlist",
+        dest="wordlist",
+        metavar="PATH",
+        help="path to wordlist.txt (default: project root or cwd)",
+    )
+
     return parser
 
 
@@ -193,8 +204,24 @@ def main(argv: list[str] | None = None) -> int:
     if rest in (["-h"], ["--help"]):
         _build_parser().print_help()
         return int(ExitCode.OK)
-    args = _parse_args(rest)
-    if args is None:
+    if rest == ["--version"]:
+        return cmd_version(CliOptions())
+    if not rest:
+        if should_launch_tui(
+            None,
+            stdin_is_tty=sys.stdin.isatty(),
+            stdout_is_tty=sys.stdout.isatty(),
+            json_requested=False,
+        ):
+            return cmd_ui(CliOptions())
+        print_non_interactive_usage_error()
+        return int(ExitCode.LINT_FAILED)
+    if rest[0] == "ui" and "--json" in rest:
+        log.error("unrecognized arguments: --json")
+        log.info("Run `spell-sync ui --help` for usage.")
+        return int(ExitCode.LINT_FAILED)
+    parsed = _parse_args(rest)
+    if parsed is None:
         unknown = rest[0] if rest else ""
         if "--json" in rest:
             emit_json(
@@ -210,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Run `spell-sync --help` for usage.")
         return int(ExitCode.UNKNOWN_COMMAND)
 
+    args = parsed
     command = args.command or "status"
     opts = CliOptions.from_namespace(args)
     was_quiet = log.quiet

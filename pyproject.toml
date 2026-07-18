@@ -20,7 +20,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Text Processing",
 ]
-dependencies = []
+dependencies = [
+    "textual>=8.2.8,<9",
+]
 
 [project.urls]
 Homepage = "https://github.com/arthurakbarov/spell-sync"
@@ -36,7 +38,7 @@ spell-sync = "spell_sync.cli:entry_point"
 include = ["spell_sync*"]
 
 [tool.setuptools.package-data]
-spell_sync = ["bundled/*"]
+spell_sync = ["bundled/*", "tui/*.tcss"]
 
 [tool.ruff]
 line-length = 100

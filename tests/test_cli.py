@@ -71,6 +71,12 @@ class TestParseArgs(unittest.TestCase):
 
 
 class TestMain(unittest.TestCase):
+    def test_top_level_version_flag(self):
+        with patch.object(cli_mod, "cmd_version", return_value=0) as cmd_version:
+            code = cli_mod.main(["spell-sync", "--version"])
+        cmd_version.assert_called_once()
+        self.assertEqual(code, 0)
+
     def test_json_status_suppresses_human_log(self):
         payload = {"command": "status", "exit": 0, "word_count": 1, "diffs": []}
 

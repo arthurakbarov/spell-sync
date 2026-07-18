@@ -1,0 +1,28 @@
+Screen {
+    layout: vertical;
+}
+
+#dashboard-summary,
+#status-content,
+#preview-content,
+#narrow-warning {
+    height: auto;
+    padding: 1 2;
+}
+
+#action-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1 2;
+    padding: 1 2;
+    height: auto;
+}
+
+Button.-disabled-action {
+    opacity: 0.45;
+}
+
+#preview-table {
+    height: 1fr;
+    padding: 0 2;
+}
