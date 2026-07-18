@@ -180,10 +180,13 @@ def test_cli_init_uses_documented_defaults(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     discovery = discover_setup_targets()
     with patch.object(SpellSyncService, "prepare_project_setup") as prepare:
-        with patch.object(SpellSyncService, "execute_project_setup"):
-            cmd_init(CliOptions())
+        with patch.object(SpellSyncService, "execute_project_setup") as execute:
+            with patch.object(SpellSyncService, "build_setup_report") as build_report:
+                cmd_init(CliOptions())
     draft = prepare.call_args.args[0]
     assert draft.selected_targets == discovery.default_enabled
+    execute.assert_called_once()
+    build_report.assert_called_once()
 
 
 def test_setup_does_not_modify_external_dictionaries(tmp_path: Path, monkeypatch) -> None:

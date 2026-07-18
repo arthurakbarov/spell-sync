@@ -190,8 +190,69 @@ class TestTuiArchitecture(unittest.TestCase):
                 "execute_project_setup",
             ) as execute:
                 with patch.object(SpellSyncService, "prepare_project_setup", return_value=prepared):
-                    cmd_init(CliOptions(wordlist=str(wordlist)))
+                    with patch.object(SpellSyncService, "build_setup_report"):
+                        cmd_init(CliOptions(wordlist=str(wordlist)))
             execute.assert_called_once()
+
+    def test_tui_does_not_import_logging_handlers(self):
+        for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
+            module = importlib.import_module(module_info.name)
+            source = Path(module.__file__ or "").read_text(encoding="utf-8")
+            self.assertNotIn("logging.handlers", source, msg=module_info.name)
+
+    def test_tui_does_not_open_history_or_log_files(self):
+        banned = (
+            "operation-history.jsonl",
+            "RotatingFileHandler",
+            ".unlink(",
+            "write_text(",
+            "write_bytes(",
+        )
+        for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
+            module = importlib.import_module(module_info.name)
+            source_path = module.__file__ or ""
+            if not source_path.endswith(".py"):
+                continue
+            source = Path(source_path).read_text(encoding="utf-8")
+            for token in banned:
+                self.assertNotIn(token, source, msg=f"{module_info.name} references {token}")
+
+    def test_history_record_has_no_word_fields(self):
+        from spell_sync.diagnostics.history_record import OperationHistoryRecord
+
+        allowed_counts = {
+            "added_words",
+            "additions",
+            "removals",
+            "updated_targets",
+            "unchanged_targets",
+            "skipped_targets",
+            "failed_targets",
+        }
+        forbidden = (
+            "wordlist",
+            "dictionary",
+            "snapshot",
+            "toml",
+            "secret",
+            "token",
+            "removal_words",
+        )
+        for name in OperationHistoryRecord.__dataclass_fields__:
+            if name in allowed_counts:
+                continue
+            lowered = name.lower()
+            for token in forbidden:
+                self.assertNotIn(token, lowered, msg=name)
+
+    def test_report_screen_does_not_append_history(self):
+        source = (Path(tui_pkg.__file__).parent / "screens" / "report_screen.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("OperationHistoryStore", source)
+        self.assertNotIn("build_history_record", source)
+        self.assertNotIn("build_setup_report", source)
+        self.assertNotIn("build_push_report", source)
 
 
 if __name__ == "__main__":

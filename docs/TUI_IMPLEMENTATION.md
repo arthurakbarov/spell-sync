@@ -193,3 +193,46 @@ If a target becomes corrupt or its discovery path changes after preview:
 - Dashboard after setup may show warnings for targets that later become unreadable/corrupt
 
 This is covered by `tests/test_setup_target_selection.py`.
+
+## Operation history and diagnostics (Phase 7)
+
+### Recorded operations
+
+History records are appended after a **completed mutating attempt** for:
+
+- Setup (`init` / setup wizard)
+- Pull
+- Push
+- Recover
+- Recovery cleanup
+- Recovery discard
+
+Not recorded: status, preview/plan, doctor, discovery, refresh, cancel-before-execute, wizard navigation, opening the TUI.
+
+### Stored fields
+
+`OperationHistoryRecord` (schema v1) stores counts, operation kind, typed outcome, duration, warning count, and opaque identifiers (`transaction_id`, `setup_id`, `record_id`). Pull/Push/Recovery/Setup-specific count fields (e.g. `added_words`, `created_files`, `restored_files`) are allowed.
+
+### Never stored
+
+Wordlist words, dictionary contents, snapshot contents, full TOML, environment dumps, secrets/tokens, Git credentials, clipboard content, or full absolute user paths in persistent records.
+
+### Platform paths
+
+| Platform | State directory | Technical log |
+|----------|-----------------|---------------|
+| macOS | `~/Library/Application Support/spell-sync/` | `~/Library/Logs/spell-sync/spell-sync.log` |
+| Linux | `${XDG_STATE_HOME:-~/.local/state}/spell-sync/` | same state dir / `spell-sync.log` |
+| Windows | `%LOCALAPPDATA%\spell-sync\` | `%LOCALAPPDATA%\spell-sync\logs\spell-sync.log` |
+
+History file: `operation-history.jsonl` (max 500 records, JSON Lines, file lock).
+
+### Rotation and retention
+
+Technical log: stdlib `RotatingFileHandler` — 1 MiB × 5 backups, UTF-8. History compaction keeps the newest 500 valid records after append when over threshold.
+
+### Failure behavior
+
+History or logging failures **never** change the core operation outcome. A successful push/pull/setup/recovery stays successful; the report may add a non-blocking warning: *Operation completed, but its history record could not be saved.* Errors go to the technical log only (no traceback in TUI).
+
+TUI reads history and log tail only through `SpellSyncService` workers — widgets do not open state files directly.

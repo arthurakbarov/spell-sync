@@ -138,7 +138,8 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertIs(execute_args[0], run)
         self.assertIs(execute_args[1], prepared)
         self.assertTrue(execute_kwargs["dry_run"])
-        service.run_push.assert_not_called()
+        service.push_execution_from_result.assert_not_called()
+        service.build_push_report.assert_not_called()
 
     def test_load_dashboard_composes_runtime_and_status(self):
         service = SpellSyncService()
