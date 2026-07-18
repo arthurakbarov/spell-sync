@@ -26,7 +26,7 @@ from .journal_schema import (
 )
 from .log import log
 from .project import ProjectContext
-from .push_transaction import PushTransaction, discard_txn_snapshots
+from .push_transaction import PushTransaction, txn_snapshot_root
 
 JOURNAL_SCHEMA_VERSION = 2
 SUPPORTED_SCHEMA_VERSIONS = frozenset({2})
@@ -689,25 +689,138 @@ def recover_from_journal(journal: PushJournal, *, dry_run: bool = False) -> Reco
     )
 
 
-def cleanup_after_successful_recovery(journal: PushJournal) -> None:
+@dataclass(frozen=True)
+class DiscardArtifactsResult:
+    journal_removed: bool
+    snapshots_removed: bool
+    detail: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.detail is None
+
+
+class DiscardSafetyError(ValueError):
+    """Discard refused because recovery metadata paths are unsafe."""
+
+
+def cleanup_after_successful_recovery(journal: PushJournal) -> DiscardArtifactsResult:
     """Remove journal and transaction snapshots after confirmed recovery."""
     wordlist = Path(journal.wordlist)
-    discard_journal(wordlist)
-    if journal.snapshot_dir:
-        discard_txn_snapshots(Path(journal.snapshot_dir))
+    snapshots_ok, snap_detail = safe_discard_txn_snapshots(
+        wordlist,
+        journal.transaction_id,
+        journal.snapshot_dir,
+    )
+    if not snapshots_ok:
+        return DiscardArtifactsResult(False, False, snap_detail)
+    journal_ok, journal_detail = safe_discard_journal_file(wordlist)
+    if not journal_ok:
+        return DiscardArtifactsResult(False, True, journal_detail)
+    return DiscardArtifactsResult(True, True, None)
 
 
-def discard_journal(wordlist: Path) -> None:
+def _safe_txn_snapshot_dir(
+    wordlist: Path,
+    transaction_id: str,
+    snapshot_dir: str | None,
+) -> Path | None:
+    if not snapshot_dir:
+        return None
+    expected = txn_snapshot_root(wordlist, transaction_id)
+    snap = Path(snapshot_dir)
+    if snap.is_symlink():
+        raise DiscardSafetyError("snapshot directory is a symlink")
     try:
-        journal_path_for_wordlist(wordlist).unlink(missing_ok=True)
-    except OSError:
+        resolved = snap.resolve()
+        expected_resolved = expected.resolve()
+    except OSError as exc:
+        raise DiscardSafetyError(str(exc)) from exc
+    if resolved != expected_resolved:
+        raise DiscardSafetyError("snapshot directory outside expected transaction directory")
+    if not snap.is_dir():
+        raise DiscardSafetyError("snapshot directory missing")
+    return snap
+
+
+def safe_discard_txn_snapshots(
+    wordlist: Path,
+    transaction_id: str,
+    snapshot_dir: str | None,
+) -> tuple[bool, str | None]:
+    try:
+        snap = _safe_txn_snapshot_dir(wordlist, transaction_id, snapshot_dir)
+    except DiscardSafetyError as exc:
+        return False, str(exc)
+    if snap is None:
+        return True, None
+    try:
+        shutil.rmtree(snap)
+        parent = snap.parent
+        if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+        return True, None
+    except OSError as exc:
+        return False, str(exc)
+
+
+def safe_discard_journal_file(wordlist: Path) -> tuple[bool, str | None]:
+    path = journal_path_for_wordlist(wordlist)
+    project = ProjectContext.build(wordlist).project_dir.resolve()
+    if path.is_symlink():
+        return False, "journal file is a symlink"
+    try:
+        path.resolve().relative_to(project)
+    except (OSError, ValueError):
+        return False, "journal file outside project directory"
+    if not path.exists():
+        return True, None
+    try:
+        path.unlink(missing_ok=True)
+        return True, None
+    except OSError as exc:
+        return False, str(exc)
+
+
+def discard_txn_snapshots(snapshot_dir: Path | None) -> None:
+    if snapshot_dir is None:
+        return
+    try:
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
+        parent = snapshot_dir.parent
+        if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
+            try:
+                parent.rmdir()
+            except OSError:  # pragma: no cover -- directory may be non-empty/race
+                pass
+    except OSError:  # pragma: no cover -- rmtree(ignore_errors=True) rarely raises
         pass
 
 
-def discard_completed_journal(wordlist: Path) -> None:
+def discard_journal(wordlist: Path) -> None:
+    ok, detail = safe_discard_journal_file(wordlist)
+    if not ok:
+        raise DiscardSafetyError(detail or "journal discard failed")
+
+
+def discard_completed_journal(wordlist: Path) -> DiscardArtifactsResult:
     """Remove a completed leftover journal and orphan snapshots after successful cleanup."""
     result = load_journal_result(wordlist)
-    if result.status is JournalLoadStatus.VALID_COMPLETED and result.journal is not None:
-        discard_journal(wordlist)
-        if result.journal.snapshot_dir:
-            discard_txn_snapshots(Path(result.journal.snapshot_dir))
+    if result.status is not JournalLoadStatus.VALID_COMPLETED or result.journal is None:
+        return DiscardArtifactsResult(
+            journal_removed=False,
+            snapshots_removed=False,
+            detail="completed journal is not present",
+        )
+    journal = result.journal
+    snapshots_ok, snap_detail = safe_discard_txn_snapshots(
+        wordlist,
+        journal.transaction_id,
+        journal.snapshot_dir,
+    )
+    if not snapshots_ok:
+        return DiscardArtifactsResult(False, False, snap_detail)
+    journal_ok, journal_detail = safe_discard_journal_file(wordlist)
+    if not journal_ok:
+        return DiscardArtifactsResult(False, snapshots_ok, journal_detail)
+    return DiscardArtifactsResult(True, True, None)

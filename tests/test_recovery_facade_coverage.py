@@ -24,6 +24,7 @@ from spell_sync.exit_codes import ExitCode
 from spell_sync.push_journal import (
     JOURNAL_STATE_COMPLETED,
     JOURNAL_STATE_ROLLBACK_INCOMPLETE,
+    DiscardArtifactsResult,
     JournalLoadResult,
     JournalLoadStatus,
     RecoverResult,
@@ -226,6 +227,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
                 mutating.return_value.__enter__.return_value = scope
                 mutating.return_value.__exit__.return_value = False
                 with patch("spell_sync.application.service.discard_completed_journal") as discard:
+                    discard.return_value = DiscardArtifactsResult(True, True, None)
                     cleaned = service.execute_recovery_cleanup(
                         CliOptions(wordlist=str(wordlist)),
                         cleanup_preview,
@@ -244,7 +246,10 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
         ) as mutating:
             mutating.return_value.__enter__.return_value = _recovery_scope(Path("/tmp/w.txt"))
             mutating.return_value.__exit__.return_value = False
-            with patch("spell_sync.application.service.discard_journal") as discard:
+            with patch(
+                "spell_sync.application.service.safe_discard_journal_file",
+                return_value=(True, None),
+            ) as discard:
                 discarded = service.execute_recovery_discard(
                     CliOptions(),
                     discard_preview,

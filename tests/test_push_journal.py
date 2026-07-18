@@ -431,12 +431,15 @@ class TestPushJournalHelpers(unittest.TestCase):
             tx.close()
 
     def test_discard_journal_oserror(self):
+        from spell_sync.push_journal import DiscardSafetyError
+
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
             with patch.object(Path, "unlink", side_effect=OSError("nope")):
-                discard_journal(wordlist)
+                with self.assertRaises(DiscardSafetyError):
+                    discard_journal(wordlist)
 
     def test_journal_property(self):
         with tempfile.TemporaryDirectory() as d:
