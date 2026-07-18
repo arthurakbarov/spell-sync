@@ -1,6 +1,8 @@
-"""Read-only push preview."""
+"""Read-only push preview with continue-to-push."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
@@ -20,11 +22,19 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
         ("v", "view_removals", "View removals"),
     ]
 
-    def __init__(self, controller: TuiController) -> None:
+    def __init__(
+        self,
+        controller: TuiController,
+        *,
+        refresh_on_mount: bool = False,
+    ) -> None:
         super().__init__()
         self._controller = controller
         self._preview: PushPreview | None = None
         self._active_token = 0
+        self._refresh_on_mount = refresh_on_mount
+        self._starting = False
+        self._worker: Any = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -32,15 +42,13 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
         yield DataTable(id="preview-table")
         yield Button("View removals", id="btn-view-removals")
         yield Button("Refresh preview", id="btn-refresh-preview", variant="primary")
-        yield Button(
-            "Push execution will be added in Phase 4",
-            id="btn-continue-push",
-            disabled=True,
-            classes="-disabled-action",
-        )
+        yield Button("Continue to push", id="btn-continue-push")
         yield Footer()
 
     def on_mount(self) -> None:
+        if self._refresh_on_mount:
+            self.refresh_preview()
+            return
         try:
             self._render_preview(self._controller.preview())
         except Exception:
@@ -49,6 +57,25 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
     def _set_loading(self, loading: bool) -> None:
         self.query_one("#btn-refresh-preview", Button).disabled = loading
         self.query_one("#btn-view-removals", Button).disabled = loading
+        continue_btn = self.query_one("#btn-continue-push", Button)
+        if loading:
+            continue_btn.disabled = True
+
+    def _update_continue_button(self, preview: PushPreview) -> None:
+        btn = self.query_one("#btn-continue-push", Button)
+        can_run = (
+            preview.is_executable
+            and preview.prepared is not None
+            and not self._controller.mutation_active
+            and not self._starting
+        )
+        btn.disabled = not can_run
+        if can_run:
+            btn.label = "Continue to push"
+            btn.remove_class("-disabled-action")
+        else:
+            btn.label = "Push unavailable"
+            btn.add_class("-disabled-action")
 
     def _render_preview(self, preview: PushPreview) -> None:
         self._preview = preview
@@ -66,9 +93,11 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
         summary = self.query_one("#preview-content", Static)
         if preview.wordlist_error is not None:
             summary.update(f"× Preview unavailable (exit {int(preview.wordlist_error)})")
+            self._update_continue_button(preview)
             return
         if preview.prepare_error is not None:
             summary.update(f"× Plan blocked (exit {int(preview.prepare_error)})")
+            self._update_continue_button(preview)
             return
 
         lines = [
@@ -87,12 +116,16 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
         if preview.warnings:
             lines.append(f"Warnings: {'; '.join(preview.warnings)}")
         summary.update("\n".join(lines))
+        self._update_continue_button(preview)
 
     def refresh_preview(self) -> None:
+        self._controller.invalidate_push_preview()
+        self._preview = None
         self._active_token = self._begin_load()
         self._set_loading(True)
         self.query_one("#preview-content", Static).update("Loading preview...")
-        self.load_preview_worker()
+        self._worker = self.load_preview_worker()
+        self.set_interval(0.05, self._poll_preview_worker, repeat=40)
 
     @work(thread=True, exclusive=True, group="preview-load")
     def load_preview_worker(self) -> PushPreview:
@@ -114,6 +147,23 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
                 blocked=(),
             )
 
+    def _poll_preview_worker(self) -> None:
+        worker = getattr(self, "_worker", None)
+        if worker is None or not self.is_mounted:
+            return
+        if worker.state is WorkerState.ERROR:
+            self._set_loading(False)
+            self.query_one("#preview-content", Static).update(
+                "× Preview unavailable — try Refresh."
+            )
+            self._worker = None
+            return
+        if worker.state is WorkerState.SUCCESS:
+            self._set_loading(False)
+            if self._active_token == self._load_generation:
+                self._render_preview(worker.result)
+            self._worker = None
+
     def on_load_preview_worker_state_changed(self, event) -> None:
         if event.state is WorkerState.RUNNING:
             return
@@ -126,9 +176,10 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
             return
         if event.state is not WorkerState.SUCCESS:
             return
-        if not self._is_current_load(self._active_token):
+        if self._active_token != self._load_generation:
             return
         self._render_preview(event.worker.result)
+        self._worker = None
 
     def _selected_target(self):
         preview = self._preview
@@ -151,16 +202,53 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
 
         self.app.push_screen(RemovalsScreen(target.name, target.removal_words))
 
+    def action_continue_push(self) -> None:
+        preview = self._preview
+        if (
+            preview is None
+            or not preview.is_executable
+            or preview.prepared is None
+            or self._controller.mutation_active
+            or self._starting
+        ):
+            self.notify("Push is not available for this preview.", severity="warning")
+            return
+        self._starting = True
+        self._update_continue_button(preview)
+
+        def _after_confirm(confirmed: bool | None) -> None:
+            self._starting = False
+            if not self.is_mounted:
+                return
+            self._update_continue_button(preview)
+            if not confirmed:
+                return
+            from .operation_screen import OperationScreen
+
+            self.app.push_screen(
+                OperationScreen(
+                    self._controller,
+                    operation="push",
+                    push_preview=preview,
+                )
+            )
+
+        from .push_confirm_screen import PushConfirmScreen
+
+        self.app.push_screen(PushConfirmScreen(self._controller, preview), _after_confirm)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-view-removals":
             self.action_view_removals()
         elif event.button.id == "btn-refresh-preview":
             self.action_refresh_preview()
+        elif event.button.id == "btn-continue-push":
+            self.action_continue_push()
 
     def action_refresh_preview(self) -> None:
-        self._preview = None
         self.refresh_preview()
 
     def action_back(self) -> None:
+        self._controller.invalidate_push_preview()
         self._preview = None
         self.app.pop_screen()

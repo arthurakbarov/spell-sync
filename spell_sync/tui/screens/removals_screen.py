@@ -1,4 +1,4 @@
-"""Scrollable removal word list."""
+"""Scrollable word list (removals or additions)."""
 
 from __future__ import annotations
 
@@ -11,10 +11,17 @@ from textual.widgets import Footer, Header, Static
 class RemovalsScreen(Screen[None]):
     BINDINGS = [("escape", "back", "Back")]
 
-    def __init__(self, target_name: str, removal_words: frozenset[str]) -> None:
+    def __init__(
+        self,
+        target_name: str,
+        removal_words: frozenset[str],
+        *,
+        title: str | None = None,
+    ) -> None:
         super().__init__()
         self._target_name = target_name
         self._removal_words = removal_words
+        self._title = title or f"Removals for {target_name}"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -25,13 +32,11 @@ class RemovalsScreen(Screen[None]):
 
     def on_mount(self) -> None:
         count = len(self._removal_words)
-        self.query_one("#removals-summary", Static).update(
-            f"Removals for {self._target_name}: {count} word(s)"
-        )
+        self.query_one("#removals-summary", Static).update(f"{self._title}: {count} word(s)")
         if count:
             body = "\n".join(sorted(self._removal_words))
         else:
-            body = "No removals for this target."
+            body = "No words for this target."
         self.query_one("#removals-content", Static).update(body)
 
     def action_back(self) -> None:

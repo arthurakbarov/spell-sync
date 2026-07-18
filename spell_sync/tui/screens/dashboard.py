@@ -9,10 +9,11 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.reports import DashboardSeverity
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
-_DISABLED_HINT = "Available in Phase 4"
+_DISABLED_HINT = "Available in a later phase"
 
 
 class DashboardScreen(LoadTokenMixin, Screen[None]):
@@ -27,6 +28,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         super().__init__()
         self._controller = controller
         self._active_token = 0
+        self._blocked = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -37,8 +39,8 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             yield Button("Status", id="btn-status", variant="primary")
             yield Button("Preview", id="btn-preview")
             yield Button("Doctor", id="btn-doctor")
-            yield Button("Pull", id="btn-pull", disabled=True, classes="-disabled-action")
-            yield Button("Push", id="btn-push", disabled=True, classes="-disabled-action")
+            yield Button("Pull", id="btn-pull")
+            yield Button("Push", id="btn-push")
             yield Button("Recovery", id="btn-recovery", disabled=True, classes="-disabled-action")
             yield Button("Logs", id="btn-logs", disabled=True, classes="-disabled-action")
             yield Button("Quit", id="btn-quit", variant="error")
@@ -90,6 +92,23 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         else:
             self.query_one("#dashboard-issues", Static).update("")
 
+        self._blocked = (
+            state.pending_recovery
+            or state.overall_severity is DashboardSeverity.BLOCKED
+            or self._controller.mutation_active
+        )
+        self.query_one("#btn-pull", Button).disabled = self._blocked
+        self.query_one("#btn-push", Button).disabled = self._blocked
+        recovery_btn = self.query_one("#btn-recovery", Button)
+        if state.pending_recovery:
+            recovery_btn.disabled = False
+            recovery_btn.remove_class("-disabled-action")
+            recovery_btn.label = "Recovery (Phase 5)"
+        else:
+            recovery_btn.disabled = True
+            recovery_btn.add_class("-disabled-action")
+            recovery_btn.label = "Recovery"
+
     def refresh_dashboard(self) -> None:
         self._active_token = self._begin_load()
         self._set_loading(True)
@@ -127,13 +146,23 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         button_id = event.button.id
         if button_id == "btn-status":
             self.action_open_status()
-        elif button_id == "btn-preview":
+        elif button_id == "btn-preview" or button_id == "btn-push":
             self.action_open_preview()
         elif button_id == "btn-doctor":
             self.action_open_doctor()
+        elif button_id == "btn-pull":
+            self.action_open_pull()
         elif button_id == "btn-quit":
+            if self._controller.mutation_active:
+                self.notify(
+                    "The operation is in progress and must finish or roll back safely.",
+                    severity="warning",
+                )
+                return
             self.app.exit(0)
-        elif button_id in {"btn-pull", "btn-push", "btn-recovery", "btn-logs"}:
+        elif button_id == "btn-recovery":
+            self.notify("Recovery execution will be added in Phase 5.", severity="warning")
+        elif button_id == "btn-logs":
             self.notify(_DISABLED_HINT, severity="warning")
 
     def action_refresh_dashboard(self) -> None:
@@ -149,6 +178,14 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         from .preview_screen import PreviewScreen
 
         self.app.push_screen(PreviewScreen(self._controller))
+
+    def action_open_pull(self) -> None:
+        if self._blocked:
+            self.notify("Writes are blocked. Resolve recovery or blocking issues first.")
+            return
+        from .pull_screen import PullScreen
+
+        self.app.push_screen(PullScreen(self._controller))
 
     def action_open_doctor(self) -> None:
         from .doctor_screen import DoctorScreen

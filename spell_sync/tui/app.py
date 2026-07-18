@@ -26,6 +26,12 @@ class SpellSyncApp(App[None]):
         self.push_screen(DashboardScreen(self.controller))
 
     def action_quit_app(self) -> None:
+        if self.controller.mutation_active:
+            self.notify(
+                "The operation is in progress and must finish or roll back safely.",
+                severity="warning",
+            )
+            return
         self.exit()
 
 
