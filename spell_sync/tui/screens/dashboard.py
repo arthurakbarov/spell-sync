@@ -33,6 +33,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(id="narrow-warning")
+        yield Static(id="recovery-banner")
         yield Static(id="dashboard-summary")
         yield Static(id="dashboard-issues")
         with Vertical(id="action-grid"):
@@ -100,14 +101,25 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         self.query_one("#btn-pull", Button).disabled = self._blocked
         self.query_one("#btn-push", Button).disabled = self._blocked
         recovery_btn = self.query_one("#btn-recovery", Button)
-        if state.pending_recovery:
+        recovery_needed = state.pending_recovery or any(
+            issue.code in {"pending_recovery", "corrupt_journal"} for issue in state.issues
+        )
+        if recovery_needed:
             recovery_btn.disabled = False
             recovery_btn.remove_class("-disabled-action")
-            recovery_btn.label = "Recovery (Phase 5)"
+            recovery_btn.label = "Recovery"
         else:
             recovery_btn.disabled = True
             recovery_btn.add_class("-disabled-action")
             recovery_btn.label = "Recovery"
+
+        banner = self.query_one("#recovery-banner", Static)
+        if state.pending_recovery:
+            banner.update("! Recovery required — resolve the unfinished transaction before writes.")
+        elif any(issue.code == "corrupt_journal" for issue in state.issues):
+            banner.update("× Corrupt recovery journal — inspect Recovery before writes.")
+        else:
+            banner.update("")
 
     def refresh_dashboard(self) -> None:
         self._active_token = self._begin_load()
@@ -161,7 +173,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
                 return
             self.app.exit(0)
         elif button_id == "btn-recovery":
-            self.notify("Recovery execution will be added in Phase 5.", severity="warning")
+            self.action_open_recovery()
         elif button_id == "btn-logs":
             self.notify(_DISABLED_HINT, severity="warning")
 
@@ -186,6 +198,11 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         from .pull_screen import PullScreen
 
         self.app.push_screen(PullScreen(self._controller))
+
+    def action_open_recovery(self) -> None:
+        from .recovery_screen import RecoveryScreen
+
+        self.app.push_screen(RecoveryScreen(self._controller))
 
     def action_open_doctor(self) -> None:
         from .doctor_screen import DoctorScreen

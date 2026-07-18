@@ -13,6 +13,8 @@ from ..application.reports import (
     PullPreview,
     PushExecution,
     PushPreview,
+    RecoveryExecution,
+    RecoveryPreview,
     StatusDetailSnapshot,
     StatusSnapshot,
 )
@@ -54,6 +56,37 @@ class TuiService(Protocol):
 
     def build_pull_report(self, execution: PullExecution) -> OperationReport: ...
 
+    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview: ...
+
+    def execute_recovery(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution: ...
+
+    def execute_recovery_cleanup(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution: ...
+
+    def execute_recovery_discard(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution: ...
+
+    def build_recovery_report(self, execution: RecoveryExecution) -> OperationReport: ...
+
 
 class TuiController:
     def __init__(self, service: TuiService, opts: CliOptions) -> None:
@@ -62,6 +95,7 @@ class TuiController:
         self._mutation_active = False
         self._active_push_preview: PushPreview | None = None
         self._active_pull_preview: PullPreview | None = None
+        self._active_recovery_preview: RecoveryPreview | None = None
 
     @property
     def mutation_active(self) -> bool:
@@ -142,6 +176,62 @@ class TuiController:
 
     def pull_report(self, execution: PullExecution) -> OperationReport:
         return self._service.build_pull_report(execution)
+
+    def inspect_recovery(self) -> RecoveryPreview:
+        preview = self._service.inspect_recovery(self.opts)
+        self._active_recovery_preview = preview
+        return preview
+
+    def set_active_recovery_preview(self, preview: RecoveryPreview) -> None:
+        self._active_recovery_preview = preview
+
+    def invalidate_recovery_preview(self) -> None:
+        self._active_recovery_preview = None
+
+    def active_recovery_preview(self) -> RecoveryPreview | None:
+        return self._active_recovery_preview
+
+    def execute_recovery(
+        self,
+        preview: RecoveryPreview,
+        *,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        return self._service.execute_recovery(
+            self.opts,
+            preview,
+            confirmed_transaction_id=preview.preview_fingerprint,
+            event_sink=event_sink,
+        )
+
+    def execute_recovery_cleanup(
+        self,
+        preview: RecoveryPreview,
+        *,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        return self._service.execute_recovery_cleanup(
+            self.opts,
+            preview,
+            confirmed_transaction_id=preview.preview_fingerprint,
+            event_sink=event_sink,
+        )
+
+    def execute_recovery_discard(
+        self,
+        preview: RecoveryPreview,
+        *,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        return self._service.execute_recovery_discard(
+            self.opts,
+            preview,
+            confirmed_transaction_id=preview.preview_fingerprint,
+            event_sink=event_sink,
+        )
+
+    def recovery_report(self, execution: RecoveryExecution) -> OperationReport:
+        return self._service.build_recovery_report(execution)
 
     def writes_blocked(self, state: DashboardState | None = None) -> bool:
         current = state or self.dashboard()

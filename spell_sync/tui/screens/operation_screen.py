@@ -22,6 +22,8 @@ from ...application.reports import (
     PullPreview,
     PushExecution,
     PushPreview,
+    RecoveryExecution,
+    RecoveryPreview,
 )
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
@@ -47,12 +49,14 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         operation: str,
         pull_preview: PullPreview | None = None,
         push_preview: PushPreview | None = None,
+        recovery_preview: RecoveryPreview | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
         self._operation = operation
         self._pull_preview = pull_preview
         self._push_preview = push_preview
+        self._recovery_preview = recovery_preview
         self._events: list[OperationEvent] = []
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
@@ -125,7 +129,17 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             self._complete_with_result(worker.result)
 
     def _apply_event(self, event: OperationEvent) -> None:
-        if event.stage in {"acquiring_lock", "verifying_plan", "creating_snapshots"}:
+        if event.stage in {
+            "acquiring_lock",
+            "verifying_plan",
+            "creating_snapshots",
+            "validating_journal",
+            "validating_snapshots",
+            "checking_conflicts",
+            "restoring_wordlist",
+            "restoring_target",
+            "removing_created_target",
+        }:
             self._mutating = True
             self.phase = OperationPhase.EXECUTING
         if event.stage == "rolling_back":
@@ -153,6 +167,21 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             return self._controller.execute_pull(self._pull_preview, event_sink=self._sink)
         if self._operation == "push" and self._push_preview is not None:
             return self._controller.execute_push(self._push_preview, event_sink=self._sink)
+        if self._operation == "recover" and self._recovery_preview is not None:
+            return self._controller.execute_recovery(
+                self._recovery_preview,
+                event_sink=self._sink,
+            )
+        if self._operation == "cleanup" and self._recovery_preview is not None:
+            return self._controller.execute_recovery_cleanup(
+                self._recovery_preview,
+                event_sink=self._sink,
+            )
+        if self._operation == "discard" and self._recovery_preview is not None:
+            return self._controller.execute_recovery_discard(
+                self._recovery_preview,
+                event_sink=self._sink,
+            )
         return None
 
     def on_execute_operation_worker_state_changed(self, event) -> None:
@@ -174,6 +203,8 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             report = self._controller.pull_report(result)
         elif isinstance(result, PushExecution):
             report = self._controller.push_report(result)
+        elif isinstance(result, RecoveryExecution):
+            report = self._controller.recovery_report(result)
         else:
             self._finish_failed("Operation returned no result.")
             return
@@ -190,6 +221,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._controller.end_mutation()
         self._controller.invalidate_pull_preview()
         self._controller.invalidate_push_preview()
+        self._controller.invalidate_recovery_preview()
         if self._flush_timer is not None:
             self._flush_timer.stop()
         from .report_screen import ReportScreen
