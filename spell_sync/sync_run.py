@@ -86,6 +86,30 @@ class SyncRun:
 
         return write_text_words(self.wordlist_str, merged, "utf-8", bom=False)
 
+    def execute_prepared_pull(
+        self,
+        *,
+        merged_words: tuple[str, ...],
+        before_count: int,
+        after_count: int,
+        wordlist_fingerprint: str | None = None,
+    ) -> Union[tuple[int, int], ExitCode]:
+        """Write a prepared pull merge without re-discovering dictionary sources."""
+        unreadable = self.check_wordlist()
+        if unreadable is not None:
+            return unreadable
+        if wordlist_fingerprint is not None:
+            from .push_journal import file_content_hash
+
+            current = file_content_hash(Path(self.wordlist_str))
+            if current is not None and current != wordlist_fingerprint:
+                log.abort("pull aborted — wordlist changed since preview.")
+                return ExitCode.PUSH_ABORT
+        if not self._write_wordlist(merged_words):
+            log.abort("pull aborted — failed to write wordlist.")
+            return ExitCode.PUSH_ABORT
+        return before_count, after_count
+
     def pull_into_wordlist(self) -> Union[tuple[int, int], ExitCode]:
         """Union all dictionaries → wordlist. Returns (before, after) or ExitCode."""
         unreadable = self.check_wordlist()
@@ -109,10 +133,15 @@ class SyncRun:
                     seen_casefold.add(key)
         merged = merge_case_duplicates(ordered)
         after = len(merged)
-        if not self._write_wordlist(merged):
-            log.abort("pull aborted — failed to write wordlist.")
-            return ExitCode.PUSH_ABORT
-        return before, after
+        from .push_journal import file_content_hash
+
+        fingerprint = file_content_hash(Path(self.wordlist_str))
+        return self.execute_prepared_pull(
+            merged_words=tuple(merged),
+            before_count=before,
+            after_count=after,
+            wordlist_fingerprint=fingerprint,
+        )
 
     def pull_add_from(self, source: Path | str) -> Union[tuple[int, int], ExitCode]:
         """Merge words from an external UTF-8 or Hunspell file into wordlist."""

@@ -32,6 +32,15 @@ from spell_sync.sync_models import PushResult
 from spell_sync.sync_run import SyncRun
 
 
+def _pull_scope(wordlist: str = "/tmp/w.txt"):
+    ctx = MagicMock()
+    ctx.wordlist_str = wordlist
+    ctx.wordlist_file = Path(wordlist)
+    validated = MagicMock()
+    validated.context = ctx
+    return validated
+
+
 class TestPhase4FacadeCoverage(unittest.TestCase):
     def test_build_pull_preview_error_and_skip_statuses(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -190,27 +199,33 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         with patch(
             "spell_sync.application.service.command_helpers.mutating_command_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
-            with patch(
-                "spell_sync.application.service.file_content_hash",
-                return_value="changed",
+            with patch.object(
+                SyncRun,
+                "execute_prepared_pull",
+                return_value=ExitCode.PUSH_ABORT,
             ):
-                conflict = service.execute_pull(CliOptions(), good, confirmed_plan_id="p1")
+                with patch(
+                    "spell_sync.application.service.file_content_hash",
+                    return_value="changed",
+                ):
+                    conflict = service.execute_pull(CliOptions(), good, confirmed_plan_id="p1")
         self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
 
         with patch(
             "spell_sync.application.service.command_helpers.mutating_command_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.file_content_hash",
                 return_value="abc",
             ):
-                with patch(
-                    "spell_sync.application.service.write_text_words",
-                    return_value=False,
+                with patch.object(
+                    SyncRun,
+                    "execute_prepared_pull",
+                    return_value=ExitCode.PUSH_ABORT,
                 ):
                     write_fail = service.execute_pull(
                         CliOptions(),

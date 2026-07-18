@@ -15,6 +15,16 @@ from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.settings import ConfigStatus
 from spell_sync.sync_models import DictionaryDiff, PushResult
+from spell_sync.sync_run import SyncRun
+
+
+def _pull_scope(wordlist: str = "/tmp/w.txt"):
+    ctx = MagicMock()
+    ctx.wordlist_str = wordlist
+    ctx.wordlist_file = Path(wordlist)
+    validated = MagicMock()
+    validated.context = ctx
+    return validated
 
 
 class TestSpellSyncService(unittest.TestCase):
@@ -309,23 +319,24 @@ class TestSpellSyncService(unittest.TestCase):
         with patch(
             "spell_sync.application.service.command_helpers.mutating_command_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.file_content_hash",
                 return_value="abc",
             ):
-                with patch(
-                    "spell_sync.application.service.write_text_words",
-                    return_value=True,
-                ) as write:
+                with patch.object(
+                    SyncRun,
+                    "execute_prepared_pull",
+                    return_value=(preview.before_count, preview.after_count),
+                ) as execute:
                     ok = service.execute_pull(
                         CliOptions(),
                         preview,
                         confirmed_plan_id="p1",
                         event_sink=events.append,
                     )
-        write.assert_called_once()
+        execute.assert_called_once()
         self.assertEqual(ok.outcome, OperationOutcome.COMPLETED)
         self.assertTrue(any(event.stage == "completed" for event in events))
 

@@ -9,11 +9,18 @@ from ..cli_options import CliOptions
 from ..config import push_strict_enabled
 from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
-from ..io import write_text_words
 from ..operation_lock import read_active_operation_lock
 from ..paths import resolve_wordlist_path
 from ..push_abort import PushAbort
-from ..push_journal import JournalLoadStatus, file_content_hash, load_journal_result
+from ..push_journal import (
+    JournalLoadStatus,
+    cleanup_after_successful_recovery,
+    discard_completed_journal,
+    discard_journal,
+    file_content_hash,
+    load_journal_result,
+    recover_from_journal,
+)
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
 from ..sync_models import PushResult
 from ..sync_run import SyncRun
@@ -25,6 +32,8 @@ from .builders import (
     build_pull_preview,
     build_push_operation_report,
     build_push_preview,
+    build_recovery_operation_report,
+    build_recovery_preview,
     build_status_detail_snapshot,
     build_target_updates_from_preview,
 )
@@ -38,6 +47,10 @@ from .reports import (
     PullPreview,
     PushExecution,
     PushPreview,
+    RecoveryExecution,
+    RecoveryOutcome,
+    RecoveryPreview,
+    RecoveryStatus,
     StatusDetailSnapshot,
     StatusSnapshot,
 )
@@ -173,29 +186,33 @@ class SpellSyncService:
                     level=EventLevel.SUCCESS,
                 ),
             )
-            wordlist = Path(preview.wordlist_path)
-            current = file_content_hash(wordlist)
-            if (
-                preview.wordlist_fingerprint is not None
-                and current is not None
-                and current != preview.wordlist_fingerprint
-            ):
+            run = SyncRun(context=scope.context)
+            if Path(preview.wordlist_path).resolve() != Path(run.wordlist_str).resolve():
                 _emit(
                     event_sink,
                     OperationEvent(
                         OperationKind.PULL,
                         "failed",
-                        "Wordlist changed after preview",
+                        "Preview wordlist path mismatch",
                         level=EventLevel.ERROR,
                     ),
                 )
                 return PullExecution(
                     preview=preview,
                     result=ExitCode.PUSH_ABORT,
-                    outcome=OperationOutcome.STOPPED_SAFELY,
-                    message="Wordlist changed after the preview was created.",
+                    outcome=OperationOutcome.FAILED,
+                    message="Pull preview does not match the active wordlist.",
                 )
 
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.PULL,
+                    "verifying_plan",
+                    "Verifying prepared pull plan",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
             _emit(
                 event_sink,
                 OperationEvent(
@@ -204,26 +221,40 @@ class SpellSyncService:
                     "Writing canonical wordlist",
                 ),
             )
-            if not write_text_words(
-                preview.wordlist_path,
-                list(preview.merged_words),
-                "utf-8",
-                bom=False,
-            ):
+            result = run.execute_prepared_pull(
+                merged_words=preview.merged_words,
+                before_count=preview.before_count,
+                after_count=preview.after_count,
+                wordlist_fingerprint=preview.wordlist_fingerprint,
+            )
+            if isinstance(result, ExitCode):
+                current = file_content_hash(Path(run.wordlist_str))
+                conflict = (
+                    preview.wordlist_fingerprint is not None
+                    and current is not None
+                    and current != preview.wordlist_fingerprint
+                )
                 _emit(
                     event_sink,
                     OperationEvent(
                         OperationKind.PULL,
                         "failed",
-                        "Failed to write wordlist",
+                        "Wordlist changed after preview" if conflict else "Pull write failed",
                         level=EventLevel.ERROR,
                     ),
                 )
                 return PullExecution(
                     preview=preview,
-                    result=ExitCode.PUSH_ABORT,
-                    outcome=OperationOutcome.FAILED,
-                    message="Pull aborted — failed to write wordlist.",
+                    result=result,
+                    outcome=(
+                        OperationOutcome.STOPPED_SAFELY if conflict else OperationOutcome.FAILED
+                    ),
+                    message=(
+                        "Wordlist changed after the preview was created."
+                        if conflict
+                        else "Pull aborted — failed to write wordlist."
+                    ),
+                    warnings=preview.warnings,
                 )
 
             _emit(
@@ -235,14 +266,12 @@ class SpellSyncService:
                     level=EventLevel.SUCCESS,
                 ),
             )
+            before, after = result
             return PullExecution(
                 preview=preview,
-                result=(preview.before_count, preview.after_count),
+                result=(before, after),
                 outcome=OperationOutcome.COMPLETED,
-                message=(
-                    f"wordlist: {preview.before_count} -> {preview.after_count} "
-                    f"(+{preview.additions})"
-                ),
+                message=f"wordlist: {before} -> {after} (+{after - before})",
                 warnings=preview.warnings,
             )
 
@@ -612,8 +641,308 @@ class SpellSyncService:
             plan_identifier=preview.plan_identifier,
         )
 
+    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview:
+        wordlist = resolve_wordlist_path(opts.wordlist)
+        validated = build_validated_runtime(wordlist, validate_journal_wordlist=True)
+        return build_recovery_preview(validated)
+
+    def execute_recovery(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        if confirmed_transaction_id != preview.preview_fingerprint:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Recovery confirmation does not match the current preview.",
+            )
+        if not preview.can_recover:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Recovery is not available for this preview.",
+            )
+
+        _emit(
+            event_sink,
+            OperationEvent(OperationKind.RECOVER, "validating_journal", "Validating journal"),
+        )
+        with command_helpers.mutating_command_scope(
+            opts,
+            "recover",
+            allow_unfinished_journal=True,
+        ) as scope:
+            if isinstance(scope, int):
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.RECOVER,
+                        "failed",
+                        "Recovery blocked by lock or configuration",
+                        level=EventLevel.ERROR,
+                    ),
+                )
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode(scope),
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Recovery could not acquire a safe execution context.",
+                )
+
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "acquiring_lock",
+                    "Operation lock acquired",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
+            journal_result = scope.journal_result
+            if journal_result.status is not JournalLoadStatus.VALID_IN_PROGRESS:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Recovery journal is no longer in progress.",
+                )
+            journal = journal_result.journal
+            assert journal is not None
+            if journal.transaction_id != preview.transaction_id:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Recovery journal changed after preview.",
+                )
+
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "validating_snapshots",
+                    "Validating recovery snapshots",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "checking_conflicts",
+                    "Checking recovery conflicts",
+                ),
+            )
+            total = max(len(preview.items), 1)
+            for index, item in enumerate(preview.items, start=1):
+                if item.status != "ready":
+                    continue
+                stage = "restoring_wordlist" if item.name == "wordlist" else "restoring_target"
+                if not item.existed_before and item.write_started:
+                    stage = "removing_created_target"
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.RECOVER,
+                        stage,
+                        f"Recovering {item.name}",
+                        target=item.name,
+                        completed=index,
+                        total=total,
+                    ),
+                )
+
+            result = recover_from_journal(journal, dry_run=False)
+            incomplete = bool(result.failed or result.conflicts)
+            if incomplete:
+                outcome = (
+                    RecoveryOutcome.CONFLICTED
+                    if result.conflicts
+                    else RecoveryOutcome.RECOVERY_INCOMPLETE
+                )
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.RECOVER,
+                        "failed",
+                        "Recovery incomplete",
+                        level=EventLevel.ERROR,
+                    ),
+                )
+                return RecoveryExecution(
+                    preview=preview,
+                    result=result,
+                    outcome=outcome,
+                    message=(
+                        "Recovery stopped safely due to conflicts."
+                        if result.conflicts
+                        else "Recovery is incomplete."
+                    ),
+                    warnings=preview.warnings,
+                    restored=result.restored,
+                    skipped=result.skipped,
+                    conflicts=result.conflicts,
+                    failed=result.failed,
+                )
+
+            cleanup_after_successful_recovery(journal)
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "cleaning_artifacts",
+                    "Cleaning recovery artifacts",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "completed",
+                    "Recovery completed",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
+            outcome = (
+                RecoveryOutcome.RECOVERED_WITH_WARNINGS
+                if result.skipped and result.restored
+                else RecoveryOutcome.RECOVERED
+            )
+            message = (
+                f"{len(result.restored)} file(s) restored"
+                if result.restored
+                else "Recovery completed with no file changes"
+            )
+            return RecoveryExecution(
+                preview=preview,
+                result=result,
+                outcome=outcome,
+                message=message,
+                warnings=preview.warnings,
+                restored=result.restored,
+                skipped=result.skipped,
+                conflicts=result.conflicts,
+                failed=result.failed,
+            )
+
+    def execute_recovery_cleanup(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        if confirmed_transaction_id != preview.preview_fingerprint:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Cleanup confirmation does not match the current preview.",
+            )
+        if preview.status is not RecoveryStatus.COMPLETED_CLEANUP_PENDING:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Cleanup is not available for this preview.",
+            )
+        with command_helpers.mutating_command_scope(
+            opts,
+            "recover",
+            allow_unfinished_journal=True,
+        ) as scope:
+            if isinstance(scope, int):
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode(scope),
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Cleanup could not acquire a safe execution context.",
+                )
+            wordlist = scope.context.wordlist_file
+            journal_result = scope.journal_result
+            if journal_result.status is not JournalLoadStatus.VALID_COMPLETED:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Completed journal is no longer present.",
+                )
+            discard_completed_journal(wordlist)
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "cleaning_artifacts",
+                    "Cleanup completed",
+                    level=EventLevel.SUCCESS,
+                ),
+            )
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.OK,
+                outcome=RecoveryOutcome.CLEANUP_COMPLETED,
+                message="Remaining recovery artifacts were removed.",
+            )
+
+    def execute_recovery_discard(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        if confirmed_transaction_id != preview.preview_fingerprint:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Discard confirmation does not match the current preview.",
+            )
+        if not preview.can_discard:
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.PUSH_ABORT,
+                outcome=RecoveryOutcome.FAILED,
+                message="Discard is not available for this preview.",
+            )
+        with command_helpers.mutating_command_scope(
+            opts,
+            "recover",
+            allow_unfinished_journal=True,
+        ) as scope:
+            if isinstance(scope, int):
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode(scope),
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Discard could not acquire a safe execution context.",
+                )
+            wordlist = scope.context.wordlist_file
+            if preview.status is RecoveryStatus.CORRUPT_JOURNAL:
+                discard_journal(wordlist)
+            else:
+                discard_completed_journal(wordlist)
+            return RecoveryExecution(
+                preview=preview,
+                result=ExitCode.OK,
+                outcome=RecoveryOutcome.DISCARDED,
+                message="Recovery metadata discarded.",
+            )
+
     def build_push_report(self, execution: PushExecution) -> OperationReport:
         return build_push_operation_report(execution)
 
     def build_pull_report(self, execution: PullExecution) -> OperationReport:
         return build_pull_operation_report(execution)
+
+    def build_recovery_report(self, execution: RecoveryExecution) -> OperationReport:
+        return build_recovery_operation_report(execution)
