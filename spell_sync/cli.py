@@ -15,7 +15,12 @@ from .json_output import base_payload, emit_json
 from .log import log
 from .plan_cmd import cmd_plan
 from .recover_cmd import cmd_recover
-from .tui import cmd_ui, print_non_interactive_usage_error, should_launch_tui
+from .tui import (
+    cmd_ui,
+    print_non_interactive_ui_error,
+    print_non_interactive_usage_error,
+    should_launch_tui,
+)
 from .version_cmd import cmd_version
 
 CommandFn = Callable[[CliOptions], int]
@@ -219,6 +224,14 @@ def main(argv: list[str] | None = None) -> int:
     if rest[0] == "ui" and "--json" in rest:
         log.error("unrecognized arguments: --json")
         log.info("Run `spell-sync ui --help` for usage.")
+        return int(ExitCode.LINT_FAILED)
+    if rest[0] == "ui" and not should_launch_tui(
+        "ui",
+        stdin_is_tty=sys.stdin.isatty(),
+        stdout_is_tty=sys.stdout.isatty(),
+        json_requested=False,
+    ):
+        print_non_interactive_ui_error()
         return int(ExitCode.LINT_FAILED)
     parsed = _parse_args(rest)
     if parsed is None:

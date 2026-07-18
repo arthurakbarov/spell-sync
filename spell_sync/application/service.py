@@ -5,10 +5,27 @@ from __future__ import annotations
 from .. import command_helpers
 from ..cli_options import CliOptions
 from ..exit_codes import ExitCode
+from ..health.report import build_doctor_report
+from ..operation_lock import read_active_operation_lock
+from ..paths import resolve_wordlist_path
 from ..push_prepared import PreparedPush, plan_fingerprint_conflict
 from ..sync_run import PushResult, SyncRun
+from ..validated_runtime import build_validated_runtime
+from .builders import (
+    build_dashboard_state,
+    build_doctor_snapshot,
+    build_push_preview,
+    build_status_detail_snapshot,
+)
 from .events import EventLevel, EventSink, OperationEvent, OperationKind
-from .reports import DashboardState, PushExecution, PushPreviewSnapshot, StatusSnapshot
+from .reports import (
+    DashboardState,
+    DoctorSnapshot,
+    PushExecution,
+    PushPreview,
+    StatusDetailSnapshot,
+    StatusSnapshot,
+)
 
 
 def _emit(
@@ -43,40 +60,41 @@ class SpellSyncService:
             empty_wordlist=not words,
         )
 
-    def load_dashboard(self, opts: CliOptions) -> DashboardState:
-        from ..paths import resolve_wordlist_path
-        from ..settings import ConfigStatus
-        from ..validated_runtime import build_validated_runtime
+    def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot:
+        run = command_helpers.sync_run_for(opts)
+        return build_status_detail_snapshot(run)
 
+    def load_dashboard(self, opts: CliOptions) -> DashboardState:
         wordlist = resolve_wordlist_path(opts.wordlist)
         validated = build_validated_runtime(wordlist)
         snapshot = self.load_status(opts)
-        config_status = validated.config_result.status
-        config_valid = config_status in (ConfigStatus.VALID, ConfigStatus.ABSENT)
-        return DashboardState(
-            wordlist_path=str(wordlist),
-            config_status=config_status.value,
-            config_valid=config_valid,
-            targets_detected=len(validated.context.dictionaries),
-            snapshot=snapshot,
-        )
+        lock_info = read_active_operation_lock(wordlist)
+        return build_dashboard_state(validated, snapshot, lock_info=lock_info)
 
-    def load_push_preview(self, opts: CliOptions) -> PushPreviewSnapshot:
+    def load_push_preview(self, opts: CliOptions) -> PushPreview:
         from ..config import push_strict_enabled
 
         strict = opts.strict or push_strict_enabled()
         run = command_helpers.sync_run_for(opts, strict_push=strict)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
-            return PushPreviewSnapshot(
-                diffs=(),
-                plan_result=wordlist_error,
-                wordlist_error=wordlist_error,
+            return build_push_preview(None, wordlist_error=wordlist_error)
+        prepared = self.prepare_push(run, opts)
+        if isinstance(prepared, ExitCode):
+            return build_push_preview(None, prepare_error=prepared)
+        return build_push_preview(prepared)
+
+    def load_doctor(self, opts: CliOptions) -> DoctorSnapshot:
+        try:
+            run = command_helpers.sync_run_for(opts)
+            report = build_doctor_report(run)
+            return build_doctor_snapshot(report)
+        except Exception:
+            return DoctorSnapshot(
+                checks=(),
+                has_errors=True,
+                load_error="Doctor report could not be loaded.",
             )
-        skip_names = command_helpers.push_skip_running_app_dicts(run, opts)
-        diffs = tuple(run.status_diffs(verbose=opts.verbose))
-        plan_result = run.plan_push(skip_names=skip_names)
-        return PushPreviewSnapshot(diffs=diffs, plan_result=plan_result, wordlist_error=None)
 
     def prepare_push(
         self,

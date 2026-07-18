@@ -8,9 +8,10 @@ from unittest.mock import MagicMock, patch
 
 from spell_sync.application import SpellSyncService
 from spell_sync.application.events import OperationEvent
-from spell_sync.application.reports import StatusSnapshot
+from spell_sync.application.reports import DashboardSeverity, StatusSnapshot
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
+from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.settings import ConfigStatus
 from spell_sync.sync_models import DictionaryDiff, PushResult
@@ -139,44 +140,51 @@ class TestSpellSyncService(unittest.TestCase):
         )
         validated = MagicMock()
         validated.config_result.status = ConfigStatus.VALID
+        validated.config_result.diagnostics = ()
         validated.context.dictionaries = [MagicMock(), MagicMock(), MagicMock()]
+        validated.context.wordlist_file = Path("/tmp/w.txt")
+        validated.context.project_dir = Path("/tmp")
+        validated.journal_result = JournalLoadResult(JournalLoadStatus.ABSENT, None)
 
         with patch("spell_sync.paths.resolve_wordlist_path", return_value=Path("/tmp/w.txt")):
             with patch(
-                "spell_sync.validated_runtime.build_validated_runtime",
+                "spell_sync.application.service.build_validated_runtime",
                 return_value=validated,
             ):
-                with patch.object(service, "load_status", return_value=snapshot) as load_status:
-                    state = service.load_dashboard(CliOptions(wordlist="/tmp/w.txt"))
+                with patch(
+                    "spell_sync.application.service.read_active_operation_lock",
+                    return_value=None,
+                ):
+                    with patch.object(service, "load_status", return_value=snapshot) as load_status:
+                        state = service.load_dashboard(CliOptions(wordlist="/tmp/w.txt"))
 
         load_status.assert_called_once()
         self.assertEqual(state.wordlist_path, "/tmp/w.txt")
         self.assertTrue(state.config_valid)
-        self.assertEqual(state.config_status, "valid")
+        self.assertEqual(state.overall_severity, DashboardSeverity.READY)
         self.assertEqual(state.targets_detected, 3)
         self.assertIs(state.snapshot, snapshot)
 
-    def test_load_push_preview_delegates_to_sync_run(self):
+    def test_load_push_preview_returns_prepared_push(self):
         service = SpellSyncService()
-        diff = DictionaryDiff(
-            name="demo",
-            target_count=2,
-            local_count=1,
-            to_add=1,
-            to_remove=0,
-        )
+        prepared = MagicMock(spec=PreparedPush)
+        prepared.targets = ()
+        prepared.skipped_unreadable = ()
+        prepared.skipped_corrupt = ()
+        prepared.skipped_blocked = ()
+        prepared.ctx = MagicMock()
+        prepared.ctx.wordlist_str = "/tmp/w.txt"
+        prepared.wordlist_rendered = None
         run = MagicMock()
         run.check_wordlist.return_value = None
-        run.status_diffs.return_value = [diff]
-        run.plan_push.return_value = PushResult(word_count=1, written=("demo",))
 
         with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
-            with patch("spell_sync.command_helpers.push_skip_running_app_dicts", return_value=()):
+            with patch.object(service, "prepare_push", return_value=prepared):
                 preview = service.load_push_preview(CliOptions())
 
-        self.assertEqual(preview.diffs, (diff,))
-        self.assertIsInstance(preview.plan_result, PushResult)
+        self.assertIs(preview.prepared, prepared)
         self.assertIsNone(preview.wordlist_error)
+        self.assertIsNone(preview.prepare_error)
 
     def test_load_push_preview_wordlist_error_short_circuits(self):
         service = SpellSyncService()
@@ -187,8 +195,60 @@ class TestSpellSyncService(unittest.TestCase):
             preview = service.load_push_preview(CliOptions())
 
         self.assertEqual(preview.wordlist_error, ExitCode.PUSH_ABORT)
-        self.assertEqual(preview.plan_result, ExitCode.PUSH_ABORT)
-        run.plan_push.assert_not_called()
+        self.assertIsNone(preview.prepared)
+        run.prepare_push_operation.assert_not_called()
+
+    def test_load_push_preview_prepare_error(self):
+        service = SpellSyncService()
+        run = MagicMock()
+        run.check_wordlist.return_value = None
+
+        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            with patch.object(service, "prepare_push", return_value=ExitCode.PUSH_ABORT):
+                preview = service.load_push_preview(CliOptions())
+
+        self.assertEqual(preview.prepare_error, ExitCode.PUSH_ABORT)
+        self.assertIsNone(preview.prepared)
+
+    def test_load_status_detail_delegates_to_builder(self):
+        service = SpellSyncService()
+        run = MagicMock()
+        detail = MagicMock()
+
+        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            with patch(
+                "spell_sync.application.service.build_status_detail_snapshot",
+                return_value=detail,
+            ) as builder:
+                result = service.load_status_detail(CliOptions())
+
+        builder.assert_called_once_with(run)
+        self.assertIs(result, detail)
+
+    def test_load_doctor_wraps_report(self):
+        service = SpellSyncService()
+        report = MagicMock()
+        snapshot = MagicMock()
+
+        with patch("spell_sync.command_helpers.sync_run_for", return_value=MagicMock()):
+            with patch("spell_sync.application.service.build_doctor_report", return_value=report):
+                with patch(
+                    "spell_sync.application.service.build_doctor_snapshot",
+                    return_value=snapshot,
+                ) as builder:
+                    result = service.load_doctor(CliOptions())
+
+        builder.assert_called_once_with(report)
+        self.assertIs(result, snapshot)
+
+    def test_load_doctor_returns_controlled_error(self):
+        service = SpellSyncService()
+        with patch(
+            "spell_sync.application.service.command_helpers.sync_run_for",
+            side_effect=RuntimeError("boom"),
+        ):
+            snapshot = service.load_doctor(CliOptions())
+        self.assertEqual(snapshot.load_error, "Doctor report could not be loaded.")
 
     def test_run_push_wraps_execute_push_result(self):
         service = SpellSyncService()

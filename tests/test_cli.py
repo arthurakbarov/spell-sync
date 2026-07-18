@@ -105,10 +105,19 @@ class TestMain(unittest.TestCase):
             argv = ["spell-sync", name]
             if name == "contains":
                 argv.append("testword")
-            with patch.dict(cli_mod.COMMANDS, {name: handler}, clear=True):
-                with redirect_stdout(io.StringIO()):
-                    code = cli_mod.main(argv)
-                self.assertEqual(code, 0)
+            ctx = patch.dict(cli_mod.COMMANDS, {name: handler}, clear=True)
+            if name == "ui":
+                with (
+                    ctx,
+                    patch.object(cli_mod, "should_launch_tui", return_value=True),
+                ):
+                    with redirect_stdout(io.StringIO()):
+                        code = cli_mod.main(argv)
+            else:
+                with ctx:
+                    with redirect_stdout(io.StringIO()):
+                        code = cli_mod.main(argv)
+            self.assertEqual(code, 0)
 
     def test_main_default_argv(self):
         with patch.object(cli_mod, "main", wraps=cli_mod.main) as main_fn:

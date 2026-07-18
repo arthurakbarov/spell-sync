@@ -25,6 +25,7 @@ from spell_sync.operation_lock import (
     OperationLockInfo,
     acquire_operation_lock,
     lock_path_for_wordlist,
+    read_active_operation_lock,
 )
 
 
@@ -286,3 +287,44 @@ class TestOperationLockWin32(unittest.TestCase):
             from spell_sync.operation_lock import _release_fd
 
             _release_fd(0)
+
+    def test_read_active_operation_lock_corrupt_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            lock_path = lock_path_for_wordlist(wordlist)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text("not-json", encoding="utf-8")
+            info = read_active_operation_lock(wordlist)
+            self.assertIsNotNone(info)
+            self.assertEqual(info.pid, 0)
+
+    def test_read_active_operation_lock_stale_pid(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            lock_path = lock_path_for_wordlist(wordlist)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "pid": 999_999_999,
+                "started": "2020-01-01T00:00:00+00:00",
+                "command": "push",
+                "wordlist": str(wordlist),
+            }
+            lock_path.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertIsNone(read_active_operation_lock(wordlist))
+
+    def test_read_active_operation_lock_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            self.assertIsNone(read_active_operation_lock(wordlist))
+
+    def test_read_active_operation_lock_live_pid(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            with acquire_operation_lock(wordlist, "push"):
+                info = read_active_operation_lock(wordlist)
+            self.assertIsNotNone(info)
+            self.assertEqual(info.command, "push")

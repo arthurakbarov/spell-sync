@@ -154,6 +154,19 @@ def _unknown_lock_info(wordlist: Path) -> OperationLockInfo:
     )
 
 
+def read_active_operation_lock(wordlist: Path) -> OperationLockInfo | None:
+    """Return lock metadata when another live process holds the project lock."""
+    lock_path = lock_path_for_wordlist(wordlist)
+    if not lock_path.is_file():
+        return None
+    info = _read_lock_info(lock_path)
+    if info is None:
+        return _unknown_lock_info(wordlist)
+    if info.pid and _pid_alive(info.pid):
+        return info
+    return None
+
+
 @contextmanager
 def acquire_operation_lock(wordlist: Path, command: str) -> Iterator[OperationLockInfo]:
     """Acquire an exclusive project lock; release on exit.
