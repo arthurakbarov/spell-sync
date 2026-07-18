@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from spell_sync.application.builders import (
     build_pull_operation_report,
     build_push_operation_report,
+    build_recovery_operation_report,
 )
 from spell_sync.application.events import EventLevel, EventSink, OperationEvent, OperationKind
 from spell_sync.application.reports import (
@@ -21,6 +22,11 @@ from spell_sync.application.reports import (
     PullSourcePreview,
     PushExecution,
     PushPreview,
+    RecoveryExecution,
+    RecoveryItemPreview,
+    RecoveryOutcome,
+    RecoveryPreview,
+    RecoveryStatus,
     StatusDetailSnapshot,
     StatusSnapshot,
     TargetPreview,
@@ -47,7 +53,11 @@ class FakeTuiService:
     last_executed_prepared: object | None = None
     push_execution: PushExecution | None = None
     pull_execution: PullExecution | None = None
+    recovery_preview: RecoveryPreview | None = None
+    recovery_execution: RecoveryExecution | None = None
+    execute_recovery_calls: int = 0
     raise_on_execute: Exception | None = None
+    raise_on_inspect: Exception | None = None
 
     def load_dashboard(self, opts: CliOptions) -> DashboardState:
         return self.dashboard_state
@@ -187,6 +197,113 @@ class FakeTuiService:
 
     def build_pull_report(self, execution: PullExecution):
         return build_pull_operation_report(execution)
+
+    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview:
+        if self.raise_on_inspect is not None:
+            raise self.raise_on_inspect
+        return self.recovery_preview or sample_recovery_preview()
+
+    def execute_recovery(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        self.execute_recovery_calls += 1
+        if self.raise_on_execute is not None:
+            raise self.raise_on_execute
+        if event_sink is not None:
+            event_sink(
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "validating_journal",
+                    "Validating journal",
+                    level=EventLevel.SUCCESS,
+                )
+            )
+            event_sink(
+                OperationEvent(
+                    OperationKind.RECOVER,
+                    "completed",
+                    "Recovery completed",
+                    level=EventLevel.SUCCESS,
+                )
+            )
+        if self.recovery_execution is not None:
+            return self.recovery_execution
+        return RecoveryExecution(
+            preview=preview,
+            result=ExitCode.OK,
+            outcome=RecoveryOutcome.RECOVERED,
+            message="2 file(s) restored",
+            restored=("wordlist", "chrome"),
+        )
+
+    def execute_recovery_cleanup(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        return RecoveryExecution(
+            preview=preview,
+            result=ExitCode.OK,
+            outcome=RecoveryOutcome.CLEANUP_COMPLETED,
+            message="Remaining recovery artifacts were removed.",
+        )
+
+    def execute_recovery_discard(
+        self,
+        opts: CliOptions,
+        preview: RecoveryPreview,
+        *,
+        confirmed_transaction_id: str,
+        event_sink: EventSink | None = None,
+    ) -> RecoveryExecution:
+        return RecoveryExecution(
+            preview=preview,
+            result=ExitCode.OK,
+            outcome=RecoveryOutcome.DISCARDED,
+            message="Recovery metadata discarded.",
+        )
+
+    def build_recovery_report(self, execution: RecoveryExecution):
+        return build_recovery_operation_report(execution)
+
+
+def sample_recovery_preview(**kwargs) -> RecoveryPreview:
+    defaults = dict(
+        status=RecoveryStatus.RECOVERABLE,
+        transaction_id="tx-12345678",
+        command="push",
+        transaction_state="writing",
+        started_at="2026-01-01T00:00:00+00:00",
+        wordlist_path="/tmp/wordlist.txt",
+        snapshot_directory="/tmp/snapshots",
+        items=(
+            RecoveryItemPreview(
+                name="wordlist",
+                path="/tmp/wordlist.txt",
+                current_state="Post-write",
+                recovery_action="Restore snapshot",
+                status="ready",
+            ),
+        ),
+        recoverable_count=1,
+        conflict_count=0,
+        failure_count=0,
+        warnings=(),
+        can_recover=True,
+        can_discard=False,
+        snapshots_valid=True,
+        preview_fingerprint="tx-12345678",
+    )
+    defaults.update(kwargs)
+    return RecoveryPreview(**defaults)
 
 
 def sample_status(*, empty: bool = False, wordlist_error: ExitCode | None = None) -> StatusSnapshot:
@@ -359,6 +476,8 @@ def fake_service(
     doctor: DoctorSnapshot | None = None,
     push_execution: PushExecution | None = None,
     pull_execution: PullExecution | None = None,
+    recovery_preview: RecoveryPreview | None = None,
+    recovery_execution: RecoveryExecution | None = None,
 ) -> FakeTuiService:
     snapshot = sample_status(wordlist_error=wordlist_error)
     labels = {
@@ -381,6 +500,8 @@ def fake_service(
         preview or sample_preview(),
         doctor or sample_doctor(),
         pull_preview or sample_pull_preview(),
+        recovery_preview=recovery_preview,
         push_execution=push_execution,
         pull_execution=pull_execution,
+        recovery_execution=recovery_execution,
     )

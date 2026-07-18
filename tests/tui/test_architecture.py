@@ -47,6 +47,9 @@ class TestTuiArchitecture(unittest.TestCase):
             "atomic_write",
             "execute_prepared_push",
             "PushJournalSession",
+            "recover_from_journal",
+            "discard_journal",
+            "push_journal",
         )
         for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
             module = importlib.import_module(module_info.name)
