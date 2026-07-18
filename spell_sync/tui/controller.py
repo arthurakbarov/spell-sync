@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from pathlib import Path
 from typing import Protocol
 
 from ..application.events import EventSink
@@ -19,6 +21,11 @@ from ..application.reports import (
     StatusSnapshot,
 )
 from ..cli_options import CliOptions
+from ..project_setup.discovery import SetupTargetDiscovery
+from ..project_setup.draft import SetupDraft
+from ..project_setup.execute import ProjectSetupExecution
+from ..project_setup.prepare import PreparedProjectSetup
+from ..project_setup.state import ProjectSetupState
 
 
 class TuiService(Protocol):
@@ -87,6 +94,24 @@ class TuiService(Protocol):
 
     def build_recovery_report(self, execution: RecoveryExecution) -> OperationReport: ...
 
+    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState: ...
+
+    def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery: ...
+
+    def prepare_project_setup(self, draft: SetupDraft) -> PreparedProjectSetup: ...
+
+    def execute_project_setup(
+        self,
+        prepared: PreparedProjectSetup,
+        *,
+        confirmed_setup_id: str,
+        event_sink: EventSink | None = None,
+    ) -> ProjectSetupExecution: ...
+
+    def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]: ...
+
+    def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport: ...
+
 
 class TuiController:
     def __init__(self, service: TuiService, opts: CliOptions) -> None:
@@ -96,6 +121,13 @@ class TuiController:
         self._active_push_preview: PushPreview | None = None
         self._active_pull_preview: PullPreview | None = None
         self._active_recovery_preview: RecoveryPreview | None = None
+        self._setup_wordlist: Path | None = None
+        self._setup_selected_targets: tuple[str, ...] = ()
+        self._setup_prepared: PreparedProjectSetup | None = None
+
+    @property
+    def setup_selected_targets(self) -> tuple[str, ...]:
+        return self._setup_selected_targets
 
     @property
     def mutation_active(self) -> bool:
@@ -236,3 +268,61 @@ class TuiController:
     def writes_blocked(self, state: DashboardState | None = None) -> bool:
         current = state or self.dashboard()
         return current.pending_recovery or current.overall_severity.value == "blocked"
+
+    def inspect_project_setup(self) -> ProjectSetupState:
+        return self._service.inspect_project_setup(self.opts)
+
+    def setup_wordlist_default(self) -> Path:
+        return Path.home() / "spell-words" / "wordlist.txt"
+
+    def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:
+        return self._service.validate_setup_wordlist(raw_path)
+
+    def set_setup_wordlist(self, path: Path) -> None:
+        self._setup_wordlist = path
+        discovery = self._service.discover_setup_targets(
+            SetupDraft(path, (), create_wordlist=not path.is_file())
+        )
+        self._setup_selected_targets = discovery.default_enabled
+
+    def refresh_setup_targets(self) -> SetupTargetDiscovery:
+        draft = self._setup_draft()
+        return self._service.discover_setup_targets(draft)
+
+    def prepare_setup_preview(self) -> PreparedProjectSetup:
+        prepared = self._service.prepare_project_setup(self._setup_draft())
+        self._setup_prepared = prepared
+        return prepared
+
+    def execute_setup(
+        self,
+        prepared: PreparedProjectSetup,
+        *,
+        event_sink: EventSink | None = None,
+    ) -> ProjectSetupExecution:
+        execution = self._service.execute_project_setup(
+            prepared,
+            confirmed_setup_id=prepared.setup_id,
+            event_sink=event_sink,
+        )
+        if execution.outcome.value == "completed":
+            self.opts = replace(self.opts, wordlist=str(prepared.wordlist_path))
+            self.clear_setup_session()
+        return execution
+
+    def setup_report(self, execution: ProjectSetupExecution) -> OperationReport:
+        return self._service.build_setup_report(execution)
+
+    def clear_setup_session(self) -> None:
+        self._setup_wordlist = None
+        self._setup_selected_targets = ()
+        self._setup_prepared = None
+
+    def _setup_draft(self) -> SetupDraft:
+        if self._setup_wordlist is None:
+            raise RuntimeError("Setup wordlist is not selected.")
+        return SetupDraft(
+            wordlist_path=self._setup_wordlist,
+            selected_targets=self._setup_selected_targets,
+            create_wordlist=not self._setup_wordlist.is_file(),
+        )

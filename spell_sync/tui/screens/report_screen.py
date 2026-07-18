@@ -88,6 +88,15 @@ class ReportScreen(Screen[None]):
     def action_back_dashboard(self) -> None:
         from .dashboard import DashboardScreen
 
+        if self._report.operation == "setup" and self._report.outcome is OperationOutcome.COMPLETED:
+            while len(self.app.screen_stack) > 1:
+                self.app.pop_screen()
+            self.app.push_screen(DashboardScreen(self._controller))
+            screen = self.app.screen
+            if isinstance(screen, DashboardScreen):
+                screen.action_refresh_dashboard()
+            return
+
         while not isinstance(self.app.screen, DashboardScreen):
             if len(self.app.screen_stack) <= 1:
                 break

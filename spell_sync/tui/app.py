@@ -23,6 +23,12 @@ class SpellSyncApp(App[None]):
         self.controller = controller
 
     def on_mount(self) -> None:
+        state = self.controller.inspect_project_setup()
+        if state.can_start_wizard:
+            from .screens.setup_welcome_screen import SetupWelcomeScreen
+
+            self.push_screen(SetupWelcomeScreen(self.controller))
+            return
         self.push_screen(DashboardScreen(self.controller))
 
     def action_quit_app(self) -> None:

@@ -25,6 +25,8 @@ from ...application.reports import (
     RecoveryExecution,
     RecoveryPreview,
 )
+from ...project_setup.execute import ProjectSetupExecution
+from ...project_setup.prepare import PreparedProjectSetup
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
@@ -50,6 +52,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         pull_preview: PullPreview | None = None,
         push_preview: PushPreview | None = None,
         recovery_preview: RecoveryPreview | None = None,
+        setup_prepared: PreparedProjectSetup | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
@@ -57,6 +60,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._pull_preview = pull_preview
         self._push_preview = push_preview
         self._recovery_preview = recovery_preview
+        self._setup_prepared = setup_prepared
         self._events: list[OperationEvent] = []
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
@@ -77,7 +81,15 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        title = f"Running {self._operation}"
+        titles = {
+            "setup": "Creating Spell Sync project",
+            "pull": "Running pull",
+            "push": "Running push",
+            "recover": "Running recovery",
+            "cleanup": "Running cleanup",
+            "discard": "Running discard",
+        }
+        title = titles.get(self._operation, f"Running {self._operation}")
         self.query_one("#operation-title", Static).update(title)
         self.query_one("#operation-stages", Static).update("Preparing...")
         self.query_one("#operation-details", Static).update("")
@@ -182,6 +194,11 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
                 self._recovery_preview,
                 event_sink=self._sink,
             )
+        if self._operation == "setup" and self._setup_prepared is not None:
+            return self._controller.execute_setup(
+                self._setup_prepared,
+                event_sink=self._sink,
+            )
         return None
 
     def on_execute_operation_worker_state_changed(self, event) -> None:
@@ -205,6 +222,8 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             report = self._controller.push_report(result)
         elif isinstance(result, RecoveryExecution):
             report = self._controller.recovery_report(result)
+        elif isinstance(result, ProjectSetupExecution):
+            report = self._controller.setup_report(result)
         else:
             self._finish_failed("Operation returned no result.")
             return
