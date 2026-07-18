@@ -43,7 +43,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             yield Button("Pull", id="btn-pull")
             yield Button("Push", id="btn-push")
             yield Button("Recovery", id="btn-recovery", disabled=True, classes="-disabled-action")
-            yield Button("Logs", id="btn-logs", disabled=True, classes="-disabled-action")
+            yield Button("Logs", id="btn-logs")
             yield Button("Quit", id="btn-quit", variant="error")
         yield Footer()
 
@@ -175,7 +175,9 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         elif button_id == "btn-recovery":
             self.action_open_recovery()
         elif button_id == "btn-logs":
-            self.notify(_DISABLED_HINT, severity="warning")
+            from .logs_screen import LogsScreen
+
+            self.app.push_screen(LogsScreen(self._controller))
 
     def action_refresh_dashboard(self) -> None:
         self._refresh_layout_warning()

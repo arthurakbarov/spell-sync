@@ -333,6 +333,26 @@ class FakeTuiService:
     def build_setup_report(self, execution: ProjectSetupExecution):
         return build_setup_operation_report(execution)
 
+    def load_operation_history(self, **kwargs):
+        from spell_sync.diagnostics.types import OperationHistorySnapshot
+
+        return OperationHistorySnapshot(records=())
+
+    def clear_operation_history(self):
+        from spell_sync.diagnostics.types import HistoryClearResult
+
+        return HistoryClearResult(ok=True)
+
+    def technical_log_path(self):
+        from pathlib import Path
+
+        return Path("/tmp/spell-sync-test.log")
+
+    def read_technical_log_tail(self, **kwargs):
+        from spell_sync.diagnostics.types import TechnicalLogSnapshot
+
+        return TechnicalLogSnapshot(path=self.technical_log_path(), lines=())
+
 
 def sample_recovery_preview(**kwargs) -> RecoveryPreview:
     defaults = dict(

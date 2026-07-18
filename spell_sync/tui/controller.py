@@ -6,10 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from ..application.events import EventSink
+from ..application.events import EventSink, OperationKind
 from ..application.reports import (
     DashboardState,
     DoctorSnapshot,
+    OperationOutcome,
     OperationReport,
     PullExecution,
     PullPreview,
@@ -120,6 +121,25 @@ class TuiService(Protocol):
     def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]: ...
 
     def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport: ...
+
+    def load_operation_history(
+        self,
+        *,
+        limit: int = 50,
+        operation: OperationKind | None = None,
+        outcome: OperationOutcome | None = None,
+    ): ...
+
+    def clear_operation_history(self): ...
+
+    def technical_log_path(self) -> Path: ...
+
+    def read_technical_log_tail(
+        self,
+        *,
+        max_lines: int = 200,
+        max_bytes: int = 128 * 1024,
+    ): ...
 
 
 class TuiController:
@@ -286,6 +306,28 @@ class TuiController:
 
     def recovery_report(self, execution: RecoveryExecution) -> OperationReport:
         return self._service.build_recovery_report(execution)
+
+    def load_operation_history(
+        self,
+        *,
+        limit: int = 50,
+        operation: OperationKind | None = None,
+        outcome: OperationOutcome | None = None,
+    ):
+        return self._service.load_operation_history(
+            limit=limit,
+            operation=operation,
+            outcome=outcome,
+        )
+
+    def clear_operation_history(self):
+        return self._service.clear_operation_history()
+
+    def technical_log_path(self) -> Path:
+        return self._service.technical_log_path()
+
+    def read_technical_log_tail(self, **kwargs):
+        return self._service.read_technical_log_tail(**kwargs)
 
     def writes_blocked(self, state: DashboardState | None = None) -> bool:
         current = state or self.dashboard()
