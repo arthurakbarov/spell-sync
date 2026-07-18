@@ -19,6 +19,7 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.health.types import DoctorAction
 from spell_sync.io import write_text_words
 from spell_sync.runtime import (
+    cli_argv,
     cli_shell_command,
     discover_pip_script,
     installed_package_version,
@@ -53,6 +54,10 @@ class TestRuntimeHelpers(unittest.TestCase):
     def test_cli_shell_command(self):
         with patch("spell_sync.runtime.cli_argv", return_value=["spell-sync"]):
             self.assertEqual(cli_shell_command("pull"), "spell-sync pull")
+
+    def test_cli_argv_when_script_on_path(self):
+        with patch("spell_sync.runtime.shutil.which", return_value="/usr/bin/spell-sync"):
+            self.assertEqual(cli_argv(), ["/usr/bin/spell-sync"])
 
     def test_read_pyproject_version_oserror(self):
         with patch.object(Path, "read_text", side_effect=OSError("nope")):
@@ -245,7 +250,14 @@ class TestPlanRemovalsHuman(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            code = plan_mod.cmd_plan(CliOptions(wordlist=wordlist, plan_removals=True))
+            run = SyncRun(
+                wordlist=wordlist,
+                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            )
+            with patch.object(plan_mod, "sync_run_for", return_value=run):
+                code = plan_mod.cmd_plan(
+                    CliOptions(wordlist=wordlist, plan_removals=True),
+                )
             self.assertEqual(code, 0)
 
     def test_plan_removals_wordlist_error(self):
