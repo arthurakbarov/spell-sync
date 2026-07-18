@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import spell_sync.tui as tui_pkg
+from spell_sync.application import SpellSyncService
 from spell_sync.application.reports import PushPreview
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.tui.controller import TuiController
@@ -138,6 +139,41 @@ class TestTuiArchitecture(unittest.TestCase):
         # Event schema has no word payload fields.
         self.assertNotIn("words", OperationEvent.__annotations__)
         self.assertNotIn("removal_words", OperationEvent.__annotations__)
+
+    def test_tui_setup_goes_through_service(self):
+        service = fake_service()
+        controller = TuiController(service, MagicMock())
+        controller.set_setup_wordlist(Path("/tmp/project/wordlist.txt"))
+        controller.prepare_setup_preview()
+        self.assertIsNotNone(controller._setup_prepared)
+
+    def test_tui_does_not_import_project_setup_execute(self):
+        banned = ("atomic_write", "execute_project_setup", "prepare_project_setup")
+        source = Path(tui_pkg.__file__).parent / "screens" / "setup_welcome_screen.py"
+        text = source.read_text(encoding="utf-8")
+        for token in banned:
+            self.assertNotIn(token, text, msg=f"setup_welcome_screen references {token}")
+
+    def test_cli_init_and_tui_share_service_entrypoint(self):
+        import tempfile
+
+        from spell_sync.cli_options import CliOptions
+        from spell_sync.commands import cmd_init
+        from spell_sync.project_setup.draft import SetupDraft
+        from spell_sync.project_setup.prepare import prepare_project_setup
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            prepared = prepare_project_setup(
+                SetupDraft(wordlist, (), create_wordlist=True),
+            )
+            with patch.object(
+                SpellSyncService,
+                "execute_project_setup",
+            ) as execute:
+                with patch.object(SpellSyncService, "prepare_project_setup", return_value=prepared):
+                    cmd_init(CliOptions(wordlist=str(wordlist)))
+            execute.assert_called_once()
 
 
 if __name__ == "__main__":

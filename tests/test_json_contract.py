@@ -10,11 +10,12 @@ import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import spell_sync.commands as commands
 import spell_sync.doctor as doctor_mod
 import spell_sync.plan_cmd as plan_mod
+from spell_sync.application import SpellSyncService
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
@@ -220,7 +221,19 @@ class TestJsonContractExtended(unittest.TestCase):
     def test_init_json_has_exit(self):
         buf = io.StringIO()
         with (
-            patch.object(commands, "init_project_directory", return_value=["wordlist.txt"]),
+            patch.object(
+                SpellSyncService,
+                "execute_project_setup",
+                return_value=MagicMock(
+                    outcome=MagicMock(value="completed"),
+                    created_files=("wordlist.txt",),
+                ),
+            ),
+            patch.object(
+                SpellSyncService,
+                "prepare_project_setup",
+                return_value=MagicMock(setup_id="setup-1"),
+            ),
             redirect_stdout(buf),
         ):
             code = commands.cmd_init(CliOptions(json_output=True))

@@ -8,6 +8,7 @@ from spell_sync.application.builders import (
     build_pull_operation_report,
     build_push_operation_report,
     build_recovery_operation_report,
+    build_setup_operation_report,
 )
 from spell_sync.application.events import EventLevel, EventSink, OperationEvent, OperationKind
 from spell_sync.application.reports import (
@@ -34,6 +35,11 @@ from spell_sync.application.reports import (
 )
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
+from spell_sync.project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
+from spell_sync.project_setup.draft import SetupDraft
+from spell_sync.project_setup.execute import ProjectSetupExecution, ProjectSetupOutcome
+from spell_sync.project_setup.prepare import PreparedProjectSetup, prepare_project_setup
+from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.sync_models import DictionaryDiff, PushResult
 
@@ -58,6 +64,10 @@ class FakeTuiService:
     execute_recovery_calls: int = 0
     raise_on_execute: Exception | None = None
     raise_on_inspect: Exception | None = None
+    setup_state: ProjectSetupState | None = None
+    setup_prepared: PreparedProjectSetup | None = None
+    setup_execution: ProjectSetupExecution | None = None
+    execute_setup_calls: int = 0
 
     def load_dashboard(self, opts: CliOptions) -> DashboardState:
         return self.dashboard_state
@@ -274,6 +284,55 @@ class FakeTuiService:
     def build_recovery_report(self, execution: RecoveryExecution):
         return build_recovery_operation_report(execution)
 
+    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState:
+        if self.setup_state is not None:
+            return self.setup_state
+        return ProjectSetupState(
+            status=ProjectSetupStatus.READY,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=False,
+            detail=None,
+        )
+
+    def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery:
+        return discover_setup_targets(selected_targets=draft.selected_targets)
+
+    def prepare_project_setup(self, draft: SetupDraft) -> PreparedProjectSetup:
+        if self.setup_prepared is not None:
+            return self.setup_prepared
+        return prepare_project_setup(draft)
+
+    def execute_project_setup(
+        self,
+        prepared: PreparedProjectSetup,
+        *,
+        confirmed_setup_id: str,
+        event_sink=None,
+    ) -> ProjectSetupExecution:
+        self.execute_setup_calls += 1
+        if self.raise_on_execute is not None:
+            raise self.raise_on_execute
+        if self.setup_execution is not None:
+            return self.setup_execution
+        return ProjectSetupExecution(
+            prepared=prepared,
+            outcome=ProjectSetupOutcome.COMPLETED,
+            message="Project created.",
+            created_files=tuple(
+                item.relative_name for item in prepared.files if item.action.value == "create"
+            ),
+        )
+
+    def validate_setup_wordlist(self, raw_path: str):
+        from spell_sync.project_setup.state import validate_setup_wordlist
+
+        return validate_setup_wordlist(raw_path)
+
+    def build_setup_report(self, execution: ProjectSetupExecution):
+        return build_setup_operation_report(execution)
+
 
 def sample_recovery_preview(**kwargs) -> RecoveryPreview:
     defaults = dict(
@@ -478,6 +537,7 @@ def fake_service(
     pull_execution: PullExecution | None = None,
     recovery_preview: RecoveryPreview | None = None,
     recovery_execution: RecoveryExecution | None = None,
+    setup_state: ProjectSetupState | None = None,
 ) -> FakeTuiService:
     snapshot = sample_status(wordlist_error=wordlist_error)
     labels = {
@@ -504,4 +564,5 @@ def fake_service(
         push_execution=push_execution,
         pull_execution=pull_execution,
         recovery_execution=recovery_execution,
+        setup_state=setup_state,
     )
