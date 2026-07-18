@@ -9,9 +9,17 @@ Screen {
 #removals-summary,
 #removals-content,
 #narrow-warning,
-#dashboard-issues {
+#dashboard-issues,
+#targets-header,
+#targets-status {
     height: auto;
     padding: 1 2;
+}
+
+#targets-list {
+    height: 1fr;
+    min-height: 6;
+    padding: 0 1;
 }
 
 #action-grid {
@@ -24,6 +32,21 @@ Screen {
 
 Button.-disabled-action {
     opacity: 0.45;
+}
+
+.setup-target-row {
+    padding: 0 2 1 2;
+    height: auto;
+}
+
+.setup-target-row.-focused {
+    background: $surface-lighten-1;
+    border: solid $accent;
+}
+
+.setup-target-meta {
+    padding: 0 0 0 4;
+    color: $text-muted;
 }
 
 #preview-table {

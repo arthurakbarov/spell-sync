@@ -174,6 +174,22 @@ Working actions: Status, Preview, Quit, Refresh, Escape-back. Disabled (Phase 4+
 
 `SpellSyncService` methods: `load_status`, `prepare_push`, `execute_push`, `run_push`. Push execution reuses the same `PreparedPush` object and checks fingerprints before calling `run.push_from_wordlist(prepared=...)`.
 
-## Remaining issues
+## Setup wizard target selection (Phase 6.1)
 
-None confirmed for Phase 2. Phase 3: dashboard blocking states, richer status/preview polish.
+Setup target toggles are UI controls only. Discovery defaults are a starting point; the
+wizard stores exact selection in `SetupSelection` on `TuiController` until confirmation.
+
+### Post-preview semantics
+
+Setup writes only project files (`wordlist.txt`, `spell-sync.toml`, whitelist). External
+application dictionaries are never modified during discovery, toggle, refresh, preview, or
+project creation.
+
+If a target becomes corrupt or its discovery path changes after preview:
+
+- `execute_project_setup()` uses the immutable `PreparedProjectSetup` from preview
+- Selected target IDs and rendered config bytes are not recomputed at execution time
+- Config records enabled flags from the prepared selection only
+- Dashboard after setup may show warnings for targets that later become unreadable/corrupt
+
+This is covered by `tests/test_setup_target_selection.py`.

@@ -125,43 +125,9 @@ class SetupWordlistScreen(Screen[None]):
                 self.notify(str(exc), severity="error")
                 return
             self._controller.set_setup_wordlist(path)
+            from .setup_targets_screen import SetupTargetsScreen
+
             self.app.push_screen(SetupTargetsScreen(self._controller, detail or ""))
-
-
-class SetupTargetsScreen(Screen[None]):
-    BINDINGS = [("escape", "back", "Back")]
-
-    def __init__(self, controller: TuiController, wordlist_detail: str) -> None:
-        super().__init__()
-        self._controller = controller
-        self._wordlist_detail = wordlist_detail
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Static(id="targets-content")
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
-        yield Footer()
-
-    def on_mount(self) -> None:
-        discovery = self._controller.refresh_setup_targets()
-        lines = [self._wordlist_detail, "", "Detected application dictionaries", ""]
-        for row in discovery.targets:
-            mark = "[x]" if row.target_id in self._controller.setup_selected_targets else "[ ]"
-            status = row.read_status
-            count = f" · {row.word_count} words" if row.word_count is not None else ""
-            warning = f"\n    ! {row.warning}" if row.warning else ""
-            lines.append(f"{mark} {row.display_name}")
-            lines.append(f"    {row.path}")
-            lines.append(f"    {status.title()}{count}{warning}")
-        self.query_one("#targets-content", Static).update("\n".join(lines))
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-back":
-            self.app.pop_screen()
-            return
-        if event.button.id == "btn-continue":
-            self.app.push_screen(SetupPreviewScreen(self._controller))
 
 
 class SetupPreviewScreen(Screen[None]):
@@ -180,8 +146,12 @@ class SetupPreviewScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        from ...project_setup.discovery import target_display_name
+
         self._prepared = self._controller.prepare_setup_preview()
         prepared = self._prepared
+        discovery = self._controller.setup_target_discovery()
+        selected = set(prepared.selected_target_ids)
         lines = [
             "Create Spell Sync project",
             "",
@@ -195,7 +165,17 @@ class SetupPreviewScreen(Screen[None]):
             elif item.action.value == "keep":
                 lines.append(f"  {item.relative_name} (kept unchanged)")
         lines.extend(["", "Enabled targets:"])
-        lines.extend(f"  {target}" for target in prepared.enabled_targets)
+        enabled_names = [target_display_name(target_id) for target_id in prepared.enabled_targets]
+        if enabled_names:
+            lines.extend(f"  {name}" for name in enabled_names)
+        else:
+            lines.append("  (none)")
+        not_enabled_names = [
+            target.display_name for target in discovery.targets if target.identifier not in selected
+        ]
+        if not_enabled_names:
+            lines.extend(["", "Not enabled:"])
+            lines.extend(f"  {name}" for name in not_enabled_names)
         lines.extend(["", "External dictionaries:", "  No changes will be made."])
         self.query_one("#preview-content", Static).update("\n".join(lines))
         self.query_one("#btn-create", Button).disabled = not prepared.can_execute

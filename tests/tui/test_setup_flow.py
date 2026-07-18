@@ -13,9 +13,9 @@ from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.dashboard import DashboardScreen
+from spell_sync.tui.screens.setup_targets_screen import SetupTargetsScreen
 from spell_sync.tui.screens.setup_welcome_screen import (
     SetupPreviewScreen,
-    SetupTargetsScreen,
     SetupWelcomeScreen,
     SetupWordlistScreen,
 )
@@ -122,14 +122,16 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:
             await wait_for_text(pilot, "#welcome-content", "Welcome")
             await pilot.click("#btn-setup")
             await pilot.pause()
             await pilot.click("#btn-continue")
             await pilot.pause()
             self.assertIsInstance(app.screen, SetupTargetsScreen)
-            await pilot.click("#btn-continue")
+            event = MagicMock()
+            event.button.id = "btn-continue"
+            app.screen.on_button_pressed(event)
             await pilot.pause()
             self.assertIsInstance(app.screen, SetupPreviewScreen)
 
@@ -183,12 +185,14 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:
             await pilot.click("#btn-setup")
             await pilot.pause()
             await pilot.click("#btn-continue")
             await pilot.pause()
-            await pilot.click("#btn-continue")
+            event = MagicMock()
+            event.button.id = "btn-continue"
+            app.screen.on_button_pressed(event)
             await pilot.pause()
             await pilot.click("#btn-back")
             await pilot.pause()
@@ -219,12 +223,14 @@ class TestSetupPreviewScreen(unittest.IsolatedAsyncioTestCase):
         service = fake_service(setup_state=missing)
         controller = TuiController(service, CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:
             await pilot.click("#btn-setup")
             await pilot.pause()
             await pilot.click("#btn-continue")
             await pilot.pause()
-            await pilot.click("#btn-continue")
+            event = MagicMock()
+            event.button.id = "btn-continue"
+            app.screen.on_button_pressed(event)
             await pilot.pause()
             await pilot.click("#btn-create")
             await pilot.pause()

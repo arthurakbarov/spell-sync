@@ -169,7 +169,7 @@ class TestRemainingCoverage(unittest.TestCase):
 
     def test_discover_macos_spelling_family(self):
         rows = discover_setup_targets().targets
-        self.assertTrue(any(row.target_id == "macos_spelling" for row in rows))
+        self.assertTrue(any(row.identifier == "macos_spelling" for row in rows))
 
     def test_cleanup_after_successful_recovery_snapshot_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -737,7 +737,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 return_value=empty_result,
             ):
                 rows = discovery_mod.discover_setup_targets().targets
-        self.assertEqual(rows[0].read_status, ReadStatus.EMPTY.value)
+        self.assertEqual(rows[0].status, ReadStatus.EMPTY.value)
         self.assertTrue(rows[0].available)
 
     def test_safe_discard_snapshot_resolve_oserror(self):

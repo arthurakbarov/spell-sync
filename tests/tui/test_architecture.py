@@ -149,10 +149,28 @@ class TestTuiArchitecture(unittest.TestCase):
 
     def test_tui_does_not_import_project_setup_execute(self):
         banned = ("atomic_write", "execute_project_setup", "prepare_project_setup")
-        source = Path(tui_pkg.__file__).parent / "screens" / "setup_welcome_screen.py"
-        text = source.read_text(encoding="utf-8")
-        for token in banned:
-            self.assertNotIn(token, text, msg=f"setup_welcome_screen references {token}")
+        for name in ("setup_welcome_screen.py", "setup_targets_screen.py"):
+            source = Path(tui_pkg.__file__).parent / "screens" / name
+            text = source.read_text(encoding="utf-8")
+            for token in banned:
+                self.assertNotIn(token, text, msg=f"{name} references {token}")
+
+    def test_setup_targets_screen_uses_controller_selection(self):
+        source = (Path(tui_pkg.__file__).parent / "screens" / "setup_targets_screen.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("toggle_setup_target", source)
+        self.assertNotIn("discover_dictionaries", source)
+        self.assertNotIn("render_project_config", source)
+
+    def test_prepared_setup_exposes_selected_target_ids(self):
+        from spell_sync.project_setup.draft import SetupDraft
+        from spell_sync.project_setup.prepare import prepare_project_setup
+
+        prepared = prepare_project_setup(
+            SetupDraft(Path("/tmp/x/wordlist.txt"), ("chrome",), create_wordlist=True)
+        )
+        self.assertEqual(prepared.selected_target_ids, ("chrome",))
 
     def test_cli_init_and_tui_share_service_entrypoint(self):
         import tempfile

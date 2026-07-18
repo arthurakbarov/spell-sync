@@ -39,6 +39,7 @@ class PreparedProjectSetup:
     whitelist_path: Path
     directories_to_create: tuple[Path, ...]
     files: tuple[PlannedSetupFile, ...]
+    selected_target_ids: tuple[str, ...]
     enabled_targets: tuple[str, ...]
     warnings: tuple[str, ...]
     conflicts: tuple[str, ...]
@@ -158,7 +159,8 @@ def prepare_project_setup(draft: SetupDraft) -> PreparedProjectSetup:
         whitelist_path=whitelist_path,
         directories_to_create=directories,
         files=file_tuple,
-        enabled_targets=draft.selected_targets,
+        selected_target_ids=draft.selected_targets,
+        enabled_targets=config_draft.enabled_targets,
         warnings=tuple(warnings),
         conflicts=tuple(conflicts),
         can_execute=can_execute,

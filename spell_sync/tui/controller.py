@@ -25,6 +25,15 @@ from ..project_setup.discovery import SetupTargetDiscovery
 from ..project_setup.draft import SetupDraft
 from ..project_setup.execute import ProjectSetupExecution
 from ..project_setup.prepare import PreparedProjectSetup
+from ..project_setup.selection import (
+    SetupSelection,
+    clear_selectable_targets,
+    default_selection,
+    merge_selection_after_refresh,
+    select_available_targets,
+    selection_tuple,
+    toggle_target,
+)
 from ..project_setup.state import ProjectSetupState
 
 
@@ -122,12 +131,25 @@ class TuiController:
         self._active_pull_preview: PullPreview | None = None
         self._active_recovery_preview: RecoveryPreview | None = None
         self._setup_wordlist: Path | None = None
-        self._setup_selected_targets: tuple[str, ...] = ()
+        self._setup_discovery: SetupTargetDiscovery | None = None
+        self._setup_selection: SetupSelection | None = None
         self._setup_prepared: PreparedProjectSetup | None = None
 
     @property
     def setup_selected_targets(self) -> tuple[str, ...]:
-        return self._setup_selected_targets
+        if self._setup_selection is None:
+            return ()
+        return selection_tuple(self._setup_selection)
+
+    def setup_selection(self) -> SetupSelection:
+        if self._setup_selection is None:
+            return SetupSelection(frozenset())
+        return self._setup_selection
+
+    def setup_target_discovery(self) -> SetupTargetDiscovery:
+        if self._setup_discovery is None:
+            raise RuntimeError("Setup target discovery is not available.")
+        return self._setup_discovery
 
     @property
     def mutation_active(self) -> bool:
@@ -279,15 +301,82 @@ class TuiController:
         return self._service.validate_setup_wordlist(raw_path)
 
     def set_setup_wordlist(self, path: Path) -> None:
+        wordlist_changed = self._setup_wordlist != path
         self._setup_wordlist = path
-        discovery = self._service.discover_setup_targets(
-            SetupDraft(path, (), create_wordlist=not path.is_file())
+        self._load_setup_discovery(reset_selection=wordlist_changed)
+
+    def _load_setup_discovery(self, *, reset_selection: bool) -> None:
+        if self._setup_wordlist is None:
+            return
+        draft = SetupDraft(
+            self._setup_wordlist,
+            (),
+            create_wordlist=not self._setup_wordlist.is_file(),
         )
-        self._setup_selected_targets = discovery.default_enabled
+        discovery = self._service.discover_setup_targets(draft)
+        self._setup_discovery = discovery
+        if reset_selection or self._setup_selection is None:
+            self._setup_selection = default_selection(discovery)
+        else:
+            previous_ids = frozenset(
+                target.identifier
+                for target in (self._setup_discovery.targets if self._setup_discovery else ())
+            )
+            self._setup_selection = merge_selection_after_refresh(
+                self._setup_selection,
+                previous_ids,
+                discovery,
+            )
+
+    def refresh_setup_target_discovery(self) -> SetupTargetDiscovery:
+        draft = self._setup_draft()
+        previous_discovery = self._setup_discovery
+        previous_ids = (
+            frozenset(target.identifier for target in previous_discovery.targets)
+            if previous_discovery
+            else frozenset()
+        )
+        previous_selection = self._setup_selection or SetupSelection(frozenset())
+        discovery = self._service.discover_setup_targets(draft)
+        self._setup_discovery = discovery
+        self._setup_selection = merge_selection_after_refresh(
+            previous_selection,
+            previous_ids,
+            discovery,
+        )
+        self._setup_prepared = None
+        return discovery
+
+    def toggle_setup_target(self, target_id: str) -> bool:
+        if self._setup_discovery is None or self._setup_selection is None:
+            return False
+        updated = toggle_target(self._setup_selection, self._setup_discovery, target_id)
+        if updated == self._setup_selection:
+            return False
+        self._setup_selection = updated
+        self._setup_prepared = None
+        return True
+
+    def select_available_setup_targets(self) -> None:
+        if self._setup_discovery is None or self._setup_selection is None:
+            return
+        self._setup_selection = select_available_targets(
+            self._setup_selection,
+            self._setup_discovery,
+        )
+        self._setup_prepared = None
+
+    def clear_setup_target_selection(self) -> None:
+        if self._setup_discovery is None or self._setup_selection is None:
+            return
+        self._setup_selection = clear_selectable_targets(
+            self._setup_selection,
+            self._setup_discovery,
+        )
+        self._setup_prepared = None
 
     def refresh_setup_targets(self) -> SetupTargetDiscovery:
-        draft = self._setup_draft()
-        return self._service.discover_setup_targets(draft)
+        return self.refresh_setup_target_discovery()
 
     def prepare_setup_preview(self) -> PreparedProjectSetup:
         prepared = self._service.prepare_project_setup(self._setup_draft())
@@ -315,7 +404,8 @@ class TuiController:
 
     def clear_setup_session(self) -> None:
         self._setup_wordlist = None
-        self._setup_selected_targets = ()
+        self._setup_discovery = None
+        self._setup_selection = None
         self._setup_prepared = None
 
     def _setup_draft(self) -> SetupDraft:
@@ -323,6 +413,6 @@ class TuiController:
             raise RuntimeError("Setup wordlist is not selected.")
         return SetupDraft(
             wordlist_path=self._setup_wordlist,
-            selected_targets=self._setup_selected_targets,
+            selected_targets=self.setup_selected_targets,
             create_wordlist=not self._setup_wordlist.is_file(),
         )

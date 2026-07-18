@@ -3,30 +3,50 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..dictionaries import Dictionary, discover_dictionaries
-from ..paths import is_macos
+from ..paths import is_macos, is_windows
 from ..read_outcome import ReadStatus, dictionary_read_result
 from .draft import ProjectConfigDraft, SafetyConfig
 
+_CONFIG_TARGET_IDS = frozenset(
+    {
+        "editors",
+        "chrome",
+        "edge",
+        "brave",
+        "vivaldi",
+        "firefox",
+        "neovim",
+        "jetbrains",
+        "hunspell",
+        "obsidian",
+        "libreoffice",
+    }
+)
+
 
 @dataclass(frozen=True)
-class SetupTargetRow:
-    target_id: str
+class SetupTarget:
+    identifier: str
     display_name: str
-    path: str
-    format: str
+    path: Path | None
+    format_name: str
     detected: bool
     available: bool
-    read_status: str
+    readable: bool
+    supported: bool
+    enabled_by_default: bool
+    selectable: bool
     word_count: int | None
-    warning: str | None
-    can_enable: bool
+    status: str
+    detail: str | None
 
 
 @dataclass(frozen=True)
 class SetupTargetDiscovery:
-    targets: tuple[SetupTargetRow, ...]
+    targets: tuple[SetupTarget, ...]
     default_enabled: tuple[str, ...]
 
 
@@ -70,23 +90,55 @@ def _iter_target_groups(
     return groups
 
 
+def _platform_supported(identifier: str) -> bool:
+    if identifier == "macos_spelling":
+        return is_macos()
+    if identifier == "win_spelling":
+        return is_windows()
+    return True
+
+
+def _ambiguous_discovery(items: list[Dictionary], statuses: set[ReadStatus]) -> bool:
+    if len(items) <= 1:
+        return False
+    blocking = {ReadStatus.CORRUPT, ReadStatus.UNREADABLE, ReadStatus.UNSUPPORTED}
+    if statuses & blocking and ReadStatus.OK in statuses:
+        return True
+    if ReadStatus.CORRUPT in statuses and ReadStatus.UNREADABLE in statuses:
+        return True
+    return False
+
+
+def _target_selectable(
+    *,
+    identifier: str,
+    detected: bool,
+    available: bool,
+    readable: bool,
+    supported: bool,
+    status: ReadStatus,
+    ambiguous: bool,
+) -> bool:
+    if not supported or ambiguous:
+        return False
+    if status in (ReadStatus.CORRUPT, ReadStatus.UNREADABLE, ReadStatus.UNSUPPORTED):
+        return False
+    if not detected:
+        return False
+    if not available or not readable:
+        return False
+    if identifier not in _CONFIG_TARGET_IDS and identifier not in {
+        "macos_spelling",
+        "win_spelling",
+    }:
+        return False
+    return True
+
+
 def _default_discovery_config(enabled: tuple[str, ...]) -> dict[str, dict[str, object]]:
     enabled_set = set(enabled)
     flags: dict[str, object] = {
-        name: (name in enabled_set if enabled else True)
-        for name in (
-            "editors",
-            "chrome",
-            "edge",
-            "brave",
-            "vivaldi",
-            "firefox",
-            "neovim",
-            "jetbrains",
-            "hunspell",
-            "obsidian",
-            "libreoffice",
-        )
+        name: (name in enabled_set if enabled else True) for name in _CONFIG_TARGET_IDS
     }
     return {"dictionaries": flags, "push": {}, "io": {"backup_keep": 3}}
 
@@ -103,19 +155,22 @@ def discover_setup_targets(
 
     if is_macos():
         grouped.setdefault("macos_spelling", [])
-    rows: list[SetupTargetRow] = []
+    rows: list[SetupTarget] = []
     default_enabled: list[str] = []
     for target_id, items in _iter_target_groups(grouped):
         detected = bool(items)
         best_status = ReadStatus.MISSING
         word_count: int | None = None
-        warning: str | None = None
+        detail: str | None = None
         available = False
-        sample_path = ""
+        sample_path: Path | None = None
         sample_format = "text"
+        seen_statuses: set[ReadStatus] = set()
         for dictionary in items:
             result = dictionary_read_result(dictionary)
-            sample_path = sample_path or dictionary.path
+            seen_statuses.add(result.status)
+            if sample_path is None and dictionary.path:
+                sample_path = Path(dictionary.path)
             sample_format = dictionary.format.value
             if result.status is ReadStatus.OK:
                 available = True
@@ -126,10 +181,11 @@ def discover_setup_targets(
                     best_status = ReadStatus.MISSING
             elif result.status in (ReadStatus.CORRUPT, ReadStatus.UNSUPPORTED):
                 best_status = result.status
-                warning = result.detail or result.status.value
+                if result.detail:
+                    detail = result.detail
             elif result.status is ReadStatus.UNREADABLE:
                 best_status = ReadStatus.UNREADABLE
-                warning = result.detail or "Unreadable dictionary"
+                detail = result.detail or "Unreadable dictionary"
             elif result.status is ReadStatus.EMPTY and best_status not in (
                 ReadStatus.CORRUPT,
                 ReadStatus.UNREADABLE,
@@ -137,45 +193,53 @@ def discover_setup_targets(
             ):
                 best_status = ReadStatus.EMPTY
                 available = True
-        can_enable = available and best_status not in (
-            ReadStatus.CORRUPT,
-            ReadStatus.UNREADABLE,
-            ReadStatus.UNSUPPORTED,
+        readable = best_status in (ReadStatus.OK, ReadStatus.EMPTY)
+        supported = _platform_supported(target_id)
+        ambiguous = _ambiguous_discovery(items, seen_statuses)
+        selectable = _target_selectable(
+            identifier=target_id,
+            detected=detected,
+            available=available,
+            readable=readable,
+            supported=supported,
+            status=best_status,
+            ambiguous=ambiguous,
         )
-        if can_enable and target_id not in default_enabled:
+        enabled_by_default = selectable and detected and available and readable and supported
+        if enabled_by_default and target_id not in default_enabled:
             default_enabled.append(target_id)
         if not detected:
-            warning = warning or "Not found"
+            detail = detail or "Not found"
+        if best_status is ReadStatus.CORRUPT and not detail:
+            detail = "Corrupt dictionary · cannot be enabled safely"
         rows.append(
-            SetupTargetRow(
-                target_id=target_id,
+            SetupTarget(
+                identifier=target_id,
                 display_name=_DISPLAY_NAMES.get(target_id, target_id),
-                path=sample_path or "Not found",
-                format=sample_format,
+                path=sample_path,
+                format_name=sample_format,
                 detected=detected,
                 available=available,
-                read_status=best_status.value,
+                readable=readable,
+                supported=supported,
+                enabled_by_default=enabled_by_default,
+                selectable=selectable,
                 word_count=word_count,
-                warning=warning,
-                can_enable=can_enable,
+                status=best_status.value,
+                detail=detail,
             )
         )
     return SetupTargetDiscovery(tuple(rows), tuple(default_enabled))
 
 
 def config_draft_from_targets(selected_targets: tuple[str, ...]) -> ProjectConfigDraft:
-    enabled = tuple(
-        target
-        for target in selected_targets
-        if target
-        not in {
-            "macos_spelling",
-            "win_spelling",
-            "sublime",
-        }
-    )
+    enabled = tuple(target for target in selected_targets if target in _CONFIG_TARGET_IDS)
     return ProjectConfigDraft(
         schema_version=1,
         enabled_targets=enabled,
         safety=SafetyConfig(),
     )
+
+
+def target_display_name(identifier: str) -> str:
+    return _DISPLAY_NAMES.get(identifier, identifier)

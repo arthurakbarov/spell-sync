@@ -13,10 +13,10 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
+from spell_sync.tui.screens.setup_targets_screen import SetupTargetsScreen
 from spell_sync.tui.screens.setup_welcome_screen import (
     SetupOpenProjectScreen,
     SetupPreviewScreen,
-    SetupTargetsScreen,
     SetupWordlistScreen,
 )
 from tests.tui.fake_service import fake_service
