@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from .. import command_helpers
 from ..cli_options import CliOptions
 from ..config import push_strict_enabled
+from ..diagnostics.history_builder import HistoryBuildContext, build_history_record
+from ..diagnostics.history_store import OperationHistoryStore
+from ..diagnostics.paths import AppStatePaths, resolve_app_state_paths
+from ..diagnostics.technical_logging import (
+    configure_file_logging,
+    get_spell_sync_logger,
+    read_technical_log_tail,
+)
+from ..diagnostics.types import (
+    HistoryClearResult,
+    OperationHistorySnapshot,
+    TechnicalLogSnapshot,
+)
 from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
 from ..operation_lock import read_active_operation_lock
@@ -61,6 +75,8 @@ from .reports import (
     StatusSnapshot,
 )
 
+_HISTORY_SAVE_WARNING = "Operation completed, but its history record could not be saved."
+
 
 def _emit(
     sink: EventSink | None,
@@ -78,6 +94,89 @@ def _running_app_skip_reasons(dictionary_names) -> dict[str, str]:
 
 class SpellSyncService:
     """UI-neutral entry point for spell-sync operations."""
+
+    def __init__(
+        self,
+        *,
+        state_paths: AppStatePaths | None = None,
+        history_store: OperationHistoryStore | None = None,
+        enable_file_logging: bool = True,
+    ) -> None:
+        self._state_paths = state_paths or resolve_app_state_paths()
+        self._history_store = history_store or OperationHistoryStore(self._state_paths)
+        if enable_file_logging:
+            setup = configure_file_logging(self._state_paths)
+            if not setup.ok:
+                get_spell_sync_logger().warning(
+                    "technical log unavailable",
+                    extra={"reason_code": "log_setup_failed"},
+                )
+
+    @property
+    def state_paths(self) -> AppStatePaths:
+        return self._state_paths
+
+    def load_operation_history(
+        self,
+        *,
+        limit: int = 50,
+        operation: OperationKind | None = None,
+        outcome: OperationOutcome | None = None,
+    ) -> OperationHistorySnapshot:
+        result = self._history_store.read_recent(
+            limit=limit,
+            operation=operation,
+            outcome=outcome,
+        )
+        return OperationHistorySnapshot(
+            records=result.records,
+            malformed_lines=result.malformed_lines,
+            detail=result.detail,
+        )
+
+    def clear_operation_history(self) -> HistoryClearResult:
+        return self._history_store.clear()
+
+    def technical_log_path(self) -> Path:
+        return self._state_paths.technical_log
+
+    def read_technical_log_tail(
+        self,
+        *,
+        max_lines: int = 200,
+        max_bytes: int = 128 * 1024,
+    ) -> TechnicalLogSnapshot:
+        return read_technical_log_tail(
+            self._state_paths,
+            max_lines=max_lines,
+            max_bytes=max_bytes,
+        )
+
+    def _finalize_report(
+        self,
+        report: OperationReport,
+        *,
+        source: object | None = None,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        record = build_history_record(
+            report,
+            context=HistoryBuildContext(duration_ms=duration_ms),
+            source=source,
+        )
+        write_result = self._history_store.append(record)
+        if write_result.ok:
+            return report
+        get_spell_sync_logger().warning(
+            "history append failed",
+            extra={
+                "reason_code": "history_append_failed",
+                "record_id": record.record_id,
+                "operation": report.operation,
+            },
+        )
+        warnings = report.warnings + (_HISTORY_SAVE_WARNING,)
+        return replace(report, warnings=warnings)
 
     def load_status(self, opts: CliOptions) -> StatusSnapshot:
         run = command_helpers.sync_run_for(opts)
@@ -381,12 +480,51 @@ class SpellSyncService:
             dry_run=dry_run,
             event_sink=event_sink,
         )
-        outcome = OperationOutcome.COMPLETED
+        return self.push_execution_from_result(prepared, result)
+
+    def pull_execution_from_result(
+        self,
+        preview: PullPreview,
+        result: tuple[int, int] | ExitCode,
+    ) -> PullExecution:
         if isinstance(result, ExitCode):
-            outcome = OperationOutcome.FAILED
-        elif result.skipped:
+            return PullExecution(
+                preview=preview,
+                result=result,
+                outcome=OperationOutcome.FAILED,
+                message="Pull failed.",
+                warnings=preview.warnings,
+            )
+        before, after = result
+        return PullExecution(
+            preview=preview,
+            result=(before, after),
+            outcome=OperationOutcome.COMPLETED,
+            message=f"wordlist: {before} -> {after} (+{after - before})",
+            warnings=preview.warnings,
+        )
+
+    def push_execution_from_result(
+        self,
+        prepared: PreparedPush,
+        result: PushResult | ExitCode,
+    ) -> PushExecution:
+        if isinstance(result, ExitCode):
+            return PushExecution(
+                prepared=prepared,
+                result=result,
+                outcome=OperationOutcome.FAILED,
+                message="Push failed.",
+            )
+        outcome = OperationOutcome.COMPLETED
+        if result.skipped:
             outcome = OperationOutcome.COMPLETED_WITH_WARNINGS
-        return PushExecution(prepared=prepared, result=result, outcome=outcome)
+        return PushExecution(
+            prepared=prepared,
+            result=result,
+            outcome=outcome,
+            message="Push completed.",
+        )
 
     def execute_push_preview(
         self,
@@ -1025,14 +1163,38 @@ class SpellSyncService:
     def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:
         return validate_setup_wordlist(raw_path)
 
-    def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport:
-        return build_setup_operation_report(execution)
+    def build_setup_report(
+        self,
+        execution: ProjectSetupExecution,
+        *,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        report = build_setup_operation_report(execution)
+        return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
-    def build_push_report(self, execution: PushExecution) -> OperationReport:
-        return build_push_operation_report(execution)
+    def build_push_report(
+        self,
+        execution: PushExecution,
+        *,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        report = build_push_operation_report(execution)
+        return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
-    def build_pull_report(self, execution: PullExecution) -> OperationReport:
-        return build_pull_operation_report(execution)
+    def build_pull_report(
+        self,
+        execution: PullExecution,
+        *,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        report = build_pull_operation_report(execution)
+        return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
-    def build_recovery_report(self, execution: RecoveryExecution) -> OperationReport:
-        return build_recovery_operation_report(execution)
+    def build_recovery_report(
+        self,
+        execution: RecoveryExecution,
+        *,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        report = build_recovery_operation_report(execution)
+        return self._finalize_report(report, source=execution, duration_ms=duration_ms)

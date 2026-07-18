@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import sys
 
+from .application import SpellSyncService
+from .application.builders import build_recovery_preview
+from .application.reports import RecoveryExecution, RecoveryOutcome, RecoveryPreview
 from .cli_options import CliOptions
 from .command_helpers import (
     mutating_command_scope,
@@ -22,6 +25,16 @@ from .push_journal import (
     journal_payload,
     recover_from_journal,
 )
+
+_DIAGNOSTICS = SpellSyncService(enable_file_logging=False)
+
+
+def _record_recovery(execution: RecoveryExecution) -> None:
+    _DIAGNOSTICS.build_recovery_report(execution)
+
+
+def _preview_from_validated(validated) -> RecoveryPreview:
+    return build_recovery_preview(validated)
 
 
 def _emit_recover_text(result: RecoverResult, *, dry_run: bool) -> int:
@@ -97,6 +110,15 @@ def _cmd_recover_locked(opts: CliOptions, *, validated=None) -> int:
             )
         if not dry_run:
             discard_journal(wordlist)
+            if validated is not None:
+                _record_recovery(
+                    RecoveryExecution(
+                        preview=_preview_from_validated(validated),
+                        result=ExitCode.OK,
+                        outcome=RecoveryOutcome.CLEANUP_COMPLETED,
+                        message="Recovery metadata cleaned up.",
+                    )
+                )
         log.detail("recover: completed journal cleaned up")
         return int(ExitCode.OK)
 
@@ -107,6 +129,15 @@ def _cmd_recover_locked(opts: CliOptions, *, validated=None) -> int:
         detail = load_result.detail or load_result.status.value
         if opts.discard_corrupt_journal and not dry_run:
             discard_journal(wordlist)
+            if validated is not None:
+                _record_recovery(
+                    RecoveryExecution(
+                        preview=_preview_from_validated(validated),
+                        result=ExitCode.OK,
+                        outcome=RecoveryOutcome.DISCARDED,
+                        message="Corrupt recovery metadata discarded.",
+                    )
+                )
             if opts.json_output:
                 emit_json(
                     {
@@ -171,6 +202,31 @@ def _cmd_recover_locked(opts: CliOptions, *, validated=None) -> int:
     exit_code = int(ExitCode.PUSH_ABORT if incomplete else ExitCode.OK)
     if not dry_run and not incomplete:
         cleanup_after_successful_recovery(journal)
+
+    if not dry_run and validated is not None:
+        preview = _preview_from_validated(validated)
+        if incomplete:
+            outcome = (
+                RecoveryOutcome.CONFLICTED
+                if result.conflicts
+                else RecoveryOutcome.RECOVERY_INCOMPLETE
+            )
+            message = "Recovery incomplete."
+        else:
+            outcome = RecoveryOutcome.RECOVERED
+            message = "Recovery completed."
+        _record_recovery(
+            RecoveryExecution(
+                preview=preview,
+                result=result,
+                outcome=outcome,
+                message=message,
+                restored=tuple(result.restored),
+                skipped=tuple(result.skipped),
+                conflicts=tuple(result.conflicts),
+                failed=tuple(result.failed),
+            )
+        )
 
     if opts.json_output:
         payload: dict[str, object] = {

@@ -26,7 +26,6 @@ from .reports import (
     TargetStatusRow,
     TargetUpdateReport,
 )
-from .service import SpellSyncService
 
 __all__ = [
     "DashboardIssue",
@@ -58,3 +57,11 @@ __all__ = [
     "TargetStatusRow",
     "TargetUpdateReport",
 ]
+
+
+def __getattr__(name: str):
+    if name == "SpellSyncService":
+        from .service import SpellSyncService
+
+        return SpellSyncService
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

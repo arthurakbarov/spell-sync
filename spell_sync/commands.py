@@ -103,6 +103,7 @@ def cmd_pull(opts: CliOptions) -> int:
 
 
 def _cmd_pull_locked(opts: CliOptions) -> int:
+    preview = _SERVICE.prepare_pull(opts)
     run = sync_run_for(opts)
     if opts.add_from:
         log.section(f"pull: merge words from {opts.add_from} -> wordlist")
@@ -113,6 +114,7 @@ def _cmd_pull_locked(opts: CliOptions) -> int:
     if isinstance(result, ExitCode):
         return emit_command_exit(opts, "pull", result)
     before, after = result
+    _SERVICE.build_pull_report(_SERVICE.pull_execution_from_result(preview, (before, after)))
     source = opts.add_from
     if opts.json_output:
         emit_json(
@@ -205,6 +207,8 @@ def _cmd_push_locked(opts: CliOptions) -> int:
         snapshot = _SERVICE.load_status(opts)
         for diff in snapshot.diffs:
             print_status_diff(diff, verbose=opts.verbose)
+    if not dry_run and not isinstance(result, ExitCode):
+        _SERVICE.build_push_report(_SERVICE.push_execution_from_result(prepared, result))
     return finish_push(result, opts, dry_run=dry_run, command="push")
 
 
@@ -226,7 +230,7 @@ def cmd_init(opts: CliOptions) -> int:
             selected_targets=discovery.default_enabled,
             create_wordlist=not wordlist.is_file(),
         )
-        service = SpellSyncService()
+        service = SpellSyncService(enable_file_logging=False)
         prepared = service.prepare_project_setup(draft)
         if not prepared.can_execute:
             if opts.json_output:
@@ -247,6 +251,7 @@ def cmd_init(opts: CliOptions) -> int:
             prepared,
             confirmed_setup_id=prepared.setup_id,
         )
+        service.build_setup_report(execution)
         if opts.json_output:
             emit_json(
                 {

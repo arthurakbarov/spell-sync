@@ -981,6 +981,7 @@ def build_setup_operation_report(execution) -> OperationReport:
             summary=execution.message,
             details=tuple(details),
             warnings=execution.warnings,
+            plan_identifier=prepared.setup_id,
         )
     if execution.outcome is ProjectSetupOutcome.STOPPED_SAFELY:
         return OperationReport(
@@ -990,6 +991,7 @@ def build_setup_operation_report(execution) -> OperationReport:
             summary=execution.message,
             details=("No existing file was overwritten.",),
             warnings=execution.warnings,
+            plan_identifier=prepared.setup_id,
         )
     if execution.outcome is ProjectSetupOutcome.SETUP_INCOMPLETE:
         return OperationReport(
@@ -1002,6 +1004,7 @@ def build_setup_operation_report(execution) -> OperationReport:
                 "Existing files were not overwritten.",
             ),
             warnings=execution.warnings,
+            plan_identifier=prepared.setup_id,
         )
     return OperationReport(
         operation="setup",
@@ -1010,4 +1013,5 @@ def build_setup_operation_report(execution) -> OperationReport:
         summary=execution.message,
         details=(),
         warnings=execution.warnings,
+        plan_identifier=prepared.setup_id,
     )
