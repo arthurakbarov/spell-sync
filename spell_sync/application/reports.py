@@ -107,6 +107,12 @@ class PushPreview:
     prepare_error: ExitCode | None = None
     wordlist_error: ExitCode | None = None
 
+    @property
+    def is_executable(self) -> bool:
+        return (
+            self.prepared is not None and self.prepare_error is None and self.wordlist_error is None
+        )
+
 
 @dataclass(frozen=True)
 class DoctorCheckView:
@@ -133,9 +139,98 @@ class PushPreviewSnapshot:
     wordlist_error: ExitCode | None = None
 
 
+class OperationOutcome(str, Enum):
+    COMPLETED = "completed"
+    COMPLETED_WITH_WARNINGS = "completed_with_warnings"
+    STOPPED_SAFELY = "stopped_safely"
+    RECOVERY_REQUIRED = "recovery_required"
+    FAILED = "failed"
+
+
+class OperationPhase(str, Enum):
+    PREPARING = "preparing"
+    EXECUTING = "executing"
+    ROLLING_BACK = "rolling_back"
+    FINALIZING = "finalizing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class PullSourcePreview:
+    name: str
+    status: str
+    words_contributed: int = 0
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
+class PullPreview:
+    """Immutable pull preview with the exact merged wordlist for execution."""
+
+    wordlist_path: str
+    additions: int
+    before_count: int
+    after_count: int
+    sources_used: tuple[str, ...]
+    sources_skipped: tuple[str, ...]
+    source_rows: tuple[PullSourcePreview, ...]
+    warnings: tuple[str, ...]
+    created_at: str
+    plan_identifier: str
+    merged_words: tuple[str, ...]
+    addition_words: frozenset[str] = frozenset()
+    wordlist_fingerprint: str | None = None
+    prepare_error: ExitCode | None = None
+    wordlist_error: ExitCode | None = None
+
+    @property
+    def is_executable(self) -> bool:
+        return self.prepare_error is None and self.wordlist_error is None
+
+
+@dataclass(frozen=True)
+class PullExecution:
+    preview: PullPreview
+    result: tuple[int, int] | ExitCode
+    outcome: OperationOutcome
+    message: str
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TargetUpdateReport:
+    name: str
+    additions: int
+    removals: int
+    status: str
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
+class OperationReport:
+    operation: str
+    outcome: OperationOutcome
+    title: str
+    summary: str
+    details: tuple[str, ...] = ()
+    target_updates: tuple[TargetUpdateReport, ...] = ()
+    warnings: tuple[str, ...] = ()
+    conflict_target: str | None = None
+    recovery_required: bool = False
+    plan_identifier: str | None = None
+
+
 @dataclass(frozen=True)
 class PushExecution:
     """Outcome of push prepare/execute using one PreparedPush instance."""
 
-    prepared: PreparedPush
+    prepared: PreparedPush | None
     result: PushResult | ExitCode
+    outcome: OperationOutcome = OperationOutcome.COMPLETED
+    message: str = ""
+    conflict_target: str | None = None
+    warnings: tuple[str, ...] = ()
+    target_updates: tuple[TargetUpdateReport, ...] = ()
+    recovery_required: bool = False
+    plan_identifier: str | None = None

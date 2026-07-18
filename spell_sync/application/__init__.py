@@ -7,12 +7,19 @@ from .reports import (
     DashboardState,
     DoctorCheckView,
     DoctorSnapshot,
+    OperationOutcome,
+    OperationPhase,
+    OperationReport,
+    PullExecution,
+    PullPreview,
+    PullSourcePreview,
     PushExecution,
     PushPreview,
     StatusDetailSnapshot,
     StatusSnapshot,
     TargetPreview,
     TargetStatusRow,
+    TargetUpdateReport,
 )
 from .service import SpellSyncService
 
@@ -26,6 +33,12 @@ __all__ = [
     "EventSink",
     "OperationEvent",
     "OperationKind",
+    "OperationOutcome",
+    "OperationPhase",
+    "OperationReport",
+    "PullExecution",
+    "PullPreview",
+    "PullSourcePreview",
     "PushExecution",
     "PushPreview",
     "SpellSyncService",
@@ -33,4 +46,5 @@ __all__ = [
     "StatusSnapshot",
     "TargetPreview",
     "TargetStatusRow",
+    "TargetUpdateReport",
 ]

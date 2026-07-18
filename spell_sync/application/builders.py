@@ -13,6 +13,7 @@ from ..push_journal import JournalLoadStatus, file_content_hash
 from ..push_prepared import PreparedPush
 from ..read_outcome import ReadStatus, dictionary_read_result
 from ..settings import ConfigStatus
+from ..sync_models import PushResult
 from ..sync_run import SyncRun
 from ..validated_runtime import ValidatedRuntime
 from .reports import (
@@ -21,11 +22,18 @@ from .reports import (
     DashboardState,
     DoctorCheckView,
     DoctorSnapshot,
+    OperationOutcome,
+    OperationReport,
+    PullExecution,
+    PullPreview,
+    PullSourcePreview,
+    PushExecution,
     PushPreview,
     StatusDetailSnapshot,
     StatusSnapshot,
     TargetPreview,
     TargetStatusRow,
+    TargetUpdateReport,
 )
 
 
@@ -490,3 +498,233 @@ def build_doctor_snapshot(report: DoctorReport) -> DoctorSnapshot:
             )
         )
     return DoctorSnapshot(checks=tuple(checks), has_errors=report.has_errors)
+
+
+def build_pull_preview(run: SyncRun) -> PullPreview:
+    """Compute pull merge without writing the wordlist."""
+    from ..io import read_text_words
+    from ..read_outcome import is_readable_for_union
+    from ..words import clean_words, merge_case_duplicates, sort_words
+
+    created_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    wordlist_path = run.wordlist_str
+    wordlist_error = run.check_wordlist()
+    if wordlist_error is not None:
+        return PullPreview(
+            wordlist_path=wordlist_path,
+            additions=0,
+            before_count=0,
+            after_count=0,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at=created_at,
+            plan_identifier="unavailable",
+            merged_words=(),
+            wordlist_error=wordlist_error,
+        )
+
+    words = clean_words(read_text_words(wordlist_path))
+    before = len(words)
+    ordered = sort_words(words)
+    seen_casefold = {word.casefold() for word in ordered}
+    addition_words: set[str] = set()
+    sources_used: list[str] = []
+    sources_skipped: list[str] = []
+    source_rows: list[PullSourcePreview] = []
+    warnings: list[str] = []
+
+    for dictionary in run.context.dictionaries:
+        read_result = dictionary_read_result(dictionary)
+        status = read_result.status
+        if status is ReadStatus.UNREADABLE:
+            sources_skipped.append(dictionary.name)
+            source_rows.append(
+                PullSourcePreview(
+                    dictionary.name,
+                    "skipped",
+                    detail="no access — pull skipped",
+                )
+            )
+            warnings.append(f"Skipped unreadable: {dictionary.name}")
+            continue
+        if status in (ReadStatus.CORRUPT, ReadStatus.UNSUPPORTED):
+            sources_skipped.append(dictionary.name)
+            source_rows.append(
+                PullSourcePreview(
+                    dictionary.name,
+                    "skipped",
+                    detail="corrupt or unsupported — pull skipped",
+                )
+            )
+            warnings.append(f"Skipped corrupt: {dictionary.name}")
+            continue
+        if not is_readable_for_union(status):
+            sources_skipped.append(dictionary.name)
+            source_rows.append(PullSourcePreview(dictionary.name, "skipped", detail=status.value))
+            continue
+        contributed = 0
+        for word in sort_words(read_result.words):
+            key = word.casefold()
+            if key not in seen_casefold:
+                ordered.append(word)
+                seen_casefold.add(key)
+                addition_words.add(word)
+                contributed += 1
+        sources_used.append(dictionary.name)
+        source_rows.append(
+            PullSourcePreview(
+                dictionary.name,
+                "used",
+                words_contributed=contributed,
+            )
+        )
+
+    merged = merge_case_duplicates(ordered)
+    after = len(merged)
+    digest = file_content_hash(Path(wordlist_path))
+    plan_id = (digest or f"{before}-{after}")[:8]
+    return PullPreview(
+        wordlist_path=wordlist_path,
+        additions=after - before,
+        before_count=before,
+        after_count=after,
+        sources_used=tuple(sources_used),
+        sources_skipped=tuple(sources_skipped),
+        source_rows=tuple(source_rows),
+        warnings=tuple(warnings),
+        created_at=created_at,
+        plan_identifier=plan_id,
+        merged_words=tuple(merged),
+        addition_words=frozenset(addition_words),
+        wordlist_fingerprint=digest,
+    )
+
+
+def build_target_updates_from_preview(preview: PushPreview) -> tuple[TargetUpdateReport, ...]:
+    rows: list[TargetUpdateReport] = []
+    for target in preview.targets:
+        rows.append(
+            TargetUpdateReport(
+                name=target.name,
+                additions=target.additions,
+                removals=target.removals,
+                status=target.status,
+            )
+        )
+    for name in preview.skipped:
+        rows.append(TargetUpdateReport(name=name, additions=0, removals=0, status="Skipped"))
+    for name in preview.corrupt:
+        rows.append(TargetUpdateReport(name=name, additions=0, removals=0, status="Corrupt"))
+    return tuple(rows)
+
+
+def build_push_operation_report(execution: PushExecution) -> OperationReport:
+    outcome = execution.outcome
+    if outcome is OperationOutcome.RECOVERY_REQUIRED:
+        return OperationReport(
+            operation="push",
+            outcome=outcome,
+            title="Push requires recovery",
+            summary=(
+                "Automatic rollback was incomplete. Recovery metadata and snapshots were preserved."
+            ),
+            details=(
+                "Run Recovery before another write operation.",
+                execution.message,
+            ),
+            target_updates=execution.target_updates,
+            warnings=execution.warnings,
+            recovery_required=True,
+            plan_identifier=execution.plan_identifier,
+        )
+    if outcome is OperationOutcome.STOPPED_SAFELY:
+        if execution.conflict_target:
+            return OperationReport(
+                operation="push",
+                outcome=outcome,
+                title="Push stopped safely",
+                summary=(
+                    "A target changed after the preview was created. "
+                    "The conflicting file was not overwritten."
+                ),
+                details=(
+                    f"Conflicting target: {execution.conflict_target}",
+                    "No conflicting file was overwritten.",
+                ),
+                conflict_target=execution.conflict_target,
+                plan_identifier=execution.plan_identifier,
+            )
+        return OperationReport(
+            operation="push",
+            outcome=outcome,
+            title="Push stopped safely",
+            summary="A write failed. Previously updated files were restored.",
+            details=(execution.message,),
+            target_updates=execution.target_updates,
+            warnings=execution.warnings,
+            plan_identifier=execution.plan_identifier,
+        )
+    if outcome is OperationOutcome.COMPLETED_WITH_WARNINGS:
+        result = execution.result
+        skipped = len(result.skipped) if isinstance(result, PushResult) else 0
+        written = len(result.written) if isinstance(result, PushResult) else 0
+        return OperationReport(
+            operation="push",
+            outcome=outcome,
+            title="Push completed with warnings",
+            summary=f"{written} targets updated, {skipped} target(s) skipped.",
+            details=(execution.message,),
+            target_updates=execution.target_updates,
+            warnings=execution.warnings,
+            plan_identifier=execution.plan_identifier,
+        )
+    if outcome is OperationOutcome.COMPLETED:
+        return OperationReport(
+            operation="push",
+            outcome=outcome,
+            title="Push completed",
+            summary=execution.message or "Push finished successfully.",
+            details=("Transaction: completed", "Recovery data: cleaned up"),
+            target_updates=execution.target_updates,
+            warnings=execution.warnings,
+            plan_identifier=execution.plan_identifier,
+        )
+    return OperationReport(
+        operation="push",
+        outcome=outcome,
+        title="Push failed",
+        summary=execution.message or "Push could not complete.",
+        details=(),
+        target_updates=execution.target_updates,
+        warnings=execution.warnings,
+        plan_identifier=execution.plan_identifier,
+    )
+
+
+def build_pull_operation_report(execution: PullExecution) -> OperationReport:
+    preview = execution.preview
+    if execution.outcome is OperationOutcome.COMPLETED:
+        return OperationReport(
+            operation="pull",
+            outcome=execution.outcome,
+            title="Pull completed",
+            summary=(f"{preview.additions} words added to the canonical wordlist"),
+            details=(
+                f"{len(preview.sources_used)} sources read",
+                f"{len(preview.sources_skipped)} source(s) skipped",
+                f"Wordlist: {preview.wordlist_path}",
+            ),
+            warnings=execution.warnings or preview.warnings,
+            plan_identifier=preview.plan_identifier,
+        )
+    return OperationReport(
+        operation="pull",
+        outcome=execution.outcome,
+        title="Pull failed",
+        summary=execution.message or "Pull could not complete.",
+        details=(f"Wordlist: {preview.wordlist_path}",),
+        warnings=execution.warnings,
+        plan_identifier=preview.plan_identifier,
+    )
