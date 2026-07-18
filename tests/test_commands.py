@@ -48,7 +48,7 @@ class TestCommands(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
-            with patch("spell_sync.commands.sync_run_for", return_value=run):
+            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     self.assertEqual(commands.cmd_status(DEFAULT_OPTS), 0)
@@ -68,7 +68,7 @@ class TestCommands(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
-            with patch("spell_sync.commands.sync_run_for", return_value=run):
+            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_status(CliOptions(verbose=True))
@@ -99,7 +99,7 @@ class TestWordlistUnreadable(unittest.TestCase):
             open(wordlist, "w").close()
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             with (
-                patch("spell_sync.commands.sync_run_for", return_value=run),
+                patch("spell_sync.command_helpers.sync_run_for", return_value=run),
                 patch("spell_sync.push_setup.wordlist_unreadable", return_value=True),
             ):
                 code = commands.cmd_status(DEFAULT_OPTS)

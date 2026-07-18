@@ -11,6 +11,7 @@ from .app_process_check import (
     confirm_firefox_before_push,
     confirm_obsidian_before_push,
 )
+from .application import SpellSyncService
 from .bundled_files import init_project_directory
 from .cli_options import CliOptions
 from .command_helpers import (
@@ -20,7 +21,6 @@ from .command_helpers import (
     guard_exit_code,
     mutating_command_scope,
     print_status_diff,
-    push_skip_running_app_dicts,
     quiet_json_output,
     sync_run_for,
     wordlist_file_for,
@@ -34,6 +34,8 @@ from .log import log
 from .removal_review import review_removals_interactive
 from .runtime import installed_package_version
 from .sync_run import PushResult, SyncRun
+
+_SERVICE = SpellSyncService()
 
 
 def _effective_push_strict(opts: CliOptions) -> bool:
@@ -69,31 +71,26 @@ def cmd_status(opts: CliOptions) -> int:
     with quiet_json_output(opts):
         verbose = opts.verbose
         log.section("status" + (" (verbose)" if verbose else ""))
-        run = sync_run_for(opts)
-        wordlist_err = run.check_wordlist()
-        if wordlist_err is not None:
-            return emit_command_exit(opts, "status", wordlist_err)
-        words = run.load_wordlist()
-        if not words:
+        snapshot = _SERVICE.load_status(opts)
+        if snapshot.wordlist_error is not None:
+            return emit_command_exit(opts, "status", snapshot.wordlist_error)
+        if snapshot.empty_wordlist:
             log.warn("wordlist is empty — push will abort; dictionaries won't change.")
-        else:
-            risk = run.destructive_push_risk()
-            if risk:
-                log.warn(risk)
-        diffs = run.status_diffs(verbose=verbose)
+        elif snapshot.destructive_risk:
+            log.warn(snapshot.destructive_risk)
         if opts.json_output:
             emit_json(
                 {
                     **base_payload("status", exit=int(ExitCode.OK)),
                     "version": installed_package_version(),
-                    "wordlist_count": len(words),
-                    "skipped_unreadable": list(run.skipped_unreadable_dictionary_names()),
-                    "skipped_corrupt": list(run.skipped_corrupt_dictionary_names()),
-                    "dictionaries": [dictionary_diff_payload(d) for d in diffs],
+                    "wordlist_count": snapshot.wordlist_count,
+                    "skipped_unreadable": list(snapshot.skipped_unreadable),
+                    "skipped_corrupt": list(snapshot.skipped_corrupt),
+                    "dictionaries": [dictionary_diff_payload(d) for d in snapshot.diffs],
                 }
             )
             return int(ExitCode.OK)
-        for diff in diffs:
+        for diff in snapshot.diffs:
             print_status_diff(diff, verbose=verbose)
         return int(ExitCode.OK)
 
@@ -151,8 +148,7 @@ def _cmd_push_locked(opts: CliOptions) -> int:
     log.section(f"push{mode}: wordlist OVERWRITES all dictionaries")
     warn_missing_optional_apps()
     run = sync_run_for(opts, strict_push=_effective_push_strict(opts))
-    skip_names = push_skip_running_app_dicts(run, opts)
-    prepared = run.prepare_push_operation(skip_names=skip_names)
+    prepared = _SERVICE.prepare_push(run, opts)
     if isinstance(prepared, ExitCode):
         return finish_push(prepared, opts, dry_run=dry_run, command="push")
     if not dry_run:
@@ -205,12 +201,10 @@ def _cmd_push_locked(opts: CliOptions) -> int:
                 action=action,
                 reason="confirm_push_removals",
             )
-    if dry_run:
-        result = run._run_push_transaction(dry_run=True, prepared=prepared)
-    else:
-        result = run.push_from_wordlist(prepared=prepared)
+    result = _SERVICE.execute_push(run, prepared, dry_run=dry_run)
     if dry_run and isinstance(result, PushResult) and not opts.json_output:
-        for diff in run.status_diffs(verbose=opts.verbose):
+        snapshot = _SERVICE.load_status(opts)
+        for diff in snapshot.diffs:
             print_status_diff(diff, verbose=opts.verbose)
     return finish_push(result, opts, dry_run=dry_run, command="push")
 

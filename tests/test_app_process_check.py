@@ -380,7 +380,7 @@ class TestChromeGuard(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with patch.object(commands, "sync_run_for", return_value=run):
+            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     commands.cmd_status(DEFAULT_OPTS)

@@ -233,7 +233,7 @@ class TestCommandsSyncFlow(unittest.TestCase):
     def test_status_unreadable_json(self):
         run = SyncRun(wordlist="/tmp/x", dictionaries=[])
         run.check_wordlist = lambda: ExitCode.WORDLIST_UNREADABLE  # type: ignore
-        with patch.object(commands, "sync_run_for", return_value=run):
+        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_status(CliOptions(json_output=True))
@@ -259,7 +259,7 @@ class TestCommandsSyncFlow(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with patch.object(commands, "sync_run_for", return_value=run):
+            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_status(DEFAULT_OPTS)
