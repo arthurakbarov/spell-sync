@@ -462,10 +462,13 @@ class ReviewSessionReportScreen(Screen[None]):
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
+        self._saved_report_path: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(id="review-session-report")
+        yield Button("Save report", id="btn-save-report")
+        yield Static(id="session-report-export-status")
         yield Button("Back to dashboard", id="btn-dashboard", variant="primary")
         yield Button("View operation history", id="btn-history")
         yield Button("Quit", id="btn-quit", variant="error")
@@ -476,7 +479,9 @@ class ReviewSessionReportScreen(Screen[None]):
         self.query_one("#review-session-report", Static).update("\n".join(report.summary_lines))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-dashboard":
+        if event.button.id == "btn-save-report":
+            self._save_session_report()
+        elif event.button.id == "btn-dashboard":
             self.action_back_dashboard()
         elif event.button.id == "btn-history":
             from .logs_screen import LogsScreen
@@ -485,6 +490,28 @@ class ReviewSessionReportScreen(Screen[None]):
         elif event.button.id == "btn-quit":
             self._controller.clear_review_session()
             self.app.exit(0)
+
+    def _save_session_report(self) -> None:
+        from ...support.path_redaction import redact_path
+
+        status = self.query_one("#session-report-export-status", Static)
+        if self._saved_report_path is not None:
+            status.update(
+                "Report already saved\n\n"
+                f"{redact_path(self._saved_report_path) or self._saved_report_path}"
+            )
+            return
+        try:
+            path = self._controller.export_review_session_report(fmt="json")
+        except FileExistsError as exc:
+            status.update(f"× {exc}")
+            return
+        except Exception:
+            status.update("× Review report could not be exported.")
+            return
+        self._saved_report_path = str(path)
+        redacted = redact_path(str(path)) or str(path)
+        status.update(f"Report saved\n\n{redacted}")
 
     def action_back_dashboard(self) -> None:
         from .dashboard import DashboardScreen
