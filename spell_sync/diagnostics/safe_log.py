@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 _SENSITIVE_PATTERNS = (
     re.compile(r"(?i)(password|secret|token|api[_-]?key)\s*[:=]\s*\S+"),
     re.compile(r"(?i)(removed words|wordlist content|dictionary content|full environment)\s*[:=]"),
+    re.compile(r"(?i)\[chrome\s*=\s*true\]"),
+    re.compile(r"(?i)/Users/[^\s]+"),
+    re.compile(r"(?i)/home/[^\s]+"),
 )
 
 _FORBIDDEN_SUBSTRINGS = (
@@ -15,6 +19,8 @@ _FORBIDDEN_SUBSTRINGS = (
     "wordlist content:",
     "dictionary content:",
     "full environment:",
+    "wordlist.txt",
+    "spell-sync.toml",
 )
 
 
@@ -35,8 +41,36 @@ def sanitize_exception_message(message: str | None) -> str | None:
     cleaned = sanitize_log_message(message)
     if cleaned != message:
         return "[sanitized exception message]"
-    return message
+    return "[sanitized exception message]"
 
 
 def safe_repr(value: Any) -> str:
     return f"{type(value).__name__}"
+
+
+def format_safe_log_record(record: logging.LogRecord, formatted: str) -> str:
+    if isinstance(record.msg, str):
+        record.msg = sanitize_log_message(record.msg)
+    if record.exc_info:
+        exc_type = record.exc_info[0]
+        type_name = exc_type.__name__ if exc_type is not None else "Exception"
+        reason = getattr(record, "reason_code", None)
+        suffix = f" exception_type={type_name}"
+        if reason:
+            suffix += f" reason_code={reason}"
+        first_line = formatted.splitlines()[0] if formatted else ""
+        return sanitize_log_message(first_line) + suffix
+    return _sanitize_formatted_output(formatted)
+
+
+def _sanitize_formatted_output(text: str) -> str:
+    lines: list[str] = []
+    for line in text.splitlines():
+        if re.match(r"^\s*\w+(Error|Exception):", line):
+            lines.append(re.sub(r"(:\s*).+", r"\1[sanitized exception message]", line, count=1))
+            continue
+        if line.lstrip().startswith("File "):
+            lines.append("  File [redacted]")
+            continue
+        lines.append(sanitize_log_message(line))
+    return "\n".join(lines)

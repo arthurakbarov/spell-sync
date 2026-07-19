@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,9 +14,12 @@ from spell_sync.diagnostics.history_builder import build_history_record
 from spell_sync.diagnostics.history_record import OperationHistoryRecord
 from spell_sync.diagnostics.history_store import OperationHistoryStore
 from spell_sync.diagnostics.paths import resolve_app_state_paths
-from spell_sync.diagnostics.safe_log import safe_repr, sanitize_exception_message
-from spell_sync.diagnostics.technical_logging import (
+from spell_sync.diagnostics.safe_log import (
     _sanitize_formatted_output,
+    safe_repr,
+    sanitize_exception_message,
+)
+from spell_sync.diagnostics.technical_logging import (
     configure_file_logging,
     read_technical_log_tail,
     reset_logging_for_tests,
@@ -57,10 +61,10 @@ def test_resolve_platform_paths_linux_xdg(monkeypatch, tmp_path: Path) -> None:
 def test_history_append_oserror(tmp_path: Path, monkeypatch) -> None:
     store = OperationHistoryStore(_paths(tmp_path))
 
-    def fail_open(*args, **kwargs):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(Path, "open", fail_open)
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.history_store.open_append_only",
+        lambda *args, **kwargs: (None, "disk full"),
+    )
     result = store.append(
         OperationHistoryRecord(
             schema_version=1,
@@ -362,7 +366,7 @@ def test_sanitize_forbidden_substring() -> None:
     from spell_sync.diagnostics.safe_log import sanitize_log_message
 
     assert sanitize_log_message("removed words: [x]") == "[redacted diagnostic message]"
-    assert sanitize_exception_message("plain failure") == "plain failure"
+    assert sanitize_exception_message("plain failure") == "[sanitized exception message]"
     assert sanitize_exception_message("token=abc") == "[sanitized exception message]"
 
 
@@ -512,3 +516,179 @@ def test_lock_close_failure(tmp_path: Path, monkeypatch) -> None:
             duration_ms=1,
         )
     )
+
+
+def test_history_record_clamps_negative_and_overflow_counts() -> None:
+    record = OperationHistoryRecord.from_json_dict(
+        {
+            "schema_version": 1,
+            "record_id": "clamp",
+            "timestamp": "2026-07-19T00:00:00",
+            "operation": "push",
+            "outcome": "completed",
+            "duration_ms": 1,
+            "updated_targets": -5,
+            "additions": 20_000_000,
+        }
+    )
+    assert record is not None
+    assert record.updated_targets == 0
+    assert record.additions == 10_000_000
+
+
+def test_history_append_write_failure(tmp_path: Path, monkeypatch) -> None:
+    import os
+
+    store = OperationHistoryStore(_paths(tmp_path))
+
+    def fail_write(*args, **kwargs):
+        raise OSError("write failed")
+
+    monkeypatch.setattr(os, "write", fail_write)
+    result = store.append(
+        OperationHistoryRecord(
+            schema_version=1,
+            record_id="write-fail",
+            timestamp=datetime.now(timezone.utc),
+            operation="push",
+            outcome="completed",
+            duration_ms=1,
+        )
+    )
+    assert not result.ok
+
+
+def test_history_state_dir_creation_failure(tmp_path: Path, monkeypatch) -> None:
+    store = OperationHistoryStore(_paths(tmp_path))
+
+    def fail_mkdir(*args, **kwargs):
+        raise OSError("mkdir failed")
+
+    monkeypatch.setattr(Path, "mkdir", fail_mkdir)
+    result = store.append(
+        OperationHistoryRecord(
+            schema_version=1,
+            record_id="mkdir-fail",
+            timestamp=datetime.now(timezone.utc),
+            operation="push",
+            outcome="completed",
+            duration_ms=1,
+        )
+    )
+    assert not result.ok
+
+
+def test_compaction_temp_path_symlink(tmp_path: Path) -> None:
+    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
+
+    paths = _paths(tmp_path)
+    store = OperationHistoryStore(paths)
+    for index in range(MAX_HISTORY_RECORDS):
+        store.append(
+            OperationHistoryRecord(
+                schema_version=1,
+                record_id=f"tmp-{index}",
+                timestamp=datetime.now(timezone.utc),
+                operation="push",
+                outcome="completed",
+                duration_ms=1,
+            )
+        )
+    outside = tmp_path / "outside.tmp"
+    outside.write_text("blocked", encoding="utf-8")
+    temp_path = paths.history_file.with_suffix(".jsonl.tmp")
+    temp_path.symlink_to(outside)
+    store.append(
+        OperationHistoryRecord(
+            schema_version=1,
+            record_id="tmp-trigger",
+            timestamp=datetime.now(timezone.utc),
+            operation="push",
+            outcome="completed",
+            duration_ms=1,
+        )
+    )
+    assert outside.read_text(encoding="utf-8") == "blocked"
+
+
+def test_compaction_cleanup_unlink_failure(tmp_path: Path, monkeypatch) -> None:
+    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
+
+    paths = _paths(tmp_path)
+    store = OperationHistoryStore(paths)
+    for index in range(MAX_HISTORY_RECORDS + 1):
+        store.append(
+            OperationHistoryRecord(
+                schema_version=1,
+                record_id=f"cleanup-{index}",
+                timestamp=datetime.now(timezone.utc),
+                operation="push",
+                outcome="completed",
+                duration_ms=1,
+            )
+        )
+
+    def fail_replace(self, target):
+        raise OSError("replace failed")
+
+    def fail_unlink(self):
+        raise OSError("unlink failed")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+    store._maybe_compact_unlocked()
+
+
+def test_logging_rejects_symlink_log_directory(tmp_path: Path) -> None:
+    reset_logging_for_tests()
+    root = tmp_path / "state"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    log_parent = root / "logs"
+    log_parent.symlink_to(outside)
+    from spell_sync.diagnostics.paths import AppStatePaths
+
+    paths = AppStatePaths(
+        state_directory=root,
+        history_file=root / "operation-history.jsonl",
+        history_lock=root / "operation-history.lock",
+        technical_log=log_parent / "spell-sync.log",
+        log_root=root,
+    )
+    result = configure_file_logging(paths)
+    assert not result.ok
+
+
+def test_format_safe_log_record_with_reason_code() -> None:
+    import logging
+
+    from spell_sync.diagnostics.safe_log import format_safe_log_record
+
+    record = logging.LogRecord(
+        name="spell_sync",
+        level=logging.ERROR,
+        pathname=__file__,
+        lineno=1,
+        msg="failed",
+        args=(),
+        exc_info=None,
+    )
+    record.reason_code = "push_blocked"
+    try:
+        raise RuntimeError("token=secret")
+    except RuntimeError:
+        record.exc_info = sys.exc_info()
+    formatted = format_safe_log_record(record, "ERROR spell_sync failed")
+    assert "reason_code=push_blocked" in formatted
+    assert "secret" not in formatted
+
+
+def test_sanitize_formatted_output_redacts_traceback_lines() -> None:
+    from spell_sync.diagnostics.safe_log import _sanitize_formatted_output
+
+    text = "ERROR boom\n  File /Users/me/secret.py\nValueError: token=abc"
+    cleaned = _sanitize_formatted_output(text)
+    assert "/Users/me" not in cleaned
+    assert "abc" not in cleaned
+    assert "File [redacted]" in cleaned

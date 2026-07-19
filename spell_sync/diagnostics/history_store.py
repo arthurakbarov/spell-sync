@@ -11,6 +11,13 @@ from typing import Iterator
 from ..application.events import OperationKind
 from ..application.reports import OperationOutcome
 from .history_record import OperationHistoryRecord
+from .path_guard import (
+    PathCheckResult,
+    open_append_only,
+    safe_unlink,
+    validate_directory_path,
+    validate_file_path,
+)
 from .paths import AppStatePaths
 from .types import HistoryClearResult, HistoryReadResult, HistoryWriteResult
 
@@ -65,12 +72,32 @@ class OperationHistoryStore:
     def paths(self) -> AppStatePaths:
         return self._paths
 
-    def _ensure_state_dir(self) -> None:
-        self._paths.state_directory.mkdir(parents=True, exist_ok=True)
+    def _ensure_state_dir(self) -> PathCheckResult:
+        check = validate_directory_path(
+            self._paths.state_directory,
+            root=self._paths.state_directory,
+        )
+        if not check.ok:
+            return check
+        try:
+            self._paths.state_directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            return PathCheckResult(False, str(exc))
+        return PathCheckResult(True)
 
     @contextmanager
     def _history_lock(self) -> Iterator[bool]:
-        self._ensure_state_dir()
+        dir_check = self._ensure_state_dir()
+        if not dir_check.ok:
+            yield False
+            return
+        lock_check = validate_file_path(
+            self._paths.history_lock,
+            root=self._paths.state_directory,
+        )
+        if not lock_check.ok:
+            yield False
+            return
         fd = os.open(self._paths.history_lock, os.O_CREAT | os.O_RDWR, 0o600)
         acquired = False
         try:
@@ -95,11 +122,23 @@ class OperationHistoryStore:
                 self._session_record_ids.add(record.record_id)
                 return HistoryWriteResult(ok=True, record_id=record.record_id, duplicate=True)
             line = json.dumps(record.to_json_dict(), ensure_ascii=False, sort_keys=True)
+            fd, open_error = open_append_only(
+                self._paths.history_file,
+                root=self._paths.state_directory,
+            )
+            if open_error is not None:
+                return HistoryWriteResult(ok=False, detail=open_error)
+            assert fd is not None
             try:
-                with self._paths.history_file.open("a", encoding="utf-8") as handle:
-                    handle.write(line + "\n")
+                payload = (line + "\n").encode("utf-8")
+                os.write(fd, payload)
             except OSError as exc:
                 return HistoryWriteResult(ok=False, detail=str(exc))
+            finally:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
             self._session_record_ids.add(record.record_id)
             self._maybe_compact_unlocked()
             return HistoryWriteResult(ok=True, record_id=record.record_id)
@@ -138,6 +177,12 @@ class OperationHistoryStore:
         outcome: OperationOutcome | None = None,
     ) -> HistoryReadResult:
         bounded = max(1, min(limit, 500))
+        read_check = validate_file_path(
+            self._paths.history_file,
+            root=self._paths.state_directory,
+        )
+        if not read_check.ok and self._paths.history_file.exists():
+            return HistoryReadResult(records=(), detail=read_check.detail)
         if not self._paths.history_file.is_file():
             return HistoryReadResult(records=())
         malformed = 0
@@ -168,11 +213,12 @@ class OperationHistoryStore:
         with self._history_lock() as acquired:
             if not acquired:
                 return HistoryClearResult(ok=False, detail="History lock unavailable.")
-            try:
-                if self._paths.history_file.is_file():
-                    self._paths.history_file.unlink()
-            except OSError as exc:
-                return HistoryClearResult(ok=False, detail=str(exc))
+            unlink = safe_unlink(
+                self._paths.history_file,
+                root=self._paths.state_directory,
+            )
+            if not unlink.ok:
+                return HistoryClearResult(ok=False, detail=unlink.detail)
             self._session_record_ids.clear()
             return HistoryClearResult(ok=True)
 
@@ -192,6 +238,9 @@ class OperationHistoryStore:
             return
         kept = parsed[-MAX_HISTORY_RECORDS:]
         temp_path = self._paths.history_file.with_suffix(".jsonl.tmp")
+        temp_check = validate_file_path(temp_path, root=self._paths.state_directory)
+        if not temp_check.ok:
+            return
         payload = "\n".join(
             json.dumps(record.to_json_dict(), ensure_ascii=False, sort_keys=True) for record in kept
         )

@@ -15,6 +15,7 @@ class AppStatePaths:
     history_file: Path
     history_lock: Path
     technical_log: Path
+    log_root: Path
 
 
 def _linux_state_home() -> Path:
@@ -37,6 +38,7 @@ def resolve_app_state_paths(*, state_root: Path | None = None) -> AppStatePaths:
             history_file=root / "operation-history.jsonl",
             history_lock=root / "operation-history.lock",
             technical_log=root / "spell-sync.log",
+            log_root=root,
         )
 
     if is_macos():
@@ -44,17 +46,21 @@ def resolve_app_state_paths(*, state_root: Path | None = None) -> AppStatePaths:
         technical_log = (
             home_dir() / "Library" / "Logs" / "spell-sync" / "spell-sync.log"
         ).resolve()
+        log_root = technical_log.parent
     elif is_windows():
         local = Path(os.getenv("LOCALAPPDATA") or home_dir()).expanduser().resolve()
         state_directory = (local / "spell-sync").resolve()
         technical_log = (state_directory / "logs" / "spell-sync.log").resolve()
+        log_root = technical_log.parent
     else:
         state_directory = (_linux_state_home() / "spell-sync").resolve()
         technical_log = (state_directory / "spell-sync.log").resolve()
+        log_root = state_directory
 
     return AppStatePaths(
         state_directory=state_directory,
         history_file=state_directory / "operation-history.jsonl",
         history_lock=state_directory / "operation-history.lock",
         technical_log=technical_log,
+        log_root=log_root,
     )
