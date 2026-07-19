@@ -217,6 +217,7 @@ class TestCliWiringInvariants(unittest.TestCase):
         "push",
         "recover",
         "status",
+        "support-report",
         "ui",
         "version",
     }

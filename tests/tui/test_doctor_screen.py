@@ -73,6 +73,23 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             content = await wait_for_text(pilot, "#doctor-content", "Doctor failed")
             self.assertNotIn("Traceback", str(content.render()))
 
+    async def test_export_support_report(self):
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        controller = TuiController(fake_service(), CliOptions())
+        controller.export_support_report = MagicMock(  # type: ignore[method-assign]
+            return_value=Path("/tmp/support-reports/support-report-test.json")
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            status = await wait_for_text(pilot, "#doctor-export-status", "Report saved")
+            self.assertIn("Report saved", str(status.render()))
+            controller.export_support_report.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

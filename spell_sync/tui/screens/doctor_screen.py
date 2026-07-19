@@ -9,6 +9,7 @@ from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.reports import DoctorSnapshot
+from ...support.path_redaction import redact_path
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
@@ -28,6 +29,8 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
         yield Header()
         yield Static(id="doctor-content")
         yield Button("Run again", id="btn-run-doctor", variant="primary")
+        yield Button("Export support report", id="btn-export-support")
+        yield Static(id="doctor-export-status")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -113,6 +116,21 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-run-doctor":
             self.action_run_doctor()
+        elif event.button.id == "btn-export-support":
+            self._export_support_report()
+
+    def _export_support_report(self) -> None:
+        status = self.query_one("#doctor-export-status", Static)
+        try:
+            path = self._controller.export_support_report(fmt="json")
+        except FileExistsError as exc:
+            status.update(f"× {exc}")
+            return
+        except Exception:
+            status.update("× Support report could not be exported.")
+            return
+        redacted = redact_path(str(path)) or str(path)
+        status.update(f"Report saved\n\n{redacted}")
 
     def action_run_doctor(self) -> None:
         self.run_doctor()

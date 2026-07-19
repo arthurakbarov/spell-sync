@@ -21,6 +21,7 @@ from .json_output import base_payload, emit_json
 from .log import log
 from .plan_cmd import cmd_plan
 from .recover_cmd import cmd_recover
+from .support_report_cmd import cmd_support_report
 from .tui import (
     cmd_ui,
     print_non_interactive_ui_error,
@@ -41,6 +42,7 @@ COMMANDS: Dict[str, CommandFn] = {
     "push": cmd_push,
     "recover": cmd_recover,
     "status": cmd_status,
+    "support-report": cmd_support_report,
     "ui": cmd_ui,
     "version": cmd_version,
 }
@@ -176,6 +178,25 @@ def _build_parser() -> argparse.ArgumentParser:
     version_p = sub.add_parser("version", help="print installed package version")
     add_common_flags(version_p)
 
+    support_p = sub.add_parser(
+        "support-report",
+        help="export a redacted diagnostic support report",
+    )
+    support_p.add_argument(
+        "--format",
+        dest="support_report_format",
+        choices=("text", "json"),
+        default="text",
+        help="output format (default: text)",
+    )
+    support_p.add_argument(
+        "--output",
+        dest="support_report_output",
+        metavar="PATH",
+        help="write report to PATH instead of the default support-reports directory",
+    )
+    add_common_flags(support_p)
+
     ui_p = sub.add_parser("ui", help="open interactive TUI dashboard")
     ui_p.add_argument(
         "-C",
@@ -204,6 +225,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace | None:
         "discard_corrupt_journal": False,
         "show_targets": False,
         "plan_removals": False,
+        "support_report_format": "text",
+        "support_report_output": None,
     }
     if not argv:
         return argparse.Namespace(**defaults)

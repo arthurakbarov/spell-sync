@@ -20,6 +20,8 @@ class CliOptions:
     discard_corrupt_journal: bool = False
     show_targets: bool = False
     plan_removals: bool = False
+    support_report_format: str = "text"
+    support_report_output: str | None = None
 
     @classmethod
     def from_namespace(cls, args: object) -> CliOptions:
@@ -37,4 +39,6 @@ class CliOptions:
             discard_corrupt_journal=getattr(args, "discard_corrupt_journal", False),
             show_targets=getattr(args, "show_targets", False),
             plan_removals=getattr(args, "plan_removals", False),
+            support_report_format=getattr(args, "support_report_format", "text"),
+            support_report_output=getattr(args, "support_report_output", None),
         )
