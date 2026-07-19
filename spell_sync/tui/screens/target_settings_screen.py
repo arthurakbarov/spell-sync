@@ -27,6 +27,7 @@ class TargetSettingsScreen(LoadTokenMixin, Screen[None]):
         Binding("up", "focus_previous", "Up", show=False),
         Binding("down", "focus_next", "Down", show=False),
         Binding("space", "toggle_focused", "Toggle", show=False),
+        Binding("enter", "open_details", "Details", show=False),
     ]
 
     def __init__(self, controller: TuiController) -> None:
@@ -137,6 +138,14 @@ class TargetSettingsScreen(LoadTokenMixin, Screen[None]):
         focused = self.focused
         if isinstance(focused, SetupTargetRowWidget) and focused._target.selectable:
             focused.post_message(SetupTargetRowWidget.Toggled(focused._target.identifier))
+
+    def action_open_details(self) -> None:
+        focused = self.focused
+        if not isinstance(focused, SetupTargetRowWidget):
+            return
+        from .target_details_screen import TargetDetailsScreen
+
+        self.app.push_screen(TargetDetailsScreen(self._controller, focused._target.identifier))
 
     def action_back(self) -> None:
         self.app.pop_screen()

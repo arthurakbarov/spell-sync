@@ -620,6 +620,23 @@ class TuiController:
         self._target_settings_selection = None
         self._target_settings_prepared = None
 
+    def target_details(self, target_id: str):
+        from ..application.target_details import build_target_details
+        from ..application.user_notices import build_notice, format_notice_action
+
+        discovery = self.target_settings_discovery()
+        for target in discovery.targets:
+            if target.identifier == target_id:
+                suggested = None
+                if target.status == "corrupt":
+                    notice = build_notice("target_corrupt")
+                    suggested = format_notice_action(notice)
+                elif target.status == "unreadable":
+                    notice = build_notice("target_unreadable")
+                    suggested = format_notice_action(notice)
+                return build_target_details(target, suggested_action=suggested)
+        raise KeyError(target_id)
+
     def begin_review_session(self) -> ReviewSession:
         self._review_session = ReviewSession()
         return self._review_session
@@ -681,3 +698,29 @@ class TuiController:
         pending = self.dashboard().pending_recovery
         session = self._review_session or ReviewSession()
         return build_review_session_report(session, pending_recovery=pending)
+
+    def export_support_report(self, *, fmt: str = "json") -> Path:
+        from ..application.support_report import (
+            build_support_report,
+            default_support_report_path,
+            export_support_report,
+        )
+
+        report = build_support_report(self._service, self.opts)
+        path = default_support_report_path(fmt=fmt)
+        return export_support_report(report, output_path=path, fmt=fmt)
+
+    def export_review_session_report(self, *, fmt: str = "json") -> Path:
+        from ..application.session_report_export import (
+            build_session_report_export,
+            default_session_report_path,
+            export_session_report,
+        )
+
+        session = self._review_session or ReviewSession()
+        export = build_session_report_export(
+            session,
+            pending_recovery=self.dashboard().pending_recovery,
+        )
+        path = default_session_report_path(fmt=fmt)
+        return export_session_report(export, output_path=path, fmt=fmt)

@@ -136,6 +136,21 @@ def capability_by_id(identifier: str) -> TargetCapability | None:
     return None
 
 
+_DISCOVERY_CAPABILITY_ALIASES: dict[str, str] = {
+    "editor": "editors",
+    "nvim-en": "neovim",
+    "macos": "macos_spelling",
+}
+
+
+def resolve_capability_identifier(identifier: str) -> str:
+    return _DISCOVERY_CAPABILITY_ALIASES.get(identifier, identifier)
+
+
+def capability_for_discovery_target(identifier: str) -> TargetCapability | None:
+    return capability_by_id(resolve_capability_identifier(identifier))
+
+
 def all_capability_identifiers() -> frozenset[str]:
     return frozenset(item.identifier for item in TARGET_CAPABILITIES)
 

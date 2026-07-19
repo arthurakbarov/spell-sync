@@ -180,6 +180,22 @@ class TestTargetSettingsScreen(unittest.IsolatedAsyncioTestCase):
             selected = controller.target_settings_selection().selected_target_ids
             assert selected == frozenset({"chrome"})
 
+    async def test_open_details_from_focused_row(self) -> None:
+        snapshot = _snapshot(_target("chrome", enabled=True))
+        controller = self._controller(snapshot)
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(TargetSettingsScreen(controller))
+            screen = app.screen
+            assert isinstance(screen, TargetSettingsScreen)
+            row = screen.query_one("#target-row-chrome", SetupTargetRowWidget)
+            row.focus()
+            await pilot.press("enter")
+            await pilot.pause()
+            from spell_sync.tui.screens.target_details_screen import TargetDetailsScreen
+
+            self.assertIsInstance(app.screen, TargetDetailsScreen)
+
 
 if __name__ == "__main__":
     unittest.main()
