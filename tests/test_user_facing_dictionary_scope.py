@@ -7,12 +7,13 @@ import unittest
 from pathlib import Path
 
 from spell_sync.application.builders import build_pull_operation_report, build_push_operation_report
-from spell_sync.application.product_concepts import CLI_ROOT_DESCRIPTION
+from spell_sync.application.product_concepts import CLI_ROOT_DESCRIPTION, PUSH_SCOPE_NOTICE
 from spell_sync.application.reports import OperationOutcome, PullExecution, PushExecution
 from spell_sync.cli import _build_parser
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.sync_models import PushResult
 from spell_sync.sync_run import SyncRun
+from spell_sync.words import subset_english, subset_russian
 from tests.tui.fake_service import sample_preview, sample_pull_preview
 
 USER_FACING_FILES = (
@@ -29,6 +30,9 @@ DANGEROUS_UNQUALIFIED = (
     "all application dictionaries",
     "complete application dictionary",
     "words missing from application dictionaries",
+    "every target receives the full canonical wordlist",
+    "keeps applications consistent",
+    "keeps enabled applications consistent",
 )
 
 
@@ -45,8 +49,14 @@ class TestUserFacingDictionaryScope(unittest.TestCase):
         help_text = parser.format_help().lower()
         self.assertIn("pull personal words", help_text)
         self.assertIn("custom diction", help_text)
-        self.assertIn("push the canonical personal wordlist", help_text)
+        self.assertIn("push personal words", help_text)
         self.assertNotIn("sync built-in", help_text)
+
+    def test_push_scope_copy_matches_filtering_model(self):
+        lowered = PUSH_SCOPE_NOTICE.lower()
+        self.assertIn("applicable personal", lowered)
+        self.assertIn("most targets", lowered)
+        self.assertIn("filter", lowered)
 
     def test_pull_report_summary_uses_custom_dictionaries(self):
         preview = sample_pull_preview(additions=3)
@@ -72,7 +82,10 @@ class TestUserFacingDictionaryScope(unittest.TestCase):
                 message="ok",
             )
         )
-        self.assertIn("custom diction", report.summary.lower())
+        summary = report.summary.lower()
+        self.assertIn("custom diction", summary)
+        self.assertIn("updated from the canonical wordlist", summary)
+        self.assertNotIn("was written to", summary)
 
     def test_push_writes_to_custom_dictionary_without_built_in_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -106,6 +119,22 @@ class TestUserFacingDictionaryScope(unittest.TestCase):
             assert not isinstance(prepared, int)
             run.push_from_wordlist(prepared=prepared)
             self.assertIn("RedundantExample", custom.read_text(encoding="utf-8"))
+
+    def test_ordinary_target_receives_full_wordlist(self):
+        words = {"alpha", "Бета", "123"}
+        target = Dictionary("custom", "/tmp/custom.txt", DictionaryFormat.TEXT)
+        self.assertEqual(target.target_words(words), words)
+
+    def test_windows_english_targets_receive_latin_subset(self):
+        words = {"alpha", "Бета", "123"}
+        for name in ("win-en", "win-en-gb"):
+            target = Dictionary(name, "/tmp/win.txt", DictionaryFormat.TEXT, subset=subset_english)
+            self.assertEqual(target.target_words(words), {"alpha"})
+
+    def test_windows_russian_target_receives_cyrillic_subset(self):
+        words = {"alpha", "Бета", "123"}
+        target = Dictionary("win-ru", "/tmp/win.txt", DictionaryFormat.TEXT, subset=subset_russian)
+        self.assertEqual(target.target_words(words), {"Бета", "123"})
 
     def test_user_facing_docs_avoid_dangerous_unqualified_claims(self):
         root = Path(__file__).resolve().parents[1]

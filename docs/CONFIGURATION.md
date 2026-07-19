@@ -15,6 +15,11 @@ default `true`). Enabling a target means its custom dictionary file is read duri
 written during Push — Spell Sync does **not** control the application's entire spell checker
 or its built-in dictionaries.
 
+During Push, most targets receive the full canonical wordlist. Some platform-specific
+targets apply language- or format-specific filtering (for example Windows English custom
+spelling files receive applicable Latin-script words). Configuration does not control
+built-in dictionaries.
+
 | Key | Custom dictionary targets |
 |-----|---------------------------|
 | `editors` | VS Code / Cursor family (`spell-sync-words.txt`) |

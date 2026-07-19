@@ -63,7 +63,10 @@ Check:
 - [ ] Wordlist setup explains what belongs in the canonical list (names, terms, abbreviations).
 - [ ] Pull preview says words come from **application custom dictionaries**.
 - [ ] Push preview mentions harmless redundancy when a word may already be recognized by default.
-- [ ] UI does **not** imply Spell Sync modifies built-in application dictionaries.
+- [ ] Push preview mentions applicable personal words and target-specific filtering where relevant.
+- [ ] Push preview does not claim every target receives the full unfiltered wordlist.
+- [ ] Redundancy notice refers to personal wordlist consistency, not identical spell-checker behavior.
+- [ ] UI does not imply Spell Sync modifies built-in application dictionaries.
 - [ ] Difference between custom dictionary files and built-in spell check is clear to a new tester.
 - [ ] Keyboard navigation works (Tab, Enter, Escape).
 - [ ] Mouse clicks work on buttons where shown.

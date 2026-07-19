@@ -137,6 +137,8 @@ Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work o
 - All user-facing directions refer to **application custom dictionaries**.
 - Built-in application dictionaries are outside the Spell Sync model and are never read or
   modified.
+- User-facing Push summaries must not imply that every target receives the unfiltered
+  canonical wordlist.
 - Central copy lives in `spell_sync/application/product_concepts.py` (UI-neutral).
 
 ### Safety

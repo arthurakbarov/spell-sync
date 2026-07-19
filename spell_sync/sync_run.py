@@ -210,11 +210,12 @@ class SyncRun:
         skip_names: frozenset[str] | None = None,
         prepared: PreparedPush | None = None,
     ) -> PushResult | ExitCode:
-        """Write the canonical personal wordlist to enabled custom dictionaries.
+        """Derive each enabled custom dictionary from the canonical personal wordlist.
 
-        Each enabled target receives the canonical wordlist, or a target-specific
-        subset when ``Dictionary.subset`` is configured. Built-in application
-        dictionaries are not read or modified.
+        Most targets receive the full canonical wordlist. Targets with an explicit
+        subset function receive the applicable filtered subset.
+
+        Built-in application dictionaries are not inspected, read, or modified.
         """
         return self._run_push_transaction(
             dry_run=False,

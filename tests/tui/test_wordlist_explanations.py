@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from spell_sync.application.product_concepts import PUSH_FILTERING_NOTICE
 from spell_sync.cli_options import CliOptions
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.tui.app import SpellSyncApp
@@ -90,15 +91,19 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
             content = await wait_for_text(pilot, "#pull-content", "already")
             self.assertIn("enabled custom diction", str(content.render()).lower())
 
-    async def test_push_preview_includes_redundancy_notice(self):
+    async def test_push_preview_includes_filtering_and_redundancy_notices(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
             content = await wait_for_text(pilot, "#preview-content", "custom diction")
             text = str(content.render()).lower()
-            self.assertIn("redundan", text)
+            self.assertIn("most targets", text)
+            self.assertIn("subset", text)
             self.assertIn("built-in", text)
+            self.assertIn("expected", text)
+            self.assertNotIn("warning", text)
+            self.assertIn(PUSH_FILTERING_NOTICE.splitlines()[0].lower(), text)
 
     async def test_narrow_terminal_renders_wordlist_setup(self):
         missing = ProjectSetupState(

@@ -30,13 +30,27 @@ PULL_SCOPE_NOTICE = (
 )
 
 PUSH_SCOPE_NOTICE = (
-    "Push writes the canonical personal wordlist to enabled application custom dictionaries."
+    "Push writes the applicable personal words from the canonical wordlist to each "
+    "enabled application custom dictionary.\n\n"
+    "Most targets receive the full canonical wordlist. Some platform-specific targets "
+    "apply language- or format-specific filtering."
+)
+
+PUSH_FILTERING_NOTICE = (
+    "Most targets receive the full canonical wordlist.\n"
+    "Some platform-specific targets receive an applicable subset."
 )
 
 PUSH_REDUNDANCY_NOTICE = (
-    "Spell Sync does not inspect built-in dictionaries. Some personal words may "
-    "be stored redundantly in an application's custom dictionary. "
-    "This intentional redundancy keeps enabled applications consistent."
+    "Spell Sync does not inspect applications' built-in dictionaries. Some personal "
+    "words may therefore be stored redundantly in an application's custom dictionary. "
+    "This intentional redundancy keeps your personal wordlist consistent across enabled "
+    "applications."
+)
+
+PUSH_REDUNDANCY_PREVIEW_NOTICE = (
+    "Built-in dictionaries are not inspected. Some personal words may be stored "
+    "redundantly in a custom dictionary; this is expected."
 )
 
 WELCOME_INTRO = (
@@ -56,8 +70,8 @@ WORDLIST_SETUP_WHAT_BELONGS = (
 
 WORDLIST_SETUP_REDUNDANCY_NOTE = (
     "Some applications may already recognize some of these words through their "
-    "built-in dictionaries. Keeping them here is harmless and makes the personal "
-    "list consistent across applications."
+    "built-in dictionaries. Keeping them here is harmless and keeps your personal "
+    "wordlist consistent across enabled applications."
 )
 
 TARGETS_SCOPE_NOTICE = (
@@ -89,7 +103,9 @@ CLI_PULL_HELP = (
     "Pull personal words from enabled application custom dictionaries into the canonical wordlist."
 )
 
-CLI_PUSH_HELP = "Push the canonical personal wordlist to enabled application custom dictionaries."
+CLI_PUSH_HELP = (
+    "Push personal words from the canonical wordlist to enabled application custom dictionaries."
+)
 
 CLI_PUSH_REDUNDANCY_EPILOG = (
     "Some words may already be recognized by an application's built-in dictionary. "
@@ -120,8 +136,6 @@ def pull_completed_summary(additions: int) -> str:
 
 def push_completed_summary(custom_dictionary_count: int) -> str:
     if custom_dictionary_count == 0:
-        return "The canonical personal wordlist was not written to custom dictionaries."
+        return "No custom dictionaries were updated from the canonical wordlist."
     noun = "dictionary" if custom_dictionary_count == 1 else "dictionaries"
-    return (
-        f"The canonical personal wordlist was written to {custom_dictionary_count} custom {noun}."
-    )
+    return f"{custom_dictionary_count} custom {noun} were updated from the canonical wordlist."

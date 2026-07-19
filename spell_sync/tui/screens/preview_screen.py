@@ -12,7 +12,8 @@ from textual.worker import WorkerState
 
 from ...application.product_concepts import (
     PUSH_DIRECTION_LABEL,
-    PUSH_REDUNDANCY_NOTICE,
+    PUSH_FILTERING_NOTICE,
+    PUSH_REDUNDANCY_PREVIEW_NOTICE,
     PUSH_SCOPE_NOTICE,
 )
 from ...application.reports import PushPreview
@@ -119,7 +120,9 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
             "",
             PUSH_SCOPE_NOTICE,
             "",
-            PUSH_REDUNDANCY_NOTICE,
+            PUSH_FILTERING_NOTICE,
+            "",
+            PUSH_REDUNDANCY_PREVIEW_NOTICE,
         ]
         if preview.skipped:
             lines.append(f"Skipped: {', '.join(preview.skipped)}")

@@ -11,7 +11,7 @@
 Keep one `wordlist.txt` as the source of truth for **personal spelling exceptions** across
 **application custom dictionaries** on **OS**, **browsers**, **editors and IDEs**, and
 **Hunspell**. Use **Pull** to merge new words from custom dictionaries into the wordlist, and
-**Push** to write the wordlist back to configured custom dictionaries. Version control is
+**Push** to write applicable personal words from the wordlist to configured custom dictionaries. Version control is
 optional — Spell Sync works with a local wordlist directory just as well as a Git-tracked
 project.
 
@@ -26,14 +26,18 @@ dictionaries. Spell Sync reads and writes **application custom dictionaries** on
 dictionaries shipped with applications are never inspected.
 
 Pull builds a union of personal words already in the wordlist plus words found in enabled
-custom dictionaries. Push spreads the canonical list to those custom dictionaries. A word may
-already be recognized by an application's built-in dictionary; storing it in a custom
-dictionary anyway is **expected, harmless, and safe** — Spell Sync does not try to remove
-that redundancy because it cannot reproduce each application's built-in spell checker.
+custom dictionaries. Push writes applicable personal words from the canonical wordlist to
+those custom dictionaries. Most custom dictionaries receive the full canonical wordlist;
+some platform-specific targets receive a language-specific subset (for example Windows
+English targets receive applicable Latin-script words; Windows Russian targets receive
+applicable Cyrillic and non-Latin words). A word may already be recognized by an
+application's built-in dictionary; storing it in a custom dictionary anyway is **expected,
+harmless, and safe** — Spell Sync does not try to remove that redundancy because it
+cannot reproduce each application's built-in spell checker.
 
 **Example:** A project name is already recognized by one browser but marked misspelled in
 another. Keep the name in the canonical wordlist. Spell Sync may also write it to the first
-browser's custom dictionary. That extra copy keeps your personal list consistent across
+browser's custom dictionary. That extra copy keeps your personal wordlist consistent across
 enabled applications.
 
 To make a personal word consistently available across enabled applications, keep it in the
@@ -56,10 +60,13 @@ dictionary.
 
 ### Push (wordlist → custom dictionaries)
 
-**Push** writes the canonical personal wordlist to every enabled **custom dictionary** target.
-Words present in a custom dictionary but absent from the wordlist may be removed — Push is how
-you delete a word everywhere. Some words may remain redundantly in a custom dictionary when an
-app already recognizes them by default; that is intentional. Always preview first.
+**Push** writes applicable personal words from the canonical wordlist to each enabled
+**custom dictionary** target. Most targets receive the full canonical wordlist; some
+platform-specific targets apply language- or format-specific filtering. Words present in a
+custom dictionary but absent from the applicable wordlist subset may be removed — Push is
+how you delete a word everywhere that target supports. Some words may remain redundantly in
+a custom dictionary when an app already recognizes them by default; that is intentional and
+keeps your personal wordlist consistent. Always preview first.
 
 ### Review and update (TUI)
 

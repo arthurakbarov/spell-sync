@@ -13,7 +13,8 @@ from textual.worker import WorkerState
 from ...application.product_concepts import (
     PULL_DIRECTION_LABEL,
     PUSH_DIRECTION_LABEL,
-    PUSH_REDUNDANCY_NOTICE,
+    PUSH_FILTERING_NOTICE,
+    PUSH_REDUNDANCY_PREVIEW_NOTICE,
     REVIEW_START_BODY,
     pull_preview_additions_line,
 )
@@ -58,7 +59,9 @@ def _format_push_preview(preview: PushPreview) -> str:
         f"Total removals: {preview.removals}",
         f"Unchanged: {preview.unchanged}",
         "",
-        PUSH_REDUNDANCY_NOTICE,
+        PUSH_FILTERING_NOTICE,
+        "",
+        PUSH_REDUNDANCY_PREVIEW_NOTICE,
     ]
     if preview.skipped:
         lines.append(f"Skipped: {', '.join(preview.skipped)}")
