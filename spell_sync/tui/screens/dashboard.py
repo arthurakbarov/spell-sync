@@ -13,8 +13,6 @@ from ...application.reports import DashboardSeverity
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
-_DISABLED_HINT = "Available in a later phase"
-
 
 class DashboardScreen(LoadTokenMixin, Screen[None]):
     BINDINGS = [
