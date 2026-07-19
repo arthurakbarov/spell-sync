@@ -125,7 +125,9 @@ class TestPublicExports(unittest.TestCase):
         from spell_sync.runtime import read_pyproject_version
 
         expected = read_pyproject_version(REPO_DIR / "pyproject.toml")
-        self.assertEqual(expected, "0.2.0")
+        from spell_sync.runtime import installed_package_version
+
+        self.assertEqual(installed_package_version(), expected)
 
 
 class TestJsonNaming(unittest.TestCase):

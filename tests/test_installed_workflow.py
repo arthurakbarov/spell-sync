@@ -111,7 +111,7 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
 
     version_result = _run(venv_python, home=home, cwd=outside_repo, args=["version"])
     assert version_result.returncode == 0
-    assert "0.2.0" in version_result.stdout
+    assert "0.2.1" in version_result.stdout
 
     init_result = _run(
         venv_python,
@@ -183,3 +183,13 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
         history_text = history_file.read_text(encoding="utf-8")
         assert "gamma" not in history_text
         assert str(editor_dict.resolve()) not in history_text
+
+    support_result = _run(
+        venv_python,
+        home=home,
+        cwd=outside_repo,
+        args=["support-report", "-C", str(wordlist), "--format", "json"],
+    )
+    assert support_result.returncode == 0, support_result.stderr
+    assert "secret-token-like-value" not in support_result.stdout
+    assert "user@example.com" not in support_result.stdout
