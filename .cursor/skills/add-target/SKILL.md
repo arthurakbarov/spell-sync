@@ -47,6 +47,11 @@ description: >-
 - [ ] Platform limitations stated when simulated
 - [ ] Public docs updated (`docs/CONFIGURATION.md`, product copy if user-visible)
 - [ ] Installed-wheel resource check if bundled paths involved
+- [ ] `spell_sync/target_capabilities.py` descriptor added or updated
+- [ ] `docs/target-validation.json` row(s) for each supported platform
+- [ ] Regenerate matrix: `python3.11 scripts/check-target-capabilities.py --write`
+- [ ] Contract tests in `tests/test_target_capabilities.py`
+- [ ] Manual validation status explicit (`not-run` until real-app evidence exists)
 
 ## Pre-read
 

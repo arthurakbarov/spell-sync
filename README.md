@@ -78,6 +78,10 @@ nothing runs silently.
 
 After setup, open **Targets** in the dashboard to enable or disable dictionary targets. Changes
 update `spell-sync.toml` only — they do not modify wordlists, application dictionaries, or journals.
+Open **Targets → Details** to inspect capabilities, runtime state, and validation status for one target.
+
+See [Supported targets](docs/SUPPORTED_TARGETS.md) for the difference between implemented,
+automatically tested, and manually validated support.
 
 ### Safety previews
 
@@ -164,6 +168,7 @@ Run `spell-sync` in an empty directory (or use `spell-sync init` for a non-inter
 | `recover` | Restore from unfinished push journal |
 | `config-check` | Validate `spell-sync.toml` |
 | `lint` | Check wordlist quality |
+| `support-report` | Export a redacted diagnostic report |
 | `ui` | Launch the terminal UI |
 | `version` | Print installed package version |
 
@@ -182,6 +187,8 @@ details.
 
 | Document | Contents |
 |----------|----------|
+| [Supported targets](docs/SUPPORTED_TARGETS.md) | Capability matrix and validation levels |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Symptom-based support guidance |
 | [Configuration](docs/CONFIGURATION.md) | `spell-sync.toml` reference |
 | [Recovery](docs/RECOVERY.md) | Transaction journal and `recover` |
 | [Architecture](docs/ARCHITECTURE.md) | Internal design and safety model |

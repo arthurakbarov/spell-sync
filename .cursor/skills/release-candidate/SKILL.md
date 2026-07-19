@@ -28,6 +28,9 @@ description: >-
 - [ ] Privacy scan (`privacy-export` skill)
 - [ ] SHA-256 hashes recorded for handoff artifacts
 - [ ] `docs/MANUAL_TESTING.md` scenarios current
+- [ ] `python3.11 scripts/check-target-capabilities.py --check` green
+- [ ] No false `manual_validation: pass` claims in `docs/target-validation.json`
+- [ ] Pending real-app validations listed explicitly
 - [ ] Known limitations documented
 - [ ] No tag, push, or publish performed
 

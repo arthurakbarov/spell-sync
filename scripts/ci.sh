@@ -24,6 +24,7 @@ $PYTHON -m pip install -q ruff mypy pytest pytest-cov build wheel twine 'setupto
 $PYTHON -m pip install -q -e .
 bash scripts/check-docs-style.sh
 $PYTHON scripts/check-agent-config.py
+$PYTHON scripts/check-target-capabilities.py --check
 $PYTHON -m ruff check spell_sync tests
 $PYTHON -m ruff format --check spell_sync tests
 $PYTHON -m mypy spell_sync
