@@ -1,4 +1,4 @@
-# Spell Sync 0.1.0 test report
+# Spell Sync 0.2.0 test report
 
 Copy this template for external tester feedback. Remove personal paths and secrets before sharing.
 
@@ -22,7 +22,7 @@ excerpt you include.
 | Python | |
 | Install method | wheel / source zip / other |
 | Package version | |
-| Artifact source | e.g. `spell_sync-0.1.0-py3-none-any.whl` |
+| Artifact source | e.g. `spell_sync-0.2.0-py3-none-any.whl` |
 
 ## Installation result
 
@@ -95,7 +95,7 @@ Sizes tested: 80×24 / 100×30 / 120×40 / other
 
 ## Overall assessment
 
-- [ ] **Ready** — safe to recommend for wider 0.1.0 testing
+- [ ] **Ready** — safe to recommend for wider 0.2.0 testing
 - [ ] **Ready with minor issues** — non-blocking issues documented
 - [ ] **Not ready** — blockers must be fixed first
 

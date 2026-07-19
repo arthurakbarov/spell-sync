@@ -1,8 +1,8 @@
-# Manual testing — Spell Sync 0.1.0
+# Manual testing — Spell Sync 0.2.0
 
-This checklist is for a human tester validating the **0.1.0 release candidate** before wider
-distribution. Use synthetic dictionary targets only. Do not test against real personal
-spell-check data unless you accept the risk of file changes.
+This checklist is for a human tester validating **Spell Sync 0.2.0** before wider distribution.
+Use synthetic dictionary targets only. Do not test against real personal spell-check data unless
+you accept the risk of file changes.
 
 ## Test environment
 
@@ -14,7 +14,7 @@ Record before you start:
 | Terminal app | |
 | Python version | |
 | Installation method | wheel / source archive / git clone |
-| Package version (`spell-sync version`) | expect `0.1.0` |
+| Package version (`spell-sync version`) | expect `0.2.0` |
 | Temporary test directory | e.g. `~/spell-sync-rc-test` |
 | Synthetic targets used | e.g. Cursor `spell-sync-words.txt`, local text file |
 
@@ -26,7 +26,7 @@ account so application state does not mix with daily use.
 From the repository checkout (handoff artifacts live in `dist/`):
 
 ```bash
-uv tool install ./dist/spell_sync-0.1.0-py3-none-any.whl
+uv tool install ./dist/spell_sync-0.2.0-py3-none-any.whl
 spell-sync version
 spell-sync --help
 ```
@@ -35,12 +35,12 @@ If you received the wheel file separately (not inside a clone), use the path to 
 saved it, for example:
 
 ```bash
-uv tool install ~/Downloads/spell_sync-0.1.0-py3-none-any.whl
+uv tool install ~/Downloads/spell_sync-0.2.0-py3-none-any.whl
 ```
 
 Expected:
 
-- Version prints `0.1.0`.
+- Version prints `0.2.0`.
 - Help lists commands: `status`, `pull`, `push`, `plan`, `config-check`, `lint`, `recover`,
   `init`, `doctor`, `version`, `ui`.
 - Pull and Push descriptions mention direction (applications → wordlist / wordlist → applications).
@@ -63,10 +63,6 @@ Check:
 - [ ] Mouse clicks work on buttons where shown.
 - [ ] **Quit** from Welcome exits without creating project files.
 
-Optional feedback (no launcher in 0.1.0):
-
-> Would a desktop or Start Menu launcher improve this workflow?
-
 ## Setup
 
 From Welcome, run the Setup wizard:
@@ -79,15 +75,75 @@ From Welcome, run the Setup wizard:
 - [ ] External application dictionaries were **not** modified during setup.
 - [ ] Quit and relaunch `spell-sync` — wizard does **not** appear again.
 
-## Status and Doctor
+## Dashboard (0.2)
 
-- [ ] **Status** shows wordlist vs dictionary diffs; headings are readable.
-- [ ] **Doctor** shows paths, permissions, and actionable warnings.
+After setup, on the sectioned dashboard:
+
+- [ ] Summary shows canonical wordlist path (with `~` when under home), word count, and target
+  counts (ready / needs attention / disabled / unavailable).
+- [ ] **Review and update** is the primary action.
+- [ ] Direct actions: **Pull new words**, **Push wordlist**.
+- [ ] Manage: **Targets**. Support: **Health**, **History**.
+- [ ] Status available via `s` hotkey (not a dashboard button).
+- [ ] Last operation summary appears when history exists (counts only, no words).
+- [ ] Blocking banner when config is invalid or wordlist unreadable.
+
+## Targets update
+
+From Dashboard → **Targets**:
+
+- [ ] Target list loads with enable/disable toggles; Refresh updates discovery.
+- [ ] **Select available** and **Clear selection** behave predictably.
+- [ ] **Review changes** shows enabled/disabled diff before confirm.
+- [ ] Confirm and execute; report shows outcome.
+- [ ] `spell-sync.toml` reflects selection; wordlist and application dictionaries unchanged.
+- [ ] Operation history records a Targets entry (counts only).
+- [ ] Disable a target that was enabled at setup — Push no longer writes to it.
+- [ ] Re-enable a previously disabled target — Push includes it again after preview.
+
+### Target disabled after setup
+
+- [ ] Complete setup with target A enabled.
+- [ ] Targets → disable A → confirm update.
+- [ ] Push preview and execution skip A; other enabled targets still update.
+- [ ] Pull still reads only enabled targets.
+
+## Review and update
+
+From Dashboard → **Review and update**:
+
+- [ ] Start screen explains Pull-then-Push flow; nothing runs without confirmation.
+- [ ] Pull review shows additions count and direction (applications → wordlist).
+- [ ] **Pull words** opens confirm screen; cancel returns without changes.
+- [ ] After Pull, **Pull complete** screen appears when wordlist changed.
+- [ ] Fresh Push preview loads (never reuses pre-Pull preview).
+- [ ] **Push changes** requires confirm (and typed **`PUSH`** if removals).
+- [ ] Session report summarizes what ran; Dashboard reachable from report.
+- [ ] Failed or recovery-required Pull/Push ends session with clear note.
+
+### Pull skip
+
+- [ ] Start review with synthetic words only in targets (not yet in wordlist).
+- [ ] On Pull review, choose **Skip Pull**.
+- [ ] Fresh Push preview still builds.
+- [ ] Wordlist bytes unchanged; Push preview reflects current wordlist vs targets.
+
+### Push skip
+
+- [ ] Complete Pull in review (or skip Pull with divergent targets).
+- [ ] On Push review, choose **Finish without Push**.
+- [ ] Session report shows Pull outcome only; target files unchanged by Push.
+- [ ] History records Pull if executed; no Push record for skipped Push.
+
+## Status and Health
+
+- [ ] **Status** (`s`) shows wordlist vs dictionary diffs; headings are readable.
+- [ ] **Health** shows paths, permissions, and actionable warnings (formerly Doctor).
 - [ ] Enabled targets match `spell-sync.toml`.
 - [ ] Invalid `spell-sync.toml` blocks mutating operations with a clear message (test by
   introducing a syntax error, then attempting Pull or Push).
 
-## Pull
+## Pull (direct)
 
 Use a synthetic dictionary that contains at least one word not in the wordlist.
 
@@ -96,10 +152,10 @@ Use a synthetic dictionary that contains at least one word not in the wordlist.
 - [ ] Confirmation shows number of additions.
 - [ ] Execute Pull; report shows completion.
 - [ ] Wordlist bytes change as expected.
-- [ ] Operation history records the Pull (counts only — open **Logs**).
-- [ ] Technical log contains no wordlist words or secrets (tail via **Logs → Technical log**).
+- [ ] Operation history records the Pull (counts only — open **History**).
+- [ ] Technical log contains no wordlist words or secrets (tail via **History → Technical log**).
 
-## Push
+## Push (direct)
 
 Ensure wordlist and synthetic target differ (e.g. after Pull).
 
@@ -111,19 +167,35 @@ Ensure wordlist and synthetic target differ (e.g. after Pull).
 - [ ] Change the target file externally after preview — execution must **not** silently
   re-plan; expect a controlled conflict or stale-preview block.
 
+## Planned vs actual (reports)
+
+After Pull or Push with at least one skipped source or target:
+
+- [ ] Report shows **Planned** and **Actual** sections (or equivalent per-target rows).
+- [ ] Skipped targets/sources have human-readable reason (not raw paths or words).
+- [ ] Updated vs skipped counts match what you observed on disk.
+
+## Changed config race
+
+- [ ] Open Push preview (direct or via review).
+- [ ] Edit `spell-sync.toml` externally (e.g. disable a target) before confirming execute.
+- [ ] Execution stops safely with stale-plan or fingerprint message — no silent re-plan.
+- [ ] Repeat for Targets update: change selection in UI, edit config on disk before confirm.
+
 ## Recovery
 
 Simulate an interrupted Push (e.g. kill the process during operation, or use a test journal if
 you have a reproducer):
 
 - [ ] Dashboard shows recovery required / blocked state.
+- [ ] **Review recovery** is primary; Pull/Push/Review disabled.
 - [ ] Recovery screen distinguishes **Recover** vs **Discard**.
 - [ ] Recovery preview is readable.
 - [ ] Typed **`RECOVER`** required where applicable.
-- [ ] Successful recovery restores consistency and re-enables Pull/Push.
+- [ ] Successful recovery restores consistency and re-enables Pull/Push/Review.
 - [ ] External changes to a conflicted file are not overwritten without warning.
 
-## Logs
+## History
 
 - [ ] Empty history shows an empty state (fresh install).
 - [ ] Filters (operation / outcome) work.
@@ -149,7 +221,7 @@ Also check:
 - [ ] Unicode in UI labels (if any) renders or has text fallback.
 - [ ] `NO_COLOR=1` (or terminal without color) — status remains understandable without color alone.
 - [ ] Long paths and messages wrap without breaking layout.
-- [ ] Keyboard-only session completes Setup → Pull → Push → Quit.
+- [ ] Keyboard-only session completes Setup → Review and update (or Pull → Push) → Quit.
 
 ## Second launch
 

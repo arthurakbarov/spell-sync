@@ -11,7 +11,8 @@ CliOptions                     frozen dataclass from argparse namespace
     ↓
 SpellSyncService               UI-neutral facade (spell_sync/application/service.py)
     ↓
-command_helpers / SyncRun      existing pull, push, recover, status core
+command_helpers / SyncRun      pull, push, recover, status core
+project_setup/                 setup wizard + post-setup target settings
     ↓
 diagnostics/                   operation history + technical logs (configured paths only)
     ↓
@@ -36,9 +37,11 @@ Routing logic: `spell_sync/tui/routing.py` (`should_launch_tui`).
 `config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `ui`, `version`
 
 CLI and TUI call the same `SpellSyncService` methods for setup, pull, push, recovery, status,
-doctor, and logs.
+doctor, logs, and post-setup target settings.
 
 ## Screen map
+
+### Setup wizard
 
 | Screen | Module | Primary actions |
 |--------|--------|-----------------|
@@ -49,17 +52,80 @@ doctor, and logs.
 | Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
 | Setup operation | `operation_screen.py` | (worker) |
 | Setup report | `report_screen.py` | Dashboard |
-| Dashboard | `dashboard.py` | Pull, Push, Status, Doctor, Recovery, Logs, Quit |
-| Status | `status_screen.py` | Back |
-| Preview | `preview_screen.py` | Pull/Push, Back |
-| Pull | `pull_screen.py` | Preview, Execute, Back |
-| Push confirmation | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+
+### Dashboard (sectioned)
+
+| Section | Actions |
+|---------|---------|
+| Summary | Canonical wordlist path, word count, target counts, overall state, last operation |
+| Primary | **Review and update** (guided flow); **Review recovery** when pending |
+| Direct actions | Pull new words, Push wordlist |
+| Manage | Targets |
+| Support | Health (doctor), History (operation log) |
+| Exit | Quit |
+
+Hotkeys: `r` refresh, `s` status, `h` health. Status is not a dashboard button.
+
+Blocking banners use `UserNotice` catalog copy for recovery, invalid config, and unreadable
+wordlist. Pull, Push, and Review are disabled while recovery is pending.
+
+Module: `dashboard.py`.
+
+### Targets (post-setup)
+
+| Screen | Module | Primary actions |
+|--------|--------|-----------------|
+| Target selection | `target_settings_screen.py` | Toggle targets, Refresh, Select available, Review changes, Back |
+| Target review | `target_settings_screen.py` | Confirm update, Back |
+| Target operation | `operation_screen.py` | (worker) |
+| Target report | `report_screen.py` | Dashboard |
+
+Config-only writes via `PreparedTargetSettingsUpdate`; stale fingerprint stops safely.
+
+### Review and update (guided)
+
+In-memory session on `TuiController` — not persisted as a history record.
+
+| Screen | Module | Primary actions |
+|--------|--------|-----------------|
+| Review start | `review_update_screen.py` | Start review, Back |
+| Pull review | `review_update_screen.py` | Pull words, Skip Pull, View additions, Back |
+| Pull confirm | `pull_confirm_screen.py` | Confirm, Back |
+| Pull operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
+| Pull complete | `review_update_screen.py` | Build push preview |
+| Push review | `review_update_screen.py` | Push changes, Finish without Push, View removals, Back |
+| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+| Push operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
+| Session report | `review_update_screen.py` | Dashboard |
+
+Fresh `PushPreview` is always built after Pull or Skip Pull. Pull and Push remain separate
+operations with existing confirm/execute paths.
+
+### Direct Pull and Push
+
+| Screen | Module | Primary actions |
+|--------|--------|-----------------|
+| Pull preview | `pull_screen.py` | Preview, Execute, Back |
+| Pull confirm | `pull_confirm_screen.py` | Confirm, Back |
+| Push preview | `preview_screen.py` | Pull/Push, Back |
+| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+| Removals detail | `removals_screen.py` | Back |
 | Operation | `operation_screen.py` | (worker) |
 | Report | `report_screen.py` | Dashboard |
-| Doctor | `doctor_screen.py` | Back |
-| Recovery | `recovery_screen.py` | Recover, Discard, Back |
-| Logs | `logs_screen.py` | Filters, Clear, Technical log, Back |
+
+Reports use `format_operation_report_text` with planned vs actual rows and `UserNotice`
+explanations for skipped targets and sources.
+
+### Support screens
+
+| Screen | Module | Primary actions |
+|--------|--------|-----------------|
+| Status | `status_screen.py` | Back |
+| Health | `doctor_screen.py` | Back |
+| History | `logs_screen.py` | Filters, Clear, Technical log, Back |
 | Technical log | `logs_screen.py` | Back |
+| Recovery | `recovery_screen.py` | Recover, Discard, Back |
+| Recovery confirm | `recovery_confirm_screen.py` | Type RECOVER, Run, Back |
 
 Navigation: keyboard (Tab, Enter, Escape), mouse clicks, visible focus styles in `app.tcss`.
 Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work on dismiss.
@@ -75,13 +141,15 @@ Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work o
 - Removal confirmation requires typing `PUSH` when removals are present.
 - Transaction snapshots + journal v2 before writes; rollback on failure.
 - Recovery does not overwrite external changes; journal/snapshots preserved on incomplete rollback.
-- Setup writes only project files; external dictionaries are never modified during setup.
+- Setup and target-settings writes touch project config only; external dictionaries are not
+  modified during setup or target toggles.
 - `--dry-run` never mutates files.
 - `--json` emits exactly one JSON object on stdout.
 - User words must not appear in technical logs or operation history.
 - TUI never opens state files directly; reads go through `SpellSyncService`.
 - Diagnostic paths come from configured platform roots only — never from TUI/CLI user input.
 - History or logging failures never change the core operation outcome.
+- Guided review session is in-memory only; history records Pull/Push/Targets executions individually.
 
 ## Setup wizard
 
@@ -95,11 +163,11 @@ preview — selected target IDs and rendered config bytes are not recomputed at 
 
 ### Recorded operations
 
-History records are appended after a completed mutating attempt for: Setup, Pull, Push, Recover,
-recovery cleanup, recovery discard.
+History records are appended after a completed mutating attempt for: Setup, Pull, Push, Targets
+(target settings update), Recover, recovery cleanup, recovery discard.
 
 Not recorded: status, preview/plan, doctor, discovery, refresh, cancel-before-execute, wizard
-navigation, opening the TUI.
+navigation, guided review session shell, opening the TUI.
 
 ### Stored fields
 

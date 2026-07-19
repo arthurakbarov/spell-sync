@@ -61,7 +61,7 @@ ship an interactive GUI harness.
 
 ## Version
 
-Single source: `version` in `pyproject.toml` (currently **0.1.0**).
+Single source: `version` in `pyproject.toml` (currently **0.2.0**).
 
 ## Maintainer layout (optional)
 

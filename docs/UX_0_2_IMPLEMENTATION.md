@@ -8,30 +8,22 @@ architecture rewrite, no remote publish.
 
 ## Existing architecture
 
-- Version: `0.1.0` (`pyproject.toml`)
+- Version: `0.2.0` (`pyproject.toml`)
 - CLI commands: `config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`,
   `recover`, `status`, `ui`, `version` (`spell_sync/cli.py` `COMMANDS`)
 - Shared facade: `SpellSyncService` (`spell_sync/application/service.py`)
 - TUI entry: no-args TTY / `spell-sync ui` → `cmd_ui` → Textual app
-- Dashboard actions today: Status, Preview, Doctor, Pull, Push, Recovery
-  (conditional), Logs, Quit (`spell_sync/tui/screens/dashboard.py`)
+- Dashboard: sectioned layout with **Review and update** primary, direct Pull/Push,
+  Targets, Health, History (`spell_sync/tui/screens/dashboard.py`)
+- Post-setup Targets: `TargetSettingsScreen` → config-only update via
+  `PreparedTargetSettingsUpdate`
 - Config target schema: `[dictionaries]` boolean keys only
-  (`editors`, `chrome`, `edge`, `brave`, `vivaldi`, `firefox`, `neovim`,
-  `jetbrains`, `hunspell`, `obsidian`, `libreoffice`) — no `[targets].enabled`
 - Target discovery DTO: `SetupTarget` / `SetupTargetDiscovery`
-  (`spell_sync/project_setup/discovery.py`) fields include `identifier`,
-  `display_name`, `path`, `detected`, `available`, `readable`, `supported`,
-  `selectable`, `word_count`, `status`, `detail` (setup uses `enabled_by_default`)
-- Config writer today: `render_project_config` → bytes in `PreparedProjectSetup` →
-  `atomic_write` only during setup (`project_setup/render.py`, `execute.py`)
-- No post-setup config mutation API
+- Config writer: `render_project_config` for setup and target settings updates
 - Immutable previews: `PullPreview`, `PushPreview`, `RecoveryPreview`,
-  `PreparedProjectSetup`, `PreparedPush`
-- Operation report: `OperationReport` (`application/reports.py`)
-- Recovery open path: Dashboard `action_open_recovery` → `RecoveryScreen` →
-  `controller.inspect_recovery()`
-- Setup selection path: TUI `SetupSelection` on controller → `SetupDraft` →
-  `prepare_project_setup` → rendered TOML → `execute_project_setup`
+  `PreparedProjectSetup`, `PreparedPush`, `PreparedTargetSettingsUpdate`
+- Operation report: `OperationReport` with planned vs actual and `UserNotice` catalog
+- Guided review: in-memory `ReviewSession` on `TuiController` (not a history record)
 
 ## Safety invariants
 
@@ -60,7 +52,7 @@ architecture rewrite, no remote publish.
 
 ## Current phase
 
-Phase 4 — UserNotice / planned vs actual (complete)
+Phase 5 — docs + version `0.2.0` (complete)
 
 ## Completed phases
 
@@ -225,22 +217,41 @@ Tests:
 - `tests/test_user_notices.py` — catalog, mapping, planned/actual, sensitivity guards
 - Updated TUI expectations in dashboard, push flow, phase4 coverage
 
+### Phase 5 — docs + version `0.2.0`
+
+Documentation:
+
+- `README.md` — canonical wordlist positioning; Git optional; Pull/Push/Review/Targets/
+  safety/recovery/history privacy
+- `docs/TUI_IMPLEMENTATION.md` — current screen map (sectioned dashboard, Targets, Review
+  flow, Health, History); invariants updated
+- `docs/MANUAL_TESTING.md` — 0.2.0 checklist including Targets, Review, skip paths,
+  planned vs actual, config race, disabled target
+- `docs/DEVELOPMENT.md`, `docs/TEST_REPORT_TEMPLATE.md` — version references
+
+Version:
+
+- `pyproject.toml` → `0.2.0`
+- Test version assertions updated
+
+No changelog, tag, push, or PyPI publish in this phase.
+
 ## Last validation
 
 ```bash
-python3.11 -m ruff check spell_sync tests          # pass
-python3.11 -m ruff format --check spell_sync tests # pass
-python3.11 -m mypy spell_sync                      # pass
-python3.11 -m pytest tests/test_user_notices.py tests/tui -q  # pass
-bash scripts/ci.sh                                 # EXIT 0
-coverage policy: 100% lines, 96%+ branches
+.venv/bin/python -m ruff check spell_sync tests          # pass
+.venv/bin/python -m ruff format --check spell_sync tests # pass
+.venv/bin/python -m mypy spell_sync                      # pass
+.venv/bin/python -m pytest tests/tui -q                  # pass
+.venv/bin/python -m pytest tests/test_project_setup.py tests/test_pull_safety.py \
+  tests/test_tui_mutation_safety.py tests/test_tui_recovery_safety.py \
+  tests/test_operation_history.py tests/test_technical_logging.py -q  # pass
+bash scripts/ci.sh                                       # EXIT 0
 ```
 
 ## Remaining work
 
-### Later phases
-
-- Phase 5: docs + version `0.2.0`
+None for 0.2.0 UX scope.
 
 ## Deferred work
 

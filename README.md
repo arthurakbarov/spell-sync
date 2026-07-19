@@ -1,21 +1,68 @@
 # spell-sync
 
-**One git-tracked wordlist for all your personal spell-check dictionaries.**
+**One canonical wordlist for all your spell-check dictionaries.**
+
+*Optionally keep it in Git.*
 
 [![CI](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml/badge.svg)](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/arthurakbarov/spell-sync)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-Keep one canonical `wordlist.txt` and use **Pull** (applications → wordlist) and **Push**
-(wordlist → applications) to stay in sync across **OS**, **browsers**, **editors and IDEs**, and
-**Hunspell**.
+Keep one `wordlist.txt` as the source of truth for personal spell-check words across **OS**,
+**browsers**, **editors and IDEs**, and **Hunspell**. Use **Pull** to merge new words from
+applications into the wordlist, and **Push** to write the wordlist back to configured dictionaries.
+Version control is optional — Spell Sync works with a local wordlist directory just as well as a
+Git-tracked project.
+
+## What Spell Sync does
+
+### Canonical wordlist
+
+Spell Sync treats one file — usually `wordlist.txt` in your project directory — as the canonical
+list. All enabled dictionary targets sync against that file. You choose the path during setup or
+with `-C/--wordlist`.
+
+### Pull (applications → wordlist)
+
+**Pull** reads enabled application dictionaries and merges new words into the canonical wordlist
+(union). It never removes words from the wordlist. Use Pull after adding words in an app or browser.
+
+### Push (wordlist → applications)
+
+**Push** writes the canonical wordlist to every enabled target. Words present in a target but absent
+from the wordlist may be removed — Push is how you delete a word everywhere. Always preview first.
+
+### Review and update (TUI)
+
+The terminal UI offers a guided **Review and update** flow: review Pull additions, optionally Pull,
+then build a fresh Push preview and optionally Push. Each step still requires explicit confirmation;
+nothing runs silently.
+
+### Targets
+
+After setup, open **Targets** in the dashboard to enable or disable dictionary targets. Changes
+update `spell-sync.toml` only — they do not modify wordlists, application dictionaries, or journals.
+
+### Safety previews
+
+Every mutating operation starts from an immutable preview plan. Confirmation binds to that exact plan;
+if the wordlist or a target file changes before execution, Spell Sync stops safely instead of
+re-planning silently. Push with removals requires typing **`PUSH`**.
+
+### Recovery
+
+If Push is interrupted, a transaction journal and snapshots remain. Run **Review recovery** (TUI) or
+`spell-sync recover` (CLI) to restore consistency. Successful recovery removes journal artifacts;
+external changes to conflicted files are not overwritten without warning.
+
+### History privacy
+
+Operation history stores counts, outcomes, and opaque identifiers — never your words. Technical logs
+are redacted and bounded. See [Architecture](docs/ARCHITECTURE.md) for details.
 
 ## Install
 
-### From GitHub (recommended after release)
-
-Install directly from GitHub once the **0.1.0 release candidate** has been pushed to the
-remote repository:
+### From GitHub
 
 ```bash
 uv tool install \
@@ -25,9 +72,8 @@ uv tool update-shell   # only if the uv tools directory is not already on PATH
 spell-sync
 ```
 
-Before that push, external testers should install from the handoff artifacts instead: the wheel
-(`dist/spell_sync-0.1.0-py3-none-any.whl`) or source ZIP (`dist/spell-sync-0.1.0-source.zip`).
-See [Manual testing](docs/MANUAL_TESTING.md).
+For release-candidate testing before a GitHub release, install from a wheel in `dist/` — see
+[Manual testing](docs/MANUAL_TESTING.md).
 
 ### From a clone
 
@@ -61,7 +107,7 @@ Run `spell-sync` in an empty directory (or use `spell-sync init` for a non-inter
 
 | Situation | Command |
 |-----------|---------|
-| Added a word in an app | `spell-sync pull` then commit `wordlist.txt` |
+| Added a word in an app | `spell-sync pull` then commit `wordlist.txt` if you use Git |
 | New machine / after `git pull` | `spell-sync push` |
 | Delete a word everywhere | Remove from wordlist → `spell-sync push` (not pull) |
 | Preview changes | `spell-sync status` or `spell-sync plan` |
@@ -103,8 +149,9 @@ details.
 | [Configuration](docs/CONFIGURATION.md) | `spell-sync.toml` reference |
 | [Recovery](docs/RECOVERY.md) | Transaction journal and `recover` |
 | [Architecture](docs/ARCHITECTURE.md) | Internal design and safety model |
+| [TUI implementation](docs/TUI_IMPLEMENTATION.md) | Terminal UI screen map and invariants |
 | [Development](docs/DEVELOPMENT.md) | Hacking, tests, CI |
-| [Manual testing](docs/MANUAL_TESTING.md) | Release candidate checklist for human testers |
+| [Manual testing](docs/MANUAL_TESTING.md) | Release checklist for human testers |
 | [Contributing](docs/CONTRIBUTING.md) | Pull requests |
 
 ## Safety (summary)
