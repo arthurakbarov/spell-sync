@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from spell_sync.dictionaries import Dictionary, DictionaryFormat, discover_dictionaries
+from spell_sync.dictionaries import discover_dictionaries
 from spell_sync.project_setup.discovery import _CONFIG_TARGET_IDS
 from spell_sync.target_capabilities import (
     DICTIONARY_FILTER_KINDS,
@@ -41,7 +41,11 @@ def test_includes_platform_targets() -> None:
 
 
 def test_no_unknown_registry_entries_vs_config() -> None:
-    extra = all_capability_identifiers() - config_target_identifiers() - platform_capability_identifiers()
+    extra = (
+        all_capability_identifiers()
+        - config_target_identifiers()
+        - platform_capability_identifiers()
+    )
     assert extra == frozenset()
 
 
@@ -115,3 +119,43 @@ def test_registry_module_has_no_filesystem_access(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("pathlib.Path.open", fail_open)
     importlib.reload(importlib.import_module("spell_sync.target_capabilities"))
+
+
+def test_discovery_alias_mapping() -> None:
+    from spell_sync.target_capabilities import (
+        capability_for_discovery_target,
+        resolve_capability_identifier,
+    )
+
+    assert resolve_capability_identifier("editor") == "editors"
+    assert resolve_capability_identifier("nvim-en") == "neovim"
+    capability = capability_for_discovery_target("editor")
+    assert capability is not None
+    assert capability.identifier == "editors"
+
+
+def test_validation_matrix_covers_registry() -> None:
+    import json
+
+    root = Path(__file__).resolve().parents[1]
+    data = json.loads((root / "docs" / "target-validation.json").read_text(encoding="utf-8"))
+    pairs = {
+        (row["target_id"], row["platform"]) for row in data["targets"] if isinstance(row, dict)
+    }
+    from spell_sync.target_capabilities import registry_target_platform_pairs
+
+    assert pairs == set(registry_target_platform_pairs())
+
+
+def test_supported_targets_matrix_not_stale() -> None:
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, str(root / "scripts" / "check-target-capabilities.py"), "--check"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

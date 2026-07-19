@@ -28,6 +28,7 @@ description: >-
 - [ ] No personal lint whitelist. The tracked bundled runtime whitelist is allowed and must remain packaged.
 - [ ] No absolute personal paths, credentials, tokens, or private emails
 - [ ] No logs, operation history, pending journal data, or transaction snapshots in tracked files or artifacts
+- [ ] No exported support or review session reports in tracked files
 - [ ] No build caches (`.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `dist/`, `build/`)
 - [ ] Inspect ZIP/wheel/sdist file list before handoff
 - [ ] Calculate SHA-256 for each artifact
