@@ -45,11 +45,13 @@ python3.11 -m venv /tmp/spell-sync-smoke-venv
 cd "$smoke_cwd"
 HOME="$smoke_home" /tmp/spell-sync-smoke-venv/bin/spell-sync --help
 HOME="$smoke_home" /tmp/spell-sync-smoke-venv/bin/spell-sync version
+HOME="$smoke_home" /tmp/spell-sync-smoke-venv/bin/spell-sync support-report --format json
 ```
 
 4. Verify TUI import and bundled resources (TCSS, examples) load from installed package.
+   Exercise Target Details, Health → Export support report, and Review session Save report when validating 0.2.1+ transparency features.
 
-5. Optional: run `tests/test_installed_workflow.py` — automated end-to-end smoke.
+5. Optional: run `tests/test_installed_workflow.py` — automated end-to-end smoke (includes `support-report`).
 
 6. Confirm no network calls and no real user data touched.
 
