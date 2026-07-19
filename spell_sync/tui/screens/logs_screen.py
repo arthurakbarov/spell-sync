@@ -60,6 +60,10 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static("Operation history", id="logs-title")
+        yield Static(
+            "Operation history stores counts and outcomes, not your words.",
+            id="logs-privacy",
+        )
         yield Select(
             [
                 ("All operations", "all"),

@@ -90,11 +90,17 @@ def _build_parser() -> argparse.ArgumentParser:
     status_p.add_argument("-v", "--verbose", action="store_true")
     add_common_flags(status_p)
 
-    pull_p = sub.add_parser("pull", help="merge dictionary words into wordlist")
+    pull_p = sub.add_parser(
+        "pull",
+        help="Pull: merge application dictionary words into the canonical wordlist",
+    )
     add_pull_flags(pull_p)
     add_common_flags(pull_p)
 
-    push_p = sub.add_parser("push", help="write wordlist to dictionaries")
+    push_p = sub.add_parser(
+        "push",
+        help="Push: write the canonical wordlist to application dictionaries",
+    )
     add_push_flags(push_p)
     add_common_flags(push_p)
 
