@@ -23,12 +23,19 @@ account so application state does not mix with daily use.
 
 ## Installation
 
-From the handoff artifacts in the repository root (or a copy you received):
+From the repository checkout (handoff artifacts live in `dist/`):
 
 ```bash
-uv tool install ./spell_sync-0.1.0-py3-none-any.whl
+uv tool install ./dist/spell_sync-0.1.0-py3-none-any.whl
 spell-sync version
 spell-sync --help
+```
+
+If you received the wheel file separately (not inside a clone), use the path to wherever you
+saved it, for example:
+
+```bash
+uv tool install ~/Downloads/spell_sync-0.1.0-py3-none-any.whl
 ```
 
 Expected:

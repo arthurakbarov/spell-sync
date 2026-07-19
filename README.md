@@ -12,7 +12,10 @@ Keep one canonical `wordlist.txt` and use **Pull** (applications → wordlist) a
 
 ## Install
 
-### From GitHub (recommended)
+### From GitHub (recommended after release)
+
+Install directly from GitHub once the **0.1.0 release candidate** has been pushed to the
+remote repository:
 
 ```bash
 uv tool install \
@@ -21,6 +24,10 @@ uv tool install \
 uv tool update-shell   # only if the uv tools directory is not already on PATH
 spell-sync
 ```
+
+Before that push, external testers should install from the handoff artifacts instead: the wheel
+(`dist/spell_sync-0.1.0-py3-none-any.whl`) or source ZIP (`dist/spell-sync-0.1.0-source.zip`).
+See [Manual testing](docs/MANUAL_TESTING.md).
 
 ### From a clone
 
