@@ -315,11 +315,11 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             screen = app.screen
             assert isinstance(screen, PullScreen)
             await pilot.click("#btn-refresh")
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             screen._preview = None
             screen.action_run_pull()
             screen.action_view_additions()
@@ -496,7 +496,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             pull = app.screen
             assert isinstance(pull, PullScreen)
             await pilot.click("#btn-view-additions")

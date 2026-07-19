@@ -8,6 +8,15 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Static
 
+from ...application.product_concepts import (
+    PULL_DIRECTION_LABEL,
+    PUSH_DIRECTION_LABEL,
+    WELCOME_BUILT_IN_EXCLUSION,
+    WELCOME_INTRO,
+    WORDLIST_SETUP_HEADING,
+    WORDLIST_SETUP_REDUNDANCY_NOTE,
+    WORDLIST_SETUP_WHAT_BELONGS,
+)
 from ...project_setup.prepare import PreparedProjectSetup
 from ..controller import TuiController
 
@@ -33,14 +42,15 @@ class SetupWelcomeScreen(Screen[None]):
                 [
                     "Welcome to Spell Sync",
                     "",
-                    "Spell Sync keeps one canonical wordlist synchronized",
-                    "with dictionaries used by your applications.",
+                    WELCOME_INTRO,
+                    "",
+                    WELCOME_BUILT_IN_EXCLUSION,
                     "",
                     "Pull",
-                    "Applications → canonical wordlist",
+                    PULL_DIRECTION_LABEL,
                     "",
                     "Push",
-                    "Canonical wordlist → applications",
+                    PUSH_DIRECTION_LABEL,
                 ]
             )
         )
@@ -111,7 +121,17 @@ class SetupWordlistScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#wordlist-content", Static).update("Choose the canonical wordlist")
+        self.query_one("#wordlist-content", Static).update(
+            "\n".join(
+                [
+                    WORDLIST_SETUP_HEADING,
+                    "",
+                    WORDLIST_SETUP_WHAT_BELONGS,
+                    "",
+                    WORDLIST_SETUP_REDUNDANCY_NOTE,
+                ]
+            )
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":

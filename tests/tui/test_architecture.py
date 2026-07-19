@@ -305,6 +305,26 @@ class TestTuiArchitecture(unittest.TestCase):
         self.assertIn("clear_review_session", controller_source)
         self.assertNotIn("_review_session: ReviewSession = ReviewSession", controller_source)
 
+    def test_product_concepts_does_not_import_textual(self):
+        import ast
+
+        from spell_sync.application import product_concepts
+
+        tree = ast.parse(Path(product_concepts.__file__).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    self.assertNotIn("textual", alias.name)
+            if isinstance(node, ast.ImportFrom) and node.module:
+                self.assertNotIn("textual", node.module)
+
+    def test_dictionaries_module_does_not_define_built_in_reader(self):
+        source = Path(__import__("spell_sync.dictionaries").dictionaries.__file__).read_text(
+            encoding="utf-8"
+        )
+        for token in ("built_in", "builtin", "language_pack", "hunspell_lookup"):
+            self.assertNotIn(token, source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,121 @@
+"""TUI copy for canonical wordlist and custom dictionary scope."""
+
+from __future__ import annotations
+
+import unittest
+
+from spell_sync.cli_options import CliOptions
+from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
+from spell_sync.tui.app import SpellSyncApp
+from spell_sync.tui.controller import TuiController
+from spell_sync.tui.screens.preview_screen import PreviewScreen
+from spell_sync.tui.screens.pull_screen import PullScreen
+from spell_sync.tui.screens.setup_targets_screen import SetupTargetsScreen
+from tests.tui.fake_service import fake_service, sample_pull_preview
+from tests.tui.test_helpers import wait_for_text
+
+
+class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
+    async def test_welcome_explains_custom_dictionaries_and_excludes_built_in(self):
+        missing = ProjectSetupState(
+            status=ProjectSetupStatus.MISSING_PROJECT,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=True,
+            detail=None,
+        )
+        controller = TuiController(fake_service(setup_state=missing), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            content = await wait_for_text(pilot, "#welcome-content", "Welcome")
+            text = str(content.render()).lower()
+            self.assertIn("custom diction", text)
+            self.assertIn("built-in", text)
+            self.assertIn("does not inspect", text)
+
+    async def test_wordlist_setup_explains_personal_exceptions(self):
+        missing = ProjectSetupState(
+            status=ProjectSetupStatus.MISSING_PROJECT,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=True,
+            detail=None,
+        )
+        controller = TuiController(fake_service(setup_state=missing), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await pilot.click("#btn-setup")
+            content = await wait_for_text(pilot, "#wordlist-content", "What belongs here")
+            text = str(content.render()).lower()
+            self.assertIn("personal", text)
+            self.assertIn("built-in", text)
+
+    async def test_targets_screen_scope_notice(self):
+        missing = ProjectSetupState(
+            status=ProjectSetupStatus.MISSING_PROJECT,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=True,
+            detail=None,
+        )
+        controller = TuiController(fake_service(setup_state=missing), CliOptions())
+        controller.set_setup_wordlist(controller.setup_wordlist_default())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(SetupTargetsScreen(controller, "wordlist ok"))
+            header = await wait_for_text(pilot, "#targets-header", "custom diction")
+            text = str(header.render()).lower()
+            self.assertIn("built-in", text)
+            self.assertIn("not modified", text)
+
+    async def test_pull_preview_mentions_custom_dictionaries(self):
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 36)) as pilot:
+            app.push_screen(PullScreen(controller))
+            content = await wait_for_text(pilot, "#pull-content", "custom diction")
+            text = str(content.render()).lower()
+            self.assertIn("application custom diction", text)
+            self.assertNotIn("sources used:", text)
+
+    async def test_pull_empty_state_is_clear(self):
+        preview = sample_pull_preview(additions=0)
+        controller = TuiController(fake_service(pull_preview=preview), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 36)) as pilot:
+            app.push_screen(PullScreen(controller))
+            content = await wait_for_text(pilot, "#pull-content", "already")
+            self.assertIn("enabled custom diction", str(content.render()).lower())
+
+    async def test_push_preview_includes_redundancy_notice(self):
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 36)) as pilot:
+            app.push_screen(PreviewScreen(controller))
+            content = await wait_for_text(pilot, "#preview-content", "custom diction")
+            text = str(content.render()).lower()
+            self.assertIn("redundan", text)
+            self.assertIn("built-in", text)
+
+    async def test_narrow_terminal_renders_wordlist_setup(self):
+        missing = ProjectSetupState(
+            status=ProjectSetupStatus.MISSING_PROJECT,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=True,
+            detail=None,
+        )
+        controller = TuiController(fake_service(setup_state=missing), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(72, 24)) as pilot:
+            await pilot.click("#btn-setup")
+            content = await wait_for_text(pilot, "#wordlist-content", "What belongs here")
+            self.assertGreater(len(str(content.render())), 40)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -49,7 +49,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
                 "#review-body",
                 "Nothing changes without confirmation",
             )
-            self.assertIn("review application dictionaries", str(body.render()))
+            self.assertIn("review application custom dictionaries", str(body.render()))
             self.assertIsInstance(app.screen, ReviewStartScreen)
             self.assertIsNone(controller.review_session())
 
@@ -60,8 +60,9 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             content = app.screen.query_one("#review-pull-content")
-            self.assertIn("New words: 17", str(content.render()))
-            self.assertIn("Sources ready: 2", str(content.render()))
+            rendered = str(content.render())
+            self.assertIn("17 words were found in application custom dictionaries", rendered)
+            self.assertIn("Sources ready: 2", rendered)
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
@@ -79,9 +80,10 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             content = await wait_for_text(
                 pilot,
                 "#review-pull-content",
-                "already contains all discovered words",
+                "enabled custom dictionaries",
             )
-            self.assertIn("New words: 0", str(content.render()))
+            rendered = str(content.render())
+            self.assertIn("All readable words from enabled custom dictionaries", rendered)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Plan id:")
 
@@ -91,7 +93,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             before = service.preview_counter
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Plan id:")
@@ -106,7 +108,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             session = controller.review_session()
             assert session is not None
             pre_pull_plan = session.push_preview_plan_before_pull
@@ -138,7 +140,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
@@ -282,7 +284,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsNone(controller.review_session())
@@ -292,7 +294,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-additions")
             await pilot.pause()
             from spell_sync.tui.screens.removals_screen import RemovalsScreen
@@ -308,7 +310,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             controller.begin_review_session()
             app.push_screen(screen)
             await pilot.pause()
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             screen._starting = True
             screen.action_run_pull()
             self.assertEqual(service.execute_pull_calls, 0)
@@ -342,7 +344,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
@@ -417,7 +419,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
-            await wait_for_text(pilot, "#review-pull-content", "New words")
+            await wait_for_text(pilot, "#review-pull-content", "custom diction")
             preview = app.screen._preview
             assert preview is not None
             controller.invalidate_pull_preview()

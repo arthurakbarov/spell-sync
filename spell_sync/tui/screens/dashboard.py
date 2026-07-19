@@ -11,6 +11,10 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.product_concepts import (
+    DASHBOARD_WORDLIST_LABEL,
+    DASHBOARD_WORDLIST_SUBTITLE,
+)
 from ...application.reports import DashboardSeverity
 from ...application.user_notices import (
     NoticeSeverity,
@@ -92,7 +96,8 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         lines = [
             "Spell Sync",
             "",
-            "Canonical wordlist",
+            DASHBOARD_WORDLIST_LABEL,
+            f"  {DASHBOARD_WORDLIST_SUBTITLE}",
             f"  {_display_path(state.wordlist_path)}",
             f"  {word_count} words",
             "",

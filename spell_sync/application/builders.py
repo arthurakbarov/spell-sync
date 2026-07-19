@@ -33,6 +33,7 @@ from .operation_explanations import (
     pull_report_metadata_lines,
     push_report_metadata_lines,
 )
+from .product_concepts import pull_completed_summary, push_completed_summary
 from .reports import (
     DashboardIssue,
     DashboardSeverity,
@@ -608,7 +609,11 @@ def build_doctor_snapshot(report: DoctorReport) -> DoctorSnapshot:
 
 
 def build_pull_preview(run: SyncRun) -> PullPreview:
-    """Compute pull merge without writing the wordlist."""
+    """Compute the Pull merge preview without writing the canonical wordlist.
+
+    Merges words from readable enabled application custom dictionaries into the
+    current canonical wordlist using case-insensitive deduplication.
+    """
     from ..io import read_text_words
     from ..read_outcome import is_readable_for_union
     from ..words import clean_words, merge_case_duplicates, sort_words
@@ -800,11 +805,17 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
             plan_identifier=execution.plan_identifier,
         )
     if outcome is OperationOutcome.COMPLETED:
+        result = execution.result
+        written = len(result.written) if isinstance(result, PushResult) else 0
         return OperationReport(
             operation="push",
             outcome=outcome,
             title="Push completed",
-            summary=execution.message or "Push finished successfully.",
+            summary=(
+                push_completed_summary(written)
+                if written
+                else (execution.message or "Push finished successfully.")
+            ),
             details=detail_parts,
             target_updates=updates,
             warnings=execution.warnings,
@@ -832,7 +843,7 @@ def build_pull_operation_report(execution: PullExecution) -> OperationReport:
             operation="pull",
             outcome=execution.outcome,
             title="Pull completed",
-            summary=(f"{preview.additions} words planned for the canonical wordlist"),
+            summary=pull_completed_summary(preview.additions),
             details=detail_parts,
             warnings=execution.warnings or preview.warnings,
             plan_identifier=preview.plan_identifier,

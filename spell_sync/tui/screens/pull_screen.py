@@ -10,6 +10,11 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.product_concepts import (
+    PULL_DIRECTION_LABEL,
+    PULL_SCOPE_NOTICE,
+    pull_preview_additions_line,
+)
 from ...application.reports import PullPreview
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
@@ -56,16 +61,18 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             run_btn.disabled = True
             return
         lines = [
-            "Pull words from applications",
+            "Pull personal words from custom dictionaries",
             "",
-            "Applications → canonical wordlist",
+            PULL_DIRECTION_LABEL,
             "",
-            f"New words: {preview.additions}",
-            f"Sources used: {len(preview.sources_used)}",
+            pull_preview_additions_line(preview.additions),
+            f"Sources ready: {len(preview.sources_used)}",
             f"Sources skipped: {len(preview.sources_skipped)}",
             f"Wordlist: {preview.wordlist_path}",
             f"Plan id: {preview.plan_identifier}",
             f"Created: {preview.created_at}",
+            "",
+            PULL_SCOPE_NOTICE,
             "",
             "Sources:",
         ]

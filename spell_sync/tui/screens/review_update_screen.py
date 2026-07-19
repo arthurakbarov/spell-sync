@@ -10,6 +10,13 @@ from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.product_concepts import (
+    PULL_DIRECTION_LABEL,
+    PUSH_DIRECTION_LABEL,
+    PUSH_REDUNDANCY_NOTICE,
+    REVIEW_START_BODY,
+    pull_preview_additions_line,
+)
 from ...application.reports import OperationOutcome, OperationReport, PullPreview, PushPreview
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
@@ -21,21 +28,14 @@ def _format_pull_preview(preview: PullPreview) -> str:
     lines = [
         "Pull review",
         "",
-        "Applications → canonical wordlist",
+        PULL_DIRECTION_LABEL,
         "",
-        f"New words: {preview.additions}",
+        pull_preview_additions_line(preview.additions),
         f"Sources ready: {len(preview.sources_used)}",
         f"Sources skipped: {len(preview.sources_skipped)}",
         f"Wordlist: {preview.wordlist_path}",
         f"Plan id: {preview.plan_identifier}",
     ]
-    if preview.additions == 0:
-        lines.extend(
-            [
-                "",
-                "Canonical wordlist already contains all discovered words.",
-            ]
-        )
     if preview.warnings:
         lines.append("")
         lines.extend(f"  ! {warning}" for warning in preview.warnings)
@@ -50,13 +50,15 @@ def _format_push_preview(preview: PushPreview) -> str:
     lines = [
         "Fresh push preview",
         "",
-        "Canonical wordlist → applications",
+        PUSH_DIRECTION_LABEL,
         "",
         f"Plan id: {preview.plan_identifier}",
         f"Targets to update: {preview.targets_to_update}",
         f"Total additions: {preview.additions}",
         f"Total removals: {preview.removals}",
         f"Unchanged: {preview.unchanged}",
+        "",
+        PUSH_REDUNDANCY_NOTICE,
     ]
     if preview.skipped:
         lines.append(f"Skipped: {', '.join(preview.skipped)}")
@@ -89,11 +91,7 @@ class ReviewStartScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#review-body", Static).update(
-            "Spell Sync will review application dictionaries first,\n"
-            "then prepare a fresh wordlist-to-applications preview.\n"
-            "Nothing changes without confirmation."
-        )
+        self.query_one("#review-body", Static).update(REVIEW_START_BODY)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-start":

@@ -13,6 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Static
 from textual.worker import Worker, WorkerState
 
+from ...application.product_concepts import TARGETS_SCOPE_NOTICE
 from ...project_setup.discovery import SetupTarget
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
@@ -148,7 +149,9 @@ class SetupTargetsScreen(LoadTokenMixin, Screen[None]):
             [
                 self._wordlist_detail,
                 "",
-                "Detected application dictionaries",
+                "Application custom dictionaries",
+                "",
+                TARGETS_SCOPE_NOTICE,
                 "",
                 "Use Up/Down and Space to toggle selectable targets.",
             ]

@@ -10,6 +10,11 @@ from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.product_concepts import (
+    PUSH_DIRECTION_LABEL,
+    PUSH_REDUNDANCY_NOTICE,
+    PUSH_SCOPE_NOTICE,
+)
 from ...application.reports import PushPreview
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
@@ -102,12 +107,19 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
 
         lines = [
             "Push preview (no writes)",
+            "",
+            PUSH_DIRECTION_LABEL,
+            "",
             f"Plan id: {preview.plan_identifier}",
             f"Created: {preview.created_at}",
             f"Total additions: {preview.additions}",
             f"Total removals: {preview.removals}",
             f"Targets to update: {preview.targets_to_update}",
             f"Unchanged: {preview.unchanged}",
+            "",
+            PUSH_SCOPE_NOTICE,
+            "",
+            PUSH_REDUNDANCY_NOTICE,
         ]
         if preview.skipped:
             lines.append(f"Skipped: {', '.join(preview.skipped)}")

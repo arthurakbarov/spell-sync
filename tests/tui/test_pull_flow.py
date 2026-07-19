@@ -23,10 +23,10 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-pull")
-            content = await wait_for_text(pilot, "#pull-content", "New words")
+            content = await wait_for_text(pilot, "#pull-content", "custom diction")
             text = str(content.render())
-            self.assertIn("New words: 17", text)
-            self.assertIn("Sources used: 2", text)
+            self.assertIn("17 words were found in application custom dictionaries", text)
+            self.assertIn("Sources ready: 2", text)
             self.assertIn("Sources skipped: 1", text)
             await pilot.click("#btn-refresh")
             await wait_for_text(pilot, "#pull-content", "Plan id: pull-")
@@ -38,7 +38,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             await pilot.click("#btn-run")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
@@ -51,7 +51,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             await pilot.click("#btn-run")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-cancel")
@@ -73,7 +73,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             await pilot.click("#btn-run")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
@@ -85,7 +85,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-pull")
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             await pilot.press("escape")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
@@ -97,7 +97,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             screen = PullScreen(controller)
             app.push_screen(screen)
-            await wait_for_text(pilot, "#pull-content", "New words")
+            await wait_for_text(pilot, "#pull-content", "custom diction")
             screen._starting = True
             screen.action_run_pull()
             self.assertEqual(service.execute_pull_calls, 0)

@@ -34,7 +34,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 32)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "Ready")
             text = str(summary.render())
-            self.assertIn("Canonical wordlist", text)
+            self.assertIn("Canonical personal wordlist", text)
             self.assertIn("5 ready", text)
             self.assertIn("1 need attention", text)
             self.assertIn("2 disabled", text)

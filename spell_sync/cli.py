@@ -6,6 +6,12 @@ import argparse
 import sys
 from typing import Callable, Dict
 
+from .application.product_concepts import (
+    CLI_PULL_HELP,
+    CLI_PUSH_HELP,
+    CLI_PUSH_REDUNDANCY_EPILOG,
+    CLI_ROOT_DESCRIPTION,
+)
 from .cli_options import CliOptions
 from .commands import cmd_init, cmd_lint, cmd_pull, cmd_push, cmd_status
 from .config_check_cmd import cmd_config_check
@@ -43,7 +49,9 @@ COMMANDS: Dict[str, CommandFn] = {
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="spell-sync",
-        description="Unified custom spell-check word list.",
+        description=CLI_ROOT_DESCRIPTION,
+        epilog=CLI_PUSH_REDUNDANCY_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -92,14 +100,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
     pull_p = sub.add_parser(
         "pull",
-        help="Pull: merge application dictionary words into the canonical wordlist",
+        help=CLI_PULL_HELP,
     )
     add_pull_flags(pull_p)
     add_common_flags(pull_p)
 
     push_p = sub.add_parser(
         "push",
-        help="Push: write the canonical wordlist to application dictionaries",
+        help=CLI_PUSH_HELP,
     )
     add_push_flags(push_p)
     add_common_flags(push_p)

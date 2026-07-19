@@ -111,7 +111,14 @@ class SyncRun:
         return before_count, after_count
 
     def pull_into_wordlist(self) -> Union[tuple[int, int], ExitCode]:
-        """Union all dictionaries → wordlist. Returns (before, after) or ExitCode."""
+        """Merge enabled application custom dictionaries into the canonical wordlist.
+
+        Pull reads only user custom dictionary files for enabled targets. Built-in
+        application dictionaries are never read or inspected.
+
+        Effective merge (case-insensitive):
+        ``new_wordlist = canonical_wordlist ∪ readable_custom_dictionaries``
+        """
         unreadable = self.check_wordlist()
         if unreadable is not None:
             return unreadable
@@ -203,7 +210,12 @@ class SyncRun:
         skip_names: frozenset[str] | None = None,
         prepared: PreparedPush | None = None,
     ) -> PushResult | ExitCode:
-        """wordlist → all dictionaries. Transactional: rollback on error."""
+        """Write the canonical personal wordlist to enabled custom dictionaries.
+
+        Each enabled target receives the canonical wordlist, or a target-specific
+        subset when ``Dictionary.subset`` is configured. Built-in application
+        dictionaries are not read or modified.
+        """
         return self._run_push_transaction(
             dry_run=False,
             skip_names=skip_names,

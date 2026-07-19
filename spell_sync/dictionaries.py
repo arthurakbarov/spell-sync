@@ -73,7 +73,12 @@ class DictionaryFormat(str, Enum):
 
 @dataclass(frozen=True)
 class Dictionary:
-    """Local dictionary for one application."""
+    """One application custom dictionary file discovered for sync.
+
+    Spell Sync reads and writes user custom dictionary storage (for example browser
+    custom word lists or IDE user dictionaries). Built-in application dictionaries
+    shipped with applications are never read, modified, or inspected.
+    """
 
     name: str
     path: str
@@ -83,6 +88,11 @@ class Dictionary:
     subset: Optional[SubsetFn] = None
 
     def target_words(self, wordlist: WordSet) -> WordSet:
+        """Return the canonical wordlist subset written to this target.
+
+        When ``subset`` is set (for example Windows locale custom dictionaries),
+        only matching script words are pushed: ``filter_i(W)`` instead of full ``W``.
+        """
         return self.subset(wordlist) if self.subset else wordlist
 
     def read(self, *, quiet: bool | None = None) -> WordSet:
@@ -285,6 +295,12 @@ def _optional_dictionary_sources() -> tuple[DictionarySource, ...]:
 def discover_dictionaries(
     settings: dict[str, dict[str, object]] | None = None,
 ) -> List[Dictionary]:
+    """Discover application custom dictionary files for Pull and Push.
+
+    Returns paths to user-maintained custom dictionary storage only. Built-in
+    language dictionaries and application spell-check lexicons are not discovered
+    or inspected.
+    """
     if settings is not None:
         bind_active_settings(settings)
     dictionaries = _platform_dictionaries()
