@@ -108,8 +108,8 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
-            report = await wait_for_text(pilot, "#report-content", "stopped safely")
-            self.assertIn("not overwritten", str(report.render()).lower())
+            report = await wait_for_text(pilot, "#report-content", "Preview is stale")
+            self.assertIn("no conflicting file was overwritten", str(report.render()).lower())
             await pilot.click("#btn-rebuild")
             await wait_for_text(pilot, "#preview-content", "Plan id")
 

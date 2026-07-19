@@ -130,8 +130,8 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         )
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(ReportScreen(controller, report))
-            content = await wait_for_text(pilot, "#report-content", "Recovery is required")
-            self.assertIn("Recovery is required", str(content.render()))
+            content = await wait_for_text(pilot, "#report-content", "Rollback incomplete")
+            self.assertIn("Open Recovery before another write operation", str(content.render()))
 
     async def test_push_confirm_invalid_preview(self):
         service = fake_service()

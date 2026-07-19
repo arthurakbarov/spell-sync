@@ -205,6 +205,7 @@ class FakeTuiService:
                 self.push_execution,
                 prepared=preview.prepared,
                 plan_identifier=preview.plan_identifier,
+                push_preview=preview,
             )
         return PushExecution(
             prepared=preview.prepared,
@@ -212,6 +213,7 @@ class FakeTuiService:
             outcome=OperationOutcome.COMPLETED,
             message="Updated targets: chrome",
             plan_identifier=preview.plan_identifier,
+            push_preview=preview,
         )
 
     def build_push_report(self, execution: PushExecution):

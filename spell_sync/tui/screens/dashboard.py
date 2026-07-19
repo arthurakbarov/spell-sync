@@ -12,6 +12,14 @@ from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.reports import DashboardSeverity
+from ...application.user_notices import (
+    NoticeSeverity,
+    build_notice,
+    dashboard_issue_to_notice,
+    format_notice_block,
+    format_notice_details,
+    format_notice_summary,
+)
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
@@ -117,12 +125,15 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         if state.issues:
             issue_lines = ["Issues:"]
             for issue in state.issues:
+                notice = dashboard_issue_to_notice(issue)
                 prefix = {
                     "blocked": "×",
                     "warning": "!",
                     "ready": "✓",
-                }[issue.severity.value]
-                issue_lines.append(f"  {prefix} {issue.title}: {issue.detail}")
+                    "info": "→",
+                }[notice.severity.value]
+                issue_lines.append(f"  {prefix} {format_notice_summary(notice)}")
+                issue_lines.append(f"     {format_notice_details(notice)}")
             self.query_one("#dashboard-issues", Static).update("\n".join(issue_lines))
         else:
             self.query_one("#dashboard-issues", Static).update("")
@@ -161,18 +172,21 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
         banner = self.query_one("#blocking-banner", Static)
         if state.pending_recovery:
-            banner.update(
-                "Recovery required\n"
-                "An unfinished transaction must be reviewed before another write operation."
-            )
+            matching = [issue for issue in state.issues if issue.code == "pending_recovery"]
+            if matching:
+                notice = dashboard_issue_to_notice(matching[0])
+            else:
+                notice = build_notice("pending_recovery", severity=NoticeSeverity.BLOCKED)
+            banner.update(format_notice_block(notice))
         elif any(issue.code == "invalid_config" for issue in state.issues):
             issue = next(i for i in state.issues if i.code == "invalid_config")
-            banner.update(f"Configuration blocked\n{issue.title}\n{issue.detail}")
+            banner.update(format_notice_block(dashboard_issue_to_notice(issue)))
         elif any(issue.code == "unreadable_wordlist" for issue in state.issues):
             issue = next(i for i in state.issues if i.code == "unreadable_wordlist")
-            banner.update(f"Wordlist blocked\n{issue.title}\n{issue.detail}")
+            banner.update(format_notice_block(dashboard_issue_to_notice(issue)))
         elif any(issue.code == "corrupt_journal" for issue in state.issues):
-            banner.update("× Corrupt recovery journal — inspect Recovery before writes.")
+            issue = next(i for i in state.issues if i.code == "corrupt_journal")
+            banner.update(format_notice_block(dashboard_issue_to_notice(issue)))
         else:
             banner.update("")
 

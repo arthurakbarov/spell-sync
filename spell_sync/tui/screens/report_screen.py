@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
+from ...application.operation_explanations import format_operation_report_text
 from ...application.reports import OperationOutcome, OperationReport
 from ..controller import TuiController
 
@@ -33,35 +34,10 @@ class ReportScreen(Screen[None]):
         self.query_one("#report-content", Static).update(self._summary_text())
 
     def _summary_text(self) -> str:
-        report = self._report
-        lines = [report.title, "", report.summary, ""]
-        if report.details:
-            lines.extend(report.details)
-            lines.append("")
-        if report.target_updates:
-            lines.append("Targets")
-            for row in report.target_updates:
-                lines.append(f"  {row.name:12} +{row.additions}  -{row.removals}  {row.status}")
-            lines.append("")
-        if report.warnings:
-            lines.append("Warnings")
-            lines.extend(f"  ! {warning}" for warning in report.warnings)
-            lines.append("")
-        if report.recovery_required:
-            lines.append("× Recovery is required before another write operation.")
-        if report.plan_identifier:
-            lines.append(f"Plan id: {report.plan_identifier}")
-        return "\n".join(lines).rstrip()
+        return format_operation_report_text(self._report)
 
     def _details_text(self) -> str:
-        report = self._report
-        lines = [report.title, report.summary, *report.details]
-        if report.conflict_target:
-            lines.append(f"Conflict: {report.conflict_target}")
-        lines.extend(report.warnings)
-        if report.recovery_required:
-            lines.append("recovery_required=true")
-        return "\n".join(lines)
+        return format_operation_report_text(self._report)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-dashboard":

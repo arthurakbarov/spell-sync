@@ -88,12 +88,31 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app.screen.query_one("#btn-pull").disabled)
             self.assertTrue(app.screen.query_one("#btn-push").disabled)
 
+    async def test_pending_recovery_with_issue(self):
+        issues = (
+            DashboardIssue(
+                code="pending_recovery",
+                severity=DashboardSeverity.BLOCKED,
+                title="Pending recovery",
+                detail="journal in progress",
+            ),
+        )
+        controller = TuiController(
+            fake_service(pending_recovery=True, issues=issues),
+            CliOptions(),
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            banner = await wait_for_text(pilot, "#blocking-banner", "Pending recovery")
+            self.assertIn("unfinished push journal", str(banner.render()).lower())
+
     async def test_pending_recovery(self):
         controller = TuiController(fake_service(pending_recovery=True), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
-            banner = await wait_for_text(pilot, "#blocking-banner", "Recovery required")
-            self.assertIn("unfinished transaction", str(banner.render()))
+            banner = await wait_for_text(pilot, "#blocking-banner", "Pending recovery")
+            self.assertIn("Pending recovery", str(banner.render()))
+            self.assertIn("unfinished push journal", str(banner.render()))
             recovery_btn = app.screen.query_one("#btn-recovery")
             self.assertFalse(recovery_btn.disabled)
             self.assertEqual(recovery_btn.variant, "primary")
@@ -337,8 +356,8 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
         )
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
-            banner = await wait_for_text(pilot, "#blocking-banner", "Corrupt recovery journal")
-            self.assertIn("Corrupt recovery journal", str(banner.render()))
+            banner = await wait_for_text(pilot, "#blocking-banner", "Corrupt push journal")
+            self.assertIn("Corrupt push journal", str(banner.render()))
 
 
 if __name__ == "__main__":

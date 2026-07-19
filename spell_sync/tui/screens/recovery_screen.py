@@ -10,7 +10,9 @@ from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
 
+from ...application.operation_explanations import recovery_blocker_notice
 from ...application.reports import RecoveryPreview, RecoveryStatus
+from ...application.user_notices import format_notice_block, format_notice_summary
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
@@ -65,15 +67,24 @@ class RecoveryScreen(LoadTokenMixin, Screen[None]):
             )
 
         snapshots = "valid" if preview.snapshots_valid else "incomplete"
-        title = (
-            "Recovery required"
-            if preview.status
-            not in {
-                RecoveryStatus.ABSENT,
-                RecoveryStatus.COMPLETED_CLEANUP_PENDING,
-            }
-            else preview.status.value.replace("_", " ").title()
-        )
+        if preview.status is RecoveryStatus.RECOVERY_IN_PROGRESS:
+            title = format_notice_summary(
+                recovery_blocker_notice(status_value="recovery_in_progress")
+            )
+        elif preview.status is RecoveryStatus.CORRUPT_JOURNAL:
+            title = format_notice_summary(
+                recovery_blocker_notice(
+                    status_value="corrupt_journal",
+                    detail=preview.detail,
+                )
+            )
+        elif preview.status not in {
+            RecoveryStatus.ABSENT,
+            RecoveryStatus.COMPLETED_CLEANUP_PENDING,
+        }:
+            title = format_notice_summary(recovery_blocker_notice(status_value="pending_recovery"))
+        else:
+            title = preview.status.value.replace("_", " ").title()
         lines = [
             title,
             "",
@@ -87,7 +98,19 @@ class RecoveryScreen(LoadTokenMixin, Screen[None]):
             f"Failures: {preview.failure_count}",
             f"Snapshots: {snapshots}",
         ]
-        if preview.detail:
+        if preview.detail and preview.status is RecoveryStatus.CORRUPT_JOURNAL:
+            notice = recovery_blocker_notice(
+                status_value="corrupt_journal",
+                detail=preview.detail,
+            )
+            lines.extend(["", format_notice_block(notice)])
+        elif preview.status is RecoveryStatus.RECOVERY_IN_PROGRESS:
+            notice = recovery_blocker_notice(status_value="recovery_in_progress")
+            lines.extend(["", format_notice_block(notice)])
+        elif preview.status is RecoveryStatus.RECOVERABLE:
+            notice = recovery_blocker_notice(status_value="pending_recovery")
+            lines.extend(["", format_notice_block(notice)])
+        if preview.detail and preview.status is not RecoveryStatus.CORRUPT_JOURNAL:
             lines.extend(["", preview.detail])
         if preview.warnings:
             lines.extend(["", "Warnings:"])

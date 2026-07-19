@@ -12,6 +12,8 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import Worker, WorkerState
 
+from ...application.operation_explanations import target_settings_blocker_notice
+from ...application.user_notices import format_notice_block, format_notice_summary
 from ...project_setup.discovery import target_display_name
 from ...project_setup.target_settings import PreparedTargetSettingsUpdate
 from ..controller import TuiController
@@ -78,7 +80,10 @@ class TargetSettingsScreen(LoadTokenMixin, Screen[None]):
             "Use Up/Down and Space to toggle selectable targets.",
         ]
         if self._load_error:
-            header_lines.extend(["", f"× {self._load_error}"])
+            notice = target_settings_blocker_notice(self._load_error)
+            if notice is not None:
+                header_lines.extend(["", f"× {format_notice_summary(notice)}"])
+                header_lines.append(format_notice_block(notice))
         self.query_one("#targets-header", Static).update("\n".join(header_lines))
         container = self.query_one("#targets-list", ScrollableContainer)
         container.remove_children()

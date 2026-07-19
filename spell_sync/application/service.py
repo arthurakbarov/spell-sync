@@ -64,9 +64,9 @@ from .builders import (
     build_setup_operation_report,
     build_status_detail_snapshot,
     build_target_settings_operation_report,
-    build_target_updates_from_preview,
 )
 from .events import EventLevel, EventSink, OperationEvent, OperationKind
+from .operation_explanations import build_push_target_updates
 from .reports import (
     DashboardState,
     DoctorSnapshot,
@@ -529,12 +529,24 @@ class SpellSyncService:
         prepared: PreparedPush,
         result: PushResult | ExitCode,
     ) -> PushExecution:
+        preview: PushPreview | None = None
+        updates: tuple = ()
+        if prepared is not None:
+            try:
+                preview = build_push_preview(prepared)
+                push_result = result if isinstance(result, PushResult) else None
+                updates = build_push_target_updates(preview, push_result)
+            except AttributeError:
+                preview = None
+                updates = ()
         if isinstance(result, ExitCode):
             return PushExecution(
                 prepared=prepared,
                 result=result,
                 outcome=OperationOutcome.FAILED,
                 message="Push failed.",
+                target_updates=updates,
+                push_preview=preview,
             )
         outcome = OperationOutcome.COMPLETED
         if result.skipped:
@@ -544,6 +556,8 @@ class SpellSyncService:
             result=result,
             outcome=outcome,
             message="Push completed.",
+            target_updates=updates,
+            push_preview=preview,
         )
 
     def execute_push_preview(
@@ -563,6 +577,7 @@ class SpellSyncService:
                 outcome=OperationOutcome.FAILED,
                 message="Push preview is not executable.",
                 plan_identifier=preview.plan_identifier,
+                push_preview=preview,
             )
         if confirmed_plan_id != preview.plan_identifier:
             return PushExecution(
@@ -571,9 +586,10 @@ class SpellSyncService:
                 outcome=OperationOutcome.FAILED,
                 message="Push confirmation does not match the current preview.",
                 plan_identifier=preview.plan_identifier,
+                push_preview=preview,
             )
 
-        updates = build_target_updates_from_preview(preview)
+        updates = build_push_target_updates(preview, None)
         _emit(
             event_sink,
             OperationEvent(OperationKind.PUSH, "validating", "Validating configuration"),
@@ -739,6 +755,7 @@ class SpellSyncService:
                 target_updates=updates,
                 recovery_required=recovery,
                 plan_identifier=preview.plan_identifier,
+                push_preview=preview,
             )
 
         if isinstance(result, ExitCode):
@@ -765,6 +782,7 @@ class SpellSyncService:
                 target_updates=updates,
                 recovery_required=recovery,
                 plan_identifier=preview.plan_identifier,
+                push_preview=preview,
             )
 
         warnings = list(preview.warnings)
@@ -795,14 +813,16 @@ class SpellSyncService:
             ),
         )
         written = ", ".join(result.written) if result.written else "none"
+        actual_updates = build_push_target_updates(preview, result)
         return PushExecution(
             prepared=prepared,
             result=result,
             outcome=outcome,
             message=f"Updated targets: {written}",
             warnings=tuple(warnings),
-            target_updates=updates,
+            target_updates=actual_updates,
             plan_identifier=preview.plan_identifier,
+            push_preview=preview,
         )
 
     def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview:

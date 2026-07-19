@@ -1,0 +1,260 @@
+"""UI-neutral user notices with a single text catalog."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+from .reports import DashboardIssue, DashboardSeverity
+
+
+class NoticeSeverity(str, Enum):
+    BLOCKED = "blocked"
+    WARNING = "warning"
+    INFO = "info"
+
+
+@dataclass(frozen=True)
+class NoticeTemplate:
+    title: str
+    explanation: str
+    suggested_action: str
+
+
+@dataclass(frozen=True)
+class UserNotice:
+    code: str
+    severity: NoticeSeverity
+    title: str
+    explanation: str
+    suggested_action: str | None
+    technical_detail: str | None = None
+
+
+NOTICE_CATALOG: dict[str, NoticeTemplate] = {
+    "invalid_config": NoticeTemplate(
+        title="Invalid configuration",
+        explanation="spell-sync.toml failed validation and blocks write operations.",
+        suggested_action="Fix spell-sync.toml, then run spell-sync config-check.",
+    ),
+    "unreadable_wordlist": NoticeTemplate(
+        title="Wordlist unreadable",
+        explanation="The canonical wordlist cannot be read.",
+        suggested_action="Check file permissions and path, then run spell-sync doctor.",
+    ),
+    "pending_recovery": NoticeTemplate(
+        title="Pending recovery",
+        explanation="An unfinished push journal requires recovery before writes.",
+        suggested_action="Open Recovery and finish the pending transaction.",
+    ),
+    "corrupt_journal": NoticeTemplate(
+        title="Corrupt push journal",
+        explanation="Recovery metadata is corrupt or uses an unsupported format.",
+        suggested_action="Inspect Recovery or run spell-sync recover.",
+    ),
+    "operation_locked": NoticeTemplate(
+        title="Operation lock active",
+        explanation="Another spell-sync process is running in this project.",
+        suggested_action="Wait for the other process to finish.",
+    ),
+    "target_corrupt": NoticeTemplate(
+        title="Dictionary target damaged",
+        explanation="A dictionary target is corrupt or unsupported.",
+        suggested_action="Repair the dictionary file or disable the target in config.",
+    ),
+    "target_unreadable": NoticeTemplate(
+        title="Unreadable dictionary target",
+        explanation="A dictionary target could not be read.",
+        suggested_action="Check permissions or disable the affected target.",
+    ),
+    "application_running": NoticeTemplate(
+        title="Application was running",
+        explanation="The target application was running, so its dictionary was not updated.",
+        suggested_action="Close the application and run Push again.",
+    ),
+    "stale_preview": NoticeTemplate(
+        title="Preview is stale",
+        explanation="A target changed after the preview was created.",
+        suggested_action="Rebuild the preview and confirm again.",
+    ),
+    "external_change": NoticeTemplate(
+        title="External change detected",
+        explanation="A file changed outside Spell Sync during the operation.",
+        suggested_action="Review the target state, then rebuild the preview.",
+    ),
+    "removal_confirmation_required": NoticeTemplate(
+        title="Removal confirmation required",
+        explanation="Push would remove more words than the configured limit allows.",
+        suggested_action="Review removals, then confirm or adjust spell-sync.toml limits.",
+    ),
+    "rollback_incomplete": NoticeTemplate(
+        title="Rollback incomplete",
+        explanation="Automatic rollback did not finish cleanly.",
+        suggested_action="Open Recovery before another write operation.",
+    ),
+    "history_write_failed": NoticeTemplate(
+        title="History write failed",
+        explanation="The operation finished, but its history record could not be saved.",
+        suggested_action="Check History permissions; the operation result still stands.",
+    ),
+}
+
+_DASHBOARD_CODE_ALIASES: dict[str, str] = {
+    "operation_lock": "operation_locked",
+    "skipped_unreadable": "target_unreadable",
+    "corrupt_target": "target_corrupt",
+}
+
+_DASHBOARD_SEVERITY: dict[DashboardSeverity, NoticeSeverity] = {
+    DashboardSeverity.BLOCKED: NoticeSeverity.BLOCKED,
+    DashboardSeverity.WARNING: NoticeSeverity.WARNING,
+    DashboardSeverity.READY: NoticeSeverity.INFO,
+}
+
+
+def catalog_entry(code: str) -> NoticeTemplate:
+    try:
+        return NOTICE_CATALOG[code]
+    except KeyError as exc:
+        raise KeyError(f"unknown notice code: {code}") from exc
+
+
+def build_notice(
+    code: str,
+    *,
+    severity: NoticeSeverity = NoticeSeverity.WARNING,
+    target_id: str | None = None,
+    detail: str | None = None,
+    explanation: str | None = None,
+) -> UserNotice:
+    template = catalog_entry(code)
+    technical = _technical_detail(code, target_id=target_id, detail=detail)
+    return UserNotice(
+        code=code,
+        severity=severity,
+        title=template.title,
+        explanation=explanation or template.explanation,
+        suggested_action=template.suggested_action,
+        technical_detail=technical,
+    )
+
+
+def dashboard_issue_to_notice(issue: DashboardIssue) -> UserNotice:
+    code = _DASHBOARD_CODE_ALIASES.get(issue.code, issue.code)
+    if code in NOTICE_CATALOG:
+        target_id = None
+        detail = issue.detail
+        if code in {"target_corrupt", "target_unreadable"}:
+            target_id = _target_ids_from_detail(issue.detail)
+        notice = build_notice(
+            code,
+            severity=_DASHBOARD_SEVERITY[issue.severity],
+            target_id=target_id,
+            detail=detail,
+        )
+        if issue.detail and code in {"invalid_config", "corrupt_journal", "operation_locked"}:
+            return UserNotice(
+                code=notice.code,
+                severity=notice.severity,
+                title=notice.title,
+                explanation=issue.detail,
+                suggested_action=notice.suggested_action,
+                technical_detail=notice.technical_detail,
+            )
+        return notice
+    return UserNotice(
+        code=issue.code,
+        severity=_DASHBOARD_SEVERITY[issue.severity],
+        title=issue.title,
+        explanation=issue.detail,
+        suggested_action=issue.suggested_action,
+        technical_detail=f"reason={issue.code}",
+    )
+
+
+def skip_reason_to_notice_code(reason: str) -> str:
+    lower = reason.lower()
+    if lower in {"unreadable", "corrupt"} or "corrupt" in lower or "unsupported" in lower:
+        return "target_corrupt"
+    if "unreadable" in lower or "access" in lower or "read" in lower or lower == "skipped":
+        return "target_unreadable"
+    if "running" in lower or "quit" in lower:
+        return "application_running"
+    if "blocked" in lower:
+        return "target_unreadable"
+    return "application_running"
+
+
+def format_skip_status(reason: str) -> str:
+    code = skip_reason_to_notice_code(reason)
+    template = catalog_entry(code)
+    short = template.explanation.split(".", maxsplit=1)[0].rstrip(".")
+    return f"Skipped: {short[0].lower()}{short[1:]}"
+
+
+def format_notice_summary(notice: UserNotice) -> str:
+    return notice.title
+
+
+def format_notice_details(notice: UserNotice) -> str:
+    return notice.explanation
+
+
+def format_notice_action(notice: UserNotice) -> str:
+    return notice.suggested_action or ""
+
+
+def format_notice_technical(notice: UserNotice) -> str:
+    if notice.technical_detail:
+        return notice.technical_detail
+    return f"reason={notice.code}"
+
+
+def format_notice_block(notice: UserNotice) -> str:
+    lines = [
+        format_notice_summary(notice),
+        "",
+        format_notice_details(notice),
+    ]
+    action = format_notice_action(notice)
+    if action:
+        lines.extend(["", action])
+    technical = format_notice_technical(notice)
+    if technical:
+        lines.extend(["", technical])
+    return "\n".join(lines)
+
+
+def _technical_detail(
+    code: str,
+    *,
+    target_id: str | None,
+    detail: str | None,
+) -> str | None:
+    parts = [f"reason={code}"]
+    if target_id:
+        parts.append(f"target={target_id}")
+    if detail and code == "operation_locked":
+        return None
+    return " ".join(parts)
+
+
+def _target_ids_from_detail(detail: str) -> str | None:
+    marker = ": "
+    if marker not in detail:
+        return None
+    suffix = detail.split(marker, maxsplit=1)[1].rstrip(".")
+    names = [part.strip() for part in suffix.split(",") if part.strip()]
+    if not names:
+        return None
+    return ",".join(_target_family(name) for name in names)
+
+
+def _target_family(name: str) -> str:
+    if name.startswith("macos-"):
+        return "macos_spelling"
+    if name.startswith("win-"):
+        return "win_spelling"
+    if ":" in name:
+        return name.split(":", 1)[0]
+    return name

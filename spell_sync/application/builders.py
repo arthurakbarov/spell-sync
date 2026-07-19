@@ -26,6 +26,13 @@ from ..settings import ConfigStatus
 from ..sync_models import PushResult
 from ..sync_run import SyncRun
 from ..validated_runtime import ValidatedRuntime
+from .operation_explanations import (
+    build_push_target_updates,
+    format_pull_planned_actual_lines,
+    format_push_planned_actual_lines,
+    pull_report_metadata_lines,
+    push_report_metadata_lines,
+)
 from .reports import (
     DashboardIssue,
     DashboardSeverity,
@@ -50,6 +57,7 @@ from .reports import (
     TargetStatusRow,
     TargetUpdateReport,
 )
+from .user_notices import build_notice, catalog_entry
 
 
 def _overall_label(severity: DashboardSeverity) -> str:
@@ -68,6 +76,12 @@ def _max_severity(*severities: DashboardSeverity) -> DashboardSeverity:
     return DashboardSeverity.READY
 
 
+def _dashboard_notice_text(code: str, *, detail: str | None = None) -> tuple[str, str, str]:
+    template = catalog_entry(code)
+    explanation = detail or template.explanation
+    return template.title, explanation, template.suggested_action
+
+
 def build_dashboard_issues(
     validated: ValidatedRuntime,
     snapshot: StatusSnapshot,
@@ -84,36 +98,39 @@ def build_dashboard_issues(
             if config_result.diagnostics
             else config_result.status.value
         )
+        title, explanation, action = _dashboard_notice_text("invalid_config", detail=detail)
         issues.append(
             DashboardIssue(
                 code="invalid_config",
                 severity=DashboardSeverity.BLOCKED,
-                title="Invalid configuration",
-                detail=detail,
-                suggested_action="Fix spell-sync.toml, then run spell-sync config-check.",
+                title=title,
+                detail=explanation,
+                suggested_action=action,
             )
         )
 
     if snapshot.wordlist_error is not None:
+        title, explanation, action = _dashboard_notice_text("unreadable_wordlist")
         issues.append(
             DashboardIssue(
                 code="unreadable_wordlist",
                 severity=DashboardSeverity.BLOCKED,
-                title="Wordlist unreadable",
-                detail=f"Wordlist check failed with exit {int(snapshot.wordlist_error)}.",
-                suggested_action="Check file permissions and path, then run spell-sync doctor.",
+                title=title,
+                detail=explanation,
+                suggested_action=action,
             )
         )
 
     journal = validated.journal_result
     if journal.status is JournalLoadStatus.VALID_IN_PROGRESS:
+        title, explanation, action = _dashboard_notice_text("pending_recovery")
         issues.append(
             DashboardIssue(
                 code="pending_recovery",
                 severity=DashboardSeverity.BLOCKED,
-                title="Pending recovery",
-                detail="An unfinished push journal requires recovery before writes.",
-                suggested_action="Run spell-sync recover before push or pull.",
+                title=title,
+                detail=explanation,
+                suggested_action=action,
             )
         )
     elif journal.status in (
@@ -121,39 +138,39 @@ def build_dashboard_issues(
         JournalLoadStatus.UNSUPPORTED_SCHEMA,
     ):
         detail = journal.detail or journal.status.value
+        title, explanation, action = _dashboard_notice_text("corrupt_journal", detail=detail)
         issues.append(
             DashboardIssue(
                 code="corrupt_journal",
                 severity=DashboardSeverity.BLOCKED,
-                title="Corrupt push journal",
-                detail=detail,
-                suggested_action="Inspect the journal file or run spell-sync recover.",
+                title=title,
+                detail=explanation,
+                suggested_action=action,
             )
         )
 
     if lock_info is not None:
+        title, explanation, action = _dashboard_notice_text("operation_locked")
         issues.append(
             DashboardIssue(
                 code="operation_lock",
                 severity=DashboardSeverity.BLOCKED,
-                title="Operation lock active",
-                detail=(
-                    f"Another spell-sync process holds the lock "
-                    f"({lock_info.command}, pid {lock_info.pid})."
-                ),
-                suggested_action="Wait for the other process to finish.",
+                title=title,
+                detail=(f"{explanation} ({lock_info.command}, pid {lock_info.pid})."),
+                suggested_action=action,
             )
         )
 
     if snapshot.skipped_corrupt:
         names = ", ".join(snapshot.skipped_corrupt)
+        title, explanation, action = _dashboard_notice_text("target_corrupt")
         issues.append(
             DashboardIssue(
                 code="corrupt_target",
                 severity=DashboardSeverity.BLOCKED,
-                title="Dictionary target damaged",
-                detail=f"Corrupt or unsupported dictionaries: {names}.",
-                suggested_action="Repair dictionary files or disable targets in config.",
+                title=title,
+                detail=f"{explanation} Affected targets: {names}.",
+                suggested_action=action,
             )
         )
 
@@ -170,13 +187,14 @@ def build_dashboard_issues(
 
     if snapshot.skipped_unreadable:
         names = ", ".join(snapshot.skipped_unreadable)
+        title, explanation, action = _dashboard_notice_text("target_unreadable")
         issues.append(
             DashboardIssue(
                 code="skipped_unreadable",
                 severity=DashboardSeverity.WARNING,
-                title="Unreadable dictionary targets",
-                detail=f"Read failed for: {names}.",
-                suggested_action="Check permissions or disable affected targets.",
+                title=title,
+                detail=f"{explanation} Affected targets: {names}.",
+                suggested_action=action,
             )
         )
 
@@ -692,56 +710,67 @@ def build_pull_preview(run: SyncRun) -> PullPreview:
 
 
 def build_target_updates_from_preview(preview: PushPreview) -> tuple[TargetUpdateReport, ...]:
-    rows: list[TargetUpdateReport] = []
-    for target in preview.targets:
-        rows.append(
-            TargetUpdateReport(
-                name=target.name,
-                additions=target.additions,
-                removals=target.removals,
-                status=target.status,
-            )
-        )
-    for name in preview.skipped:
-        rows.append(TargetUpdateReport(name=name, additions=0, removals=0, status="Skipped"))
-    for name in preview.corrupt:
-        rows.append(TargetUpdateReport(name=name, additions=0, removals=0, status="Corrupt"))
-    return tuple(rows)
+    return build_push_target_updates(preview, None)
 
 
 def build_push_operation_report(execution: PushExecution) -> OperationReport:
+    preview = execution.push_preview
+    updates = execution.target_updates
+    if preview is not None and isinstance(execution.result, PushResult):
+        updates = build_push_target_updates(preview, execution.result)
+    elif preview is not None and not updates:
+        updates = build_push_target_updates(preview, None)
+
+    planned_actual = format_push_planned_actual_lines(preview, updates)
+    metadata = push_report_metadata_lines(
+        preview,
+        plan_verified=execution.outcome
+        in {
+            OperationOutcome.COMPLETED,
+            OperationOutcome.COMPLETED_WITH_WARNINGS,
+        },
+        snapshots_cleaned=execution.outcome is OperationOutcome.COMPLETED
+        and not execution.recovery_required,
+    )
+    detail_parts: tuple[str, ...] = (*planned_actual, *metadata)
+
     outcome = execution.outcome
     if outcome is OperationOutcome.RECOVERY_REQUIRED:
+        notice = build_notice("rollback_incomplete")
         return OperationReport(
             operation="push",
             outcome=outcome,
-            title="Push requires recovery",
-            summary=(
-                "Automatic rollback was incomplete. Recovery metadata and snapshots were preserved."
-            ),
-            details=(
+            title=notice.title,
+            summary=notice.explanation,
+            details=detail_parts
+            + (
+                notice.suggested_action or "",
                 "Run Recovery before another write operation.",
-                execution.message,
             ),
-            target_updates=execution.target_updates,
+            target_updates=updates,
             warnings=execution.warnings,
             recovery_required=True,
             plan_identifier=execution.plan_identifier,
         )
     if outcome is OperationOutcome.STOPPED_SAFELY:
         if execution.conflict_target:
+            notice = build_notice(
+                "stale_preview",
+                target_id=execution.conflict_target.split(":", 1)[0]
+                if ":" in execution.conflict_target
+                else execution.conflict_target,
+            )
             return OperationReport(
                 operation="push",
                 outcome=outcome,
-                title="Push stopped safely",
-                summary=(
-                    "A target changed after the preview was created. "
-                    "The conflicting file was not overwritten."
-                ),
-                details=(
-                    f"Conflicting target: {execution.conflict_target}",
+                title=notice.title,
+                summary=notice.explanation,
+                details=detail_parts
+                + (
+                    notice.suggested_action or "",
                     "No conflicting file was overwritten.",
                 ),
+                target_updates=updates,
                 conflict_target=execution.conflict_target,
                 plan_identifier=execution.plan_identifier,
             )
@@ -750,8 +779,8 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
             outcome=outcome,
             title="Push stopped safely",
             summary="A write failed. Previously updated files were restored.",
-            details=(execution.message,),
-            target_updates=execution.target_updates,
+            details=detail_parts + (execution.message,),
+            target_updates=updates,
             warnings=execution.warnings,
             plan_identifier=execution.plan_identifier,
         )
@@ -759,13 +788,14 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
         result = execution.result
         skipped = len(result.skipped) if isinstance(result, PushResult) else 0
         written = len(result.written) if isinstance(result, PushResult) else 0
+        notice = build_notice("application_running")
         return OperationReport(
             operation="push",
             outcome=outcome,
             title="Push completed with warnings",
             summary=f"{written} targets updated, {skipped} target(s) skipped.",
-            details=(execution.message,),
-            target_updates=execution.target_updates,
+            details=detail_parts + (notice.explanation,),
+            target_updates=updates,
             warnings=execution.warnings,
             plan_identifier=execution.plan_identifier,
         )
@@ -775,8 +805,8 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
             outcome=outcome,
             title="Push completed",
             summary=execution.message or "Push finished successfully.",
-            details=("Transaction: completed", "Recovery data: cleaned up"),
-            target_updates=execution.target_updates,
+            details=detail_parts,
+            target_updates=updates,
             warnings=execution.warnings,
             plan_identifier=execution.plan_identifier,
         )
@@ -785,8 +815,8 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
         outcome=outcome,
         title="Push failed",
         summary=execution.message or "Push could not complete.",
-        details=(),
-        target_updates=execution.target_updates,
+        details=detail_parts,
+        target_updates=updates,
         warnings=execution.warnings,
         plan_identifier=execution.plan_identifier,
     )
@@ -794,17 +824,16 @@ def build_push_operation_report(execution: PushExecution) -> OperationReport:
 
 def build_pull_operation_report(execution: PullExecution) -> OperationReport:
     preview = execution.preview
+    planned_actual = format_pull_planned_actual_lines(preview, execution)
+    metadata = pull_report_metadata_lines(preview)
+    detail_parts: tuple[str, ...] = (*planned_actual, *metadata)
     if execution.outcome is OperationOutcome.COMPLETED:
         return OperationReport(
             operation="pull",
             outcome=execution.outcome,
             title="Pull completed",
-            summary=(f"{preview.additions} words added to the canonical wordlist"),
-            details=(
-                f"{len(preview.sources_used)} sources read",
-                f"{len(preview.sources_skipped)} source(s) skipped",
-                f"Wordlist: {preview.wordlist_path}",
-            ),
+            summary=(f"{preview.additions} words planned for the canonical wordlist"),
+            details=detail_parts,
             warnings=execution.warnings or preview.warnings,
             plan_identifier=preview.plan_identifier,
         )
@@ -813,7 +842,7 @@ def build_pull_operation_report(execution: PullExecution) -> OperationReport:
         outcome=execution.outcome,
         title="Pull failed",
         summary=execution.message or "Pull could not complete.",
-        details=(f"Wordlist: {preview.wordlist_path}",),
+        details=detail_parts,
         warnings=execution.warnings,
         plan_identifier=preview.plan_identifier,
     )

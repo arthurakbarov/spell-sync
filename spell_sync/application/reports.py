@@ -239,6 +239,7 @@ class PushExecution:
     target_updates: tuple[TargetUpdateReport, ...] = ()
     recovery_required: bool = False
     plan_identifier: str | None = None
+    push_preview: PushPreview | None = None
 
 
 class RecoveryStatus(str, Enum):

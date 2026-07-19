@@ -60,7 +60,7 @@ architecture rewrite, no remote publish.
 
 ## Current phase
 
-Phase 3 — guided Review and update (complete)
+Phase 4 — UserNotice / planned vs actual (complete)
 
 ## Completed phases
 
@@ -192,23 +192,54 @@ Tests:
 - `tests/tui/test_review_coverage.py` — screen edge paths
 - Architecture guards in `tests/tui/test_architecture.py`
 
+### Phase 4 — UserNotice / planned vs actual
+
+Application model:
+
+- `UserNotice` / `NoticeSeverity` / `NOTICE_CATALOG` (`spell_sync/application/user_notices.py`)
+- Planned vs actual helpers (`spell_sync/application/operation_explanations.py`)
+- `DashboardIssue` kept; mapped to `UserNotice` for display via `dashboard_issue_to_notice`
+
+Catalog:
+
+- Single text source for 13 reason codes: title, explanation, suggested action
+- Technical detail: reason code + target id only (no paths, hashes, or user words)
+
+Reports:
+
+- Push: Planned/Actual target rows with per-target status (Updated, Skipped: …)
+- Pull: Planned vs actual additions and skipped-source explanations
+- Allowed metadata: preview created time, plan verified, recovery snapshots cleaned
+- `PushExecution.push_preview` links execution back to the immutable preview
+
+Screens updated (NEW/main only):
+
+- Dashboard blocking banners and issue lines via `UserNotice`
+- Targets load-error banner via catalog
+- Recovery blocker copy via catalog
+- Push/Pull report screen via `format_operation_report_text`
+- Review session inherits updated operation reports
+
+Tests:
+
+- `tests/test_user_notices.py` — catalog, mapping, planned/actual, sensitivity guards
+- Updated TUI expectations in dashboard, push flow, phase4 coverage
+
 ## Last validation
 
 ```bash
 python3.11 -m ruff check spell_sync tests          # pass
 python3.11 -m ruff format --check spell_sync tests # pass
 python3.11 -m mypy spell_sync                      # pass
-python3.11 -m pytest tests/tui -q                  # 265 passed
+python3.11 -m pytest tests/test_user_notices.py tests/tui -q  # pass
 bash scripts/ci.sh                                 # EXIT 0
 coverage policy: 100% lines, 96%+ branches
-1356 passed
 ```
 
 ## Remaining work
 
 ### Later phases
 
-- Phase 4: UserNotice / planned vs actual
 - Phase 5: docs + version `0.2.0`
 
 ## Deferred work
