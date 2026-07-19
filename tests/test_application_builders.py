@@ -393,7 +393,7 @@ class TestDoctorBuilder(unittest.TestCase):
         report = DoctorReport(
             wordlist_path="/tmp/w.txt",
             wordlist_count=1,
-            package_version="0.1.0",
+            package_version="0.2.0",
             skipped_unreadable=("offline",),
             git_hooks=None,
             cli=MagicMock(
@@ -424,7 +424,7 @@ class TestDoctorBuilder(unittest.TestCase):
         report = DoctorReport(
             wordlist_path="/tmp/w.txt",
             wordlist_count=1,
-            package_version="0.1.0",
+            package_version="0.2.0",
             skipped_unreadable=("offline",),
             git_hooks=None,
             cli=MagicMock(
@@ -469,7 +469,7 @@ class TestDoctorBuilder(unittest.TestCase):
         report = DoctorReport(
             wordlist_path="/tmp/w.txt",
             wordlist_count=1,
-            package_version="0.1.0",
+            package_version="0.2.0",
             skipped_unreadable=(),
             git_hooks=None,
             cli=MagicMock(

@@ -104,10 +104,10 @@ class TestRuntimeHelpers(unittest.TestCase):
             patch("spell_sync.runtime.version", side_effect=Exception("no dist")),
             patch(
                 "spell_sync.runtime.read_pyproject_version",
-                return_value="0.1.0",
+                return_value="0.2.0",
             ),
         ):
-            self.assertEqual(installed_package_version(), "0.1.0")
+            self.assertEqual(installed_package_version(), "0.2.0")
 
     def test_installed_package_version_raises_when_unavailable(self):
         with (
@@ -296,7 +296,7 @@ class TestDoctorActionFormatting(unittest.TestCase):
         report = doctor_mod.DoctorReport(
             wordlist_path="/tmp/w.txt",
             wordlist_count=1,
-            package_version="0.1.0",
+            package_version="0.2.0",
             skipped_unreadable=(),
             git_hooks=None,
             cli=doctor_mod.CliStatus(
