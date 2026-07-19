@@ -1,6 +1,6 @@
 # spell-sync
 
-**One canonical wordlist for all your spell-check dictionaries.**
+**One canonical wordlist for all your spell-check custom dictionaries.**
 
 *Optionally keep it in Git.*
 
@@ -8,29 +8,58 @@
 [![License](https://img.shields.io/github/license/arthurakbarov/spell-sync)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-Keep one `wordlist.txt` as the source of truth for personal spell-check words across **OS**,
-**browsers**, **editors and IDEs**, and **Hunspell**. Use **Pull** to merge new words from
-applications into the wordlist, and **Push** to write the wordlist back to configured dictionaries.
-Version control is optional — Spell Sync works with a local wordlist directory just as well as a
-Git-tracked project.
+Keep one `wordlist.txt` as the source of truth for **personal spelling exceptions** across
+**application custom dictionaries** on **OS**, **browsers**, **editors and IDEs**, and
+**Hunspell**. Use **Pull** to merge new words from custom dictionaries into the wordlist, and
+**Push** to write the wordlist back to configured custom dictionaries. Version control is
+optional — Spell Sync works with a local wordlist directory just as well as a Git-tracked
+project.
+
+## What the canonical wordlist contains
+
+The canonical wordlist holds **personal spelling exceptions**: names, technical terms,
+abbreviations, project-specific words, and other words you want enabled applications to
+recognize.
+
+It is **not** a complete language dictionary and **not** a copy of application built-in
+dictionaries. Spell Sync reads and writes **application custom dictionaries** only. Built-in
+dictionaries shipped with applications are never inspected.
+
+Pull builds a union of personal words already in the wordlist plus words found in enabled
+custom dictionaries. Push spreads the canonical list to those custom dictionaries. A word may
+already be recognized by an application's built-in dictionary; storing it in a custom
+dictionary anyway is **expected, harmless, and safe** — Spell Sync does not try to remove
+that redundancy because it cannot reproduce each application's built-in spell checker.
+
+**Example:** A project name is already recognized by one browser but marked misspelled in
+another. Keep the name in the canonical wordlist. Spell Sync may also write it to the first
+browser's custom dictionary. That extra copy keeps your personal list consistent across
+enabled applications.
+
+To make a personal word consistently available across enabled applications, keep it in the
+canonical wordlist.
 
 ## What Spell Sync does
 
 ### Canonical wordlist
 
 Spell Sync treats one file — usually `wordlist.txt` in your project directory — as the canonical
-list. All enabled dictionary targets sync against that file. You choose the path during setup or
-with `-C/--wordlist`.
+list of **personal spelling exceptions**. All enabled **custom dictionary** targets sync against
+that file. You choose the path during setup or with `-C/--wordlist`.
 
-### Pull (applications → wordlist)
+### Pull (custom dictionaries → wordlist)
 
-**Pull** reads enabled application dictionaries and merges new words into the canonical wordlist
-(union). It never removes words from the wordlist. Use Pull after adding words in an app or browser.
+**Pull** reads enabled **application custom dictionaries** and merges new personal words into
+the canonical wordlist (union). It never removes words from the wordlist and never reads
+built-in application dictionaries. Use Pull after adding words in an app or browser custom
+dictionary.
 
-### Push (wordlist → applications)
+### Push (wordlist → custom dictionaries)
 
-**Push** writes the canonical wordlist to every enabled target. Words present in a target but absent
-from the wordlist may be removed — Push is how you delete a word everywhere. Always preview first.
+**Push** writes the canonical personal wordlist to every enabled **custom dictionary** target.
+Words present in a custom dictionary but absent from the wordlist may be removed — Push is how
+you delete a word everywhere. Some words may remain redundantly in a custom dictionary when an
+app already recognizes them by default; that is intentional. Always preview first.
 
 ### Review and update (TUI)
 

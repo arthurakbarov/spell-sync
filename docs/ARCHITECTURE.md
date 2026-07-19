@@ -1,8 +1,48 @@
 # Architecture
 
-spell-sync keeps one **wordlist** as source of truth and **pushes** it to discovered dictionary
-files. **Pull** merges words from dictionaries into the wordlist (union only — deletions require
-editing the wordlist and pushing).
+spell-sync keeps one **canonical personal wordlist** as source of truth and **pushes** it to
+discovered **application custom dictionary** files. **Pull** merges words from custom
+dictionaries into the wordlist (union only — deletions require editing the wordlist and
+pushing).
+
+## Wordlist model
+
+Let:
+
+```text
+W  = canonical personal wordlist (personal spelling exceptions)
+Cᵢ = custom dictionary words for enabled target i
+Bᵢ = built-in dictionary for target i (outside Spell Sync)
+```
+
+**Pull** (case-insensitive union):
+
+```text
+W' = W ∪ C₁ ∪ C₂ ∪ ... ∪ Cₙ
+```
+
+**Push** for a target without script filtering:
+
+```text
+Cᵢ' = W
+```
+
+**Push** when target i applies a subset filter (for example Windows locale custom files):
+
+```text
+Cᵢ' = filterᵢ(W)
+```
+
+**Invariants:**
+
+- `Bᵢ` is not read, modified, or used when planning Pull or Push.
+- `W ∩ Bᵢ` may be non-empty in real life. Storing a word in `Cᵢ` even when the application
+  already recognizes it via `Bᵢ` is intentional redundancy and is safe.
+- Spell Sync does not guarantee spell-check behavior beyond writing `Cᵢ'`; applications may
+  impose additional constraints.
+
+Targets with subset filtering today: Windows custom spelling files (`win-ru` → Cyrillic subset,
+`win-en` / `win-en-gb` → Latin subset). macOS custom spelling files receive the full wordlist.
 
 ## Command flow
 

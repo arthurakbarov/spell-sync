@@ -132,8 +132,16 @@ Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work o
 
 ## Invariants
 
+### Product model
+
+- All user-facing directions refer to **application custom dictionaries**.
+- Built-in application dictionaries are outside the Spell Sync model and are never read or
+  modified.
+- Central copy lives in `spell_sync/application/product_concepts.py` (UI-neutral).
+
+### Safety
+
 - Config loaded and validated before mutating operations (`ValidatedRuntime`, `config_blocks_mutating`).
-- Invalid config blocks mutating commands.
 - Corrupt or unsupported dictionaries are not overwritten.
 - Operation lock (`.spell-sync.lock`) prevents parallel mutating commands.
 - Preview and execution share one immutable plan — no silent replan after confirmation.

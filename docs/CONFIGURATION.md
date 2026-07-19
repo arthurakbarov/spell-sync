@@ -10,21 +10,24 @@ Unknown sections or keys produce a **config-check** error and block mutating com
 
 ## `[dictionaries]`
 
-Toggle discovery categories (all default `true`):
+Toggle which **application custom dictionary** categories participate in Pull and Push (all
+default `true`). Enabling a target means its custom dictionary file is read during Pull and
+written during Push — Spell Sync does **not** control the application's entire spell checker
+or its built-in dictionaries.
 
-| Key | Targets |
-|-----|---------|
+| Key | Custom dictionary targets |
+|-----|---------------------------|
 | `editors` | VS Code / Cursor family (`spell-sync-words.txt`) |
 | `chrome`, `edge`, `brave`, `vivaldi` | Chromium custom dictionaries |
 | `firefox` | `persdict.dat` profiles |
 | `neovim` | `.add` spell files |
 | `jetbrains` | IDE custom dictionaries |
-| `hunspell` | Hunspell `.dic` files |
+| `hunspell` | Hunspell `.dic` user files |
 | `obsidian` | Obsidian custom dictionary |
 | `libreoffice` | LibreOffice user dictionary |
 
-spell-sync **never creates** dictionary files except via push when the target format allows it;
-many targets must exist first (see `spell-sync doctor --targets`).
+spell-sync **never creates** custom dictionary files except via push when the target format
+allows it; many targets must exist first (see `spell-sync doctor --targets`).
 
 ## `[push]`
 

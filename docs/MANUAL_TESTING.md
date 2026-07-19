@@ -58,7 +58,13 @@ Check:
 
 - [ ] TUI opens (dashboard or Setup, depending on project state).
 - [ ] Welcome screen is visible when no project exists.
-- [ ] Pull and Push directions are understandable before any file changes.
+- [ ] Pull and Push directions mention **custom dictionaries** (not built-in dictionaries).
+- [ ] Welcome explains personal spelling exceptions and states built-in dictionaries are not inspected.
+- [ ] Wordlist setup explains what belongs in the canonical list (names, terms, abbreviations).
+- [ ] Pull preview says words come from **application custom dictionaries**.
+- [ ] Push preview mentions harmless redundancy when a word may already be recognized by default.
+- [ ] UI does **not** imply Spell Sync modifies built-in application dictionaries.
+- [ ] Difference between custom dictionary files and built-in spell check is clear to a new tester.
 - [ ] Keyboard navigation works (Tab, Enter, Escape).
 - [ ] Mouse clicks work on buttons where shown.
 - [ ] **Quit** from Welcome exits without creating project files.
