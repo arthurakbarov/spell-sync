@@ -46,7 +46,7 @@ Editable install for local CLI testing:
 uv tool install --editable .
 ```
 
-Requires **Python 3.11+**.
+Requires **Python 3.11+**. Python **3.11** and **3.12** are currently tested.
 
 ## Quick start
 
@@ -97,6 +97,7 @@ details.
 | [Recovery](docs/RECOVERY.md) | Transaction journal and `recover` |
 | [Architecture](docs/ARCHITECTURE.md) | Internal design and safety model |
 | [Development](docs/DEVELOPMENT.md) | Hacking, tests, CI |
+| [Manual testing](docs/MANUAL_TESTING.md) | Release candidate checklist for human testers |
 | [Contributing](docs/CONTRIBUTING.md) | Pull requests |
 
 ## Safety (summary)

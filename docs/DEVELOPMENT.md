@@ -4,6 +4,9 @@
 
 Requires **Python 3.11+**.
 
+Python **3.11** and **3.12** are currently tested. Classifiers list those versions; newer
+Python releases may work but are not verified in CI yet.
+
 ```bash
 git clone https://github.com/arthurakbarov/spell-sync.git
 cd spell-sync
