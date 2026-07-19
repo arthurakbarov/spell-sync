@@ -60,7 +60,7 @@ architecture rewrite, no remote publish.
 
 ## Current phase
 
-Phase 1 — Targets management after setup (complete)
+Phase 2 — simplify Dashboard (complete)
 
 ## Completed phases
 
@@ -114,24 +114,61 @@ Tests:
 - Architecture guards in `tests/tui/test_architecture.py`
 - `tests/tui/test_dashboard.py` — Targets navigation
 
+### Phase 2 — simplify Dashboard
+
+Application data on `DashboardState`:
+
+- `targets_ready`, `targets_needs_attention`, `targets_disabled`,
+  `targets_unavailable`
+- `last_operation_summary` (from most recent history record, no hashes)
+
+Implementation:
+
+- `spell_sync/application/builders.py` — application counts, last-operation
+  summary helper, extended `build_dashboard_state`
+- `spell_sync/application/service.py` — `load_dashboard` loads history tail
+- `spell_sync/tui/screens/dashboard.py` — sectioned layout, blocking banners,
+  primary `Review and update`, renamed Health/History, removed Preview button
+- `spell_sync/tui/screens/review_update_screen.py` — Phase 3 placeholder stub
+
+Dashboard layout:
+
+- Summary: canonical wordlist path (with `~`), word count, application counts,
+  overall state, last operation when history exists
+- Primary: `Review and update` (stub screen; Phase 3 replaces flow)
+- Direct actions: Pull new words, Push wordlist (opens preview as today)
+- Manage: Targets
+- Support: Health (doctor screen), History (logs screen)
+- Recovery: `Review recovery` primary when pending; Pull/Push/Review disabled
+- Blocking banners for recovery, invalid config, unreadable wordlist
+- Status remains available via `s` hotkey (not a dashboard button)
+- CLI `plan` unchanged
+
+Tests:
+
+- `tests/tui/test_dashboard.py` — ready/warning/blocked/recovery layouts,
+  navigation, keyboard, 80×24, no duplicate Preview
+- Updated navigation tests in `test_app.py`, `test_logs_screen.py`,
+  `test_preview_screen.py`, `test_recovery_flow.py`, `test_status_screen.py`
+- `tests/test_application_builders.py` — application counts and last-operation
+  formatting
+
 ## Last validation
 
 ```bash
 python3.11 -m ruff check spell_sync tests          # pass
 python3.11 -m ruff format --check spell_sync tests # pass
 python3.11 -m mypy spell_sync                      # pass
-python3.11 -m pytest tests/tui -q                  # 214 passed
-python3.11 -m pytest tests/test_target_settings.py -q  # 29 passed
+python3.11 -m pytest tests/tui -q                  # 234 passed
 bash scripts/ci.sh                                 # EXIT 0
 coverage policy: 100% lines, 96%+ branches
-1294 passed
+1312 passed
 ```
 
 ## Remaining work
 
 ### Later phases
 
-- Phase 2: simplify Dashboard
 - Phase 3: guided Review and update
 - Phase 4: UserNotice / planned vs actual
 - Phase 5: docs + version `0.2.0`

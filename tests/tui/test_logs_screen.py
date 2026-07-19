@@ -98,7 +98,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 40)) as pilot:
             app.push_screen(DashboardScreen(controller))
             await pilot.pause()
-            await pilot.click("#btn-logs")
+            await pilot.click("#btn-history")
             await pilot.pause()
             self.assertIsInstance(app.screen, LogsScreen)
 

@@ -96,9 +96,12 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(state=WorkerState.ERROR, worker=SimpleNamespace(result=None))
             )
             screen._active_token = stale_token
-            for button_id in ("btn-pull", "btn-push", "btn-recovery", "btn-logs"):
+            for button_id in ("btn-pull", "btn-push", "btn-recovery", "btn-history"):
                 screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id=button_id)))
-            screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-preview")))
+            screen.on_button_pressed(
+                SimpleNamespace(button=SimpleNamespace(id="btn-review-update"))
+            )
+            screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-health")))
             screen.on_load_dashboard_worker_state_changed(
                 SimpleNamespace(state=WorkerState.CANCELLED, worker=SimpleNamespace(result=None))
             )

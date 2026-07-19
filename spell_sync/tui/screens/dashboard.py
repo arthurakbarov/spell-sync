@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -14,12 +16,18 @@ from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
 
+def _display_path(path: str) -> str:
+    home = str(Path.home())
+    if path.startswith(home):
+        return "~" + path[len(home) :]
+    return path
+
+
 class DashboardScreen(LoadTokenMixin, Screen[None]):
     BINDINGS = [
         ("r", "refresh_dashboard", "Refresh"),
-        ("p", "open_preview", "Preview"),
         ("s", "open_status", "Status"),
-        ("d", "open_doctor", "Doctor"),
+        ("h", "open_health", "Health"),
     ]
 
     def __init__(self, controller: TuiController) -> None:
@@ -31,18 +39,25 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(id="narrow-warning")
-        yield Static(id="recovery-banner")
+        yield Static(id="blocking-banner")
         yield Static(id="dashboard-summary")
         yield Static(id="dashboard-issues")
         with Vertical(id="action-grid"):
-            yield Button("Status", id="btn-status", variant="primary")
-            yield Button("Preview", id="btn-preview")
-            yield Button("Doctor", id="btn-doctor")
-            yield Button("Pull", id="btn-pull")
-            yield Button("Push", id="btn-push")
+            yield Button("Review and update", id="btn-review-update", variant="primary")
+            yield Button(
+                "Review recovery",
+                id="btn-recovery",
+                disabled=True,
+                classes="-disabled-action",
+            )
+            yield Static("Direct actions", classes="section-label")
+            yield Button("Pull new words", id="btn-pull")
+            yield Button("Push wordlist", id="btn-push")
+            yield Static("Manage", classes="section-label")
             yield Button("Targets", id="btn-targets")
-            yield Button("Recovery", id="btn-recovery", disabled=True, classes="-disabled-action")
-            yield Button("Logs", id="btn-logs")
+            yield Static("Support", classes="section-label")
+            yield Button("Health", id="btn-health")
+            yield Button("History", id="btn-history")
             yield Button("Quit", id="btn-quit", variant="error")
         yield Footer()
 
@@ -61,24 +76,44 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             warning.update("")
 
     def _set_loading(self, loading: bool) -> None:
-        self.query_one("#btn-status", Button).disabled = loading
+        self.query_one("#btn-review-update", Button).disabled = loading
 
-    def _render_dashboard(self, state) -> None:
+    def _format_summary(self, state) -> str:
         snapshot = state.snapshot
-        config_label = "✓ Valid" if state.config_valid else "× Invalid"
-        recovery_label = "Yes" if state.pending_recovery else "No"
+        word_count = f"{snapshot.wordlist_count:,}"
         lines = [
             "Spell Sync",
-            f"Wordlist: {state.wordlist_path}",
-            f"Configuration: {config_label} ({state.config_status})",
-            f"Targets detected: {state.targets_detected}",
-            f"Targets enabled: {state.targets_enabled}",
-            f"Targets available: {state.targets_available}",
-            f"Words in wordlist: {snapshot.wordlist_count}",
-            f"Pending recovery: {recovery_label}",
-            f"Overall status: {state.overall_label}",
+            "",
+            "Canonical wordlist",
+            f"  {_display_path(state.wordlist_path)}",
+            f"  {word_count} words",
+            "",
+            "Applications",
         ]
-        self.query_one("#dashboard-summary", Static).update("\n".join(lines))
+        if state.targets_ready:
+            lines.append(f"  {state.targets_ready} ready")
+        if state.targets_needs_attention:
+            lines.append(f"  {state.targets_needs_attention} need attention")
+        if state.targets_disabled:
+            lines.append(f"  {state.targets_disabled} disabled")
+        if state.targets_unavailable:
+            lines.append(f"  {state.targets_unavailable} unavailable")
+        if not any(
+            (
+                state.targets_ready,
+                state.targets_needs_attention,
+                state.targets_disabled,
+                state.targets_unavailable,
+            )
+        ):
+            lines.append("  No application targets configured")
+        lines.extend(["", state.overall_label])
+        if state.last_operation_summary:
+            lines.append(state.last_operation_summary)
+        return "\n".join(lines)
+
+    def _render_dashboard(self, state) -> None:
+        self.query_one("#dashboard-summary", Static).update(self._format_summary(state))
         if state.issues:
             issue_lines = ["Issues:"]
             for issue in state.issues:
@@ -97,24 +132,45 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             or state.overall_severity is DashboardSeverity.BLOCKED
             or self._controller.mutation_active
         )
-        self.query_one("#btn-pull", Button).disabled = self._blocked
-        self.query_one("#btn-push", Button).disabled = self._blocked
-        recovery_btn = self.query_one("#btn-recovery", Button)
         recovery_needed = state.pending_recovery or any(
             issue.code in {"pending_recovery", "corrupt_journal"} for issue in state.issues
         )
+
+        review_btn = self.query_one("#btn-review-update", Button)
+        recovery_btn = self.query_one("#btn-recovery", Button)
+        pull_btn = self.query_one("#btn-pull", Button)
+        push_btn = self.query_one("#btn-push", Button)
+
+        pull_btn.disabled = self._blocked
+        push_btn.disabled = self._blocked
+
         if recovery_needed:
+            review_btn.disabled = True
+            review_btn.remove_class("primary")
             recovery_btn.disabled = False
             recovery_btn.remove_class("-disabled-action")
-            recovery_btn.label = "Recovery"
+            recovery_btn.variant = "primary"
+            recovery_btn.label = "Review recovery"
         else:
+            review_btn.disabled = self._blocked
+            review_btn.variant = "primary"
             recovery_btn.disabled = True
             recovery_btn.add_class("-disabled-action")
-            recovery_btn.label = "Recovery"
+            recovery_btn.variant = "default"
+            recovery_btn.label = "Review recovery"
 
-        banner = self.query_one("#recovery-banner", Static)
+        banner = self.query_one("#blocking-banner", Static)
         if state.pending_recovery:
-            banner.update("! Recovery required — resolve the unfinished transaction before writes.")
+            banner.update(
+                "Recovery required\n"
+                "An unfinished transaction must be reviewed before another write operation."
+            )
+        elif any(issue.code == "invalid_config" for issue in state.issues):
+            issue = next(i for i in state.issues if i.code == "invalid_config")
+            banner.update(f"Configuration blocked\n{issue.title}\n{issue.detail}")
+        elif any(issue.code == "unreadable_wordlist" for issue in state.issues):
+            issue = next(i for i in state.issues if i.code == "unreadable_wordlist")
+            banner.update(f"Wordlist blocked\n{issue.title}\n{issue.detail}")
         elif any(issue.code == "corrupt_journal" for issue in state.issues):
             banner.update("× Corrupt recovery journal — inspect Recovery before writes.")
         else:
@@ -155,14 +211,14 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
-        if button_id == "btn-status":
-            self.action_open_status()
-        elif button_id == "btn-preview" or button_id == "btn-push":
-            self.action_open_preview()
-        elif button_id == "btn-doctor":
-            self.action_open_doctor()
+        if button_id == "btn-review-update":
+            self.action_open_review_update()
         elif button_id == "btn-pull":
             self.action_open_pull()
+        elif button_id == "btn-push":
+            self.action_open_preview()
+        elif button_id == "btn-health":
+            self.action_open_health()
         elif button_id == "btn-quit":
             if self._controller.mutation_active:
                 self.notify(
@@ -173,7 +229,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             self.app.exit(0)
         elif button_id == "btn-recovery":
             self.action_open_recovery()
-        elif button_id == "btn-logs":
+        elif button_id == "btn-history":
             from .logs_screen import LogsScreen
 
             self.app.push_screen(LogsScreen(self._controller))
@@ -194,7 +250,18 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
         self.app.push_screen(StatusScreen(self._controller))
 
+    def action_open_review_update(self) -> None:
+        if self._blocked:
+            self.notify("Writes are blocked. Resolve recovery or blocking issues first.")
+            return
+        from .review_update_screen import ReviewUpdateScreen
+
+        self.app.push_screen(ReviewUpdateScreen())
+
     def action_open_preview(self) -> None:
+        if self._blocked:
+            self.notify("Writes are blocked. Resolve recovery or blocking issues first.")
+            return
         from .preview_screen import PreviewScreen
 
         self.app.push_screen(PreviewScreen(self._controller))
@@ -212,7 +279,9 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
         self.app.push_screen(RecoveryScreen(self._controller))
 
-    def action_open_doctor(self) -> None:
+    def action_open_health(self) -> None:
         from .doctor_screen import DoctorScreen
 
         self.app.push_screen(DoctorScreen(self._controller))
+
+    action_open_doctor = action_open_health

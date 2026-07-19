@@ -72,11 +72,16 @@ class DashboardState:
     targets_detected: int
     targets_enabled: int
     targets_available: int
+    targets_ready: int
+    targets_needs_attention: int
+    targets_disabled: int
+    targets_unavailable: int
     pending_recovery: bool
     overall_severity: DashboardSeverity
     overall_label: str
     issues: tuple[DashboardIssue, ...]
     snapshot: StatusSnapshot
+    last_operation_summary: str | None = None
 
 
 @dataclass(frozen=True)

@@ -514,11 +514,16 @@ def sample_dashboard(**kwargs) -> DashboardState:
         targets_detected=2,
         targets_enabled=2,
         targets_available=2,
+        targets_ready=2,
+        targets_needs_attention=0,
+        targets_disabled=0,
+        targets_unavailable=0,
         pending_recovery=False,
         overall_severity=DashboardSeverity.READY,
         overall_label="✓ Ready",
         issues=(),
         snapshot=snapshot,
+        last_operation_summary=None,
     )
     defaults.update(kwargs)
     return DashboardState(**defaults)
@@ -632,6 +637,11 @@ def fake_service(
     recovery_preview: RecoveryPreview | None = None,
     recovery_execution: RecoveryExecution | None = None,
     setup_state: ProjectSetupState | None = None,
+    targets_ready: int = 2,
+    targets_needs_attention: int = 0,
+    targets_disabled: int = 0,
+    targets_unavailable: int = 0,
+    last_operation_summary: str | None = None,
 ) -> FakeTuiService:
     snapshot = sample_status(wordlist_error=wordlist_error)
     labels = {
@@ -646,6 +656,11 @@ def fake_service(
         overall_label=labels[severity],
         issues=issues,
         snapshot=snapshot,
+        targets_ready=targets_ready,
+        targets_needs_attention=targets_needs_attention,
+        targets_disabled=targets_disabled,
+        targets_unavailable=targets_unavailable,
+        last_operation_summary=last_operation_summary,
     )
     return FakeTuiService(
         dashboard,

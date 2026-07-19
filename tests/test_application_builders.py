@@ -13,11 +13,13 @@ from spell_sync.application.builders import (
     build_doctor_snapshot,
     build_push_preview,
     build_status_detail_snapshot,
+    format_dashboard_last_operation,
 )
 from spell_sync.application.reports import DashboardSeverity, StatusSnapshot
 from spell_sync.exit_codes import ExitCode
 from spell_sync.health.types import DoctorCheck, DoctorReport
 from spell_sync.operation_lock import OperationLockInfo
+from spell_sync.project_setup.discovery import SetupTarget, SetupTargetDiscovery
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 
@@ -36,6 +38,10 @@ class TestDashboardBuilders(unittest.TestCase):
         validated.context.dictionaries = kwargs.get("dictionaries", [MagicMock()])
         validated.context.wordlist_file = Path("/tmp/w.txt")
         validated.context.project_dir = Path("/tmp")
+        validated.context.config = kwargs.get(
+            "config",
+            {"dictionaries": {"chrome": True, "edge": True}},
+        )
         return validated
 
     def test_max_severity_ready_only(self):
@@ -190,6 +196,148 @@ class TestDashboardBuilders(unittest.TestCase):
         state = build_dashboard_state(validated, snapshot, lock_info=None)
         self.assertEqual(state.overall_severity, DashboardSeverity.BLOCKED)
         self.assertTrue(state.pending_recovery is False)
+
+    def test_format_dashboard_last_operation_branches(self):
+        from datetime import datetime, timezone
+
+        from spell_sync.diagnostics.history_record import OperationHistoryRecord
+
+        base = dict(
+            schema_version=1,
+            record_id="r1",
+            timestamp=datetime.now(timezone.utc),
+            outcome="completed",
+            duration_ms=1,
+        )
+        self.assertEqual(format_dashboard_last_operation("not-a-record"), "")
+        pull = OperationHistoryRecord(**base, operation="pull", added_words=3)
+        self.assertIn("3 words added", format_dashboard_last_operation(pull))
+        push = OperationHistoryRecord(**base, operation="push", updated_targets=2)
+        self.assertIn("2 targets updated", format_dashboard_last_operation(push))
+        setup = OperationHistoryRecord(**base, operation="setup", created_files=4)
+        self.assertIn("4 files created", format_dashboard_last_operation(setup))
+        recover = OperationHistoryRecord(**base, operation="recover", restored_files=1)
+        self.assertIn("1 files restored", format_dashboard_last_operation(recover))
+        targets = OperationHistoryRecord(**base, operation="targets", updated_targets=1)
+        self.assertIn("1 targets changed", format_dashboard_last_operation(targets))
+        other = OperationHistoryRecord(**base, operation="lint", warnings=1)
+        self.assertIn("(warnings)", format_dashboard_last_operation(other))
+
+    def test_build_dashboard_application_counts(self):
+        snapshot = StatusSnapshot(
+            wordlist_count=1,
+            diffs=(),
+            skipped_unreadable=("editors:cursor", "win-spelling"),
+            skipped_corrupt=("macos-spelling",),
+        )
+        validated = self._validated()
+        targets = (
+            SetupTarget(
+                identifier="chrome",
+                display_name="Chrome",
+                path=None,
+                format_name="text",
+                detected=True,
+                available=True,
+                readable=True,
+                supported=True,
+                enabled_by_default=True,
+                selectable=True,
+                word_count=1,
+                status="ok",
+                detail=None,
+                enabled=True,
+            ),
+            SetupTarget(
+                identifier="edge",
+                display_name="Edge",
+                path=None,
+                format_name="text",
+                detected=False,
+                available=False,
+                readable=False,
+                supported=True,
+                enabled_by_default=False,
+                selectable=False,
+                word_count=None,
+                status="missing",
+                detail=None,
+                enabled=True,
+            ),
+            SetupTarget(
+                identifier="editors",
+                display_name="Editors",
+                path=None,
+                format_name="text",
+                detected=True,
+                available=False,
+                readable=False,
+                supported=True,
+                enabled_by_default=False,
+                selectable=False,
+                word_count=None,
+                status="unreadable",
+                detail="bad",
+                enabled=True,
+            ),
+            SetupTarget(
+                identifier="firefox",
+                display_name="Firefox",
+                path=None,
+                format_name="text",
+                detected=True,
+                available=False,
+                readable=False,
+                supported=True,
+                enabled_by_default=False,
+                selectable=False,
+                word_count=None,
+                status="unreadable",
+                detail="bad",
+                enabled=True,
+            ),
+            SetupTarget(
+                identifier="brave",
+                display_name="Brave",
+                path=None,
+                format_name="text",
+                detected=True,
+                available=True,
+                readable=True,
+                supported=True,
+                enabled_by_default=True,
+                selectable=True,
+                word_count=1,
+                status="ok",
+                detail=None,
+                enabled=False,
+            ),
+            SetupTarget(
+                identifier="macos_spelling",
+                display_name="macOS",
+                path=None,
+                format_name="text",
+                detected=True,
+                available=True,
+                readable=True,
+                supported=True,
+                enabled_by_default=True,
+                selectable=True,
+                word_count=1,
+                status="ok",
+                detail=None,
+                enabled=True,
+            ),
+        )
+        with patch(
+            "spell_sync.application.builders.discover_setup_targets",
+            return_value=SetupTargetDiscovery(targets, ()),
+        ):
+            state = build_dashboard_state(validated, snapshot, lock_info=None)
+        self.assertEqual(state.targets_ready, 1)
+        self.assertEqual(state.targets_needs_attention, 2)
+        self.assertEqual(state.targets_disabled, 1)
+        self.assertEqual(state.targets_unavailable, 1)
 
 
 class TestStatusAndPreviewBuilders(unittest.TestCase):

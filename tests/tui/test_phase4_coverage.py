@@ -19,6 +19,7 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
+from spell_sync.tui.screens.dashboard import DashboardScreen
 from spell_sync.tui.screens.operation_screen import OperationScreen
 from spell_sync.tui.screens.preview_screen import PreviewScreen
 from spell_sync.tui.screens.pull_confirm_screen import PullConfirmScreen
@@ -286,13 +287,14 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 40)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.action_quit_app()
-            await pilot.click("#btn-quit")
+            screen = app.screen
+            assert isinstance(screen, DashboardScreen)
+            screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-quit")))
             await pilot.pause()
             self.assertTrue(controller.mutation_active)
 
     async def test_dashboard_pull_blocked_and_recovery_hint(self):
         from spell_sync.application.reports import DashboardSeverity
-        from spell_sync.tui.screens.dashboard import DashboardScreen
 
         controller = TuiController(
             fake_service(severity=DashboardSeverity.BLOCKED, pending_recovery=True),

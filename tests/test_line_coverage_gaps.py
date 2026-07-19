@@ -501,7 +501,7 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
         )
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
-            await wait_for_text(pilot, "#recovery-banner", "Corrupt recovery journal")
+            await wait_for_text(pilot, "#blocking-banner", "Corrupt recovery journal")
 
     async def test_recovery_screen_guards_and_callbacks(self):
         preview = sample_recovery_preview()

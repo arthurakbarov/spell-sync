@@ -20,7 +20,7 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            await pilot.press("p")
+            await pilot.click("#btn-push")
             summary = await wait_for_text(pilot, "#preview-content", "Total removals")
             self.assertIn("Total additions: 2", str(summary.render()))
             table = app.screen.query_one("#preview-table")

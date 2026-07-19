@@ -39,7 +39,7 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            await pilot.click("#btn-status")
+            await pilot.press("s")
             await pilot.pause()
             self.assertIsInstance(app.screen, StatusScreen)
 
@@ -48,7 +48,7 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            await pilot.press("p")
+            await pilot.click("#btn-push")
             await pilot.pause()
             await wait_for_text(pilot, "#preview-content", "Total removals")
             self.assertIsInstance(app.screen, PreviewScreen)
@@ -58,7 +58,7 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            await pilot.press("p")
+            await pilot.click("#btn-push")
             await pilot.pause()
             await pilot.press("escape")
             await pilot.pause()

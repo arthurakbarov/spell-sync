@@ -176,6 +176,56 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertEqual(state.targets_detected, 3)
         self.assertIs(state.snapshot, snapshot)
 
+    def test_load_dashboard_includes_last_operation_summary(self):
+        from datetime import datetime, timezone
+
+        from spell_sync.diagnostics.history_record import OperationHistoryRecord
+        from spell_sync.diagnostics.types import OperationHistorySnapshot
+
+        service = SpellSyncService()
+        snapshot = StatusSnapshot(
+            wordlist_count=2,
+            diffs=(),
+            skipped_unreadable=(),
+            skipped_corrupt=(),
+        )
+        validated = MagicMock()
+        validated.config_result.status = ConfigStatus.VALID
+        validated.config_result.diagnostics = ()
+        validated.context.dictionaries = [MagicMock()]
+        validated.context.config = {"dictionaries": {"chrome": True}}
+        validated.context.wordlist_file = Path("/tmp/w.txt")
+        validated.context.project_dir = Path("/tmp")
+        validated.journal_result = JournalLoadResult(JournalLoadStatus.ABSENT, None)
+        record = OperationHistoryRecord(
+            schema_version=1,
+            record_id="r1",
+            timestamp=datetime.now(timezone.utc),
+            operation="push",
+            outcome="completed",
+            duration_ms=1,
+            updated_targets=2,
+        )
+
+        with patch("spell_sync.paths.resolve_wordlist_path", return_value=Path("/tmp/w.txt")):
+            with patch(
+                "spell_sync.application.service.build_validated_runtime",
+                return_value=validated,
+            ):
+                with patch(
+                    "spell_sync.application.service.read_active_operation_lock",
+                    return_value=None,
+                ):
+                    with patch.object(service, "load_status", return_value=snapshot):
+                        with patch.object(
+                            service,
+                            "load_operation_history",
+                            return_value=OperationHistorySnapshot(records=(record,)),
+                        ):
+                            state = service.load_dashboard(CliOptions(wordlist="/tmp/w.txt"))
+
+        self.assertIn("Last: Push", state.last_operation_summary or "")
+
     def test_load_push_preview_returns_prepared_push(self):
         service = SpellSyncService()
         prepared = MagicMock(spec=PreparedPush)

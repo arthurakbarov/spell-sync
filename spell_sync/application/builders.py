@@ -9,6 +9,11 @@ from ..dictionaries import Dictionary
 from ..exit_codes import ExitCode
 from ..health.types import DoctorAction, DoctorCheck, DoctorReport
 from ..operation_lock import OperationLockInfo
+from ..project_setup.discovery import (
+    _CONFIG_TARGET_IDS,
+    discover_setup_targets,
+    enabled_dictionary_targets,
+)
 from ..push_journal import (
     JOURNAL_STATE_ROLLBACK_INCOMPLETE,
     JournalLoadStatus,
@@ -189,11 +194,77 @@ def build_dashboard_issues(
     return tuple(issues)
 
 
+def _target_family_id(name: str) -> str:
+    if name.startswith("macos-"):
+        return "macos_spelling"
+    if name.startswith("win-"):
+        return "win_spelling"
+    if ":" in name:
+        return name.split(":", 1)[0]
+    return name
+
+
+def _compute_application_counts(
+    validated: ValidatedRuntime,
+    snapshot: StatusSnapshot,
+) -> tuple[int, int, int, int]:
+    config = validated.context.config
+    enabled_ids = enabled_dictionary_targets(config)
+    discovery = discover_setup_targets(enabled_targets=enabled_ids)
+    unreadable_ids = {_target_family_id(name) for name in snapshot.skipped_unreadable}
+    corrupt_ids = {_target_family_id(name) for name in snapshot.skipped_corrupt}
+
+    ready = 0
+    needs_attention = 0
+    disabled = 0
+    unavailable = 0
+    for target in discovery.targets:
+        if target.identifier not in _CONFIG_TARGET_IDS:
+            continue
+        if not target.enabled:
+            disabled += 1
+            continue
+        target_id = target.identifier
+        if target_id in corrupt_ids or target_id in unreadable_ids:
+            needs_attention += 1
+        elif not target.detected:
+            unavailable += 1
+        elif target.available and target.readable:
+            ready += 1
+        else:
+            needs_attention += 1
+    return ready, needs_attention, disabled, unavailable
+
+
+def format_dashboard_last_operation(record: object) -> str:
+    from ..diagnostics.history_record import OperationHistoryRecord
+
+    if not isinstance(record, OperationHistoryRecord):
+        return ""
+    operation = record.operation.title()
+    outcome = record.outcome.replace("_", " ").title()
+    if record.operation == "pull" and record.added_words:
+        detail = f"{record.added_words} words added"
+    elif record.operation == "push" and record.updated_targets:
+        detail = f"{record.updated_targets} targets updated"
+    elif record.operation == "setup" and record.created_files:
+        detail = f"{record.created_files} files created"
+    elif record.operation == "recover" and record.restored_files:
+        detail = f"{record.restored_files} files restored"
+    elif record.operation == "targets" and record.updated_targets:
+        detail = f"{record.updated_targets} targets changed"
+    else:
+        detail = outcome
+    warning = " (warnings)" if record.warnings else ""
+    return f"Last: {operation} — {detail}{warning}"
+
+
 def build_dashboard_state(
     validated: ValidatedRuntime,
     snapshot: StatusSnapshot,
     *,
     lock_info: OperationLockInfo | None,
+    last_operation_summary: str | None = None,
 ) -> DashboardState:
     project = validated.context.project_dir
     wordlist = validated.context.wordlist_file
@@ -208,6 +279,9 @@ def build_dashboard_state(
     pending_recovery = validated.journal_result.status is JournalLoadStatus.VALID_IN_PROGRESS
     config_status = validated.config_result.status.value
     config_valid = validated.config_result.status in (ConfigStatus.VALID, ConfigStatus.ABSENT)
+    targets_ready, targets_needs_attention, targets_disabled, targets_unavailable = (
+        _compute_application_counts(validated, snapshot)
+    )
 
     return DashboardState(
         wordlist_path=str(wordlist),
@@ -217,11 +291,16 @@ def build_dashboard_state(
         targets_detected=detected,
         targets_enabled=enabled,
         targets_available=available,
+        targets_ready=targets_ready,
+        targets_needs_attention=targets_needs_attention,
+        targets_disabled=targets_disabled,
+        targets_unavailable=targets_unavailable,
         pending_recovery=pending_recovery,
         overall_severity=overall,
         overall_label=_overall_label(overall),
         issues=issues,
         snapshot=snapshot,
+        last_operation_summary=last_operation_summary,
     )
 
 

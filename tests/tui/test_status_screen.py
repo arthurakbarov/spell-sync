@@ -21,7 +21,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            await pilot.click("#btn-status")
+            await pilot.press("s")
             content = await wait_for_text(pilot, "#status-content", "chrome")
             self.assertIn("enabled", str(content.render()))
 

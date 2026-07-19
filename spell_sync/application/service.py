@@ -217,7 +217,18 @@ class SpellSyncService:
         validated = build_validated_runtime(wordlist)
         snapshot = self.load_status(opts)
         lock_info = read_active_operation_lock(wordlist)
-        return build_dashboard_state(validated, snapshot, lock_info=lock_info)
+        last_operation_summary = None
+        history = self.load_operation_history(limit=1)
+        if history.records:
+            from .builders import format_dashboard_last_operation
+
+            last_operation_summary = format_dashboard_last_operation(history.records[0])
+        return build_dashboard_state(
+            validated,
+            snapshot,
+            lock_info=lock_info,
+            last_operation_summary=last_operation_summary,
+        )
 
     def load_push_preview(self, opts: CliOptions) -> PushPreview:
         strict = opts.strict or push_strict_enabled()
