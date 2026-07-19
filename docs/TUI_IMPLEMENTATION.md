@@ -1,221 +1,111 @@
 # TUI implementation
 
-## Current architecture
+Developer reference for the Textual terminal UI and its relationship to the application layer.
+
+## Architecture
 
 ```text
-spell_sync/cli.py          argparse, COMMANDS dispatch, entry_point
+spell_sync/cli.py              argparse, COMMANDS dispatch, entry_point
     ↓
-CliOptions                 frozen dataclass from argparse namespace
+CliOptions                     frozen dataclass from argparse namespace
     ↓
-command modules            commands.py, plan_cmd.py, doctor.py, recover_cmd.py, …
+SpellSyncService               UI-neutral facade (spell_sync/application/service.py)
     ↓
-command_helpers.py         sync_run_for, mutating_command_scope, JSON/human exits
+command_helpers / SyncRun      existing pull, push, recover, status core
     ↓
-validated_runtime.py       ValidatedRuntime (config + journal under lock)
-project.py                 ProjectContext (wordlist → project_dir, config_paths)
-sync_context.py            RuntimeContext, runtime_context_for()
+diagnostics/                   operation history + technical logs (configured paths only)
     ↓
-sync_run.py                SyncRun — pull, push, status, plan orchestration
-push_prepared.py           PreparedPush (immutable), prepare_push(), execute_prepared_push()
-push_setup.py / push_plan.py / push_render.py / push_transaction.py / push_journal.py
-health/                    DoctorReport, build_doctor_report()
+spell_sync/tui/                Textual app, controller, screens, workers
 ```
 
-### CLI entry path
+### Entry routing
 
-| Item | Location |
-|------|----------|
-| Console script | `[project.scripts] spell-sync = "spell_sync.cli:entry_point"` |
-| Module main | `spell_sync/__main__.py` → `cli.main()` |
-| Parser | `cli._build_parser()` — 10 subcommands |
-| Dispatch | `cli.main()` → `COMMANDS[command](opts)` |
+| Input | TTY | Result |
+|-------|-----|--------|
+| `spell-sync` (no args) | yes, ready project | Dashboard |
+| `spell-sync` (no args) | yes, no project | Setup wizard |
+| `spell-sync` (no args) | yes, invalid project | Dashboard with blocking diagnostic |
+| `spell-sync` (no args) | no | Usage error, exit 2 |
+| `spell-sync ui` | yes | TUI |
+| `spell-sync ui` | no | Controlled error, exit 2 |
 
-### Command execution map
+Routing logic: `spell_sync/tui/routing.py` (`should_launch_tui`).
 
-| Operation | Entry | Core path |
-|-----------|-------|-----------|
-| **status** | `commands.cmd_status` | `sync_run_for` → `run.check_wordlist` → `run.status_diffs` |
-| **plan** | `plan_cmd.cmd_plan` | `sync_run_for` → `run.plan_push` (dry-run transaction) or `list_removals` with `--removals` |
-| **pull prep/exec** | `commands.cmd_pull` | `mutating_command_scope` → `run.pull_into_wordlist()` or `run.pull_add_from()` |
-| **push prep** | `commands._cmd_push_locked` | `run.prepare_push_operation()` → `prepare_push(ctx, words)` → `PreparedPush` |
-| **push exec** | `commands._cmd_push_locked` | `run.push_from_wordlist(prepared=prepared)` → `execute_prepared_push(prepared, dry_run=False)` |
-| **push dry-run** | same | `run._run_push_transaction(dry_run=True, prepared=prepared)` |
-| **doctor** | `doctor.cmd_doctor` | `sync_run_for` → `build_doctor_report(run, …)` |
-| **recover** | `recover_cmd.cmd_recover` | `mutating_command_scope(allow_unfinished_journal=True)` → `recover_from_journal` |
+### CLI commands (11)
 
-### Existing result types (reuse for facade)
+`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `ui`, `version`
 
-| Type | Module | Role |
-|------|--------|------|
-| `CliOptions` | `cli_options.py` | CLI/TUI options bag |
-| `ValidatedRuntime` | `validated_runtime.py` | Config + journal + `RuntimeContext` |
-| `ProjectContext` | `project.py` | Wordlist-relative project paths |
-| `RuntimeContext` | `sync_context.py` | Wordlist, config, discovered dictionaries |
-| `PreparedPush` | `push_prepared.py` | Immutable push plan + rendered payloads |
-| `PushPlan` / `PlannedTarget` | `push_plan.py` | Plan structure |
-| `PushResult` | `sync_models.py` | written / skipped dictionaries |
-| `DictionaryDiff` | `sync_models.py` | Status/plan per-target diff |
-| `DoctorReport` | `health/types.py` | Doctor checks and actions |
-| `RecoverResult` | `push_journal.py` | Recovery outcome |
-| `JournalLoadResult` | `push_journal.py` | Pending/corrupt journal state |
-| `ConfigLoadResult` | `settings.py` | Config validation diagnostics |
-| `ExitCode` | `exit_codes.py` | Typed exit reasons |
+CLI and TUI call the same `SpellSyncService` methods for setup, pull, push, recovery, status,
+doctor, and logs.
 
-There is **no** existing `application/` package or shared service layer. CLI modules call `SyncRun` and helpers directly.
+## Screen map
 
-### No-argument behavior (baseline)
+| Screen | Module | Primary actions |
+|--------|--------|-----------------|
+| Welcome | `setup_welcome_screen.py` | Setup, Quit |
+| Wordlist | `setup_welcome_screen.py` | Continue, Back |
+| Targets | `setup_targets_screen.py` | Continue, Back, Refresh |
+| Setup preview | `setup_welcome_screen.py` | Confirm, Back |
+| Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
+| Setup operation | `operation_screen.py` | (worker) |
+| Setup report | `report_screen.py` | Dashboard |
+| Dashboard | `dashboard.py` | Pull, Push, Status, Doctor, Recovery, Logs, Quit |
+| Status | `status_screen.py` | Back |
+| Preview | `preview_screen.py` | Pull/Push, Back |
+| Pull | `pull_screen.py` | Preview, Execute, Back |
+| Push confirmation | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+| Operation | `operation_screen.py` | (worker) |
+| Report | `report_screen.py` | Dashboard |
+| Doctor | `doctor_screen.py` | Back |
+| Recovery | `recovery_screen.py` | Recover, Discard, Back |
+| Logs | `logs_screen.py` | Filters, Clear, Technical log, Back |
+| Technical log | `logs_screen.py` | Back |
 
-- Empty argv → `_parse_args([])` returns `Namespace(command="status", …)` → **`status` runs**.
-- `--help` / `-h` → prints help, exit 0.
-- Unknown command → exit `UNKNOWN_COMMAND` (2).
-- **No TUI** today; non-TTY empty argv still runs `status` (exit 0).
-
-### Baseline metrics (2026-07-18)
-
-| Metric | Value |
-|--------|-------|
-| CLI subcommands | 10: `status`, `pull`, `push`, `plan`, `config-check`, `lint`, `recover`, `init`, `doctor`, `version` |
-| Python requirement | `>=3.11` |
-| Runtime dependencies | none (`dependencies = []`) |
-| Console entry | `spell_sync.cli:entry_point` |
-| Tests | 741 passed, 59 subtests |
-| Workflow | `scripts/ci.sh` (no `uv.lock` in repo) |
-
-### Baseline validation (Phase 0)
-
-```bash
-cd ~/code/spell-words/spell-sync
-python3.11 -m ruff check spell_sync tests          # All checks passed
-python3.11 -m ruff format --check spell_sync tests   # 98 files already formatted
-python3.11 -m mypy spell_sync                      # Success: no issues in 51 files
-python3.11 -m pytest tests -q                        # 741 passed, 59 subtests
-```
-
-Note: project gate is `scripts/ci.sh` (coverage, wheel smoke, gui smoke). Full CI not re-run in Phase 0 (production code unchanged).
+Navigation: keyboard (Tab, Enter, Escape), mouse clicks, visible focus styles in `app.tcss`.
+Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work on dismiss.
 
 ## Invariants
 
-TUI must preserve existing safety properties:
-
 - Config loaded and validated before mutating operations (`ValidatedRuntime`, `config_blocks_mutating`).
-- Effective wordlist and project directory from `ProjectContext.build` / `resolve_wordlist_path`.
 - Invalid config blocks mutating commands.
-- Corrupt or unsupported dictionaries are not overwritten (`ReadStatus`, push plan skips).
+- Corrupt or unsupported dictionaries are not overwritten.
 - Operation lock (`.spell-sync.lock`) prevents parallel mutating commands.
-- Preview and execution share one `PreparedPush` — no silent replan after confirmation.
-- Fingerprints checked at execution (`plan_fingerprint_conflict`, `fingerprint_conflict`).
-- Removal limits enforced via `confirm_push_removals` / `max_removals_in_plan`.
+- Preview and execution share one immutable plan — no silent replan after confirmation.
+- Fingerprints checked at execution (`plan_fingerprint_conflict`).
+- Removal confirmation requires typing `PUSH` when removals are present.
 - Transaction snapshots + journal v2 before writes; rollback on failure.
 - Recovery does not overwrite external changes; journal/snapshots preserved on incomplete rollback.
+- Setup writes only project files; external dictionaries are never modified during setup.
 - `--dry-run` never mutates files.
-- `--json` emits exactly one JSON object on stdout (via `log.quiet`).
+- `--json` emits exactly one JSON object on stdout.
 - User words must not appear in technical logs or operation history.
+- TUI never opens state files directly; reads go through `SpellSyncService`.
+- Diagnostic paths come from configured platform roots only — never from TUI/CLI user input.
+- History or logging failures never change the core operation outcome.
 
-## Decisions
+## Setup wizard
 
-| Decision | Choice |
-|----------|--------|
-| UI framework | Textual (`textual>=8.2.8,<9`) — not yet added |
-| Application layer | New `spell_sync/application/` facade wrapping existing `SyncRun` / helpers |
-| CLI compatibility | Keep all existing subcommands; add `ui`; no-arg TTY → TUI (Phase 2+) |
-| Options type | Extend or mirror `CliOptions`; avoid duplicate domain models |
-| Events | `EventSink` protocol in application layer; core stays Textual-free |
-| Phase 1 CLI migration | Start with `status` + `push` only |
+Target toggles are UI controls only. Discovery defaults are a starting point; the wizard stores
+exact selection on `TuiController` until confirmation.
 
-## Phases
+If a target becomes corrupt after preview, execution uses the immutable `PreparedProjectSetup` from
+preview — selected target IDs and rendered config bytes are not recomputed at execution time.
 
-- [x] Phase 0 — baseline
-- [x] Phase 1 — application facade
-- [x] Phase 2 — TUI shell
-- [ ] Phase 3 — status and plan
-- [ ] Phase 4 — pull and push
-- [ ] Phase 5 — first-run wizard
-- [ ] Phase 6 — reports and logs
-- [ ] Phase 7 — packaging and documentation
-- [ ] Phase 8 — final validation
-
-## Current phase
-
-Phase 2 — TUI shell (complete). Next: Phase 3 — status and plan screens polish.
-
-## Last validation
-
-```bash
-cd ~/code/spell-words/spell-sync
-python3.11 -m pytest tests/tui -q          # 35 passed
-scripts/ci.sh                               # exit 0 — 789 passed, 100% line coverage
-cd ~/code/spell-sync-dev && scripts/health.sh  # 0 fail
-```
-
-### Phase 2 deliverables
-
-| Component | Path |
-|-----------|------|
-| Dependency | `pyproject.toml` — `textual>=8.2.8,<9` |
-| Routing | `spell_sync/tui/routing.py` — `should_launch_tui()` |
-| Launch | `spell_sync/tui/launch.py` — `cmd_ui` |
-| App shell | `spell_sync/tui/app.py`, `app.tcss`, `controller.py` |
-| Screens | `spell_sync/tui/screens/` — dashboard, status, preview |
-| CLI | `spell_sync/cli.py` — `ui` subcommand; no-arg TTY → TUI; non-TTY → exit 2 |
-| Service | `load_dashboard`, `load_push_preview` on `SpellSyncService` |
-| Tests | `tests/tui/` — 35 headless tests (routing, app, launch) |
-
-Working actions: Status, Preview, Quit, Refresh, Escape-back. Disabled (Phase 4+): Pull, Push, Doctor, Recovery, Logs.
-
-### Phase 1 deliverables
-
-| Component | Path |
-|-----------|------|
-| Event types | `spell_sync/application/events.py` |
-| Status/push reports | `spell_sync/application/reports.py` |
-| Facade | `spell_sync/application/service.py` — `SpellSyncService` |
-| CLI wiring | `commands.cmd_status`, `commands._cmd_push_locked` |
-| Tests | `tests/test_application_service.py` |
-
-`SpellSyncService` methods: `load_status`, `prepare_push`, `execute_push`, `run_push`. Push execution reuses the same `PreparedPush` object and checks fingerprints before calling `run.push_from_wordlist(prepared=...)`.
-
-## Setup wizard target selection (Phase 6.1)
-
-Setup target toggles are UI controls only. Discovery defaults are a starting point; the
-wizard stores exact selection in `SetupSelection` on `TuiController` until confirmation.
-
-### Post-preview semantics
-
-Setup writes only project files (`wordlist.txt`, `spell-sync.toml`, whitelist). External
-application dictionaries are never modified during discovery, toggle, refresh, preview, or
-project creation.
-
-If a target becomes corrupt or its discovery path changes after preview:
-
-- `execute_project_setup()` uses the immutable `PreparedProjectSetup` from preview
-- Selected target IDs and rendered config bytes are not recomputed at execution time
-- Config records enabled flags from the prepared selection only
-- Dashboard after setup may show warnings for targets that later become unreadable/corrupt
-
-This is covered by `tests/test_setup_target_selection.py`.
-
-## Operation history and diagnostics (Phase 7)
+## Operation history and diagnostics
 
 ### Recorded operations
 
-History records are appended after a **completed mutating attempt** for:
+History records are appended after a completed mutating attempt for: Setup, Pull, Push, Recover,
+recovery cleanup, recovery discard.
 
-- Setup (`init` / setup wizard)
-- Pull
-- Push
-- Recover
-- Recovery cleanup
-- Recovery discard
-
-Not recorded: status, preview/plan, doctor, discovery, refresh, cancel-before-execute, wizard navigation, opening the TUI.
+Not recorded: status, preview/plan, doctor, discovery, refresh, cancel-before-execute, wizard
+navigation, opening the TUI.
 
 ### Stored fields
 
-`OperationHistoryRecord` (schema v1) stores counts, operation kind, typed outcome, duration, warning count, and opaque identifiers (`transaction_id`, `setup_id`, `record_id`). Pull/Push/Recovery/Setup-specific count fields (e.g. `added_words`, `created_files`, `restored_files`) are allowed.
-
-### Never stored
-
-Wordlist words, dictionary contents, snapshot contents, full TOML, environment dumps, secrets/tokens, Git credentials, clipboard content, or full absolute user paths in persistent records.
+`OperationHistoryRecord` (schema v1): counts, operation kind, typed outcome, duration, warning
+count, opaque identifiers. Never wordlist words, dictionary contents, secrets, or full absolute
+user paths.
 
 ### Platform paths
 
@@ -227,12 +117,20 @@ Wordlist words, dictionary contents, snapshot contents, full TOML, environment d
 
 History file: `operation-history.jsonl` (max 500 records, JSON Lines, file lock).
 
-### Rotation and retention
-
-Technical log: stdlib `RotatingFileHandler` — 1 MiB × 5 backups, UTF-8. History compaction keeps the newest 500 valid records after append when over threshold.
+Technical log: `RotatingFileHandler` — 1 MiB × 5 backups, UTF-8, redacted formatter.
 
 ### Failure behavior
 
-History or logging failures **never** change the core operation outcome. A successful push/pull/setup/recovery stays successful; the report may add a non-blocking warning: *Operation completed, but its history record could not be saved.* Errors go to the technical log only (no traceback in TUI).
+History or logging failures never change the core operation outcome. Reports may add a
+non-blocking warning. Errors go to the technical log only (no traceback in TUI).
 
-TUI reads history and log tail only through `SpellSyncService` workers — widgets do not open state files directly.
+## Testing
+
+Headless Textual tests live in `tests/tui/`. Run:
+
+```bash
+python3.11 -m pytest tests/tui -q
+scripts/ci.sh
+```
+
+Coverage policy: 100% line coverage on `spell_sync`, ≥96% branch coverage.
