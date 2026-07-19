@@ -275,6 +275,36 @@ class TestTuiArchitecture(unittest.TestCase):
         self.assertNotIn("build_setup_report", source)
         self.assertNotIn("build_push_report", source)
 
+    def test_review_flow_uses_existing_pull_push_services(self):
+        source = (Path(tui_pkg.__file__).parent / "screens" / "review_update_screen.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("prepare_review_pull", source)
+        self.assertIn("prepare_review_push", source)
+        self.assertIn("OperationScreen", source)
+        self.assertIn("PullConfirmScreen", source)
+        self.assertIn("PushConfirmScreen", source)
+        self.assertNotIn("execute_prepared_push", source)
+        self.assertNotIn("atomic_write", source)
+
+    def test_review_session_not_persistent_record(self):
+        from spell_sync.application.review_session import ReviewSession
+        from spell_sync.diagnostics.history_record import OperationHistoryRecord
+
+        session_fields = set(ReviewSession.__dataclass_fields__)
+        history_fields = set(OperationHistoryRecord.__dataclass_fields__)
+        self.assertFalse(session_fields & history_fields)
+        source = (Path(tui_pkg.__file__).parent / "screens" / "review_update_screen.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("OperationHistoryStore", source)
+        self.assertNotIn("build_history_record", source)
+        controller_source = (Path(tui_pkg.__file__).parent / "controller.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("clear_review_session", controller_source)
+        self.assertNotIn("_review_session: ReviewSession = ReviewSession", controller_source)
+
 
 if __name__ == "__main__":
     unittest.main()

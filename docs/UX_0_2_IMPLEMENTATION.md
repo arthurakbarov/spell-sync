@@ -60,7 +60,7 @@ architecture rewrite, no remote publish.
 
 ## Current phase
 
-Phase 2 — simplify Dashboard (complete)
+Phase 3 — guided Review and update (complete)
 
 ## Completed phases
 
@@ -153,23 +153,61 @@ Tests:
 - `tests/test_application_builders.py` — application counts and last-operation
   formatting
 
+### Phase 3 — guided Review and update
+
+Application model:
+
+- `ReviewSession` / `ReviewSessionReport` (`spell_sync/application/review_session.py`)
+- Controller-owned in-memory session on `TuiController` (not persisted, not a
+  history record)
+
+Flow:
+
+- Dashboard → Review start → Pull review → optional Pull → Pull complete →
+  fresh Push preview → optional Push → in-memory session report
+- Pull and Push remain separate operations with existing confirm/execute paths
+- Fresh `PushPreview` always built after Pull or Skip Pull (never reused)
+
+Implementation:
+
+- `spell_sync/tui/screens/review_update_screen.py` — start, pull review, pull
+  complete, push preview, session report screens
+- `spell_sync/tui/controller.py` — `begin_review_session`, `prepare_review_pull`,
+  `prepare_review_push`, session record helpers
+- `spell_sync/tui/screens/operation_screen.py` — optional `on_complete` callback
+  for review hand-off (skips standalone report when set)
+- `spell_sync/tui/screens/dashboard.py` — primary action opens guided flow
+
+Safety:
+
+- Pull/Push confirmation binds to exact preview plan id
+- Stale preview blocked via existing confirm screens
+- Recovery / failed outcomes end session with recovery note
+- History records only for executed Pull/Push (not the review session)
+
+Tests:
+
+- `tests/test_review_workflow.py` — session report helpers
+- `tests/tui/test_review_workflow.py` — end-to-end guided flow
+- `tests/tui/test_review_coverage.py` — screen edge paths
+- Architecture guards in `tests/tui/test_architecture.py`
+
 ## Last validation
 
 ```bash
 python3.11 -m ruff check spell_sync tests          # pass
 python3.11 -m ruff format --check spell_sync tests # pass
 python3.11 -m mypy spell_sync                      # pass
-python3.11 -m pytest tests/tui -q                  # 234 passed
+python3.11 -m pytest tests/tui -q                  # 265 passed
 bash scripts/ci.sh                                 # EXIT 0
 coverage policy: 100% lines, 96%+ branches
-1312 passed
+1356 passed
 ```
 
 ## Remaining work
 
 ### Later phases
 
-- Phase 3: guided Review and update
 - Phase 4: UserNotice / planned vs actual
 - Phase 5: docs + version `0.2.0`
 

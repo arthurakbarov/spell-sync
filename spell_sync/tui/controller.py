@@ -21,6 +21,11 @@ from ..application.reports import (
     StatusDetailSnapshot,
     StatusSnapshot,
 )
+from ..application.review_session import (
+    ReviewSession,
+    ReviewSessionReport,
+    build_review_session_report,
+)
 from ..cli_options import CliOptions
 from ..project_setup.discovery import SetupTargetDiscovery
 from ..project_setup.draft import SetupDraft
@@ -186,6 +191,7 @@ class TuiController:
         self._target_settings_discovery: SetupTargetDiscovery | None = None
         self._target_settings_selection: SetupSelection | None = None
         self._target_settings_prepared: PreparedTargetSettingsUpdate | None = None
+        self._review_session: ReviewSession | None = None
 
     @property
     def setup_selected_targets(self) -> tuple[str, ...]:
@@ -613,3 +619,65 @@ class TuiController:
         self._target_settings_discovery = None
         self._target_settings_selection = None
         self._target_settings_prepared = None
+
+    def begin_review_session(self) -> ReviewSession:
+        self._review_session = ReviewSession()
+        return self._review_session
+
+    def review_session(self) -> ReviewSession | None:
+        return self._review_session
+
+    def clear_review_session(self) -> None:
+        self._review_session = None
+        self.invalidate_pull_preview()
+        self.invalidate_push_preview()
+
+    def prepare_review_pull(self) -> PullPreview:
+        session = self._review_session
+        if session is not None and session.push_preview is not None:
+            session.push_preview_plan_before_pull = session.push_preview.plan_identifier
+        preview = self.prepare_pull()
+        if session is not None:
+            session.pull_preview = preview
+        return preview
+
+    def prepare_review_push(self) -> PushPreview:
+        self.invalidate_push_preview()
+        preview = self.preview()
+        session = self._review_session
+        if session is not None:
+            session.push_preview = preview
+        return preview
+
+    def mark_review_pull_skipped(self) -> None:
+        session = self._review_session
+        if session is None:
+            return
+        session.pull_skipped = True
+        session.pull_report = None
+
+    def mark_review_push_skipped(self) -> None:
+        session = self._review_session
+        if session is None:
+            return
+        session.push_skipped = True
+        session.push_report = None
+
+    def record_review_pull_report(self, report: OperationReport) -> None:
+        session = self._review_session
+        if session is None:
+            return
+        session.pull_report = report
+        session.pull_skipped = False
+
+    def record_review_push_report(self, report: OperationReport) -> None:
+        session = self._review_session
+        if session is None:
+            return
+        session.push_report = report
+        session.push_skipped = False
+
+    def build_review_session_report(self) -> ReviewSessionReport:
+        pending = self.dashboard().pending_recovery
+        session = self._review_session or ReviewSession()
+        return build_review_session_report(session, pending_recovery=pending)

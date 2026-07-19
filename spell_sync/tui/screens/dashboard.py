@@ -254,9 +254,9 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         if self._blocked:
             self.notify("Writes are blocked. Resolve recovery or blocking issues first.")
             return
-        from .review_update_screen import ReviewUpdateScreen
+        from .review_update_screen import ReviewStartScreen
 
-        self.app.push_screen(ReviewUpdateScreen())
+        self.app.push_screen(ReviewStartScreen(self._controller))
 
     def action_open_preview(self) -> None:
         if self._blocked:

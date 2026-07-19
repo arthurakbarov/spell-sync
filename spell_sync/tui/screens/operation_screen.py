@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from typing import Any
 
 from textual import work
@@ -55,6 +56,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         recovery_preview: RecoveryPreview | None = None,
         setup_prepared: PreparedProjectSetup | None = None,
         target_settings_prepared: PreparedTargetSettingsUpdate | None = None,
+        on_complete: Callable[[OperationReport], None] | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
@@ -64,6 +66,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._recovery_preview = recovery_preview
         self._setup_prepared = setup_prepared
         self._target_settings_prepared = target_settings_prepared
+        self._on_complete = on_complete
         self._events: list[OperationEvent] = []
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
@@ -255,6 +258,10 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._controller.invalidate_recovery_preview()
         if self._flush_timer is not None:
             self._flush_timer.stop()
+        if self._on_complete is not None:
+            self.app.pop_screen()
+            self._on_complete(report)
+            return
         from .report_screen import ReportScreen
 
         self.app.push_screen(ReportScreen(self._controller, report))

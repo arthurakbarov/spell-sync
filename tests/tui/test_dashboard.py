@@ -162,7 +162,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsInstance(app.screen, PreviewScreen)
 
-    async def test_open_review_update_stub(self):
+    async def test_open_review_update_start(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
@@ -170,6 +170,8 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-review-update")
             await pilot.pause()
             self.assertIsInstance(app.screen, ReviewUpdateScreen)
+            body = await wait_for_text(pilot, "#review-body", "Start review")
+            self.assertIn("Nothing changes without confirmation", str(body.render()))
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
