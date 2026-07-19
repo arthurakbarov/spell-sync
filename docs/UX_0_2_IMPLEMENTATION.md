@@ -1,0 +1,149 @@
+# Spell Sync 0.2 UX implementation
+
+## Goal
+
+Local UX release `0.2.0`: post-setup Targets management, simpler Dashboard, guided
+`Review and update`, clearer notices/reports. Preserve safety invariants. No large
+architecture rewrite, no remote publish.
+
+## Existing architecture
+
+- Version: `0.1.0` (`pyproject.toml`)
+- CLI commands: `config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`,
+  `recover`, `status`, `ui`, `version` (`spell_sync/cli.py` `COMMANDS`)
+- Shared facade: `SpellSyncService` (`spell_sync/application/service.py`)
+- TUI entry: no-args TTY / `spell-sync ui` → `cmd_ui` → Textual app
+- Dashboard actions today: Status, Preview, Doctor, Pull, Push, Recovery
+  (conditional), Logs, Quit (`spell_sync/tui/screens/dashboard.py`)
+- Config target schema: `[dictionaries]` boolean keys only
+  (`editors`, `chrome`, `edge`, `brave`, `vivaldi`, `firefox`, `neovim`,
+  `jetbrains`, `hunspell`, `obsidian`, `libreoffice`) — no `[targets].enabled`
+- Target discovery DTO: `SetupTarget` / `SetupTargetDiscovery`
+  (`spell_sync/project_setup/discovery.py`) fields include `identifier`,
+  `display_name`, `path`, `detected`, `available`, `readable`, `supported`,
+  `selectable`, `word_count`, `status`, `detail` (setup uses `enabled_by_default`)
+- Config writer today: `render_project_config` → bytes in `PreparedProjectSetup` →
+  `atomic_write` only during setup (`project_setup/render.py`, `execute.py`)
+- No post-setup config mutation API
+- Immutable previews: `PullPreview`, `PushPreview`, `RecoveryPreview`,
+  `PreparedProjectSetup`, `PreparedPush`
+- Operation report: `OperationReport` (`application/reports.py`)
+- Recovery open path: Dashboard `action_open_recovery` → `RecoveryScreen` →
+  `controller.inspect_recovery()`
+- Setup selection path: TUI `SetupSelection` on controller → `SetupDraft` →
+  `prepare_project_setup` → rendered TOML → `execute_project_setup`
+
+## Safety invariants
+
+- Strict config validation; effective wordlist defines project directory
+- Pending recovery blocks new write operations
+- Operation lock required for mutating operations
+- Preview and execution share one immutable prepared plan
+- Fingerprint checked before write; stale preview is not executed
+- Push removal confirmation binds to exact plan
+- Corrupt / unreadable / unsupported targets are not overwritten
+- Running application checks are not bypassed
+- Transaction snapshots before writes; journal kept on incomplete rollback
+- Recovery does not overwrite external changes; successful recovery cleans artifacts
+- TUI does not call low-level writers or CLI via subprocess
+- CLI and TUI share application layer
+- User words never stored in history or technical logs
+
+## Product decisions
+
+- Keep current TOML schema (`[dictionaries]` booleans)
+- Reuse setup discovery/selection patterns for post-setup Targets
+- Targets update writes config only (never dictionaries/wordlist/journal)
+- Immutable `PreparedTargetSettingsUpdate` with rendered bytes + fingerprint
+- Guided Review session is in-memory only (not a history record / transaction)
+- Defer architecture items listed in task (CliOptions split, TargetAdapter, etc.)
+
+## Current phase
+
+Phase 1 — Targets management after setup (complete)
+
+## Completed phases
+
+### Phase 0 — baseline and audit
+
+- Production code unchanged for audit (docs hygiene only)
+- Fixed pre-existing docs style failure: removed horizontal rules from
+  `docs/TEST_REPORT_TEMPLATE.md` (blocked `scripts/check-docs-style.sh`)
+- Created this working document
+- Baseline green: ruff, mypy, `pytest tests/tui` (190), full `scripts/ci.sh`
+  (1229 passed, 100% lines, 96.17% branches)
+
+### Phase 1 — Targets management after setup
+
+Application API on `SpellSyncService`:
+
+- `load_target_settings(opts)` → `TargetSettingsSnapshot`
+- `prepare_target_settings_update(opts, selected_target_ids)` →
+  `PreparedTargetSettingsUpdate`
+- `execute_target_settings_update(opts, prepared, confirmed_update_id=...)` →
+  `TargetSettingsExecution`
+- `build_target_settings_report(execution)` → `OperationReport`
+
+Implementation:
+
+- `spell_sync/project_setup/target_settings.py` — load, prepare, execute
+- `spell_sync/project_setup/discovery.py` — `enabled` on `SetupTarget`,
+  `enabled_dictionary_targets()`
+- `spell_sync/project_setup/render.py` — preserve `[push]`, `[io]`, `[neovim]`
+  when re-rendering post-setup
+- `spell_sync/project_setup/selection.py` — `selection_from_enabled()`
+- `spell_sync/application/service.py`, `builders.py`, `events.py` (`TARGETS`)
+- `spell_sync/diagnostics/history_builder.py` — target settings history rows
+- TUI: `target_settings_screen.py`, `controller.py`, `dashboard.py` (Targets
+  button), `operation_screen.py`, `report_screen.py`
+
+Safety:
+
+- Config-only writes; dictionaries/wordlist/journal/snapshots untouched
+- Immutable `PreparedTargetSettingsUpdate` with rendered bytes + fingerprint
+- Stale fingerprint stops safely with user-facing message
+- Corrupt/unreadable/unsupported/ambiguous targets not force-enabled
+- Pending recovery blocks prepare/execute
+- Operation lock during execute; TUI routes through `SpellSyncService` only
+
+Tests:
+
+- `tests/test_target_settings.py` (29 tests)
+- `tests/tui/test_target_settings_screen.py` (6 tests)
+- `tests/tui/test_target_settings_coverage.py` (18 tests)
+- Architecture guards in `tests/tui/test_architecture.py`
+- `tests/tui/test_dashboard.py` — Targets navigation
+
+## Last validation
+
+```bash
+python3.11 -m ruff check spell_sync tests          # pass
+python3.11 -m ruff format --check spell_sync tests # pass
+python3.11 -m mypy spell_sync                      # pass
+python3.11 -m pytest tests/tui -q                  # 214 passed
+python3.11 -m pytest tests/test_target_settings.py -q  # 29 passed
+bash scripts/ci.sh                                 # EXIT 0
+coverage policy: 100% lines, 96%+ branches
+1294 passed
+```
+
+## Remaining work
+
+### Later phases
+
+- Phase 2: simplify Dashboard
+- Phase 3: guided Review and update
+- Phase 4: UserNotice / planned vs actual
+- Phase 5: docs + version `0.2.0`
+
+## Deferred work
+
+- Full removal of `CliOptions` from application layer
+- Split `SpellSyncService` into multiple services
+- TargetAdapter architecture
+- Remove global active settings
+- Config schema `[targets].enabled`
+- Rewrite all builders / replace transaction engine
+- Native GUI, tray, daemon, watcher, auto updater, telemetry, plugins
+- Automatic Pull/Push/Git/background sync
+- Changelog, tags, PyPI publish, remote changes

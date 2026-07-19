@@ -32,10 +32,16 @@ from ..project_setup.selection import (
     default_selection,
     merge_selection_after_refresh,
     select_available_targets,
+    selection_from_enabled,
     selection_tuple,
     toggle_target,
 )
 from ..project_setup.state import ProjectSetupState
+from ..project_setup.target_settings import (
+    PreparedTargetSettingsUpdate,
+    TargetSettingsExecution,
+    TargetSettingsSnapshot,
+)
 
 
 class TuiService(Protocol):
@@ -122,6 +128,28 @@ class TuiService(Protocol):
 
     def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport: ...
 
+    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot: ...
+
+    def prepare_target_settings_update(
+        self,
+        opts: CliOptions,
+        selected_target_ids: frozenset[str],
+    ) -> PreparedTargetSettingsUpdate: ...
+
+    def execute_target_settings_update(
+        self,
+        opts: CliOptions,
+        prepared: PreparedTargetSettingsUpdate,
+        *,
+        confirmed_update_id: str,
+        event_sink: EventSink | None = None,
+    ) -> TargetSettingsExecution: ...
+
+    def build_target_settings_report(
+        self,
+        execution: TargetSettingsExecution,
+    ) -> OperationReport: ...
+
     def load_operation_history(
         self,
         *,
@@ -154,6 +182,10 @@ class TuiController:
         self._setup_discovery: SetupTargetDiscovery | None = None
         self._setup_selection: SetupSelection | None = None
         self._setup_prepared: PreparedProjectSetup | None = None
+        self._target_settings_snapshot: TargetSettingsSnapshot | None = None
+        self._target_settings_discovery: SetupTargetDiscovery | None = None
+        self._target_settings_selection: SetupSelection | None = None
+        self._target_settings_prepared: PreparedTargetSettingsUpdate | None = None
 
     @property
     def setup_selected_targets(self) -> tuple[str, ...]:
@@ -458,3 +490,126 @@ class TuiController:
             selected_targets=self.setup_selected_targets,
             create_wordlist=not self._setup_wordlist.is_file(),
         )
+
+    def load_target_settings(self) -> TargetSettingsSnapshot:
+        snapshot = self._service.load_target_settings(self.opts)
+        self._apply_target_settings_snapshot(snapshot, reset_selection=False)
+        return snapshot
+
+    def begin_target_settings(self) -> TargetSettingsSnapshot:
+        self.clear_target_settings_session()
+        snapshot = self._service.load_target_settings(self.opts)
+        self._apply_target_settings_snapshot(snapshot, reset_selection=True)
+        return snapshot
+
+    def _apply_target_settings_snapshot(
+        self,
+        snapshot: TargetSettingsSnapshot,
+        *,
+        reset_selection: bool,
+    ) -> None:
+        self._target_settings_snapshot = snapshot
+        discovery = SetupTargetDiscovery(
+            targets=snapshot.targets,
+            default_enabled=tuple(sorted(snapshot.enabled_target_ids)),
+        )
+        self._target_settings_discovery = discovery
+        if reset_selection or self._target_settings_selection is None:
+            self._target_settings_selection = selection_from_enabled(
+                discovery,
+                snapshot.enabled_target_ids,
+            )
+
+    def target_settings_discovery(self):
+        if self._target_settings_discovery is None:
+            self.load_target_settings()
+        assert self._target_settings_discovery is not None
+        return self._target_settings_discovery
+
+    def target_settings_selection(self) -> SetupSelection:
+        if self._target_settings_selection is None:
+            return SetupSelection(frozenset())
+        return self._target_settings_selection
+
+    def refresh_target_settings_discovery(self) -> str | None:
+        previous_discovery = self._target_settings_discovery
+        previous_ids: frozenset[str] = (
+            frozenset(target.identifier for target in previous_discovery.targets)
+            if previous_discovery
+            else frozenset()
+        )
+        previous_selection = self._target_settings_selection or SetupSelection(frozenset())
+        snapshot = self._service.load_target_settings(self.opts)
+        self._apply_target_settings_snapshot(snapshot, reset_selection=False)
+        if snapshot.load_error:
+            return snapshot.load_error
+        discovery = self._target_settings_discovery
+        assert discovery is not None
+        self._target_settings_selection = merge_selection_after_refresh(
+            previous_selection,
+            previous_ids,
+            discovery,
+        )
+        self._target_settings_prepared = None
+        return None
+
+    def toggle_target_settings_target(self, target_id: str) -> bool:
+        discovery = self.target_settings_discovery()
+        if self._target_settings_selection is None:
+            return False
+        updated = toggle_target(self._target_settings_selection, discovery, target_id)
+        if updated == self._target_settings_selection:
+            return False
+        self._target_settings_selection = updated
+        self._target_settings_prepared = None
+        return True
+
+    def select_available_target_settings(self) -> None:
+        discovery = self.target_settings_discovery()
+        if self._target_settings_selection is None:
+            return
+        self._target_settings_selection = select_available_targets(
+            self._target_settings_selection,
+            discovery,
+        )
+        self._target_settings_prepared = None
+
+    def clear_target_settings_selection(self) -> None:
+        discovery = self.target_settings_discovery()
+        if self._target_settings_selection is None:
+            return
+        self._target_settings_selection = clear_selectable_targets(
+            self._target_settings_selection,
+            discovery,
+        )
+        self._target_settings_prepared = None
+
+    def prepare_target_settings_update(self) -> PreparedTargetSettingsUpdate:
+        prepared = self._service.prepare_target_settings_update(
+            self.opts,
+            self.target_settings_selection().selected_target_ids,
+        )
+        self._target_settings_prepared = prepared
+        return prepared
+
+    def execute_target_settings_update(
+        self,
+        prepared: PreparedTargetSettingsUpdate,
+        *,
+        event_sink: EventSink | None = None,
+    ) -> TargetSettingsExecution:
+        return self._service.execute_target_settings_update(
+            self.opts,
+            prepared,
+            confirmed_update_id=prepared.update_id,
+            event_sink=event_sink,
+        )
+
+    def target_settings_report(self, execution: TargetSettingsExecution) -> OperationReport:
+        return self._service.build_target_settings_report(execution)
+
+    def clear_target_settings_session(self) -> None:
+        self._target_settings_snapshot = None
+        self._target_settings_discovery = None
+        self._target_settings_selection = None
+        self._target_settings_prepared = None

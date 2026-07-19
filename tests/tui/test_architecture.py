@@ -149,11 +149,32 @@ class TestTuiArchitecture(unittest.TestCase):
 
     def test_tui_does_not_import_project_setup_execute(self):
         banned = ("atomic_write", "execute_project_setup", "prepare_project_setup")
-        for name in ("setup_welcome_screen.py", "setup_targets_screen.py"):
+        for name in (
+            "setup_welcome_screen.py",
+            "setup_targets_screen.py",
+            "target_settings_screen.py",
+        ):
             source = Path(tui_pkg.__file__).parent / "screens" / name
             text = source.read_text(encoding="utf-8")
             for token in banned:
                 self.assertNotIn(token, text, msg=f"{name} references {token}")
+
+    def test_target_settings_goes_through_service(self):
+        service = fake_service()
+        controller = TuiController(service, MagicMock())
+        controller.begin_target_settings()
+        prepared = controller.prepare_target_settings_update()
+        controller.execute_target_settings_update(prepared)
+        self.assertEqual(service.execute_target_settings_calls, 1)
+
+    def test_target_settings_screen_uses_controller_selection(self):
+        source = (
+            Path(tui_pkg.__file__).parent / "screens" / "target_settings_screen.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("toggle_target_settings_target", source)
+        self.assertNotIn("discover_dictionaries", source)
+        self.assertNotIn("render_project_config", source)
+        self.assertNotIn("atomic_write", source)
 
     def test_setup_targets_screen_uses_controller_selection(self):
         source = (Path(tui_pkg.__file__).parent / "screens" / "setup_targets_screen.py").read_text(

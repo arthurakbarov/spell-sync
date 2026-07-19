@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from spell_sync.application.builders import (
     build_pull_operation_report,
     build_push_operation_report,
     build_recovery_operation_report,
     build_setup_operation_report,
+    build_target_settings_operation_report,
 )
 from spell_sync.application.events import EventLevel, EventSink, OperationEvent, OperationKind
 from spell_sync.application.reports import (
@@ -40,6 +42,12 @@ from spell_sync.project_setup.draft import SetupDraft
 from spell_sync.project_setup.execute import ProjectSetupExecution, ProjectSetupOutcome
 from spell_sync.project_setup.prepare import PreparedProjectSetup, prepare_project_setup
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
+from spell_sync.project_setup.target_settings import (
+    PreparedTargetSettingsUpdate,
+    TargetSettingsExecution,
+    TargetSettingsOutcome,
+    TargetSettingsSnapshot,
+)
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.sync_models import DictionaryDiff, PushResult
 
@@ -68,6 +76,10 @@ class FakeTuiService:
     setup_prepared: PreparedProjectSetup | None = None
     setup_execution: ProjectSetupExecution | None = None
     execute_setup_calls: int = 0
+    target_settings_snapshot: TargetSettingsSnapshot | None = None
+    target_settings_prepared: PreparedTargetSettingsUpdate | None = None
+    target_settings_execution: TargetSettingsExecution | None = None
+    execute_target_settings_calls: int = 0
 
     def load_dashboard(self, opts: CliOptions) -> DashboardState:
         return self.dashboard_state
@@ -332,6 +344,68 @@ class FakeTuiService:
 
     def build_setup_report(self, execution: ProjectSetupExecution):
         return build_setup_operation_report(execution)
+
+    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot:
+        if self.target_settings_snapshot is not None:
+            return self.target_settings_snapshot
+        return TargetSettingsSnapshot(
+            config_path=Path("/tmp/project/spell-sync.toml"),
+            wordlist_path=Path("/tmp/project/wordlist.txt"),
+            targets=(),
+            enabled_target_ids=frozenset(),
+        )
+
+    def prepare_target_settings_update(
+        self,
+        opts: CliOptions,
+        selected_target_ids: frozenset[str],
+    ) -> PreparedTargetSettingsUpdate:
+        if self.target_settings_prepared is not None:
+            return self.target_settings_prepared
+        return PreparedTargetSettingsUpdate(
+            update_id="target-update-1",
+            config_path=Path("/tmp/project/spell-sync.toml"),
+            wordlist_path=Path("/tmp/project/wordlist.txt"),
+            selected_target_ids=selected_target_ids,
+            previous_target_ids=frozenset({"chrome"}),
+            enabled_target_ids=frozenset({"edge"}),
+            disabled_target_ids=frozenset(),
+            rendered_config_bytes=b"[dictionaries]\n",
+            config_fingerprint_before="abc",
+            warnings=(),
+            can_execute=True,
+        )
+
+    def execute_target_settings_update(
+        self,
+        opts: CliOptions,
+        prepared: PreparedTargetSettingsUpdate,
+        *,
+        confirmed_update_id: str,
+        event_sink: EventSink | None = None,
+    ) -> TargetSettingsExecution:
+        self.execute_target_settings_calls += 1
+        if self.raise_on_execute is not None:
+            raise self.raise_on_execute
+        if event_sink is not None:
+            event_sink(
+                OperationEvent(
+                    OperationKind.TARGETS,
+                    "completed",
+                    "Configuration updated",
+                    level=EventLevel.SUCCESS,
+                )
+            )
+        if self.target_settings_execution is not None:
+            return self.target_settings_execution
+        return TargetSettingsExecution(
+            prepared=prepared,
+            outcome=TargetSettingsOutcome.COMPLETED,
+            message="Enabled: Edge",
+        )
+
+    def build_target_settings_report(self, execution: TargetSettingsExecution):
+        return build_target_settings_operation_report(execution)
 
     def load_operation_history(self, **kwargs):
         from spell_sync.diagnostics.types import OperationHistorySnapshot

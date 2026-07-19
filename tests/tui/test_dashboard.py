@@ -98,6 +98,17 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsInstance(app.screen, DoctorScreen)
 
+    async def test_open_targets(self):
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 40)) as pilot:
+            await wait_for_text(pilot, "#dashboard-summary", "Ready")
+            await pilot.click("#btn-targets")
+            await pilot.pause()
+            from spell_sync.tui.screens.target_settings_screen import TargetSettingsScreen
+
+            self.assertIsInstance(app.screen, TargetSettingsScreen)
+
 
 if __name__ == "__main__":
     unittest.main()

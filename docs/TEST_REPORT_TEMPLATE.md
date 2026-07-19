@@ -11,8 +11,6 @@ Copy this template for external tester feedback. Remove personal paths and secre
 Redact home directories, email addresses, API tokens, and application-specific paths in any
 excerpt you include.
 
----
-
 ## Environment
 
 | Field | Value |
@@ -90,8 +88,6 @@ Sizes tested: 80×24 / 100×30 / 120×40 / other
 **Actual result:**
 
 **Screenshots or log excerpt:** (redacted)
-
----
 
 ### Problem 2
 

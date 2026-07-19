@@ -367,3 +367,9 @@ def test_stale_prepared_setup_rejected_after_selection_change(tmp_path: Path) ->
     prepared = prepare_project_setup(SetupDraft(wordlist, ("chrome",), create_wordlist=True))
     execution = execute_project_setup(prepared, confirmed_setup_id="wrong-id")
     assert execution.outcome.value == "failed"
+
+
+def test_render_push_bool_default_without_existing_config() -> None:
+    from spell_sync.project_setup.render import _push_bool
+
+    assert _push_bool(None, "strict", False) is False

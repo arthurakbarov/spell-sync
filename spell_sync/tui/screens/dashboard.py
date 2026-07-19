@@ -40,6 +40,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             yield Button("Doctor", id="btn-doctor")
             yield Button("Pull", id="btn-pull")
             yield Button("Push", id="btn-push")
+            yield Button("Targets", id="btn-targets")
             yield Button("Recovery", id="btn-recovery", disabled=True, classes="-disabled-action")
             yield Button("Logs", id="btn-logs")
             yield Button("Quit", id="btn-quit", variant="error")
@@ -176,6 +177,13 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             from .logs_screen import LogsScreen
 
             self.app.push_screen(LogsScreen(self._controller))
+        elif button_id == "btn-targets":
+            self.action_open_targets()
+
+    def action_open_targets(self) -> None:
+        from .target_settings_screen import TargetSettingsScreen
+
+        self.app.push_screen(TargetSettingsScreen(self._controller))
 
     def action_refresh_dashboard(self) -> None:
         self._refresh_layout_warning()

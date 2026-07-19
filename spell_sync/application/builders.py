@@ -1015,3 +1015,50 @@ def build_setup_operation_report(execution) -> OperationReport:
         warnings=execution.warnings,
         plan_identifier=prepared.setup_id,
     )
+
+
+def build_target_settings_operation_report(execution) -> OperationReport:
+    from ..project_setup.target_settings import TargetSettingsOutcome
+
+    prepared = execution.prepared
+    if execution.outcome is TargetSettingsOutcome.COMPLETED:
+        details = [
+            f"Configuration: {prepared.config_path}",
+            "No application dictionaries were changed.",
+        ]
+        if prepared.enabled_target_ids:
+            details.append(
+                "Enabled: " + ", ".join(sorted(prepared.enabled_target_ids)),
+            )
+        if prepared.disabled_target_ids:
+            details.append(
+                "Disabled: " + ", ".join(sorted(prepared.disabled_target_ids)),
+            )
+        return OperationReport(
+            operation="targets",
+            outcome=OperationOutcome.COMPLETED,
+            title="Configuration updated",
+            summary=execution.message,
+            details=tuple(details),
+            warnings=execution.warnings,
+            plan_identifier=prepared.update_id,
+        )
+    if execution.outcome is TargetSettingsOutcome.STOPPED_SAFELY:
+        return OperationReport(
+            operation="targets",
+            outcome=OperationOutcome.STOPPED_SAFELY,
+            title="Configuration update stopped safely",
+            summary=execution.message,
+            details=("No application dictionaries were changed.",),
+            warnings=execution.warnings,
+            plan_identifier=prepared.update_id,
+        )
+    return OperationReport(
+        operation="targets",
+        outcome=OperationOutcome.FAILED,
+        title="Configuration update failed",
+        summary=execution.message,
+        details=(),
+        warnings=execution.warnings,
+        plan_identifier=prepared.update_id,
+    )

@@ -27,6 +27,7 @@ from ...application.reports import (
 )
 from ...project_setup.execute import ProjectSetupExecution
 from ...project_setup.prepare import PreparedProjectSetup
+from ...project_setup.target_settings import PreparedTargetSettingsUpdate, TargetSettingsExecution
 from ..controller import TuiController
 from ..workers import LoadTokenMixin
 
@@ -53,6 +54,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         push_preview: PushPreview | None = None,
         recovery_preview: RecoveryPreview | None = None,
         setup_prepared: PreparedProjectSetup | None = None,
+        target_settings_prepared: PreparedTargetSettingsUpdate | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
@@ -61,6 +63,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._push_preview = push_preview
         self._recovery_preview = recovery_preview
         self._setup_prepared = setup_prepared
+        self._target_settings_prepared = target_settings_prepared
         self._events: list[OperationEvent] = []
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
@@ -88,6 +91,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             "recover": "Running recovery",
             "cleanup": "Running cleanup",
             "discard": "Running discard",
+            "targets": "Updating configuration",
         }
         title = titles.get(self._operation, f"Running {self._operation}")
         self.query_one("#operation-title", Static).update(title)
@@ -199,6 +203,11 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
                 self._setup_prepared,
                 event_sink=self._sink,
             )
+        if self._operation == "targets" and self._target_settings_prepared is not None:
+            return self._controller.execute_target_settings_update(
+                self._target_settings_prepared,
+                event_sink=self._sink,
+            )
         return None
 
     def on_execute_operation_worker_state_changed(self, event) -> None:
@@ -224,6 +233,9 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             report = self._controller.recovery_report(result)
         elif isinstance(result, ProjectSetupExecution):
             report = self._controller.setup_report(result)
+        elif isinstance(result, TargetSettingsExecution):
+            report = self._controller.target_settings_report(result)
+            self._controller.clear_target_settings_session()
         else:
             self._finish_failed("Operation returned no result.")
             return

@@ -14,6 +14,7 @@ from ..application.reports import (
     TargetUpdateReport,
 )
 from ..project_setup.execute import ProjectSetupExecution, ProjectSetupOutcome
+from ..project_setup.target_settings import TargetSettingsExecution, TargetSettingsOutcome
 from .history_record import HISTORY_SCHEMA_VERSION, OperationHistoryRecord
 
 
@@ -119,5 +120,14 @@ def build_history_record(
             created_files=len(source.created_files),
             enabled_targets=len(prepared.enabled_targets),
             setup_id=str(prepared.setup_id),
+        )
+    if type(source) is TargetSettingsExecution:
+        target_prepared = source.prepared
+        if source.outcome is TargetSettingsOutcome.STOPPED_SAFELY:
+            return replace(base, outcome="stopped_safely")
+        return replace(
+            base,
+            enabled_targets=len(target_prepared.enabled_target_ids),
+            unchanged_targets=len(target_prepared.disabled_target_ids),
         )
     return base

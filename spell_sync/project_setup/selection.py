@@ -78,6 +78,19 @@ def clear_selectable_targets(
     return SetupSelection(selected_target_ids=frozenset(disabled))
 
 
+def selection_from_enabled(
+    discovery: SetupTargetDiscovery,
+    enabled_target_ids: frozenset[str],
+) -> SetupSelection:
+    return SetupSelection(
+        selected_target_ids=frozenset(
+            target.identifier
+            for target in discovery.targets
+            if target.identifier in enabled_target_ids
+        )
+    )
+
+
 def selection_tuple(selection: SetupSelection) -> tuple[str, ...]:
     return tuple(sorted(selection.selected_target_ids))
 

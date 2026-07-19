@@ -30,6 +30,14 @@ from ..project_setup.draft import SetupDraft
 from ..project_setup.execute import ProjectSetupExecution, execute_project_setup
 from ..project_setup.prepare import PreparedProjectSetup, prepare_project_setup
 from ..project_setup.state import ProjectSetupState, inspect_project_setup, validate_setup_wordlist
+from ..project_setup.target_settings import (
+    PreparedTargetSettingsUpdate,
+    TargetSettingsExecution,
+    TargetSettingsSnapshot,
+    execute_target_settings_update,
+    load_target_settings_from_options,
+    prepare_target_settings_from_options,
+)
 from ..push_abort import PushAbort
 from ..push_journal import (
     JournalLoadStatus,
@@ -55,6 +63,7 @@ from .builders import (
     build_recovery_preview,
     build_setup_operation_report,
     build_status_detail_snapshot,
+    build_target_settings_operation_report,
     build_target_updates_from_preview,
 )
 from .events import EventLevel, EventSink, OperationEvent, OperationKind
@@ -1170,6 +1179,50 @@ class SpellSyncService:
         duration_ms: int = 0,
     ) -> OperationReport:
         report = build_setup_operation_report(execution)
+        return self._finalize_report(report, source=execution, duration_ms=duration_ms)
+
+    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot:
+        return load_target_settings_from_options(opts)
+
+    def prepare_target_settings_update(
+        self,
+        opts: CliOptions,
+        selected_target_ids: frozenset[str],
+    ) -> PreparedTargetSettingsUpdate:
+        return prepare_target_settings_from_options(opts, selected_target_ids)
+
+    def execute_target_settings_update(
+        self,
+        opts: CliOptions,
+        prepared: PreparedTargetSettingsUpdate,
+        *,
+        confirmed_update_id: str,
+        event_sink: EventSink | None = None,
+    ) -> TargetSettingsExecution:
+        def _sink(stage: str, message: str) -> None:
+            _emit(
+                event_sink,
+                OperationEvent(
+                    OperationKind.TARGETS,
+                    stage,
+                    message,
+                    level=EventLevel.SUCCESS if stage == "completed" else EventLevel.INFO,
+                ),
+            )
+
+        return execute_target_settings_update(
+            prepared,
+            confirmed_update_id=confirmed_update_id,
+            event_sink=_sink if event_sink is not None else None,
+        )
+
+    def build_target_settings_report(
+        self,
+        execution: TargetSettingsExecution,
+        *,
+        duration_ms: int = 0,
+    ) -> OperationReport:
+        report = build_target_settings_operation_report(execution)
         return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
     def build_push_report(

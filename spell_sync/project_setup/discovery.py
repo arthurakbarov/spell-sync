@@ -42,6 +42,7 @@ class SetupTarget:
     word_count: int | None
     status: str
     detail: str | None
+    enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -143,9 +144,20 @@ def _default_discovery_config(enabled: tuple[str, ...]) -> dict[str, dict[str, o
     return {"dictionaries": flags, "push": {}, "io": {"backup_keep": 3}}
 
 
+def enabled_dictionary_targets(config: dict[str, dict[str, object]]) -> frozenset[str]:
+    flags = config.get("dictionaries", {})
+    enabled: set[str] = set()
+    for target_id in _CONFIG_TARGET_IDS:
+        value = flags.get(target_id)
+        if value is True:
+            enabled.add(target_id)
+    return frozenset(enabled)
+
+
 def discover_setup_targets(
     *,
     selected_targets: tuple[str, ...] | None = None,
+    enabled_targets: frozenset[str] | None = None,
 ) -> SetupTargetDiscovery:
     config = _default_discovery_config(selected_targets or ())
     dictionaries = discover_dictionaries(config)
@@ -227,6 +239,7 @@ def discover_setup_targets(
                 word_count=word_count,
                 status=best_status.value,
                 detail=detail,
+                enabled=enabled_targets is not None and target_id in enabled_targets,
             )
         )
     return SetupTargetDiscovery(tuple(rows), tuple(default_enabled))

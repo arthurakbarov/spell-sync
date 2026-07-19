@@ -283,7 +283,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         controller.begin_mutation()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.action_quit_app()
             await pilot.click("#btn-quit")
