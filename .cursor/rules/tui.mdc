@@ -1,0 +1,32 @@
+---
+description: Textual TUI patterns — workers, navigation, testing
+globs: spell_sync/tui/**/*.py,tests/tui/**/*.py
+alwaysApply: false
+---
+
+# TUI
+
+## Workers and loading
+
+- Filesystem and service calls run in Textual workers, not on the UI thread
+- Use existing load-generation / token pattern (`LoadTokenMixin`) — stale worker results are ignored
+- Do not misuse `call_from_thread` for mutation paths
+
+## Mutation policy
+
+- After operation lock or transaction start, do not cancel the worker — follow existing cancellation policy
+- Operation screens block close during active writes
+
+## UX requirements
+
+- Support keyboard and mouse navigation
+- Handle loading, empty, and controlled error states — no tracebacks in user-facing errors
+- Test at **80×24** minimum; also exercise wider sizes when layout-sensitive
+
+## Testing
+
+- Ordinary UI flows: `tests/tui/fake_service.py` — no real dictionaries
+- Safety integration: real core with synthetic fixtures (`tests/test_tui_mutation_safety.py`, `tests/test_tui_recovery_safety.py`)
+- Architecture guards: `tests/tui/test_architecture.py`
+
+Screen map: `@docs/TUI_IMPLEMENTATION.md`

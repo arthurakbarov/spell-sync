@@ -23,6 +23,7 @@ esac
 $PYTHON -m pip install -q ruff mypy pytest pytest-cov build wheel twine 'setuptools>=77'
 $PYTHON -m pip install -q -e .
 bash scripts/check-docs-style.sh
+$PYTHON scripts/check-agent-config.py
 $PYTHON -m ruff check spell_sync tests
 $PYTHON -m ruff format --check spell_sync tests
 $PYTHON -m mypy spell_sync

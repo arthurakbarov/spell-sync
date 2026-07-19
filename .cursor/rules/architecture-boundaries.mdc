@@ -1,0 +1,25 @@
+---
+description: Layer boundaries between CLI, TUI, application facade, and core mutation code
+globs: spell_sync/**/*.py,tests/**/*.py
+alwaysApply: false
+---
+
+# Architecture boundaries
+
+## Layering
+
+- CLI and TUI call `SpellSyncService` (`spell_sync/application/service.py`) — not core writers directly
+- Application layer orchestrates; it must not import Textual
+- Core owns mutation semantics: `sync_run`, `push_prepared`, `push_transaction`, `pull`, `project_setup`
+- TUI must not import dictionary writers, journal internals, snapshot writers, or config writers
+
+## Immutability and reports
+
+- Prepared preview objects remain frozen through confirmation and execution
+- `ReportScreen` displays results — it does not write history or mutate filesystem state
+- Do not add a second implementation of an existing execution path
+
+## Canonical references
+
+- `@docs/ARCHITECTURE.md` — module map, Pull/Push model
+- `@docs/TUI_IMPLEMENTATION.md` — controller, workers, screen routing

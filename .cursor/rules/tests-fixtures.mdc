@@ -1,0 +1,28 @@
+---
+description: Test fixtures, coverage policy, and privacy boundaries
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Tests and fixtures
+
+## Fixtures
+
+- Use temporary HOME and isolated state roots
+- Synthetic dictionaries only — never read or import a maintainer wordlist
+- No network calls in tests
+- Platform-specific behavior must state when simulated vs real
+
+## Coverage policy
+
+- `scripts/ci.sh` enforces **100% line** and **≥96% branch** coverage on `spell_sync/`
+- Prefer behavior and invariant tests over line-execution padding
+- Do not create `coverage_gaps` files or weaken safety suites
+- Preserve strict safety coverage: `test_transaction_safety`, `test_pull_safety`, `test_tui_mutation_safety`, `test_tui_recovery_safety`
+
+## Installed-wheel tests
+
+When validating packaging, install the built wheel in a clean venv with cwd outside the
+repository — see `tests/test_installed_workflow.py` and the `installed-wheel-smoke` skill.
+
+Deterministic fixtures; no secrets or absolute personal paths in committed test data.

@@ -1,0 +1,33 @@
+---
+description: Canonical product terminology for docs, CLI, and TUI copy
+globs: README.md,docs/**/*.md,spell_sync/cli.py,spell_sync/application/product_concepts.py,spell_sync/tui/**/*.py
+alwaysApply: false
+---
+
+# Product language
+
+Use central copy from `spell_sync/application/product_concepts.py` — do not paraphrase long strings inline.
+
+## Model
+
+- **Canonical personal wordlist** — personal spelling exceptions (names, technical terms, abbreviations, project words)
+- **Application custom dictionaries** — files Spell Sync reads and writes
+- **Built-in dictionaries** — not inspected, not modified
+
+## Operations
+
+- **Pull:** custom dictionaries → canonical wordlist (`W' = W ∪ C₁ ∪ … ∪ Cₙ`)
+- **Push:** canonical wordlist → custom dictionaries
+- Ordinary target: `Cᵢ' = W` (full wordlist)
+- Filtered target: `Cᵢ' = filterᵢ(W)` — e.g. `win-en`, `win-en-gb`, `win-ru`
+- Do not claim every target receives the entire wordlist
+
+## Redundancy
+
+Built-in dictionaries are not inspected. Redundant storage in custom dictionaries keeps the
+personal wordlist consistent across enabled applications. Do not promise equal spell-checker
+behavior across applications.
+
+## Command naming
+
+Use **Pull** and **Push** — not sync, apply, import, or merge in user-facing text.

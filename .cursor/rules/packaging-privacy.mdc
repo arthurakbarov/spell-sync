@@ -1,0 +1,25 @@
+---
+description: Wheel/sdist packaging, source export, and privacy boundaries
+globs: pyproject.toml,README.md,docs/MANUAL_TESTING.md,scripts/**/*
+alwaysApply: false
+---
+
+# Packaging and privacy
+
+## Artifacts
+
+- Build in clean `dist/` — wheel contains runtime modules, TCSS, bundled resources, metadata, license only
+- Wheel must not contain: tests, caches, logs, history, wordlist, config, journal, snapshots
+- Verify version consistency in `pyproject.toml`, `spell-sync version`, wheel METADATA, sdist PKG-INFO
+
+## Source handoff
+
+- Use `git archive` from the public repository root
+- Never zip or archive a parent workspace containing private repos or personal data
+
+## Publication
+
+- Package publication, tagging, and remote push only on explicit owner request
+- Pre-publication: run `privacy-export` skill checklist and full CI
+
+Manual testing reference: `@docs/MANUAL_TESTING.md`
