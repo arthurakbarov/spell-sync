@@ -23,7 +23,15 @@ description: >-
 
 1. `@docs/ARCHITECTURE.md`
 2. `@docs/RECOVERY.md`
-3. Relevant module: `push_prepared.py`, `push_transaction.py`, `push_journal.py`, `operation_lock.py`, `project_setup/target_settings.py`
+3. Relevant modules:
+
+```text agent-config-paths
+spell_sync/push_prepared.py
+spell_sync/push_transaction.py
+spell_sync/push_journal.py
+spell_sync/operation_lock.py
+spell_sync/project_setup/target_settings.py
+```
 
 ## Checklist
 

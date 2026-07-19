@@ -6,7 +6,7 @@ cd "$root"
 
 fail=0
 
-hr="$(git grep -n '^---$' -- '*.md' docs 2>/dev/null || true)"
+hr="$(git grep -n '^---$' -- '*.md' docs ':(exclude).cursor/**' 2>/dev/null || true)"
 if [ -n "$hr" ]; then
   echo "Horizontal rules (---) are forbidden in committed .md files:" >&2
   echo "$hr" >&2

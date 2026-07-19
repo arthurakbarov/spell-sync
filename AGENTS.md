@@ -34,8 +34,9 @@ Central product copy lives in `spell_sync/application/product_concepts.py`.
 
 ## CLI commands (11)
 
-`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`,
-`ui`, `version`
+```text agent-config-cli-commands
+`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `ui`, `version`
+```
 
 No-args on a TTY launches the TUI when a project is ready. See `spell_sync/cli.py`.
 
