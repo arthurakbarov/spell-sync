@@ -68,9 +68,9 @@ This skill does not run full CI.
 
 ## Finalize workspace snapshot
 
-When this task changed workspace state in any repository:
+Before the final user report on modifying tasks:
 
-1. Compare final Git metadata to the baseline captured at task start.
-2. Follow skill `create-code-snapshot` in the private maintainer repository (`spell-sync-dev`).
-3. Do not finish the success report until `$HOME/code.zip` is validated when recreation was required.
-4. Include the **Workspace snapshot** section in the final report.
+1. Remove stale non-canonical archives (script default cleanup).
+2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
+3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
+4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.

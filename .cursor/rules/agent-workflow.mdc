@@ -14,7 +14,7 @@ alwaysApply: true
 7. Update tests, docs, contracts, and ADRs together with code changes.
 8. Do not claim pass without command evidence.
 9. Capture baseline Git state for all three workspace repositories at task start.
-10. After modifying tasks, finalize the owner-controlled workspace snapshot before the final report.
+10. Before the final user report on modifying tasks, always create `$HOME/code.zip` via skill `create-code-snapshot` (`--force`, then `--check`).
 11. Do not advance to the next phase without owner approval (`advance-current-phase`).
 12. Do not push, tag, release, or publish without explicit owner request.
 

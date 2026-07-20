@@ -109,6 +109,8 @@ FOCUSED_SKILL_FORBIDDEN_CI = re.compile(
     r"(?<!\bnot )(?<!\bwithout )scripts/ci\.sh",
     re.I,
 )
+SNAPSHOT_FORCE_REQUIRED = re.compile(r"--force")
+SNAPSHOT_REPORT_FOOTER = re.compile(r"CODE_ARCHIVE")
 
 SNAPSHOT_FINALIZATION_MARKER = "Finalize workspace snapshot"
 
@@ -331,10 +333,47 @@ def check_modifying_skill_validation(root: Path) -> list[str]:
     return errors
 
 
+def check_snapshot_finalization_skills(root: Path) -> list[str]:
+    errors: list[str] = []
+    skills = root / ".cursor" / "skills"
+    for skill_name in MODIFYING_SKILLS:
+        skill_file = skills / skill_name / "SKILL.md"
+        if not skill_file.is_file():
+            continue
+        text = skill_file.read_text(encoding="utf-8")
+        rel = skill_file.relative_to(root)
+        if SNAPSHOT_FINALIZATION_MARKER not in text:
+            errors.append(
+                f"[SNAPSHOT-001] {rel}: modifying skill missing '{SNAPSHOT_FINALIZATION_MARKER}' section"
+            )
+            continue
+        if not SNAPSHOT_FORCE_REQUIRED.search(text):
+            errors.append(
+                f"[SNAPSHOT-002] {rel}: snapshot finalization must require create-code-snapshot --force"
+            )
+        if not SNAPSHOT_REPORT_FOOTER.search(text):
+            errors.append(
+                f"[SNAPSHOT-003] {rel}: snapshot finalization must require CODE_ARCHIVE report footer"
+            )
+        if "when recreation was required" in text.lower():
+            errors.append(
+                f"[SNAPSHOT-004] {rel}: do not gate snapshot on optional recreation; always before report"
+            )
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
+    if agent_dev.is_file():
+        text = agent_dev.read_text(encoding="utf-8")
+        if "Workspace archive (mandatory before report)" not in text:
+            errors.append(
+                "[SNAPSHOT-005] docs/AGENT_DEVELOPMENT.md missing mandatory workspace archive section"
+            )
+    return errors
+
+
 def validate_agent_config(root: Path) -> list[str]:
     errors: list[str] = []
     errors.extend(check_test_efficiency_contract(root))
     errors.extend(check_modifying_skill_validation(root))
+    errors.extend(check_snapshot_finalization_skills(root))
     cursor = root / ".cursor"
     rules = cursor / "rules"
     skills = cursor / "skills"

@@ -187,31 +187,42 @@ When the task changed workspace state in any repository, section **14. Workspace
 
 - result: success
 - created: true
-- path: `<home>/code.zip`
+- verified: true
+- path: `$HOME/code.zip`
 - SHA-256: `...`
 - size: `... bytes`
 - archive file count: `...`
+- stale archives removed: `...`
 - repositories included:
   - spell-sync
   - spell-sync-dev
   - spell-words
-- previous archive replaced: yes
+- previous canonical archive replaced: yes
 ```
 
-When workspace state did not change:
+When the task was read-only:
 
 ```markdown
 ## 14. Workspace snapshot
 
 - result: skipped
 - created: false
-- reason: workspace unchanged
-- existing path: `<home>/code.zip`
+- reason: read-only task
+- existing path: `$HOME/code.zip`
 ```
 
-Modifying tasks must finalize the owner-controlled workspace snapshot via the private maintainer
-skill `create-code-snapshot` before the final report. Full owner-controlled workspace snapshot for
-offline inspection and preservation of the exact completed task state.
+## Workspace archive (mandatory before report)
+
+Every **modifying task** must finalize the owner-controlled workspace snapshot in `$HOME`
+**before** the final user report:
+
+1. Remove stale non-canonical archives (script default cleanup).
+2. Create fresh `$HOME/code.zip` with `--force` after commits and validation.
+3. Verify with `--check`.
+4. End the report with `CODE_ARCHIVE` and `SHA256`.
+
+Skill: `create-code-snapshot` in the private maintainer repository (`spell-sync-dev`).
+Canonical paths only: `$HOME/code.zip` and `$HOME/code.zip.sha256`. No timestamped alternates.
 
 Modifying-task reports end with:
 

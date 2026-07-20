@@ -26,4 +26,10 @@ alwaysApply: true
 - Run focused tests for changed scope, then full `scripts/ci.sh`
 - Do not stop on red tests; do not mask failures with meaningless coverage tests
 
+## Workspace snapshot
+
+Before the final user report on modifying tasks: remove stale archives, create `$HOME/code.zip`
+with `--force`, verify with `--check`, end report with `CODE_ARCHIVE` and `SHA256`. Skill:
+`create-code-snapshot` in spell-sync-dev. Read-only tasks skip recreation.
+
 Recovery protocol details: `@docs/RECOVERY.md`
