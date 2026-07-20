@@ -37,6 +37,7 @@ python3.11 -m ruff check spell_sync tests
 python3.11 -m ruff format --check spell_sync tests
 python3.11 -m mypy spell_sync
 python3.11 scripts/check-agent-config.py
+python3.11 scripts/check-docs-contract.py
 ```
 
 4. Run full CI:
@@ -45,16 +46,30 @@ python3.11 scripts/check-agent-config.py
 scripts/ci.sh
 ```
 
+Read `CI_LOG` and `CI_SUMMARY` from the printed paths. On failure, use `CI_FAILED_ID` as the
+primary gate identifier. Do not ask the owner to diagnose failures.
+
 ## What ci.sh enforces
 
-- `scripts/check-docs-style.sh` — no horizontal rules; Python 3.11+ in docs
-- ruff check + format on `spell_sync` and `tests`
-- mypy on `spell_sync`
-- pytest with **100% line** and **≥96% branch** coverage on `spell_sync/`
-- wheel build + `twine check`
-- wheel install smoke (`version`, `--help`)
-- `spell-sync lint --strict` smoke
-- `tests/test_gui_smoke.py`
+Via `scripts/ci_runner.py`:
+
+| Check ID | Gate |
+|----------|------|
+| `bootstrap.python` | Python 3.11+ |
+| `deps.install` / `deps.editable` | Tooling + editable install |
+| `docs.style` | Markdown style |
+| `docs.contract` | Documentation contracts |
+| `agent.config` | Cursor agent configuration |
+| `targets.capabilities` | Target registry |
+| `ruff.check` / `ruff.format` | Lint and format |
+| `mypy` | Types on `spell_sync/` |
+| `tests.pytest` | Full pytest suite |
+| `coverage.policy` | 100% lines, ≥96% branches on `spell_sync/` |
+| `packaging.build` | wheel + sdist build |
+| `packaging.twine` | Artifact validation |
+| `packaging.wheel-smoke` | Installed wheel commands |
+| `smoke.init` / `smoke.lint` | Temporary project smoke |
+| `smoke.tui` | Headless CLI scenarios |
 
 ## Common fixes
 
@@ -64,6 +79,7 @@ scripts/ci.sh
 | mypy | Fix types in `spell_sync/` |
 | Docs style | Remove `---` horizontal rules; ensure Python 3.11+ in DEVELOPMENT/CONTRIBUTING |
 | Agent config | Fix `.cursor/` frontmatter or stale facts flagged by `check-agent-config.py` |
+| Docs contract | Fix stale API names or phase claims flagged by `check-docs-contract.py` |
 
 ## Stop conditions
 
@@ -73,7 +89,9 @@ scripts/ci.sh
 
 ## Final report
 
-- Focused tests run and results
+- Focused commands run and results
 - Static check results
 - `scripts/ci.sh` exit code
-- Remaining failures with file/line if any
+- `CI_SUMMARY` and `CI_LOG` paths
+- `CI_FAILED_ID` when CI failed
+- Remaining failures with stable test/check ID if any

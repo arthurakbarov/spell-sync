@@ -71,7 +71,8 @@ class TestApplicationRequests(unittest.TestCase):
         ):
             cls = getattr(requests_mod, name)
             self.assertTrue(is_dataclass(cls))
-            self.assertTrue(getattr(cls, "__dataclass_params__").frozen, msg=name)
+            frozen = getattr(cls, "__dataclass_params__").frozen
+            self.assertTrue(frozen, msg=f"[ARCH-REQ-001] {name} must be frozen")
 
     def test_requests_do_not_import_cli_or_textual(self) -> None:
         banned = ("cli_options", "cli_request_adapter", "argparse", "textual")
@@ -82,11 +83,11 @@ class TestApplicationRequests(unittest.TestCase):
                 for alias in node.names:
                     for token in banned:
                         if token in alias.name:
-                            self.fail(f"requests imports {alias.name}")
+                            self.fail(f"[ARCH-REQ-002] requests imports {alias.name}")
             if isinstance(node, ast.ImportFrom) and node.module:
                 for token in banned:
                     if token in node.module:
-                        self.fail(f"requests imports from {node.module}")
+                        self.fail(f"[ARCH-REQ-002] requests imports from {node.module}")
 
     def test_application_layer_does_not_import_cli_options(self) -> None:
         import spell_sync.application as application_pkg
@@ -98,14 +99,14 @@ class TestApplicationRequests(unittest.TestCase):
             for hit in _module_imports(
                 module_info.name, ("cli_options", "cli_request_adapter", "argparse")
             ):
-                self.fail(hit)
+                self.fail(f"[ARCH-REQ-003] {hit}")
 
     def test_tui_does_not_import_cli_options(self) -> None:
         import spell_sync.tui as tui_pkg
 
         for module_info in pkgutil.walk_packages(tui_pkg.__path__, tui_pkg.__name__ + "."):
             for hit in _module_imports(module_info.name, ("cli_options", "cli_request_adapter")):
-                self.fail(hit)
+                self.fail(f"[ARCH-REQ-003] {hit}")
 
     def test_cli_adapter_project_ref_semantics(self) -> None:
         absent = project_ref(CliOptions())
@@ -144,21 +145,39 @@ class TestApplicationRequests(unittest.TestCase):
         )
 
     def test_cli_commands_have_request_mappers_or_are_presentation_only(self) -> None:
-        mapped = {
+        application_ops = {
             "status",
             "doctor",
             "pull",
             "push",
             "recover",
             "support-report",
-            "ui",
+            "init",
+            "plan",
         }
-        presentation_only = {"version", "init", "plan", "config-check", "lint"}
-        self.assertEqual(set(COMMANDS), mapped | presentation_only)
+        cli_utilities = {"config-check", "lint"}
+        adapters = {"ui"}
+        presentation_only = {"version"}
+        self.assertEqual(
+            set(COMMANDS),
+            application_ops | cli_utilities | adapters | presentation_only,
+            msg="[ARCH-REQ-005] every CLI command must be classified",
+        )
+        self.assertNotIn(
+            "init",
+            presentation_only,
+            msg="[ARCH-REQ-006] init is an application operation",
+        )
+        self.assertNotIn(
+            "plan",
+            presentation_only,
+            msg="[ARCH-REQ-007] plan is an application operation",
+        )
 
     def test_requests_module_has_no_resolution_helpers(self) -> None:
-        self.assertFalse(hasattr(requests_mod, "effective_push_strict"))
-        self.assertFalse(hasattr(requests_mod, "resolve_project_wordlist"))
+        msg = "[ARCH-REQ-004] resolution helpers belong in project_resolution"
+        self.assertFalse(hasattr(requests_mod, "effective_push_strict"), msg=msg)
+        self.assertFalse(hasattr(requests_mod, "resolve_project_wordlist"), msg=msg)
 
     def test_remaining_cli_request_mappers(self) -> None:
         opts = CliOptions(wordlist="/tmp/w.txt", fix=True, strict=True)

@@ -1,0 +1,14 @@
+---
+description: Agent-first repository workflow (Cursor Agent executes checks and reads logs)
+alwaysApply: true
+---
+
+# Agent workflow
+
+- The Cursor Agent runs `scripts/ci.sh`, reads `CI_LOG` / `CI_SUMMARY`, and fixes failures without asking the owner to grep logs.
+- Update `docs/AGENT_DEVELOPMENT.md` when process changes; keep `AGENTS.md` as the short entry point.
+- Run focused pytest for the changed scope before full CI.
+- Do not commit `.artifacts/`, wheels, or local project files (`wordlist.txt`, `spell-sync.toml`).
+- Do not claim pass without running the relevant command; include exact command results in reports.
+
+SSOT: `@docs/AGENT_DEVELOPMENT.md`

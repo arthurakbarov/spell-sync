@@ -15,6 +15,7 @@ build/
 .spell-sync.lock
 .spell-sync.journal.json
 .spell-sync.txn/
+.artifacts/
 .DS_Store
 
 # Local project files (created by spell-sync init — never commit)

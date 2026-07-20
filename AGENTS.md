@@ -4,6 +4,10 @@ Public repository for Spell Sync: a CLI and TUI tool that keeps one **canonical 
 wordlist** synchronized with **application custom dictionaries**. Built-in application
 dictionaries are never inspected or modified.
 
+Development is **agent-first**: the Cursor Agent implements changes, runs tests, interprets
+CI logs, and updates docs/contracts. The repository owner defines intent, approves scope,
+and decides release policy. See `docs/AGENT_DEVELOPMENT.md`.
+
 ## Architecture map
 
 ```text
@@ -58,11 +62,16 @@ python3.11 -m mypy spell_sync
 python3.11 -m pytest <focused tests> -q
 scripts/ci.sh
 python3.11 scripts/check-agent-config.py
+python3.11 scripts/check-docs-contract.py
 ```
 
-`scripts/ci.sh` is the single CI entry point: docs style, ruff, mypy, pytest with **100%
-line** and **≥96% branch** coverage on `spell_sync/`, wheel build, twine check, lint smoke,
-headless command scenarios.
+`scripts/ci.sh` is the single CI entry point. On completion it prints `CI_RESULT`, `CI_EXIT`,
+`CI_SUMMARY`, and `CI_LOG` (full log under `.artifacts/ci/`). The Cursor Agent reads those
+paths; the owner is not expected to tail logs manually. Architecture and documentation
+contracts are mandatory before declaring a task complete.
+
+Docs style, docs contract, ruff, mypy, pytest with **100% line** and **≥96% branch**
+coverage on `spell_sync/`, wheel build, twine check, lint smoke, headless command scenarios.
 
 Requires **Python 3.11+** (`pyproject.toml`).
 
