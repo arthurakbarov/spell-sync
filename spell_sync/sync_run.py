@@ -27,6 +27,7 @@ from .push_setup import (
 from .read_outcome import ReadStatus
 from .sync_context import RuntimeContext, as_dictionary_list, runtime_context_for
 from .sync_models import DictionaryDiff, PushResult
+from .validated_runtime import ValidatedRuntime
 from .words import WordSet, clean_words, merge_case_duplicates, sort_words
 
 # Re-export public result types for existing imports.
@@ -313,6 +314,17 @@ class SyncRun:
         return result
 
 
-def sync_run_for(wordlist: Path, *, strict_push: bool = False) -> SyncRun:
+def sync_run_for(
+    wordlist: Path,
+    *,
+    strict_push: bool = False,
+    validated: ValidatedRuntime | None = None,
+) -> SyncRun:
     """Build SyncRun from an effective wordlist path."""
-    return SyncRun(context=runtime_context_for(wordlist, strict_push=strict_push))
+    return SyncRun(
+        context=runtime_context_for(
+            wordlist,
+            strict_push=strict_push,
+            validated=validated,
+        )
+    )

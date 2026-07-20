@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from .dictionaries import Dictionary, discover_dictionaries
 from .paths import wordlist_path
 from .project import ProjectContext
-from .settings import bind_active_settings, load_config_result
+from .settings import load_config_result
+
+if TYPE_CHECKING:
+    from .validated_runtime import ValidatedRuntime
 
 RuntimeConfig = dict[str, dict[str, object]]
 
@@ -63,18 +66,19 @@ class RuntimeContext(ProjectContext):
         )
 
 
-def runtime_context_for(wordlist: Path, *, strict_push: bool = False) -> RuntimeContext:
+def runtime_context_for(
+    wordlist: Path,
+    *,
+    strict_push: bool = False,
+    validated: ValidatedRuntime | None = None,
+) -> RuntimeContext:
     """Build context from effective wordlist; config is adjacent to wordlist."""
-    from .command_helpers import active_validated_runtime
-
-    validated = active_validated_runtime()
     if validated is not None:
         return validated.context
     wl = wordlist
     project_ctx = ProjectContext.build(wl)
     result = load_config_result(wordlist=wl, reload=True)
     config: RuntimeConfig = dict(result.config) if result.config is not None else {}
-    bind_active_settings(config)
     dicts = tuple(discover_dictionaries(config))
     return RuntimeContext(
         wordlist=wl,

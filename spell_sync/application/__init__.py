@@ -50,6 +50,7 @@ __all__ = [
     "RecoveryOutcome",
     "RecoveryPreview",
     "RecoveryStatus",
+    "RuntimeResolver",
     "SpellSyncService",
     "StatusDetailSnapshot",
     "StatusSnapshot",
@@ -64,4 +65,8 @@ def __getattr__(name: str):
         from .service import SpellSyncService
 
         return SpellSyncService
+    if name == "RuntimeResolver":
+        from .runtime_resolver import RuntimeResolver
+
+        return RuntimeResolver
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

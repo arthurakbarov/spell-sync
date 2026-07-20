@@ -31,24 +31,23 @@ TUI (tui/controller.py, screens/)
   → workers → service methods
 
 Settings (settings.py)
-  → ContextVar _active_settings, module cache
-  → bind_active_settings() from sync_context, validated_runtime, dictionaries
+  → module cache (load_config_result)
+  → explicit settings dict passed to discover_dictionaries / config flags
 
-Validated runtime (command_helpers.py)
-  → ContextVar _active_validated
-  → mutating_command_scope sets/resets
+Validated runtime (command_helpers.py, application/runtime_resolver.py)
+  → RuntimeResolver.bound optional reuse
+  → mutating_command_scope_for(bound=...) without ContextVar
 ```
 
 ## Global state inventory
 
 | Location | Symbol | Kind |
 |----------|--------|------|
-| `settings.py:125-130` | `_settings_cache`, `_settings_cache_key`, `_active_settings` | module cache + ContextVar |
-| `command_helpers.py:26-29` | `_active_validated` | ContextVar |
+| `settings.py` | `_settings_cache`, `_settings_cache_key` | module cache |
 | `technical_logging.py:14-16` | `_CONFIGURED`, `_HANDLER`, `_CONFIGURED_LOG` | module logging state |
-| `dictionaries.py:305` | `bind_active_settings()` call | implicit settings scope |
 
-No module-level mutable state in `runtime.py`, `sync_context.py` (builders only),
+No production `ContextVar` for settings or validated runtime (removed in Phase 3).
+No module-level mutable state in `runtime_resolver.py`, `sync_context.py` (builders only),
 `validated_runtime.py` (frozen dataclass factory).
 
 ## Service responsibility inventory
@@ -113,7 +112,7 @@ blocking, and privacy rules.
 
 ## Current phase
 
-Phase 2E complete. Phase 3 is next and has not started.
+Phase 3 implementation complete — awaiting owner approval.
 
 [architecture-status:start]
 current: phase-3
@@ -123,7 +122,7 @@ phase-2b: complete
 phase-2c: complete
 phase-2d: complete
 phase-2e: complete
-phase-3: not-started
+phase-3: awaiting-approval
 phase-4: not-started
 phase-5: not-started
 [architecture-status:end]

@@ -253,7 +253,9 @@ def patch_recover_service(**methods: object):
 
 @contextmanager
 def patch_isolated_sync_run(run: SyncRun) -> Iterator[None]:
-    with patch("spell_sync.application.service.sync_run_for", return_value=run):
+    from spell_sync.application.runtime_resolver import RuntimeResolver
+
+    with patch.object(RuntimeResolver, "sync_run", return_value=run):
         yield
 
 

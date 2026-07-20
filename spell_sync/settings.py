@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import tomllib
-from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -124,10 +123,6 @@ def config_paths(*, wordlist: Path | None = None) -> list[Path]:
 
 _settings_cache: ConfigLoadResult | None = None
 _settings_cache_key: tuple[str, ...] | None = None
-_active_settings: ContextVar[Dict[str, Dict[str, Any]] | None] = ContextVar(
-    "_active_settings",
-    default=None,
-)
 
 
 def clear_settings_cache() -> None:
@@ -135,12 +130,6 @@ def clear_settings_cache() -> None:
     global _settings_cache, _settings_cache_key
     _settings_cache = None
     _settings_cache_key = None
-    _active_settings.set(None)
-
-
-def bind_active_settings(config: Dict[str, Dict[str, Any]]) -> None:
-    """Use runtime config for dictionary flags and hook settings in this process."""
-    _active_settings.set(config)
 
 
 def _load_config_uncached(*, wordlist: Path | None = None) -> ConfigLoadResult:
@@ -214,9 +203,6 @@ def load_user_settings_with_issues(
     wordlist: Path | None = None,
     reload: bool = False,
 ) -> tuple[Dict[str, Dict[str, Any]], list[str]]:
-    scoped = _active_settings.get()
-    if scoped is not None and wordlist is None and not reload:
-        return scoped, []
     result = load_config_result(wordlist=wordlist, reload=reload)
     issues = [d.message for d in result.diagnostics]
     if result.config is None:
@@ -229,9 +215,6 @@ def load_user_settings(
     wordlist: Path | None = None,
     reload: bool = False,
 ) -> Dict[str, Dict[str, Any]]:
-    scoped = _active_settings.get()
-    if scoped is not None and wordlist is None and not reload:
-        return scoped
     settings, _issues = load_user_settings_with_issues(wordlist=wordlist, reload=reload)
     return settings
 
@@ -285,17 +268,41 @@ def dictionary_flag(
     return _section_bool(settings, "dictionaries", key, default)
 
 
-def push_int(key: str, default: int) -> int:
-    return _section_int(load_user_settings(), "push", key, default)
+def push_int(
+    key: str,
+    default: int,
+    *,
+    settings: Dict[str, Dict[str, Any]] | None = None,
+) -> int:
+    cfg = settings if settings is not None else load_user_settings()
+    return _section_int(cfg, "push", key, default)
 
 
-def push_flag(key: str, default: bool) -> bool:
-    return _section_bool(load_user_settings(), "push", key, default)
+def push_flag(
+    key: str,
+    default: bool,
+    *,
+    settings: Dict[str, Dict[str, Any]] | None = None,
+) -> bool:
+    cfg = settings if settings is not None else load_user_settings()
+    return _section_bool(cfg, "push", key, default)
 
 
-def io_int(key: str, default: int) -> int:
-    return _section_int(load_user_settings(), "io", key, default)
+def io_int(
+    key: str,
+    default: int,
+    *,
+    settings: Dict[str, Dict[str, Any]] | None = None,
+) -> int:
+    cfg = settings if settings is not None else load_user_settings()
+    return _section_int(cfg, "io", key, default)
 
 
-def neovim_flag(key: str, default: bool) -> bool:
-    return _section_bool(load_user_settings(), "neovim", key, default)
+def neovim_flag(
+    key: str,
+    default: bool,
+    *,
+    settings: Dict[str, Dict[str, Any]] | None = None,
+) -> bool:
+    cfg = settings if settings is not None else load_user_settings()
+    return _section_bool(cfg, "neovim", key, default)

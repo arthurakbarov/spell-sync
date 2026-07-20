@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 from contextlib import contextmanager
-from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator
 
@@ -27,14 +26,7 @@ from .settings import config_blocks_mutating
 from .sync_run import DictionaryDiff, PushResult, SyncRun, sync_run_for  # noqa: F401
 from .validated_runtime import ValidatedRuntime, build_validated_runtime
 
-_active_validated: ContextVar[ValidatedRuntime | None] = ContextVar(
-    "_active_validated",
-    default=None,
-)
-
-
-def active_validated_runtime() -> ValidatedRuntime | None:
-    return _active_validated.get()
+_mutating_scope_validated: ValidatedRuntime | None = None
 
 
 def invalid_config_exit_from_result(
@@ -315,11 +307,15 @@ def mutating_command_scope_for(
     allow_unfinished_journal: bool = False,
     strict_push: bool = False,
     json_output: bool = False,
+    bound: ValidatedRuntime | None = None,
 ) -> Iterator[ValidatedRuntime | int]:
     """Acquire lock, then load config and journal once for mutating commands."""
-    existing = active_validated_runtime()
-    if existing is not None:
-        yield existing
+    global _mutating_scope_validated
+    if bound is not None:
+        yield bound
+        return
+    if _mutating_scope_validated is not None:
+        yield _mutating_scope_validated
         return
     with operation_lock_scope_for(wordlist, command, json_output=json_output) as lock_exit:
         if lock_exit is not None:
@@ -345,11 +341,11 @@ def mutating_command_scope_for(
         if journal_exit is not None:
             yield journal_exit
             return
-        token = _active_validated.set(validated)
+        _mutating_scope_validated = validated
         try:
             yield validated
         finally:
-            _active_validated.reset(token)
+            _mutating_scope_validated = None
 
 
 @contextmanager

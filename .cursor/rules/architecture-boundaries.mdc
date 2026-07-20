@@ -13,7 +13,7 @@ alwaysApply: false
 - CLI and TUI call `SpellSyncService` (`spell_sync/application/service.py`) — not core writers directly
 - Application layer orchestrates; it must not import `CliOptions`, `argparse`, `cli_request_adapter`, or Textual
 - `spell_sync/application/requests.py` holds UI-neutral frozen request dataclasses only
-- `spell_sync/application/project_resolution.py` resolves requests to paths/settings (until Phase 3)
+- `spell_sync/application/project_resolution.py` resolves requests to paths and explicit runtime config
 - Core and `project_setup` must not import `spell_sync.application`
 - TUI must not import dictionary writers, journal internals, snapshot writers, or config writers
 

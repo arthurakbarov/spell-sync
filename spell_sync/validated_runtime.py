@@ -8,7 +8,7 @@ from pathlib import Path
 from .dictionaries import discover_dictionaries
 from .project import ProjectContext
 from .push_journal import JournalLoadResult, load_journal_result
-from .settings import ConfigLoadResult, bind_active_settings, load_config_result
+from .settings import ConfigLoadResult, load_config_result
 from .sync_context import RuntimeConfig, RuntimeContext
 
 
@@ -28,7 +28,6 @@ def build_validated_runtime(
     project = ProjectContext.build(wordlist)
     config_result = load_config_result(wordlist=wordlist, reload=True)
     config: RuntimeConfig = dict(config_result.config) if config_result.config is not None else {}
-    bind_active_settings(config)
     dicts = tuple(discover_dictionaries(config))
     context = RuntimeContext(
         wordlist=wordlist,

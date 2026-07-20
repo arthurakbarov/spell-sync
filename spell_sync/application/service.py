@@ -59,8 +59,7 @@ from ..push_journal import (
 )
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
 from ..sync_models import DictionaryDiff, PushResult
-from ..sync_run import SyncRun, sync_run_for
-from ..validated_runtime import build_validated_runtime
+from ..sync_run import SyncRun
 from .builders import (
     build_dashboard_state,
     build_doctor_snapshot,
@@ -95,6 +94,7 @@ from .reports import (
     StatusDetailSnapshot,
     StatusSnapshot,
 )
+from .runtime_resolver import RuntimeResolver
 
 _HISTORY_SAVE_WARNING = "Operation completed, but its history record could not be saved."
 
@@ -122,9 +122,11 @@ class SpellSyncService:
         state_paths: AppStatePaths | None = None,
         history_store: OperationHistoryStore | None = None,
         enable_file_logging: bool = True,
+        runtime_resolver: RuntimeResolver | None = None,
     ) -> None:
         self._state_paths = state_paths or resolve_app_state_paths()
         self._history_store = history_store or OperationHistoryStore(self._state_paths)
+        self._runtime = runtime_resolver or RuntimeResolver()
         if enable_file_logging:
             setup = configure_file_logging(self._state_paths)
             if not setup.ok:
@@ -200,7 +202,7 @@ class SpellSyncService:
         return replace(report, warnings=warnings)
 
     def load_status(self, request: StatusRequest) -> StatusSnapshot:
-        run = sync_run_for(resolve_project_wordlist(request.project))
+        run = self._runtime.sync_run(request.project)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return StatusSnapshot(
@@ -221,12 +223,12 @@ class SpellSyncService:
         )
 
     def load_status_detail(self, request: StatusRequest) -> StatusDetailSnapshot:
-        run = sync_run_for(resolve_project_wordlist(request.project))
+        run = self._runtime.sync_run(request.project)
         return build_status_detail_snapshot(run)
 
     def load_dashboard(self, request: StatusRequest) -> DashboardState:
         wordlist = resolve_project_wordlist(request.project)
-        validated = build_validated_runtime(wordlist)
+        validated = self._runtime.validated(request.project)
         snapshot = self.load_status(request)
         lock_info = read_active_operation_lock(wordlist)
         last_operation_summary = None
@@ -244,7 +246,7 @@ class SpellSyncService:
 
     def load_push_preview(self, request: PushRequest) -> PushPreview:
         strict = effective_push_strict(request)
-        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
+        run = self._runtime.sync_run(request.project, strict_push=strict)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return build_push_preview(None, wordlist_error=wordlist_error)
@@ -255,7 +257,7 @@ class SpellSyncService:
 
     def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
         try:
-            run = sync_run_for(resolve_project_wordlist(request.project))
+            run = self._runtime.sync_run(request.project)
             report = build_doctor_report(run)
             return build_doctor_snapshot(report)
         except Exception:
@@ -266,14 +268,14 @@ class SpellSyncService:
             )
 
     def load_doctor_report(self, request: DoctorRequest) -> DoctorReport:
-        run = sync_run_for(resolve_project_wordlist(request.project))
+        run = self._runtime.sync_run(request.project)
         return build_doctor_report(run)
 
     def load_doctor_targets(self, request: DoctorRequest) -> DoctorTargetsSnapshot:
         from ..dictionaries import DictionaryFormat
         from ..read_outcome import dictionary_read_result
 
-        run = sync_run_for(resolve_project_wordlist(request.project))
+        run = self._runtime.sync_run(request.project)
         targets: list[DoctorTargetView] = []
         for dictionary in run.dictionaries:
             status = dictionary_read_result(dictionary).status
@@ -297,7 +299,7 @@ class SpellSyncService:
 
     def load_push_removals(self, request: PushRequest) -> tuple[DictionaryDiff, ...]:
         strict = effective_push_strict(request)
-        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
+        run = self._runtime.sync_run(request.project, strict_push=strict)
         return tuple(diff for diff in run.status_diffs(verbose=True) if diff.to_remove > 0)
 
     def load_push_plan(
@@ -307,7 +309,7 @@ class SpellSyncService:
         verbose: bool = False,
     ) -> tuple[PushPreview, tuple[DictionaryDiff, ...], PushResult | ExitCode]:
         strict = effective_push_strict(request)
-        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
+        run = self._runtime.sync_run(request.project, strict_push=strict)
         preview = self.load_push_preview(request)
         diffs = tuple(run.status_diffs(verbose=verbose))
         if not preview.is_executable or preview.prepared is None:
@@ -333,6 +335,7 @@ class SpellSyncService:
             resolve_project_wordlist(request.project),
             "push",
             strict_push=strict,
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 return PushExecution(
@@ -359,8 +362,7 @@ class SpellSyncService:
             )
 
     def prepare_pull(self, request: PullRequest) -> PullPreview:
-        wordlist = resolve_project_wordlist(request.project)
-        run = sync_run_for(wordlist)
+        run = self._runtime.sync_run(request.project)
         if request.add_from is not None:
             return build_pull_add_from_preview(run, request.add_from)
         return build_pull_preview(run)
@@ -395,6 +397,7 @@ class SpellSyncService:
         with command_helpers.mutating_command_scope_for(
             resolve_project_wordlist(request.project),
             "pull",
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -708,6 +711,7 @@ class SpellSyncService:
             resolve_project_wordlist(request.project),
             "push",
             strict_push=strict,
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -935,8 +939,10 @@ class SpellSyncService:
         )
 
     def inspect_recovery(self, request: RecoveryRequest) -> RecoveryPreview:
-        wordlist = resolve_project_wordlist(request.project)
-        validated = build_validated_runtime(wordlist, validate_journal_wordlist=True)
+        validated = self._runtime.validated(
+            request.project,
+            validate_journal_wordlist=True,
+        )
         return build_recovery_preview(validated)
 
     def execute_recovery(
@@ -971,6 +977,7 @@ class SpellSyncService:
             resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -1194,6 +1201,7 @@ class SpellSyncService:
             resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 return RecoveryExecution(
@@ -1261,6 +1269,7 @@ class SpellSyncService:
             resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
+            bound=self._runtime.bound,
         ) as scope:
             if isinstance(scope, int):
                 return RecoveryExecution(
@@ -1354,7 +1363,7 @@ class SpellSyncService:
         request: PrepareTargetSettingsUpdateRequest,
     ) -> PreparedTargetSettingsUpdate:
         wordlist = resolve_project_wordlist(request.project)
-        validated = build_validated_runtime(wordlist)
+        validated = self._runtime.validated(request.project)
         pending_recovery = validated.journal_result.status not in (
             JournalLoadStatus.ABSENT,
             JournalLoadStatus.VALID_COMPLETED,

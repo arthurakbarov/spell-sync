@@ -82,6 +82,7 @@ BANNED_WORKFLOW_TERMS = [
     (re.compile(r"\barchive handoff\b", re.I), "archive handoff"),
 ]
 
+
 def _parse_frontmatter(text: str) -> dict[str, str]:
     if not text.startswith("---"):
         return {}

@@ -281,7 +281,9 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
         )
 
     awaiting_non_current = [
-        key for key, value in statuses.items() if key != "current" and value == "awaiting-approval"
+        key
+        for key, value in statuses.items()
+        if key != "current" and key != current and value == "awaiting-approval"
     ]
     current_awaiting = bool(current and statuses.get(current) == "awaiting-approval")
     if len(awaiting_non_current) > 1 or (awaiting_non_current and current_awaiting):

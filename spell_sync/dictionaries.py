@@ -54,7 +54,7 @@ from .paths import (
     sublime_packages_dir,
     vivaldi_dict_paths,
 )
-from .settings import bind_active_settings
+from .settings import load_user_settings
 from .words import WordSet, subset_english, subset_russian
 
 SubsetFn = Callable[[WordSet], WordSet]
@@ -275,20 +275,38 @@ def _discover_libreoffice() -> List[Dictionary]:
     ]
 
 
-def _optional_dictionary_sources() -> tuple[DictionarySource, ...]:
+def _optional_dictionary_sources(
+    settings: dict[str, dict[str, object]],
+) -> tuple[DictionarySource, ...]:
     """Build optional sources at call time so tests can patch enable_* helpers."""
     return (
-        DictionarySource("editors", enable_editors, _discover_editors),
-        DictionarySource("chrome", enable_chrome, _discover_chrome),
-        DictionarySource("edge", enable_edge, _discover_edge),
-        DictionarySource("brave", enable_brave, _discover_brave),
-        DictionarySource("vivaldi", enable_vivaldi, _discover_vivaldi),
-        DictionarySource("firefox", enable_firefox, _discover_firefox),
-        DictionarySource("neovim", enable_neovim, _discover_neovim),
-        DictionarySource("jetbrains", enable_jetbrains, _discover_jetbrains),
-        DictionarySource("hunspell", enable_hunspell, _discover_hunspell),
-        DictionarySource("obsidian", enable_obsidian, _discover_obsidian),
-        DictionarySource("libreoffice", enable_libreoffice, _discover_libreoffice),
+        DictionarySource("editors", lambda: enable_editors(settings=settings), _discover_editors),
+        DictionarySource("chrome", lambda: enable_chrome(settings=settings), _discover_chrome),
+        DictionarySource("edge", lambda: enable_edge(settings=settings), _discover_edge),
+        DictionarySource("brave", lambda: enable_brave(settings=settings), _discover_brave),
+        DictionarySource("vivaldi", lambda: enable_vivaldi(settings=settings), _discover_vivaldi),
+        DictionarySource("firefox", lambda: enable_firefox(settings=settings), _discover_firefox),
+        DictionarySource("neovim", lambda: enable_neovim(settings=settings), _discover_neovim),
+        DictionarySource(
+            "jetbrains",
+            lambda: enable_jetbrains(settings=settings),
+            _discover_jetbrains,
+        ),
+        DictionarySource(
+            "hunspell",
+            lambda: enable_hunspell(settings=settings),
+            _discover_hunspell,
+        ),
+        DictionarySource(
+            "obsidian",
+            lambda: enable_obsidian(settings=settings),
+            _discover_obsidian,
+        ),
+        DictionarySource(
+            "libreoffice",
+            lambda: enable_libreoffice(settings=settings),
+            _discover_libreoffice,
+        ),
     )
 
 
@@ -301,9 +319,8 @@ def discover_dictionaries(
     language dictionaries and application spell-check lexicons are not discovered
     or inspected.
     """
-    if settings is not None:
-        bind_active_settings(settings)
+    resolved = settings if settings is not None else load_user_settings()
     dictionaries = _platform_dictionaries()
     dictionaries.extend(_discover_sublime())
-    dictionaries.extend(discover_from_sources(_optional_dictionary_sources()))
+    dictionaries.extend(discover_from_sources(_optional_dictionary_sources(resolved)))
     return _dedupe_dictionaries(dictionaries)

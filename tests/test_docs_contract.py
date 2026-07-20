@@ -393,7 +393,6 @@ class TestDocsContract(unittest.TestCase):
                 msg="[DOCS-CONTRACT-020] version duplication fails",
             )
 
-
     def test_awaiting_approval_must_be_current_fails(self) -> None:
         mod = _load_docs_contract()
         with tempfile.TemporaryDirectory() as tmp:

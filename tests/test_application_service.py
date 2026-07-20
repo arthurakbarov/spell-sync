@@ -23,6 +23,7 @@ from spell_sync.application.requests import (
     PushRequest,
     StatusRequest,
 )
+from spell_sync.application.runtime_resolver import RuntimeResolver
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
@@ -79,7 +80,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.skipped_corrupt_dictionary_names.return_value = ()
         run.destructive_push_risk.return_value = None
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             snapshot = service.load_status(_status())
 
         self.assertEqual(snapshot.wordlist_count, 2)
@@ -213,8 +214,9 @@ class TestSpellSyncService(unittest.TestCase):
         validated.journal_result = JournalLoadResult(JournalLoadStatus.ABSENT, None)
 
         with patch("spell_sync.paths.resolve_wordlist_path", return_value=Path("/tmp/w.txt")):
-            with patch(
-                "spell_sync.application.service.build_validated_runtime",
+            with patch.object(
+                RuntimeResolver,
+                "validated",
                 return_value=validated,
             ):
                 with patch(
@@ -263,8 +265,9 @@ class TestSpellSyncService(unittest.TestCase):
         )
 
         with patch("spell_sync.paths.resolve_wordlist_path", return_value=Path("/tmp/w.txt")):
-            with patch(
-                "spell_sync.application.service.build_validated_runtime",
+            with patch.object(
+                RuntimeResolver,
+                "validated",
                 return_value=validated,
             ):
                 with patch(
@@ -294,7 +297,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = None
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch.object(service, "_prepare_push_for_run", return_value=prepared):
                 preview = service.load_push_preview(_push())
 
@@ -307,7 +310,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = ExitCode.PUSH_ABORT
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.wordlist_error, ExitCode.PUSH_ABORT)
@@ -319,7 +322,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = None
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch.object(service, "_prepare_push_for_run", return_value=ExitCode.PUSH_ABORT):
                 preview = service.load_push_preview(_push())
 
@@ -331,7 +334,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         detail = MagicMock()
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch(
                 "spell_sync.application.service.build_status_detail_snapshot",
                 return_value=detail,
@@ -346,7 +349,7 @@ class TestSpellSyncService(unittest.TestCase):
         report = MagicMock()
         snapshot = MagicMock()
 
-        with patch("spell_sync.application.service.sync_run_for", return_value=MagicMock()):
+        with patch.object(RuntimeResolver, "sync_run", return_value=MagicMock()):
             with patch("spell_sync.application.service.build_doctor_report", return_value=report):
                 with patch(
                     "spell_sync.application.service.build_doctor_snapshot",
@@ -359,8 +362,9 @@ class TestSpellSyncService(unittest.TestCase):
 
     def test_load_doctor_returns_controlled_error(self):
         service = SpellSyncService()
-        with patch(
-            "spell_sync.application.service.sync_run_for",
+        with patch.object(
+            RuntimeResolver,
+            "sync_run",
             side_effect=RuntimeError("boom"),
         ):
             snapshot = service.load_doctor(_doctor())
@@ -392,7 +396,7 @@ class TestSpellSyncService(unittest.TestCase):
         service = SpellSyncService()
         run = MagicMock()
         preview = MagicMock(spec=PullPreview)
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch(
                 "spell_sync.application.service.build_pull_preview",
                 return_value=preview,
@@ -516,7 +520,7 @@ class TestSpellSyncService(unittest.TestCase):
             "load_status",
             wraps=service.load_status,
         ) as load_status:
-            with patch("spell_sync.application.service.sync_run_for") as sync_run_for:
+            with patch.object(RuntimeResolver, "sync_run") as sync_run_for:
                 run = MagicMock()
                 run.check_wordlist.return_value = None
                 run.load_wordlist.return_value = {"alpha"}
@@ -537,7 +541,7 @@ class TestServiceFacadePaths(unittest.TestCase):
         run.check_wordlist.return_value = ExitCode.WORDLIST_UNREADABLE
         run.skipped_unreadable_dictionary_names.return_value = ("a",)
         run.skipped_corrupt_dictionary_names.return_value = ()
-        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+        with patch.object(RuntimeResolver, "sync_run", return_value=run):
             snapshot = service.load_status(_status("/tmp/w.txt"))
         self.assertEqual(snapshot.wordlist_error, ExitCode.WORDLIST_UNREADABLE)
 
@@ -552,7 +556,7 @@ class TestServiceFacadePaths(unittest.TestCase):
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             service = SpellSyncService(enable_file_logging=False)
-            with patch("spell_sync.application.service.sync_run_for", return_value=run):
+            with patch.object(RuntimeResolver, "sync_run", return_value=run):
                 targets = service.load_doctor_targets(
                     DoctorRequest(project=ProjectRef(wordlist=Path(wordlist))),
                 )
@@ -642,7 +646,7 @@ class TestServiceFacadePaths(unittest.TestCase):
             service = SpellSyncService(enable_file_logging=False)
             unreadable = SyncRun(wordlist=str(wordlist), dictionaries=[])
             with (
-                patch("spell_sync.application.service.sync_run_for", return_value=unreadable),
+                patch.object(RuntimeResolver, "sync_run", return_value=unreadable),
                 patch.object(
                     unreadable,
                     "check_wordlist",
@@ -684,7 +688,7 @@ class TestServiceFacadePaths(unittest.TestCase):
             prepare_error=ExitCode.PUSH_ABORT,
         )
         with (
-            patch("spell_sync.application.service.sync_run_for", return_value=run),
+            patch.object(RuntimeResolver, "sync_run", return_value=run),
             patch.object(service, "load_push_preview", return_value=blocked),
         ):
             preview, diffs, result = service.load_push_plan(_push("/tmp/w.txt"))
@@ -701,7 +705,7 @@ class TestServiceFacadePaths(unittest.TestCase):
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             service = SpellSyncService(enable_file_logging=False)
-            with patch("spell_sync.application.service.sync_run_for", return_value=run):
+            with patch.object(RuntimeResolver, "sync_run", return_value=run):
                 preview = service.load_push_preview(_push(wordlist))
                 execution = service.execute_push_dry_run(_push(wordlist), preview)
             self.assertIsInstance(execution.result, PushResult)
