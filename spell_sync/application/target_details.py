@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 
 from ..project_setup.discovery import SetupTarget
 from ..support.path_redaction import redact_path, redact_profile_label
@@ -14,9 +12,8 @@ from ..target_capabilities import (
     capability_for_discovery_target,
     resolve_capability_identifier,
 )
+from ..target_validation import load_packaged_target_validation
 from .product_concepts import PUSH_FILTERING_NOTICE
-
-_VALIDATION_FILE = Path(__file__).resolve().parents[2] / "docs" / "target-validation.json"
 
 
 @dataclass(frozen=True)
@@ -98,9 +95,9 @@ def _discovery_source(identifier: str) -> str:
 
 
 def _load_validation_lookup() -> dict[tuple[str, str], TargetValidationStatus]:
-    if not _VALIDATION_FILE.is_file():
+    payload = load_packaged_target_validation()
+    if payload is None:
         return {}
-    payload = json.loads(_VALIDATION_FILE.read_text(encoding="utf-8"))
     rows = payload.get("targets", [])
     lookup: dict[tuple[str, str], TargetValidationStatus] = {}
     if not isinstance(rows, list):

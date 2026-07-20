@@ -71,6 +71,14 @@ class TestTargetDetails(unittest.IsolatedAsyncioTestCase):
                 or details.custom_dictionary_path.startswith("<external>/")
             )
 
+    def test_automated_validation_from_packaged_data(self) -> None:
+        target = _target("chrome")
+        details = build_target_details(target)
+        text = format_target_details_text(details)
+        self.assertEqual(details.automated_validation, "pass")
+        self.assertEqual(details.manual_validation, "not-run")
+        self.assertIn("pass", text.lower())
+
     def test_corrupt_target_suggested_action(self) -> None:
         target = _target("chrome", status="corrupt")
         details = build_target_details(target, suggested_action="Repair dictionary file.")

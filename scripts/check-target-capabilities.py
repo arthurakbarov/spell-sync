@@ -12,14 +12,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_FILE = ROOT / "docs" / "target-validation.json"
+BUNDLED_VALIDATION_FILE = ROOT / "spell_sync" / "bundled" / "target-validation.json"
 SUPPORTED_DOC = ROOT / "docs" / "SUPPORTED_TARGETS.md"
-MATRIX_START = "```text target-capabilities-matrix"
-MATRIX_END = "```"
+START_MARKER = "[target-capabilities:start]"
+END_MARKER = "[target-capabilities:end]"
+LEGACY_MARKER = "```text target-capabilities-matrix"
+LEGACY_HTML_START = "<!-- target-capabilities:start -->"
+LEGACY_HTML_END = "<!-- target-capabilities:end -->"
 
 IMPLEMENTATION_STATUSES = {"implemented", "experimental", "not-implemented"}
 AUTOMATED_STATUSES = {"pass", "fail", "partial", "not-run"}
 MANUAL_STATUSES = {"pass", "fail", "not-run", "experimental"}
 PRIVATE_PATH = re.compile(r"(~/|/Users/|/home/[^/\s]+/|C:\\Users\\)")
+
+
+def _canonical_json(data: dict[str, object]) -> str:
+    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
 def _load_validation() -> dict[str, object]:
@@ -136,31 +144,84 @@ def _render_matrix(data: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def marker_structure_errors(text: str) -> list[str]:
+    errors: list[str] = []
+    if LEGACY_MARKER in text:
+        errors.append("SUPPORTED_TARGETS.md: obsolete target-capabilities-matrix marker present")
+    if LEGACY_HTML_START in text or LEGACY_HTML_END in text:
+        errors.append("SUPPORTED_TARGETS.md: obsolete HTML target-capabilities markers present")
+    start_count = text.count(START_MARKER)
+    end_count = text.count(END_MARKER)
+    if start_count != 1:
+        errors.append(
+            f"SUPPORTED_TARGETS.md: start marker must appear exactly once (found {start_count})"
+        )
+    if end_count != 1:
+        errors.append(
+            f"SUPPORTED_TARGETS.md: end marker must appear exactly once (found {end_count})"
+        )
+    if start_count != 1 or end_count != 1:
+        return errors
+    start = text.index(START_MARKER)
+    end = text.index(END_MARKER)
+    if end <= start:
+        errors.append("SUPPORTED_TARGETS.md: end marker must appear after start marker")
+    return errors
+
+
+def extract_generated_content(text: str) -> str:
+    start = text.index(START_MARKER) + len(START_MARKER)
+    end = text.index(END_MARKER)
+    return text[start:end].strip("\n")
+
+
+def replace_generated_block(text: str, matrix: str) -> str:
+    errors = marker_structure_errors(text)
+    if errors:
+        raise ValueError("; ".join(errors))
+    start = text.index(START_MARKER)
+    end = text.index(END_MARKER) + len(END_MARKER)
+    block = f"{START_MARKER}\n{matrix}\n{END_MARKER}"
+    return text[:start] + block + text[end:]
+
+
 def _write_supported_doc(matrix: str) -> None:
     template = SUPPORTED_DOC.read_text(encoding="utf-8") if SUPPORTED_DOC.is_file() else ""
-    block = f"{MATRIX_START}\n{matrix}\n{MATRIX_END}"
-    marker = MATRIX_START
-    if marker in template:
-        start = template.index(marker)
-        end = template.index(MATRIX_END, start) + len(MATRIX_END)
-        updated = template[:start] + block + template[end:]
-    else:
-        updated = template.rstrip() + "\n\n" + block + "\n"
+    try:
+        updated = replace_generated_block(template, matrix)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     SUPPORTED_DOC.write_text(updated, encoding="utf-8")
+
+
+def _write_bundled_validation(data: dict[str, object]) -> None:
+    BUNDLED_VALIDATION_FILE.parent.mkdir(parents=True, exist_ok=True)
+    BUNDLED_VALIDATION_FILE.write_text(_canonical_json(data), encoding="utf-8")
 
 
 def _check_supported_doc(data: dict[str, object]) -> list[str]:
     if not SUPPORTED_DOC.is_file():
         return ["missing docs/SUPPORTED_TARGETS.md"]
-    expected = _render_matrix(data)
     text = SUPPORTED_DOC.read_text(encoding="utf-8")
-    if MATRIX_START not in text:
-        return ["SUPPORTED_TARGETS.md: missing generated matrix block"]
-    start = text.index(MATRIX_START) + len(MATRIX_START) + 1
-    end = text.index(MATRIX_END, start)
-    actual = text[start:end].strip()
-    if actual != expected.strip():
+    errors = marker_structure_errors(text)
+    if errors:
+        return errors
+    expected = _render_matrix(data)
+    actual = extract_generated_content(text)
+    if actual != expected:
         return ["SUPPORTED_TARGETS.md generated matrix is stale — run --write"]
+    return []
+
+
+def _check_bundled_validation(data: dict[str, object]) -> list[str]:
+    if not BUNDLED_VALIDATION_FILE.is_file():
+        return ["missing spell_sync/bundled/target-validation.json"]
+    expected = _canonical_json(data)
+    actual = BUNDLED_VALIDATION_FILE.read_text(encoding="utf-8")
+    if actual != expected:
+        return ["bundled target-validation.json is stale — run --write"]
+    if PRIVATE_PATH.search(actual):
+        return ["bundled target-validation.json contains private path patterns"]
     return []
 
 
@@ -170,7 +231,7 @@ def main() -> int:
     parser.add_argument(
         "--write",
         action="store_true",
-        help="regenerate SUPPORTED_TARGETS.md matrix",
+        help="regenerate SUPPORTED_TARGETS.md matrix and bundled validation JSON",
     )
     args = parser.parse_args()
     if not args.check and not args.write:
@@ -179,9 +240,16 @@ def main() -> int:
     data = _load_validation()
     errors = _validate(data)
     if args.write:
+        if errors:
+            print("Target capability write FAILED:", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
+            return 1
         _write_supported_doc(_render_matrix(data))
+        _write_bundled_validation(data)
     if args.check:
         errors.extend(_check_supported_doc(data))
+        errors.extend(_check_bundled_validation(data))
     if errors:
         print("Target capability check FAILED:", file=sys.stderr)
         for err in errors:

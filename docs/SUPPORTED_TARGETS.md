@@ -20,7 +20,7 @@ Automatically tested does **not** mean manually validated on your machine or app
 Machine-readable validation data lives in `docs/target-validation.json`. The table below is
 generated — do not edit it by hand.
 
-```text target-capabilities-matrix
+[target-capabilities:start]
 Target | OS | Pull | Push | Filtering | Profiles | Close policy | Automated | Manual | Last real-app test
 ------ | -- | ---- | ---- | --------- | -------- | ------------ | --------- | ------ | ------------------
 Brave | linux | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
@@ -58,10 +58,7 @@ Vivaldi | linux | Yes | Yes | full | multi-profile | not-required | pass | not-r
 Vivaldi | macos | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Vivaldi | windows | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Windows Spelling | windows | Yes | Yes | locale-specific | system-managed | not-required | pass | not-run | —
-```text target-capabilities-matrix
-Target | OS | Pull | Push | Filtering | Profiles | Close policy | Automated | Manual | Last real-app test
------- | -- | ---- | ---- | --------- | -------- | ------------ | --------- | ------ | ------------------
-```
+[target-capabilities:end]
 
 Run `python3.11 scripts/check-target-capabilities.py --write` to regenerate after updating
 validation data.
