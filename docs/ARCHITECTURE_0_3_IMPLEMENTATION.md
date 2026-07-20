@@ -124,7 +124,52 @@ phase-2c: complete
 phase-2d: complete
 phase-2e: complete
 phase-3: not-started
+phase-4: not-started
+phase-5: not-started
 [architecture-status:end]
+
+## Phase 3 — Explicit runtime
+
+### Goal
+
+Replace implicit ContextVar-based settings and validated runtime with explicit resolution
+through `RuntimeResolver`, passed into the application facade.
+
+### Scope
+
+- `spell_sync/application/runtime_resolver.py` (new)
+- `spell_sync/settings.py`, `spell_sync/config.py`, `spell_sync/dictionaries.py`
+- `spell_sync/command_helpers.py`, `spell_sync/sync_context.py`, `spell_sync/validated_runtime.py`
+- `spell_sync/application/service.py`, `spell_sync/application/project_resolution.py`
+- Architecture tests and ADR
+
+### Required outcomes
+
+- No production `ContextVar` for settings or validated runtime
+- `RuntimeResolver` resolves `ProjectRef` → `ValidatedRuntime` explicitly
+- Mutating commands reuse bound runtime without implicit globals
+- CLI JSON, exit codes, and Pull/Push semantics unchanged
+
+### Safety contracts
+
+- Operation lock, journal, Recovery, and preview/execute binding unchanged
+- Single config+journal load under lock preserved
+
+### Deferred
+
+- Service decomposition (Phase 4)
+- Structured technical events (Phase 5)
+
+### Phase-specific validation
+
+- `tests/test_explicit_runtime.py` (architecture guards)
+- `tests/test_application_requests.py`
+
+### Completion criteria
+
+- Architecture tests pass; full CI green
+- Tracker status `awaiting-approval`
+- ADR `docs/decisions/0002-explicit-runtime.md` accepted in repo
 
 ## Phase 2B: complete application boundary
 

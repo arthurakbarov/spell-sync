@@ -203,3 +203,13 @@ def test_marked_path_must_exist(validator, tmp_path: Path) -> None:
 
     errors = validator.validate_agent_config(tmp_path)
     assert any("marked path does not exist: missing/file.py" in err for err in errors)
+
+
+def test_required_skills_present(validator) -> None:
+    errors = validator.validate_agent_config(REPO_ROOT)
+    assert not any("missing required skill" in err for err in errors)
+
+
+def test_banned_workflow_term_detected(validator) -> None:
+    hits = validator.scan_banned_workflow_terms("Upload handoff via review ZIP")
+    assert hits

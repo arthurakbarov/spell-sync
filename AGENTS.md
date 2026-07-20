@@ -94,12 +94,26 @@ Project-specific agent context for contributors:
 
 ```text
 .cursor/rules/     short invariants and file-scoped guidance
-.cursor/skills/    procedural workflows (CI, safety audit, TUI, packaging)
+.cursor/skills/    procedural workflows (CI, phases, safety audit, TUI, packaging)
 ```
+
+Phase-driven workflow skills:
+
+- `execute-current-phase` — implement and validate the current architecture phase
+- `apply-phase-fixes` — correct owner-listed defects without advancing the roadmap
+- `advance-current-phase` — mark an approved phase complete (owner command only)
+
+Architecture tracker: `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` (`[architecture-status:start]` block).
 
 Open this repository alone — engineering rules and skills are self-contained here. Maintainer
 topology, remotes, and publication workflows live only in the private maintainer workspace
 (not shipped with this repository).
+
+## Agent prohibitions
+
+- Do not start the next architecture phase without owner approval
+- Do not mark a phase `complete` from implementation work — use `awaiting-approval`, then `advance-current-phase`
+- Do not create archive, handoff, or upload workflows for external review
 
 ## Testing focus
 

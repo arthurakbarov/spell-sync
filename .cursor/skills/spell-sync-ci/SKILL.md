@@ -51,6 +51,9 @@ primary gate identifier. Summary schema version 2 includes `runId`, `historyLogP
 `historySummaryPath`, and `failedCheckId`. Installed-wheel smoke runs outside the checkout.
 Do not ask the owner to diagnose failures.
 
+Phase implementation uses `execute-current-phase`, `apply-phase-fixes`, and
+`advance-current-phase` — not this skill alone.
+
 ## What ci.sh enforces
 
 Via `scripts/ci_runner.py`:

@@ -57,6 +57,30 @@ FORBIDDEN_STATE_ROOT_DIRS = {
     "journal",
 }
 
+REQUIRED_RULES = (
+    "agent-workflow.mdc",
+    "project-safety.mdc",
+    "architecture-boundaries.mdc",
+    "tests-fixtures.mdc",
+)
+
+REQUIRED_SKILLS = (
+    "execute-current-phase",
+    "apply-phase-fixes",
+    "advance-current-phase",
+    "architecture-refactor",
+    "spell-sync-ci",
+    "mutation-safety-audit",
+)
+
+BANNED_WORKFLOW_TERMS = [
+    (re.compile(r"\breview\s+zip\b", re.I), "review ZIP"),
+    (re.compile(r"\bcode\.zip\b", re.I), "code.zip handoff"),
+    (re.compile(r"\bUPLOAD_THIS_FILE\b"), "UPLOAD_THIS_FILE"),
+    (re.compile(r"\bupload handoff\b", re.I), "upload handoff"),
+    (re.compile(r"\bexternal reviewer\b", re.I), "external reviewer"),
+    (re.compile(r"\barchive handoff\b", re.I), "archive handoff"),
+]
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
     if not text.startswith("---"):
@@ -187,6 +211,14 @@ def check_tracked_forbidden_files(root: Path) -> list[str]:
     return errors
 
 
+def scan_banned_workflow_terms(text: str) -> list[str]:
+    hits: list[str] = []
+    for pattern, label in BANNED_WORKFLOW_TERMS:
+        if pattern.search(text):
+            hits.append(label)
+    return hits
+
+
 def validate_agent_config(root: Path) -> list[str]:
     errors: list[str] = []
     cursor = root / ".cursor"
@@ -208,6 +240,10 @@ def validate_agent_config(root: Path) -> list[str]:
     if not rules.is_dir():
         errors.append("missing .cursor/rules/")
     else:
+        present_rules = {path.name for path in rules.glob("*.mdc")}
+        for required in REQUIRED_RULES:
+            if required not in present_rules:
+                errors.append(f"missing required rule: .cursor/rules/{required}")
         for path in sorted(rules.glob("*.mdc")):
             text = path.read_text(encoding="utf-8")
             rel = path.relative_to(root)
@@ -220,12 +256,18 @@ def validate_agent_config(root: Path) -> list[str]:
                 errors.append(f"{rel}: exceeds {MAX_RULE_LINES} lines")
             for label in scan_stale(text):
                 errors.append(f"{rel}: contains {label}")
+            for label in scan_banned_workflow_terms(text):
+                errors.append(f"{rel}: contains banned workflow term ({label})")
             for _ in scan_private_paths(text):
                 errors.append(f"{rel}: contains private path or topology reference")
 
     if not skills.is_dir():
         errors.append("missing .cursor/skills/")
     else:
+        present_skills = {path.name for path in skills.iterdir() if path.is_dir()}
+        for required in REQUIRED_SKILLS:
+            if required not in present_skills:
+                errors.append(f"missing required skill: .cursor/skills/{required}/SKILL.md")
         names: dict[str, Path] = {}
         for skill_dir in sorted(p for p in skills.iterdir() if p.is_dir()):
             skill_file = skill_dir / "SKILL.md"
@@ -250,6 +292,8 @@ def validate_agent_config(root: Path) -> list[str]:
                 names[name] = skill_file
             for label in scan_stale(text):
                 errors.append(f"{rel}: contains {label}")
+            for label in scan_banned_workflow_terms(text):
+                errors.append(f"{rel}: contains banned workflow term ({label})")
             for _ in scan_private_paths(text):
                 errors.append(f"{rel}: contains private path or topology reference")
             if PUBLISH_PATTERN.search(text) and not GUARD_PATTERN.search(text):
@@ -267,11 +311,17 @@ def validate_agent_config(root: Path) -> list[str]:
         if (skills / "spell-sync-stale-audit").exists():
             errors.append("remove obsolete skill spell-sync-stale-audit")
 
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
+    if not agent_dev.is_file():
+        errors.append("missing docs/AGENT_DEVELOPMENT.md")
+
     if agents.is_file():
         text = agents.read_text(encoding="utf-8")
         rel = agents.relative_to(root)
         for label in scan_stale(text):
             errors.append(f"{rel}: contains {label}")
+        for label in scan_banned_workflow_terms(text):
+            errors.append(f"{rel}: contains banned workflow term ({label})")
         for _ in scan_private_paths(text):
             errors.append(f"{rel}: contains private path or topology reference")
         documented, cli_issues = parse_documented_commands(text)

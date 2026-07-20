@@ -11,7 +11,17 @@ alwaysApply: false
 - Use temporary HOME and isolated state roots
 - Synthetic dictionaries only — never read or import a maintainer wordlist
 - No network calls in tests
+- Use deterministic clocks and run IDs where retention or CI history is tested
 - Platform-specific behavior must state when simulated vs real
+
+## Assertions
+
+- Prefer actionable assertion messages with stable IDs (for example `[ARCH-RT-001]`)
+- Architecture tests must name the violated contract and file path
+
+## Regression policy
+
+- Every fixed defect in `apply-phase-fixes` needs a regression test
 
 ## Coverage policy
 

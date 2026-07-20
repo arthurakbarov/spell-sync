@@ -42,7 +42,9 @@ IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md"
 CURRENT_PHASE_HEADING = "## Current phase"
 ARCHITECTURE_STATUS_START = "[architecture-status:start]"
 ARCHITECTURE_STATUS_END = "[architecture-status:end]"
-KNOWN_STATUSES = frozenset({"complete", "in-progress", "not-started", "planned"})
+KNOWN_STATUSES = frozenset(
+    {"complete", "in-progress", "not-started", "planned", "awaiting-approval", "blocked"}
+)
 AGENT_WORKFLOW_DOCS = (
     "AGENTS.md",
     "docs/AGENT_DEVELOPMENT.md",
@@ -274,7 +276,43 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
                 tracker,
                 None,
                 f"current phase points to completed phase: {current}",
-                "set current to an in-progress or not-started phase",
+                "set current to not-started, in-progress, awaiting-approval, or blocked",
+            )
+        )
+
+    awaiting_non_current = [
+        key for key, value in statuses.items() if key != "current" and value == "awaiting-approval"
+    ]
+    current_awaiting = bool(current and statuses.get(current) == "awaiting-approval")
+    if len(awaiting_non_current) > 1 or (awaiting_non_current and current_awaiting):
+        violations.append(
+            ContractViolation(
+                "PHASE-010",
+                tracker,
+                None,
+                "multiple awaiting-approval phases",
+                "mark at most one phase as awaiting-approval",
+            )
+        )
+    elif awaiting_non_current:
+        violations.append(
+            ContractViolation(
+                "PHASE-011",
+                tracker,
+                None,
+                f"awaiting-approval phase must be current: {awaiting_non_current}",
+                "set current to the awaiting-approval phase id",
+            )
+        )
+
+    if in_progress and current and statuses.get(current) != "in-progress":
+        violations.append(
+            ContractViolation(
+                "PHASE-012",
+                tracker,
+                None,
+                f"in-progress phase must be current: {in_progress}",
+                "set current to the in-progress phase id",
             )
         )
 

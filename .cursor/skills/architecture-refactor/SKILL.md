@@ -1,0 +1,39 @@
+---
+name: architecture-refactor
+description: Perform an architecture migration while preserving safety contracts, dependency direction, tests, ADRs, and one canonical execution path.
+---
+
+# Architecture refactor
+
+## When to use
+
+- `execute-current-phase` targets an architecture migration phase
+- Dependency direction, runtime model, or service boundaries change
+
+## Do not use
+
+- For product-only bug fixes outside architecture scope
+- To introduce a parallel execution path "for convenience"
+
+## Required steps
+
+1. **Dependency inventory** — map imports before and after; no reverse dependencies.
+2. **Safety inventory** — list Pull/Push/Recovery/lock/journal invariants at risk.
+3. **Migration order** — follow the tracker; finish one layer before the next.
+4. **Single path** — remove or migrate callers; no permanent compatibility wrappers.
+5. **No hidden globals** — prefer explicit parameters, resolver objects, or frozen context passed through facades.
+6. **Architecture tests** — extend `tests/test_application_requests.py` and phase-specific guards.
+7. **Focused safety tests** — run mutation safety tests when behavior touches writes.
+8. **ADR** — add or update `docs/decisions/` when a decision is accepted.
+9. **Full CI** — `scripts/ci.sh` must pass.
+10. **Package smoke** — required when CLI/package runtime or import paths change.
+
+## Stop conditions
+
+- Stop when phase completion criteria in the tracker are met and CI is green
+- Stop and report if a change would break CLI JSON, exit codes, or Pull/Push semantics without explicit phase scope
+
+## Related skills
+
+- `mutation-safety-audit` — mandatory for mutation-path changes
+- `spell-sync-ci` — validation and failure diagnosis

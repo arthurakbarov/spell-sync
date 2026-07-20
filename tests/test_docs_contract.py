@@ -394,5 +394,29 @@ class TestDocsContract(unittest.TestCase):
             )
 
 
+    def test_awaiting_approval_must_be_current_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            status = "\n".join(
+                [
+                    "current: phase-3",
+                    "phase-3: in-progress",
+                    "phase-4: awaiting-approval",
+                ]
+            )
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                        body="Invalid awaiting on non-current.",
+                        status_block=status,
+                    ),
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id == "PHASE-011"]
+            self.assertEqual(len(violations), 1, msg="[DOCS-CONTRACT-021] awaiting must be current")
+
+
 if __name__ == "__main__":
     unittest.main()
