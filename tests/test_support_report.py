@@ -14,6 +14,7 @@ import pytest
 from spell_sync.application.service import SpellSyncService
 from spell_sync.application.support_report import (
     build_support_report,
+    default_support_report_path,
     export_support_report,
     format_support_report_text,
     support_report_to_dict,
@@ -117,6 +118,19 @@ def test_export_support_report_atomic_and_collision(project_env, tmp_path: Path)
     assert output.is_file()
     with pytest.raises(FileExistsError):
         export_support_report(report, output_path=output, fmt="json")
+
+    root = tmp_path / "state"
+    first_json = default_support_report_path(state_root=root, fmt="json")
+    first_json.write_text("{}", encoding="utf-8")
+    second_json = default_support_report_path(state_root=root, fmt="json")
+    assert second_json.suffix == ".json"
+    assert second_json != first_json
+
+    first_txt = default_support_report_path(state_root=root, fmt="text")
+    first_txt.write_text("existing", encoding="utf-8")
+    second_txt = default_support_report_path(state_root=root, fmt="text")
+    assert second_txt.suffix == ".txt"
+    assert second_txt != first_txt
 
 
 def test_export_support_report_write_failure(project_env, tmp_path: Path, monkeypatch) -> None:

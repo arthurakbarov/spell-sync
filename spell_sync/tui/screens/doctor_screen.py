@@ -6,11 +6,12 @@ from textual import work
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
-from textual.worker import WorkerState
+from textual.worker import Worker, WorkerState
 
 from ...application.reports import DoctorSnapshot
 from ...support.path_redaction import redact_path
 from ..controller import TuiController
+from ..export_results import ReportExportResult
 from ..workers import LoadTokenMixin
 
 
@@ -24,6 +25,11 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
         super().__init__()
         self._controller = controller
         self._active_token = 0
+        self._export_generation = 0
+        self._export_in_progress = False
+        self._export_token = 0
+        self._export_started_token = 0
+        self._export_worker_handle: Worker | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -119,18 +125,77 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
         elif event.button.id == "btn-export-support":
             self._export_support_report()
 
+    def _begin_export(self) -> int:
+        self._export_generation += 1
+        return self._export_generation
+
+    def _is_current_export(self) -> bool:
+        return self._export_started_token == self._export_token and self.is_mounted
+
     def _export_support_report(self) -> None:
+        if self._export_in_progress:
+            return
+        self._export_in_progress = True
+        self._export_token = self._begin_export()
+        self._export_started_token = self._export_token
+        self.query_one("#btn-export-support", Button).disabled = True
+        self.query_one("#doctor-export-status", Static).update("Exporting support report...")
+        self._export_worker_handle = self.export_support_report_worker()
+        self.set_interval(0.05, self._poll_export_worker, repeat=40)
+
+    def _poll_export_worker(self) -> None:
+        worker = getattr(self, "_export_worker_handle", None)
+        if worker is None or worker.state is WorkerState.RUNNING:
+            return
+        self._finish_export_worker(worker)
+
+    def _finish_export_worker(self, worker) -> None:
+        if not self._export_in_progress:
+            return
+        self._export_in_progress = False
+        if self.is_mounted:
+            self.query_one("#btn-export-support", Button).disabled = False
+        if worker.state is WorkerState.ERROR:
+            if self.is_mounted:
+                self.query_one("#doctor-export-status", Static).update(
+                    "× Support report could not be exported."
+                )
+            self._export_worker_handle = None
+            return
+        if worker.state is not WorkerState.SUCCESS:
+            self._export_worker_handle = None
+            return
+        if not self._is_current_export():
+            self._export_worker_handle = None
+            return
+        export_result = worker.result
+        self._export_worker_handle = None
+        if not isinstance(export_result, ReportExportResult):
+            return
         status = self.query_one("#doctor-export-status", Static)
+        if export_result.ok and export_result.path is not None:
+            redacted = redact_path(export_result.path) or export_result.path
+            status.update(f"Report saved\n\n{redacted}")
+            return
+        status.update(f"× {export_result.message or 'Support report could not be exported.'}")
+
+    @work(thread=True, exclusive=True, group="support-report-export")
+    def export_support_report_worker(self) -> ReportExportResult:
         try:
             path = self._controller.export_support_report(fmt="json")
+            return ReportExportResult(ok=True, path=str(path))
         except FileExistsError as exc:
-            status.update(f"× {exc}")
-            return
+            return ReportExportResult(ok=False, message=str(exc))
         except Exception:
-            status.update("× Support report could not be exported.")
+            return ReportExportResult(
+                ok=False,
+                message="Support report could not be exported.",
+            )
+
+    def on_export_support_report_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.state is WorkerState.RUNNING:
             return
-        redacted = redact_path(str(path)) or str(path)
-        status.update(f"Report saved\n\n{redacted}")
+        self._finish_export_worker(event.worker)
 
     def action_run_doctor(self) -> None:
         self.run_doctor()

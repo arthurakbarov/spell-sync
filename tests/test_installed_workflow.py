@@ -193,3 +193,32 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
     assert support_result.returncode == 0, support_result.stderr
     assert "secret-token-like-value" not in support_result.stdout
     assert "user@example.com" not in support_result.stdout
+
+    bundled_env = os.environ.copy()
+    bundled_env["HOME"] = str(home)
+    if not is_macos():
+        bundled_env["XDG_CONFIG_HOME"] = str(home / ".config")
+    bundled_check = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "from importlib.resources import files; "
+            "path = files('spell_sync.bundled').joinpath('target-validation.json'); "
+            "assert path.is_file(), path; "
+            "from spell_sync.target_validation import load_packaged_target_validation; "
+            "payload = load_packaged_target_validation(); "
+            "assert payload is not None; "
+            "import platform; "
+            "current = {'Darwin': 'macos', 'Windows': 'windows'}.get(platform.system(), 'linux'); "
+            "chrome = next("
+            "row for row in payload['targets'] "
+            "if row['target_id'] == 'chrome' and row['platform'] == current"
+            "); "
+            "assert chrome['automated_validation'] == 'pass'; "
+            "assert chrome['manual_validation'] == 'not-run'",
+        ],
+        env=bundled_env,
+        capture_output=True,
+        text=True,
+    )
+    assert bundled_check.returncode == 0, bundled_check.stderr

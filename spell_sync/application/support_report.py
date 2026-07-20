@@ -242,7 +242,7 @@ def default_support_report_path(state_root: Path | None = None, *, fmt: str = "j
     candidate = root / f"support-report-{stamp}.{extension}"
     counter = 1
     while candidate.exists():
-        candidate = root / f"support-report-{stamp}-{counter}.json"
+        candidate = root / f"support-report-{stamp}-{counter}.{extension}"
         counter += 1
     return candidate
 

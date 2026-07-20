@@ -19,6 +19,7 @@ from spell_sync.application.reports import (
 from spell_sync.application.review_session import ReviewSession
 from spell_sync.application.session_report_export import (
     build_session_report_export,
+    default_session_report_path,
     export_session_report,
 )
 from spell_sync.cli_options import CliOptions
@@ -127,6 +128,19 @@ def test_session_export_text_and_collision(tmp_path: Path) -> None:
     assert output.is_file()
     with pytest.raises(FileExistsError):
         export_session_report(export, output_path=output, fmt="text")
+
+    root = tmp_path / "state"
+    first_json = default_session_report_path(state_root=root, fmt="json")
+    first_json.write_text("{}", encoding="utf-8")
+    second_json = default_session_report_path(state_root=root, fmt="json")
+    assert second_json.suffix == ".json"
+    assert second_json != first_json
+
+    first_txt = default_session_report_path(state_root=root, fmt="text")
+    first_txt.write_text("existing", encoding="utf-8")
+    second_txt = default_session_report_path(state_root=root, fmt="text")
+    assert second_txt.suffix == ".txt"
+    assert second_txt != first_txt
 
 
 def test_session_export_skipped_pull_push() -> None:

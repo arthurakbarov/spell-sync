@@ -432,6 +432,98 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(service.execute_pull_calls, 0)
             self.assertIsInstance(app.screen, ReviewPullScreen)
 
+    async def test_save_session_report_success(self):
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from spell_sync.tui.screens.review_update_screen import ReviewSessionReportScreen
+
+        controller = TuiController(fake_service(), CliOptions())
+        controller.begin_review_session()
+        session = controller.review_session()
+        assert session is not None
+        session.pull_skipped = True
+        session.push_skipped = True
+        controller.export_review_session_report = MagicMock(  # type: ignore[method-assign]
+            return_value=Path("/tmp/session-reports/review-report-test.json")
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(ReviewSessionReportScreen(controller))
+            await pilot.click("#btn-save-report")
+            await wait_for_text(pilot, "#session-report-export-status", "Report saved")
+            controller.export_review_session_report.assert_called_once()
+
+    async def test_save_session_report_reuses_saved_path(self):
+        from spell_sync.tui.screens.review_update_screen import ReviewSessionReportScreen
+
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            screen = ReviewSessionReportScreen(controller)
+            screen._saved_report_path = "/tmp/already-saved.json"
+            await app.push_screen(screen)
+            await pilot.click("#btn-save-report")
+            await wait_for_text(pilot, "#session-report-export-status", "Report already saved")
+
+    async def test_save_session_report_ignores_repeated_click(self):
+        import time
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from spell_sync.tui.screens.review_update_screen import ReviewSessionReportScreen
+
+        controller = TuiController(fake_service(), CliOptions())
+        controller.begin_review_session()
+        session = controller.review_session()
+        assert session is not None
+        session.pull_skipped = True
+        session.push_skipped = True
+
+        def slow_export(**kwargs: object) -> Path:
+            time.sleep(0.3)
+            return Path("/tmp/session-reports/review-report-test.json")
+
+        controller.export_review_session_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(ReviewSessionReportScreen(controller))
+            await pilot.click("#btn-save-report")
+            await pilot.click("#btn-save-report")
+            await wait_for_text(pilot, "#session-report-export-status", "Report saved")
+            self.assertEqual(controller.export_review_session_report.call_count, 1)
+
+    async def test_save_session_report_ignores_stale_result(self):
+        import asyncio
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from spell_sync.tui.screens.review_update_screen import ReviewSessionReportScreen
+
+        controller = TuiController(fake_service(), CliOptions())
+        controller.begin_review_session()
+        session = controller.review_session()
+        assert session is not None
+        session.pull_skipped = True
+        session.push_skipped = True
+        completed = asyncio.Event()
+
+        def slow_export(**kwargs: object) -> Path:
+            completed.wait(timeout=1)
+            return Path("/tmp/session-reports/review-report-test.json")
+
+        controller.export_review_session_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(ReviewSessionReportScreen(controller))
+            await pilot.click("#btn-save-report")
+            await pilot.click("#btn-dashboard")
+            completed.set()
+            await pilot.pause(0.1)
+            from spell_sync.tui.screens.dashboard import DashboardScreen
+
+            self.assertIsInstance(app.screen, DashboardScreen)
+
 
 if __name__ == "__main__":
     unittest.main()

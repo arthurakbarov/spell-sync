@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -86,8 +85,8 @@ def test_target_details_without_validation_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        Path("/missing/target-validation.json"),
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: None,
     )
     details = build_target_details(_target("chrome"))
     assert details.manual_validation == "not-run"
@@ -218,11 +217,9 @@ def test_target_details_labels_and_validation(monkeypatch: pytest.MonkeyPatch) -
             }
         ],
     }
-    validation_file = Path("/tmp/target-validation-test.json")
-    validation_file.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        validation_file,
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: payload,
     )
     monkeypatch.setattr("platform.system", lambda: "Darwin")
     validated = build_target_details(_target("chrome"))
@@ -512,11 +509,9 @@ def test_target_details_platform_and_validation_branches(
             },
         ],
     }
-    validation_file = Path("/tmp/target-validation-invalid.json")
-    validation_file.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        validation_file,
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: payload,
     )
     monkeypatch.setattr("platform.system", lambda: "Darwin")
     details = build_target_details(_target("chrome"))
@@ -526,14 +521,9 @@ def test_target_details_platform_and_validation_branches(
 def test_target_details_validation_non_list_targets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    validation_file = Path("/tmp/target-validation-non-list.json")
-    validation_file.write_text(
-        json.dumps({"schema_version": 1, "targets": "invalid"}),
-        encoding="utf-8",
-    )
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        validation_file,
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: {"schema_version": 1, "targets": "invalid"},
     )
     details = build_target_details(_target("chrome"))
     assert details.manual_validation == "not-run"
@@ -544,26 +534,20 @@ def test_target_details_validation_windows_platform(
 ) -> None:
     from spell_sync.application.target_details import _load_validation_lookup
 
-    validation_file = Path("/tmp/target-validation-windows.json")
-    validation_file.write_text(
-        json.dumps(
+    payload = {
+        "schema_version": 1,
+        "targets": [
             {
-                "schema_version": 1,
-                "targets": [
-                    {
-                        "target_id": "chrome",
-                        "platform": "windows",
-                        "automated_validation": "pass",
-                        "manual_validation": "not-run",
-                    }
-                ],
+                "target_id": "chrome",
+                "platform": "windows",
+                "automated_validation": "pass",
+                "manual_validation": "not-run",
             }
-        ),
-        encoding="utf-8",
-    )
+        ],
+    }
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        validation_file,
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: payload,
     )
     monkeypatch.setattr("platform.system", lambda: "Windows")
     lookup = _load_validation_lookup()
@@ -575,26 +559,20 @@ def test_target_details_validation_linux_platform(
 ) -> None:
     from spell_sync.application.target_details import _load_validation_lookup
 
-    validation_file = Path("/tmp/target-validation-linux.json")
-    validation_file.write_text(
-        json.dumps(
+    payload = {
+        "schema_version": 1,
+        "targets": [
             {
-                "schema_version": 1,
-                "targets": [
-                    {
-                        "target_id": "chrome",
-                        "platform": "linux",
-                        "automated_validation": "pass",
-                        "manual_validation": "not-run",
-                    }
-                ],
+                "target_id": "chrome",
+                "platform": "linux",
+                "automated_validation": "pass",
+                "manual_validation": "not-run",
             }
-        ),
-        encoding="utf-8",
-    )
+        ],
+    }
     monkeypatch.setattr(
-        "spell_sync.application.target_details._VALIDATION_FILE",
-        validation_file,
+        "spell_sync.application.target_details.load_packaged_target_validation",
+        lambda: payload,
     )
     monkeypatch.setattr("platform.system", lambda: "Linux")
     lookup = _load_validation_lookup()
@@ -691,3 +669,165 @@ def test_controller_export_methods(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     session.push_skipped = True
     assert controller.export_review_session_report(fmt="json").is_file()
     assert controller.export_support_report(fmt="json").is_file()
+
+
+def test_load_packaged_target_validation_invalid_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spell_sync.target_validation import load_packaged_target_validation
+
+    monkeypatch.setattr(
+        "spell_sync.target_validation.resources.files",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("missing")),
+    )
+    assert load_packaged_target_validation() is None
+
+    class FakeResource:
+        def joinpath(self, *_args, **_kwargs) -> FakeResource:
+            return self
+
+        def read_text(self, encoding: str = "utf-8") -> str:
+            return "[]"
+
+    monkeypatch.setattr(
+        "spell_sync.target_validation.resources.files",
+        lambda *_args, **_kwargs: FakeResource(),
+    )
+    assert load_packaged_target_validation() is None
+
+
+def test_doctor_export_worker_branches() -> None:
+    from textual.worker import Worker, WorkerState
+
+    from spell_sync.tui.export_results import ReportExportResult
+    from spell_sync.tui.screens.doctor_screen import DoctorScreen
+
+    async def _run() -> None:
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(DoctorScreen(controller))
+            screen = app.screen
+            assert isinstance(screen, DoctorScreen)
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._export_started_token = 1
+
+            running = MagicMock(state=WorkerState.RUNNING)
+            screen._export_worker_handle = running
+            screen._poll_export_worker()
+
+            success = MagicMock(
+                state=WorkerState.SUCCESS,
+                result=ReportExportResult(ok=True, path="/tmp/x.json"),
+            )
+            screen._finish_export_worker(success)
+
+            screen._export_in_progress = True
+            screen._finish_export_worker(MagicMock(state=WorkerState.ERROR))
+
+            screen._export_in_progress = True
+            screen._finish_export_worker(MagicMock(state=WorkerState.PENDING))
+
+            screen._export_in_progress = True
+            screen._export_token = 2
+            screen._export_started_token = 1
+            screen._finish_export_worker(success)
+
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._finish_export_worker(MagicMock(state=WorkerState.SUCCESS, result="bad"))
+
+            screen._export_in_progress = False
+            screen._finish_export_worker(success)
+
+            screen._export_in_progress = True
+            screen._export_token = 1
+            collision = MagicMock(
+                state=WorkerState.SUCCESS,
+                result=ReportExportResult(ok=False, message="exists"),
+            )
+            screen._finish_export_worker(collision)
+
+            done = Worker.StateChanged(success, WorkerState.SUCCESS)
+            screen.on_export_support_report_worker_state_changed(done)
+
+            running_event = Worker.StateChanged(
+                MagicMock(state=WorkerState.RUNNING), WorkerState.RUNNING
+            )
+            screen.on_export_support_report_worker_state_changed(running_event)
+
+            screen._export_in_progress = True
+            screen._export_support_report()
+            screen._export_support_report()
+            await pilot.pause()
+
+    asyncio.run(_run())
+
+
+def test_review_export_worker_branches() -> None:
+    from textual.worker import Worker, WorkerState
+
+    from spell_sync.tui.export_results import ReportExportResult
+    from spell_sync.tui.screens.review_update_screen import ReviewSessionReportScreen
+
+    async def _run() -> None:
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await app.push_screen(ReviewSessionReportScreen(controller))
+            screen = app.screen
+            assert isinstance(screen, ReviewSessionReportScreen)
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._export_started_token = 1
+
+            running = MagicMock(state=WorkerState.RUNNING)
+            screen._export_worker_handle = running
+            screen._poll_export_worker()
+
+            success = MagicMock(
+                state=WorkerState.SUCCESS,
+                result=ReportExportResult(ok=True, path="/tmp/review-report.json"),
+            )
+            screen._finish_export_worker(success)
+            assert screen._saved_report_path == "/tmp/review-report.json"
+
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._export_started_token = 1
+            screen._finish_export_worker(MagicMock(state=WorkerState.ERROR))
+
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._export_started_token = 1
+            screen._finish_export_worker(MagicMock(state=WorkerState.CANCELLED))
+
+            screen._export_in_progress = True
+            screen._export_token = 9
+            screen._export_started_token = 1
+            screen._finish_export_worker(success)
+
+            screen._export_in_progress = False
+            screen._finish_export_worker(success)
+
+            screen._export_in_progress = True
+            screen._export_token = 1
+            screen._export_started_token = 1
+            screen._finish_export_worker(MagicMock(state=WorkerState.SUCCESS, result="bad"))
+
+            screen._saved_report_path = "/tmp/already.json"
+            screen._save_session_report()
+
+            screen._saved_report_path = None
+            screen._export_in_progress = True
+            screen._save_session_report()
+
+            done = Worker.StateChanged(success, WorkerState.SUCCESS)
+            screen.on_export_session_report_worker_state_changed(done)
+
+            event = Worker.StateChanged(MagicMock(state=WorkerState.RUNNING), WorkerState.RUNNING)
+            screen.on_export_session_report_worker_state_changed(event)
+            await pilot.pause()
+
+    asyncio.run(_run())

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 import unittest
+from pathlib import Path
+from unittest.mock import MagicMock
 
 from spell_sync.application.reports import DoctorCheckView, DoctorSnapshot
 from spell_sync.cli_options import CliOptions
@@ -73,10 +77,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             content = await wait_for_text(pilot, "#doctor-content", "Doctor failed")
             self.assertNotIn("Traceback", str(content.render()))
 
-    async def test_export_support_report(self):
-        from pathlib import Path
-        from unittest.mock import MagicMock
-
+    async def test_export_support_report_success(self):
         controller = TuiController(fake_service(), CliOptions())
         controller.export_support_report = MagicMock(  # type: ignore[method-assign]
             return_value=Path("/tmp/support-reports/support-report-test.json")
@@ -89,6 +90,89 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             status = await wait_for_text(pilot, "#doctor-export-status", "Report saved")
             self.assertIn("Report saved", str(status.render()))
             controller.export_support_report.assert_called_once()
+
+    async def test_export_support_report_collision(self):
+        controller = TuiController(fake_service(), CliOptions())
+        controller.export_support_report = MagicMock(  # type: ignore[method-assign]
+            side_effect=FileExistsError("exists")
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            await wait_for_text(pilot, "#doctor-export-status", "exists")
+
+    async def test_export_support_report_generic_failure(self):
+        controller = TuiController(fake_service(), CliOptions())
+        controller.export_support_report = MagicMock(  # type: ignore[method-assign]
+            side_effect=RuntimeError("fail")
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            await wait_for_text(pilot, "#doctor-export-status", "could not be exported")
+
+    async def test_export_support_report_disables_button_while_running(self):
+        from textual.widgets import Button
+
+        controller = TuiController(fake_service(), CliOptions())
+
+        def slow_export(**kwargs: object) -> Path:
+            time.sleep(0.15)
+            return Path("/tmp/support-reports/support-report-test.json")
+
+        controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            screen = app.screen
+            assert isinstance(screen, DoctorScreen)
+            btn = screen.query_one("#btn-export-support", Button)
+            self.assertTrue(btn.disabled)
+            await wait_for_text(pilot, "#doctor-export-status", "Report saved")
+            self.assertFalse(btn.disabled)
+            controller.export_support_report.assert_called_once()
+
+    async def test_export_support_report_ignores_repeated_click(self):
+        controller = TuiController(fake_service(), CliOptions())
+
+        def slow_export(**kwargs: object) -> Path:
+            time.sleep(0.3)
+            return Path("/tmp/support-reports/support-report-test.json")
+
+        controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            await pilot.click("#btn-export-support")
+            await wait_for_text(pilot, "#doctor-export-status", "Report saved")
+            self.assertEqual(controller.export_support_report.call_count, 1)
+
+    async def test_export_support_report_ignores_stale_result(self):
+        controller = TuiController(fake_service(), CliOptions())
+        completed = asyncio.Event()
+
+        def slow_export(**kwargs: object) -> Path:
+            completed.wait(timeout=1)
+            return Path("/tmp/support-reports/support-report-test.json")
+
+        controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await pilot.click("#btn-export-support")
+            await pilot.press("escape")
+            completed.set()
+            await pilot.pause(0.1)
+            self.assertIsInstance(app.screen, DashboardScreen)
 
 
 if __name__ == "__main__":
