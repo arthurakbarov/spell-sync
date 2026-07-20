@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .cli_options import CliOptions
+from .cli_request_adapter import effective_push_strict, project_ref, push_request
 from .command_helpers import (
     finish_push,
     print_status_diff,
@@ -10,7 +11,6 @@ from .command_helpers import (
     quiet_json_output,
     sync_run_for,
 )
-from .config import push_strict_enabled
 from .exit_codes import ExitCode
 from .json_output import base_payload, dictionary_diff_payload, emit_json, push_result_payload
 from .log import log
@@ -19,7 +19,7 @@ from .sync_run import PushResult
 
 
 def _effective_push_strict(opts: CliOptions) -> bool:
-    return opts.strict or push_strict_enabled()
+    return effective_push_strict(push_request(opts))
 
 
 def _cmd_plan_removals(opts: CliOptions, run) -> int:
@@ -58,7 +58,7 @@ def _cmd_plan_removals(opts: CliOptions, run) -> int:
 
 def cmd_plan(opts: CliOptions) -> int:
     with quiet_json_output(opts):
-        run = sync_run_for(opts, strict_push=_effective_push_strict(opts))
+        run = sync_run_for(project_ref(opts), strict_push=_effective_push_strict(opts))
         if opts.plan_removals:
             return _cmd_plan_removals(opts, run)
 
@@ -70,7 +70,7 @@ def cmd_plan(opts: CliOptions) -> int:
             return emit_command_exit(opts, "plan", wordlist_err)
 
         diffs = run.status_diffs(verbose=opts.verbose)
-        skip_names = push_skip_running_app_dicts(run, opts)
+        skip_names = push_skip_running_app_dicts(run)
         result = run.plan_push(skip_names=skip_names)
 
         if opts.json_output:

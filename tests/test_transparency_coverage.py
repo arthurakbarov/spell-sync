@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from spell_sync.application.reports import OperationOutcome, OperationReport
+from spell_sync.application.requests import ProjectRef, SupportReportRequest
 from spell_sync.application.review_session import ReviewSession
 from spell_sync.application.service import SpellSyncService
 from spell_sync.application.session_report_export import (
@@ -107,12 +108,13 @@ def test_support_report_notices_and_text(tmp_path: Path, monkeypatch: pytest.Mon
         state_paths=resolve_app_state_paths(state_root=tmp_path / "state"),
         enable_file_logging=False,
     )
-    opts = CliOptions(wordlist=str(wordlist))
     with patch(
         "spell_sync.application.support_report.sync_run_for",
         side_effect=RuntimeError("boom"),
     ):
-        report = build_support_report(service, opts)
+        report = build_support_report(
+            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        )
     assert report.project.wordlist_count is None
     text = format_support_report_text(report)
     assert "Notices" in text or "Invalid configuration" in text
@@ -137,10 +139,12 @@ def test_support_report_corrupt_target_reason(
     )
     corrupt = _target("chrome", status="corrupt", available=False, readable=False)
     with patch(
-        "spell_sync.application.support_report.load_target_settings_from_options",
+        "spell_sync.application.support_report.load_target_settings",
         return_value=MagicMock(targets=(corrupt,)),
     ):
-        report = build_support_report(service, CliOptions(wordlist=str(wordlist)))
+        report = build_support_report(
+            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        )
     assert any(item.reason_code == "target_corrupt" for item in report.targets)
 
 
@@ -260,10 +264,12 @@ def test_support_report_unreadable_and_pending(
     )
     unreadable = _target("firefox", status="unreadable", available=False, readable=False)
     with patch(
-        "spell_sync.application.support_report.load_target_settings_from_options",
+        "spell_sync.application.support_report.load_target_settings",
         return_value=MagicMock(targets=(unreadable,)),
     ):
-        report = build_support_report(service, CliOptions(wordlist=str(wordlist)))
+        report = build_support_report(
+            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        )
     assert any(item.reason_code == "target_unreadable" for item in report.targets)
     with (
         patch(
@@ -275,11 +281,13 @@ def test_support_report_unreadable_and_pending(
             ),
         ),
         patch(
-            "spell_sync.application.support_report.load_target_settings_from_options",
+            "spell_sync.application.support_report.load_target_settings",
             return_value=MagicMock(targets=()),
         ),
     ):
-        pending = build_support_report(service, CliOptions(wordlist=str(wordlist)))
+        pending = build_support_report(
+            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        )
     assert pending.recovery.pending_recovery is True
 
 
@@ -334,7 +342,7 @@ def test_controller_unreadable_notice() -> None:
     )
     service = fake_service()
     service.load_target_settings = MagicMock(return_value=snapshot)
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     assert controller.target_details("firefox").suggested_action is not None
     with pytest.raises(KeyError):
         controller.target_details("missing-id")
@@ -470,7 +478,7 @@ def test_controller_target_details_notices() -> None:
     )
     service = fake_service()
     service.load_target_settings = MagicMock(return_value=snapshot)
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     assert controller.target_details("chrome").suggested_action is not None
     assert controller.target_details("firefox").suggested_action is not None
     with pytest.raises(KeyError):
@@ -640,7 +648,7 @@ def test_review_save_report_success(tmp_path: Path, monkeypatch: pytest.MonkeyPa
             state_paths=resolve_app_state_paths(state_root=tmp_path / "state"),
             enable_file_logging=False,
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.begin_review_session()
         session = controller.review_session()
         assert session is not None
@@ -661,7 +669,7 @@ def test_controller_export_methods(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         state_paths=resolve_app_state_paths(state_root=tmp_path / "state"),
         enable_file_logging=False,
     )
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     controller.begin_review_session()
     session = controller.review_session()
     assert session is not None

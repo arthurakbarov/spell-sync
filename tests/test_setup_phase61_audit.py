@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import ProjectRef
 from spell_sync.project_setup.discovery import (
     SetupTarget,
     SetupTargetDiscovery,
@@ -102,7 +102,7 @@ def test_zero_selected_targets_supported(tmp_path: Path) -> None:
 
 def test_setup_session_cleared_after_success() -> None:
     service = fake_service()
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     controller.set_setup_wordlist(Path("/tmp/wl.txt"))
     controller.clear_setup_session()
     assert controller.setup_selected_targets == ()
@@ -119,7 +119,7 @@ async def _disabled_row_toggle_blocked() -> None:
     )
     service = fake_service()
     service.discover_setup_targets = MagicMock(return_value=discovery)
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     controller.set_setup_wordlist(Path("/tmp/setup/wordlist.txt"))
     controller._setup_discovery = discovery
     app = SpellSyncApp(controller)

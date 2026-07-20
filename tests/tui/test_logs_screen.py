@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 from textual.widgets import Static
 from textual.worker import WorkerState
 
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import ProjectRef
 from spell_sync.diagnostics.history_record import OperationHistoryRecord
 from spell_sync.diagnostics.types import (
     HistoryClearResult,
@@ -64,7 +64,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             "clear_result",
             HistoryClearResult(ok=True),
         )
-        return TuiController(service, CliOptions())
+        return TuiController(service, ProjectRef())
 
     async def _wait_for_rows(self, pilot, app, *, minimum: int = 1) -> list:
         rows: list = []
@@ -189,7 +189,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_load_failure_shows_controlled_error(self):
         service = fake_service()
         service.load_operation_history = MagicMock(side_effect=RuntimeError("boom"))
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
             app.push_screen(LogsScreen(controller))
@@ -276,7 +276,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             return TechnicalLogSnapshot(path=Path("/tmp/log"), lines=("ok",))
 
         service.read_technical_log_tail = read_tail
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
             app.push_screen(TechnicalLogScreen(controller))

@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from spell_sync.application.reports import StatusDetailSnapshot
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
@@ -79,7 +80,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
             sample_doctor(),
             sample_pull_preview(),
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.switch_screen(StatusScreen(controller))

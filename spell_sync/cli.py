@@ -23,11 +23,11 @@ from .plan_cmd import cmd_plan
 from .recover_cmd import cmd_recover
 from .support_report_cmd import cmd_support_report
 from .tui import (
-    cmd_ui,
     print_non_interactive_ui_error,
     print_non_interactive_usage_error,
     should_launch_tui,
 )
+from .ui_cmd import cmd_ui
 from .version_cmd import cmd_version
 
 CommandFn = Callable[[CliOptions], int]

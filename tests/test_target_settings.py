@@ -9,7 +9,11 @@ from unittest.mock import patch
 import pytest
 
 from spell_sync.application import SpellSyncService
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import (
+    PrepareTargetSettingsUpdateRequest,
+    ProjectRef,
+    TargetSettingsRequest,
+)
 from spell_sync.operation_lock import OperationLocked, OperationLockInfo
 from spell_sync.project_setup.discovery import (
     SetupTarget,
@@ -129,7 +133,9 @@ def test_load_target_settings_current_selection(
 ) -> None:
     wordlist, _config = _write_config(tmp_path, enabled=("chrome", "firefox"))
     with mock_targets(frozenset({"chrome", "firefox"})):
-        snapshot = service.load_target_settings(CliOptions(wordlist=str(wordlist)))
+        snapshot = service.load_target_settings(
+            TargetSettingsRequest(project=ProjectRef(wordlist=wordlist))
+        )
     assert snapshot.enabled_target_ids == frozenset({"chrome", "firefox"})
     assert any(target.identifier == "chrome" and target.enabled for target in snapshot.targets)
 
@@ -142,8 +148,10 @@ def test_prepare_enable_and_disable(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"chrome", "edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist),
+                selected_target_ids=frozenset({"chrome", "edge"}),
+            )
         )
     assert prepared.enabled_target_ids == frozenset({"edge"})
     assert prepared.disabled_target_ids == frozenset()
@@ -158,8 +166,9 @@ def test_prepare_disable_target(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome", "firefox"))
     with mock_targets(frozenset({"chrome", "firefox"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"chrome"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"chrome"})
+            )
         )
     assert prepared.disabled_target_ids == frozenset({"firefox"})
     assert prepared.can_execute is True
@@ -173,8 +182,10 @@ def test_prepare_unknown_target_id(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"chrome", "not-a-target"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist),
+                selected_target_ids=frozenset({"chrome", "not-a-target"}),
+            )
         )
     assert any("Unknown target identifiers ignored" in warning for warning in prepared.warnings)
 
@@ -187,8 +198,9 @@ def test_prepare_no_changes(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"chrome"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"chrome"})
+            )
         )
     assert prepared.can_execute is False
     assert any("No configuration changes" in warning for warning in prepared.warnings)
@@ -202,8 +214,10 @@ def test_prepare_zero_targets(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome", "firefox"))
     with mock_targets(frozenset({"chrome", "firefox"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset(),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist),
+                selected_target_ids=frozenset(),
+            ),
         )
     assert prepared.disabled_target_ids == frozenset({"chrome", "firefox"})
     assert prepared.can_execute is True
@@ -237,12 +251,14 @@ def test_deterministic_rendered_config(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         first = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
         second = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     assert first.rendered_config_bytes == second.rendered_config_bytes
     assert first.update_id == second.update_id
@@ -258,11 +274,11 @@ def test_execute_updates_config_only(
     dictionary.write_text("beta\n", encoding="utf-8")
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -281,12 +297,12 @@ def test_execute_stale_fingerprint(
     wordlist, config_path = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     config_path.write_text(config_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     execution = service.execute_target_settings_update(
-        CliOptions(wordlist=str(wordlist)),
         prepared,
         confirmed_update_id=prepared.update_id,
     )
@@ -302,11 +318,11 @@ def test_execute_wrong_update_id(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     execution = service.execute_target_settings_update(
-        CliOptions(wordlist=str(wordlist)),
         prepared,
         confirmed_update_id="wrong-id",
     )
@@ -321,8 +337,9 @@ def test_execute_active_operation_lock(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
 
     class _Locked:
@@ -340,7 +357,6 @@ def test_execute_active_operation_lock(
         return_value=_Locked(),
     ):
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -357,8 +373,9 @@ def test_execute_pending_recovery_blocks(
     write_test_journal(wordlist, wordlist_write_started=True)
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     assert prepared.can_execute is False
 
@@ -397,12 +414,12 @@ def test_atomic_write_used_for_execute(
     wordlist, config_path = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
         before = file_content_hash(config_path)
         service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -417,11 +434,12 @@ def test_parser_round_trip(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge", "firefox"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist),
+                selected_target_ids=frozenset({"edge", "firefox"}),
+            )
         )
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -469,15 +487,15 @@ def test_execute_oserror(tmp_path: Path, service: SpellSyncService, mock_targets
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     with patch(
         "spell_sync.project_setup.target_settings.atomic_write",
         side_effect=OSError("disk full"),
     ):
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -493,15 +511,15 @@ def test_execute_validation_mismatch(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     with patch(
         "spell_sync.project_setup.target_settings._enabled_from_loaded_config",
         return_value=frozenset({"chrome"}),
     ):
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -516,8 +534,9 @@ def test_execute_fingerprint_race_inside_lock(
     wordlist, config_path = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     original = file_content_hash(config_path)
     calls = {"count": 0}
@@ -533,7 +552,6 @@ def test_execute_fingerprint_race_inside_lock(
         side_effect=_hash,
     ):
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -562,8 +580,9 @@ def test_prepare_missing_config_file(tmp_path: Path, service: SpellSyncService) 
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("alpha\n", encoding="utf-8")
     prepared = service.prepare_target_settings_update(
-        CliOptions(wordlist=str(wordlist)),
-        frozenset({"chrome"}),
+        PrepareTargetSettingsUpdateRequest(
+            project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"chrome"})
+        )
     )
     assert prepared.can_execute is False
     assert any("missing" in warning.lower() for warning in prepared.warnings)
@@ -574,8 +593,9 @@ def test_prepare_invalid_config_blocks(tmp_path: Path, service: SpellSyncService
     wordlist.write_text("alpha\n", encoding="utf-8")
     (tmp_path / "spell-sync.toml").write_text("[[broken\n", encoding="utf-8")
     prepared = service.prepare_target_settings_update(
-        CliOptions(wordlist=str(wordlist)),
-        frozenset({"chrome"}),
+        PrepareTargetSettingsUpdateRequest(
+            project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"chrome"})
+        )
     )
     assert prepared.can_execute is False
 
@@ -588,8 +608,9 @@ def test_execute_invalid_written_config(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
     with patch(
         "spell_sync.project_setup.target_settings.load_config_result",
@@ -602,7 +623,6 @@ def test_execute_invalid_written_config(
             (),
         )
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -617,11 +637,11 @@ def test_execute_completed_message_enable_and_disable(
     wordlist, _config = _write_config(tmp_path, enabled=("chrome", "firefox"))
     with mock_targets(frozenset({"chrome", "firefox"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
         )
@@ -723,11 +743,11 @@ def test_service_target_settings_with_event_sink(
     events: list[OperationEvent] = []
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
-            frozenset({"edge"}),
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist), selected_target_ids=frozenset({"edge"})
+            )
         )
         execution = service.execute_target_settings_update(
-            CliOptions(wordlist=str(wordlist)),
             prepared,
             confirmed_update_id=prepared.update_id,
             event_sink=events.append,
@@ -742,7 +762,7 @@ def test_controller_lazy_discovery(tmp_path: Path) -> None:
     from tests.tui.fake_service import fake_service
 
     wordlist, _ = _write_config(tmp_path, enabled=("chrome",))
-    controller = TuiController(fake_service(), CliOptions(wordlist=str(wordlist)))
+    controller = TuiController(fake_service(), ProjectRef(wordlist=wordlist))
     controller.target_settings_discovery()
 
 

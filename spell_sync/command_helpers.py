@@ -7,13 +7,14 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Iterator
 
+from .application.requests import ProjectRef, resolve_project_wordlist
 from .cli_options import CliOptions
 from .config import CONFIRM_YES, push_max_removals_without_confirm
 from .exit_codes import ExitCode
 from .json_output import base_payload, emit_json, push_result_payload
 from .log import log
 from .operation_lock import OperationLocked, acquire_operation_lock, lock_info_payload
-from .paths import resolve_wordlist_path
+from .paths import wordlist_path
 from .push_journal import (
     JournalLoadResult,
     JournalLoadStatus,
@@ -64,9 +65,10 @@ def invalid_config_exit_from_result(
 
 def invalid_config_exit(opts: CliOptions, command: str) -> int | None:
     """Pre-lock config check; prefer ``mutating_command_scope`` for mutating commands."""
+    from .cli_request_adapter import project_ref
     from .validated_runtime import build_validated_runtime
 
-    wordlist = wordlist_file_for(opts)
+    wordlist = wordlist_path_for(project_ref(opts))
     validated = build_validated_runtime(wordlist)
     return invalid_config_exit_from_result(opts, command, validated.config_result)
 
@@ -77,7 +79,7 @@ def run_from_scope(scope: ValidatedRuntime | int) -> SyncRun | int:
     return SyncRun(context=scope.context)
 
 
-def push_skip_running_app_dicts(run: SyncRun, opts: CliOptions) -> frozenset[str]:
+def push_skip_running_app_dicts(run: SyncRun) -> frozenset[str]:
     """
     Early push skip list for running-app dictionaries.
 
@@ -96,26 +98,14 @@ def operation_lock_scope(opts: CliOptions, command: str) -> Iterator[int | None]
     Yields None when the lock is held; yields an exit code when another live
     process already holds the lock.
     """
-    wordlist = wordlist_file_for(opts)
-    try:
-        with acquire_operation_lock(wordlist, command):
-            yield None
-    except OperationLocked as exc:
-        if opts.json_output:
-            emit_json(
-                {
-                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
-                    "reason": "operation_locked",
-                    "lock": lock_info_payload(exc.info),
-                }
-            )
-        else:
-            log.abort(
-                "operation aborted — another spell-sync process is running "
-                f"({exc.info.command}, pid {exc.info.pid}). "
-                f"Lock file: {exc.lock_path}"
-            )
-        yield int(ExitCode.PUSH_ABORT)
+    from .cli_request_adapter import project_ref
+
+    with operation_lock_scope_for(
+        project_ref(opts),
+        command,
+        json_output=opts.json_output,
+    ) as lock_exit:
+        yield lock_exit
 
 
 def unfinished_journal_exit_from_result(
@@ -174,9 +164,10 @@ def unfinished_journal_exit_from_result(
 
 
 def unfinished_journal_exit(opts: CliOptions, command: str) -> int | None:
-    wordlist = wordlist_file_for(opts)
+    from .cli_request_adapter import project_ref
     from .push_journal import load_journal_result
 
+    wordlist = wordlist_path_for(project_ref(opts))
     return unfinished_journal_exit_from_result(
         opts,
         command,
@@ -193,33 +184,16 @@ def mutating_command_scope(
     allow_unfinished_journal: bool = False,
     strict_push: bool = False,
 ) -> Iterator[ValidatedRuntime | int]:
-    """Acquire lock, then load config and journal once for mutating commands."""
-    wordlist = wordlist_file_for(opts)
-    with operation_lock_scope(opts, command) as lock_exit:
-        if lock_exit is not None:
-            yield lock_exit
-            return
-        validated = build_validated_runtime(wordlist, strict_push=strict_push)
-        config_exit = invalid_config_exit_from_result(opts, command, validated.config_result)
-        if config_exit is not None:
-            yield config_exit
-            return
-        journal_exit = None
-        if not allow_unfinished_journal:
-            journal_exit = unfinished_journal_exit_from_result(
-                opts,
-                command,
-                validated.journal_result,
-                wordlist=wordlist,
-            )
-        if journal_exit is not None:
-            yield journal_exit
-            return
-        token = _active_validated.set(validated)
-        try:
-            yield validated
-        finally:
-            _active_validated.reset(token)
+    from .cli_request_adapter import project_ref
+
+    with mutating_command_scope_for(
+        project_ref(opts),
+        command,
+        allow_unfinished_journal=allow_unfinished_journal,
+        strict_push=strict_push,
+        json_output=opts.json_output,
+    ) as scope:
+        yield scope
 
 
 @contextmanager
@@ -320,8 +294,168 @@ def finish_push(
     return int(exit_code)
 
 
+def wordlist_path_for(project: ProjectRef):
+    return resolve_project_wordlist(project)
+
+
 def wordlist_file_for(opts: CliOptions):
-    return resolve_wordlist_path(opts.wordlist)
+    from .cli_request_adapter import project_ref
+
+    return wordlist_path_for(project_ref(opts))
+
+
+@contextmanager
+def mutating_command_scope_for(
+    project: ProjectRef,
+    command: str,
+    *,
+    allow_unfinished_journal: bool = False,
+    strict_push: bool = False,
+    json_output: bool = False,
+) -> Iterator[ValidatedRuntime | int]:
+    """Acquire lock, then load config and journal once for mutating commands."""
+    wordlist = wordlist_path_for(project)
+    with operation_lock_scope_for(project, command, json_output=json_output) as lock_exit:
+        if lock_exit is not None:
+            yield lock_exit
+            return
+        validated = build_validated_runtime(wordlist, strict_push=strict_push)
+        config_exit = invalid_config_exit_from_scope(
+            command,
+            validated.config_result,
+            json_output=json_output,
+        )
+        if config_exit is not None:
+            yield config_exit
+            return
+        journal_exit = None
+        if not allow_unfinished_journal:
+            journal_exit = unfinished_journal_exit_from_result_for(
+                command,
+                validated.journal_result,
+                json_output=json_output,
+                wordlist=wordlist,
+            )
+        if journal_exit is not None:
+            yield journal_exit
+            return
+        token = _active_validated.set(validated)
+        try:
+            yield validated
+        finally:
+            _active_validated.reset(token)
+
+
+@contextmanager
+def operation_lock_scope_for(
+    project: ProjectRef,
+    command: str,
+    *,
+    json_output: bool = False,
+) -> Iterator[int | None]:
+    wordlist = wordlist_path_for(project)
+    try:
+        with acquire_operation_lock(wordlist, command):
+            yield None
+    except OperationLocked as exc:
+        if json_output:
+            emit_json(
+                {
+                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
+                    "reason": "operation_locked",
+                    "lock": lock_info_payload(exc.info),
+                }
+            )
+        else:
+            log.abort(
+                "operation aborted — another spell-sync process is running "
+                f"({exc.info.command}, pid {exc.info.pid}). "
+                f"Lock file: {exc.lock_path}"
+            )
+        yield int(ExitCode.PUSH_ABORT)
+
+
+def invalid_config_exit_from_scope(
+    command: str,
+    result,
+    *,
+    json_output: bool = False,
+) -> int | None:
+    if not config_blocks_mutating(result):
+        return None
+    diagnostics = [
+        {"path": item.path, "message": item.message, "kind": item.kind.value}
+        for item in result.diagnostics
+    ]
+    if json_output:
+        emit_json(
+            {
+                **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
+                "reason": "invalid_config",
+                "config_status": result.status.value,
+                "diagnostics": diagnostics,
+            }
+        )
+    else:
+        log.abort(
+            "operation aborted — invalid spell-sync.toml "
+            f"({result.status.value}). Fix config before mutating commands."
+        )
+    return int(ExitCode.PUSH_ABORT)
+
+
+def unfinished_journal_exit_from_result_for(
+    command: str,
+    result: JournalLoadResult,
+    *,
+    json_output: bool = False,
+    wordlist=None,
+) -> int | None:
+    if command == "recover":
+        return None
+    if result.status is JournalLoadStatus.ABSENT:
+        return None
+    if result.status is JournalLoadStatus.VALID_COMPLETED:
+        return None
+    if result.status in (
+        JournalLoadStatus.CORRUPT,
+        JournalLoadStatus.UNSUPPORTED_SCHEMA,
+    ):
+        reason = "corrupt_journal"
+        detail = result.detail or result.status.value
+        if json_output:
+            emit_json(
+                {
+                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
+                    "reason": reason,
+                    "detail": detail,
+                }
+            )
+        else:
+            wl = wordlist if wordlist is not None else wordlist_path()
+            log.abort(
+                "operation aborted — push journal is corrupt or unsupported "
+                f"({detail}). Inspect or remove "
+                f"{wl.resolve().parent / '.spell-sync.journal.json'} carefully."
+            )
+        return int(ExitCode.PUSH_ABORT)
+    journal = result.journal
+    assert journal is not None
+    if json_output:
+        emit_json(
+            {
+                **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
+                "reason": "unfinished_transaction",
+                "journal": journal_payload(journal),
+            }
+        )
+    else:
+        log.abort(
+            "operation aborted — unfinished push journal found "
+            f"({journal.started}, pid {journal.pid}). "
+            "Run `spell-sync recover` before mutating commands."
+        )
+    return int(ExitCode.PUSH_ABORT)
 
 
 def guard_exit_code(

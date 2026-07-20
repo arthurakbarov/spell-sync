@@ -1,4 +1,4 @@
-"""CLI command options."""
+"""CLI command options — parser DTO only; map to application requests via cli_request_adapter."""
 
 from __future__ import annotations
 

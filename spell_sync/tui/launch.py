@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from ..application import SpellSyncService
-from ..cli_options import CliOptions
+from ..application.requests import ProjectRef
 from ..log import log
 from .app import run_app
 from .controller import TuiController
 
 
-def cmd_ui(opts: CliOptions) -> int:
+def run_ui(project: ProjectRef) -> int:
     try:
-        controller = TuiController(SpellSyncService(), opts)
+        controller = TuiController(SpellSyncService(), project)
         return run_app(controller)
     except Exception:
         log.error("TUI failed to start.")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from spell_sync.application.reports import OperationOutcome, PullExecution
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.tui.app import SpellSyncApp
@@ -18,7 +19,7 @@ from tests.tui.test_helpers import wait_for_text
 class TestPullFlow(unittest.IsolatedAsyncioTestCase):
     async def test_preview_fields_and_refresh(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
@@ -34,7 +35,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirmation_and_success_report(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -47,7 +48,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancel_before_execution(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -69,7 +70,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
                 message="write failed",
             )
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -92,7 +93,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
 
     async def test_double_run_guard(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             screen = PullScreen(controller)

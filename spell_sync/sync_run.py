@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
 from .app_process_check import running_app_skip_reasons
-from .cli_options import CliOptions
+from .application.requests import ProjectRef
 from .dictionaries import Dictionary
 from .exit_codes import ExitCode
 from .io import read_hunspell_words, read_text_words
@@ -314,6 +314,6 @@ class SyncRun:
         return result
 
 
-def sync_run_for(opts: CliOptions, *, strict_push: bool = False) -> SyncRun:
-    """Build SyncRun from CLI options."""
-    return SyncRun(context=runtime_context_for(opts, strict_push=strict_push))
+def sync_run_for(project: ProjectRef, *, strict_push: bool = False) -> SyncRun:
+    """Build SyncRun from a project reference."""
+    return SyncRun(context=runtime_context_for(project, strict_push=strict_push))

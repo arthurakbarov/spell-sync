@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.worker import Worker, WorkerState
 
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.project_setup.discovery import SetupTarget, SetupTargetDiscovery
 from spell_sync.project_setup.selection import SetupSelection
@@ -61,7 +62,7 @@ class TestSetupTargetsScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         service = fake_service()
         service.discover_setup_targets = MagicMock(return_value=discovery)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.set_setup_wordlist(Path("/tmp/setup/wordlist.txt"))
         controller._setup_discovery = discovery
         controller._setup_selection = SetupSelection(frozenset({"chrome"}))
@@ -286,7 +287,7 @@ class TestControllerSetupCoverage(unittest.TestCase):
         )
         service = fake_service()
         service.discover_setup_targets = MagicMock(return_value=discovery)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         wordlist = Path("/tmp/setup/wordlist.txt")
         controller.set_setup_wordlist(wordlist)
         controller._setup_selection = SetupSelection(frozenset())

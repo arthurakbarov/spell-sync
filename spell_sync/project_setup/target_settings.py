@@ -8,9 +8,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
+from ..application.requests import (
+    PrepareTargetSettingsUpdateRequest,
+    TargetSettingsRequest,
+    resolve_project_wordlist,
+)
 from ..io import atomic_write
 from ..operation_lock import OperationLocked, acquire_operation_lock
-from ..paths import resolve_wordlist_path
 from ..push_journal import JournalLoadStatus, file_content_hash
 from ..settings import ConfigStatus, config_blocks_mutating, load_config_result
 from ..validated_runtime import build_validated_runtime
@@ -376,16 +380,15 @@ def execute_target_settings_update(
     )
 
 
-def load_target_settings_from_options(opts) -> TargetSettingsSnapshot:
-    wordlist = resolve_wordlist_path(opts.wordlist)
+def load_target_settings(request: TargetSettingsRequest) -> TargetSettingsSnapshot:
+    wordlist = resolve_project_wordlist(request.project)
     return load_target_settings_snapshot(wordlist=wordlist)
 
 
-def prepare_target_settings_from_options(
-    opts,
-    selected_target_ids: frozenset[str],
+def prepare_target_settings_update_request(
+    request: PrepareTargetSettingsUpdateRequest,
 ) -> PreparedTargetSettingsUpdate:
-    wordlist = resolve_wordlist_path(opts.wordlist)
+    wordlist = resolve_project_wordlist(request.project)
     validated = build_validated_runtime(wordlist)
     pending_recovery = validated.journal_result.status not in (
         JournalLoadStatus.ABSENT,
@@ -393,6 +396,6 @@ def prepare_target_settings_from_options(
     )
     return prepare_target_settings_update(
         wordlist=wordlist,
-        selected_target_ids=selected_target_ids,
+        selected_target_ids=request.selected_target_ids,
         pending_recovery=pending_recovery,
     )

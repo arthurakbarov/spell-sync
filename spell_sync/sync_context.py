@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from .cli_options import CliOptions
+from .application.requests import ProjectRef, resolve_project_wordlist
 from .dictionaries import Dictionary, discover_dictionaries
-from .paths import resolve_wordlist_path, wordlist_path
+from .paths import wordlist_path
 from .project import ProjectContext
 from .settings import bind_active_settings, load_config_result
 
@@ -64,23 +64,23 @@ class RuntimeContext(ProjectContext):
         )
 
 
-def runtime_context_for(opts: CliOptions, *, strict_push: bool = False) -> RuntimeContext:
-    """Build context from CLI options; project config is adjacent to effective wordlist."""
+def runtime_context_for(project: ProjectRef, *, strict_push: bool = False) -> RuntimeContext:
+    """Build context from project reference; config is adjacent to effective wordlist."""
     from .command_helpers import active_validated_runtime
 
     validated = active_validated_runtime()
     if validated is not None:
         return validated.context
-    wl = resolve_wordlist_path(opts.wordlist)
-    project = ProjectContext.build(wl)
+    wl = resolve_project_wordlist(project)
+    project_ctx = ProjectContext.build(wl)
     result = load_config_result(wordlist=wl, reload=True)
     config: RuntimeConfig = dict(result.config) if result.config is not None else {}
     bind_active_settings(config)
     dicts = tuple(discover_dictionaries(config))
     return RuntimeContext(
         wordlist=wl,
-        project_dir=project.project_dir,
-        config_paths=project.config_paths,
+        project_dir=project_ctx.project_dir,
+        config_paths=project_ctx.config_paths,
         config=config,
         dictionaries=dicts,
         strict_push=strict_push,

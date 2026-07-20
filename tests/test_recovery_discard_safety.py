@@ -8,8 +8,11 @@ import unittest
 from pathlib import Path
 
 from spell_sync.application.reports import RecoveryOutcome, RecoveryStatus
+from spell_sync.application.requests import (
+    ProjectRef,
+    RecoveryRequest,
+)
 from spell_sync.application.service import SpellSyncService
-from spell_sync.cli_options import CliOptions
 from spell_sync.push_journal import (
     JOURNAL_STATE_COMPLETED,
     JournalLoadStatus,
@@ -46,10 +49,12 @@ class TestRecoveryDiscardSafety(unittest.TestCase):
                 snap.rmdir()
             snap.symlink_to(victim_dir, target_is_directory=True)
 
-            preview = service.inspect_recovery(CliOptions(wordlist=str(wordlist)))
+            preview = service.inspect_recovery(
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist))
+            )
             self.assertEqual(preview.status, RecoveryStatus.COMPLETED_CLEANUP_PENDING)
             execution = service.execute_recovery_discard(
-                CliOptions(wordlist=str(wordlist)),
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist)),
                 preview,
                 confirmed_transaction_id=preview.preview_fingerprint,
             )
@@ -94,14 +99,16 @@ class TestRecoveryDiscardSafety(unittest.TestCase):
             wordlist = root / "wordlist.txt"
             dictionary = root / "dict.txt"
             write_restore_scenario_journal(wordlist, dictionary)
-            preview = service.inspect_recovery(CliOptions(wordlist=str(wordlist)))
+            preview = service.inspect_recovery(
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist))
+            )
             self.assertTrue(preview.can_recover)
             journal_path = journal_path_for_wordlist(wordlist)
             raw = json.loads(journal_path.read_text(encoding="utf-8"))
             raw["transaction_id"] = "00000000-0000-4000-8000-000000000099"
             journal_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
             execution = service.execute_recovery(
-                CliOptions(wordlist=str(wordlist)),
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist)),
                 preview,
                 confirmed_transaction_id=preview.preview_fingerprint,
             )
@@ -125,9 +132,11 @@ class TestRecoveryDiscardSafety(unittest.TestCase):
                 wordlist_write_started=True,
                 wordlist_write_completed=True,
             )
-            preview = service.inspect_recovery(CliOptions(wordlist=str(wordlist)))
+            preview = service.inspect_recovery(
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist))
+            )
             execution = service.execute_recovery_cleanup(
-                CliOptions(wordlist=str(wordlist)),
+                RecoveryRequest(project=ProjectRef(wordlist=wordlist)),
                 preview,
                 confirmed_transaction_id=preview.preview_fingerprint,
             )

@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from spell_sync.application.builders import build_pull_preview
 from spell_sync.application.reports import OperationOutcome
+from spell_sync.application.requests import ProjectRef, PullRequest
 from spell_sync.application.service import SpellSyncService
 from spell_sync.cli_options import CliOptions
 from spell_sync.command_helpers import mutating_command_scope
@@ -23,7 +24,7 @@ from tests.journal_test_utils import write_test_journal
 
 
 class TestPullSafety(unittest.TestCase):
-    def _project(self, tmp: str) -> tuple[Path, Path, SyncRun, CliOptions]:
+    def _project(self, tmp: str) -> tuple[Path, Path, SyncRun, PullRequest, CliOptions]:
         root = Path(tmp)
         wordlist = root / "wordlist.txt"
         dictionary = root / "local.txt"
@@ -35,11 +36,12 @@ class TestPullSafety(unittest.TestCase):
             dictionaries=[Dictionary("custom", str(dictionary), DictionaryFormat.TEXT)],
         )
         opts = CliOptions(wordlist=str(wordlist))
-        return wordlist, dictionary, run, opts
+        request = PullRequest(project=ProjectRef(wordlist=wordlist))
+        return wordlist, dictionary, run, request, opts
 
     def test_active_operation_lock_blocks_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
             lock_path = lock_path_for_wordlist(wordlist)
@@ -48,7 +50,7 @@ class TestPullSafety(unittest.TestCase):
                 side_effect=OperationLocked(info, lock_path),
             ):
                 execution = SpellSyncService().execute_pull(
-                    opts,
+                    request,
                     preview,
                     confirmed_plan_id=preview.plan_identifier,
                 )
@@ -56,11 +58,11 @@ class TestPullSafety(unittest.TestCase):
 
     def test_pending_recovery_blocks_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             write_test_journal(wordlist, wordlist_write_started=True)
             preview = build_pull_preview(run)
             execution = SpellSyncService().execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -68,11 +70,11 @@ class TestPullSafety(unittest.TestCase):
 
     def test_corrupt_journal_blocks_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             journal_path_for_wordlist(wordlist).write_text("{bad json", encoding="utf-8")
             preview = build_pull_preview(run)
             execution = SpellSyncService().execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -80,11 +82,11 @@ class TestPullSafety(unittest.TestCase):
 
     def test_invalid_config_blocks_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             (wordlist.parent / "spell-sync.toml").write_text("[[dictionaries]]\n", encoding="utf-8")
             preview = build_pull_preview(run)
             execution = SpellSyncService().execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -93,11 +95,11 @@ class TestPullSafety(unittest.TestCase):
     def test_wordlist_changed_after_preview_is_controlled_conflict(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             wordlist.write_text("alpha\nbeta\nchanged\n", encoding="utf-8")
             execution = service.execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -106,11 +108,11 @@ class TestPullSafety(unittest.TestCase):
 
     def test_external_wordlist_change_is_preserved(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             wordlist.write_text("alpha\nbeta\nexternal\n", encoding="utf-8")
             SpellSyncService().execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -121,11 +123,11 @@ class TestPullSafety(unittest.TestCase):
     def test_write_failure_does_not_report_success(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             with patch.object(SyncRun, "execute_prepared_pull", return_value=ExitCode.PUSH_ABORT):
                 execution = service.execute_pull(
-                    opts,
+                    request,
                     preview,
                     confirmed_plan_id=preview.plan_identifier,
                 )
@@ -134,7 +136,7 @@ class TestPullSafety(unittest.TestCase):
     def test_service_routes_through_sync_run_execute_prepared_pull(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             with patch.object(
                 SyncRun,
@@ -142,7 +144,7 @@ class TestPullSafety(unittest.TestCase):
                 return_value=(preview.before_count, preview.after_count),
             ) as execute:
                 execution = service.execute_pull(
-                    opts,
+                    request,
                     preview,
                     confirmed_plan_id=preview.plan_identifier,
                 )
@@ -151,7 +153,7 @@ class TestPullSafety(unittest.TestCase):
 
     def test_cli_and_service_share_execute_prepared_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             expected = (preview.before_count, preview.after_count)
             with patch.object(
@@ -169,7 +171,7 @@ class TestPullSafety(unittest.TestCase):
                         wordlist_fingerprint=preview.wordlist_fingerprint,
                     )
                 service_result = SpellSyncService().execute_pull(
-                    opts,
+                    request,
                     preview,
                     confirmed_plan_id=preview.plan_identifier,
                 )
@@ -179,7 +181,7 @@ class TestPullSafety(unittest.TestCase):
 
     def test_pull_into_wordlist_delegates_to_execute_prepared_pull(self):
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, dictionary, run, _opts = self._project(tmp)
+            wordlist, dictionary, run, _request, _opts = self._project(tmp)
             with patch.object(
                 SyncRun,
                 "execute_prepared_pull",
@@ -192,10 +194,10 @@ class TestPullSafety(unittest.TestCase):
     def test_pull_events_include_real_stages(self):
         events: list = []
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, _dictionary, run, opts = self._project(tmp)
+            wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             SpellSyncService().execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
                 event_sink=events.append,

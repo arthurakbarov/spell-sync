@@ -343,14 +343,14 @@ def test_multiple_ok_dictionaries_not_ambiguous() -> None:
 def test_controller_selection_helpers() -> None:
     from unittest.mock import MagicMock
 
-    from spell_sync.cli_options import CliOptions
+    from spell_sync.application.requests import ProjectRef
     from spell_sync.tui.controller import TuiController
     from tests.tui.fake_service import fake_service
 
     discovery = _discovery(_target("chrome"), _target("firefox"))
     service = fake_service()
     service.discover_setup_targets = MagicMock(return_value=discovery)
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     controller.set_setup_wordlist(Path("/tmp/setup/wordlist.txt"))
     assert controller.setup_selection().selected_target_ids
     controller.clear_setup_target_selection()

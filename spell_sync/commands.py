@@ -13,6 +13,13 @@ from .app_process_check import (
 )
 from .application import SpellSyncService
 from .cli_options import CliOptions
+from .cli_request_adapter import (
+    effective_push_strict,
+    project_ref,
+    pull_request,
+    push_request,
+    status_request,
+)
 from .command_helpers import (
     confirm_push_removals,
     emit_command_exit,
@@ -24,7 +31,6 @@ from .command_helpers import (
     sync_run_for,
     wordlist_file_for,
 )
-from .config import push_strict_enabled
 from .dictionary_hints import warn_missing_optional_apps
 from .exit_codes import ExitCode
 from .json_output import base_payload, dictionary_diff_payload, emit_json
@@ -38,7 +44,7 @@ _SERVICE = SpellSyncService()
 
 
 def _effective_push_strict(opts: CliOptions) -> bool:
-    return opts.strict or push_strict_enabled()
+    return effective_push_strict(push_request(opts))
 
 
 def _running_apps_check_for_push(opts: CliOptions) -> bool | None:
@@ -70,7 +76,7 @@ def cmd_status(opts: CliOptions) -> int:
     with quiet_json_output(opts):
         verbose = opts.verbose
         log.section("status" + (" (verbose)" if verbose else ""))
-        snapshot = _SERVICE.load_status(opts)
+        snapshot = _SERVICE.load_status(status_request(opts))
         if snapshot.wordlist_error is not None:
             return emit_command_exit(opts, "status", snapshot.wordlist_error)
         if snapshot.empty_wordlist:
@@ -103,8 +109,8 @@ def cmd_pull(opts: CliOptions) -> int:
 
 
 def _cmd_pull_locked(opts: CliOptions) -> int:
-    preview = _SERVICE.prepare_pull(opts)
-    run = sync_run_for(opts)
+    preview = _SERVICE.prepare_pull(pull_request(opts))
+    run = sync_run_for(project_ref(opts))
     if opts.add_from:
         log.section(f"pull: merge words from {opts.add_from} -> wordlist")
         result = run.pull_add_from(opts.add_from)
@@ -148,8 +154,8 @@ def _cmd_push_locked(opts: CliOptions) -> int:
     mode = " (dry-run)" if dry_run else ""
     log.section(f"push{mode}: wordlist OVERWRITES all dictionaries")
     warn_missing_optional_apps()
-    run = sync_run_for(opts, strict_push=_effective_push_strict(opts))
-    prepared = _SERVICE.prepare_push(run, opts)
+    run = sync_run_for(project_ref(opts), strict_push=_effective_push_strict(opts))
+    prepared = _SERVICE.prepare_push(run)
     if isinstance(prepared, ExitCode):
         return finish_push(prepared, opts, dry_run=dry_run, command="push")
     if not dry_run:
@@ -204,7 +210,7 @@ def _cmd_push_locked(opts: CliOptions) -> int:
             )
     result = _SERVICE.execute_push(run, prepared, dry_run=dry_run)
     if dry_run and isinstance(result, PushResult) and not opts.json_output:
-        snapshot = _SERVICE.load_status(opts)
+        snapshot = _SERVICE.load_status(status_request(opts))
         for diff in snapshot.diffs:
             print_status_diff(diff, verbose=opts.verbose)
     if not dry_run and not isinstance(result, ExitCode):

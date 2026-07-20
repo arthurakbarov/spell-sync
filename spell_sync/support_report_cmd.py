@@ -12,6 +12,7 @@ from .application.support_report import (
     support_report_to_dict,
 )
 from .cli_options import CliOptions
+from .cli_request_adapter import support_report_request
 from .command_helpers import emit_command_exit
 from .exit_codes import ExitCode
 
@@ -20,7 +21,7 @@ def cmd_support_report(opts: CliOptions) -> int:
     from .application.service import SpellSyncService
 
     service = SpellSyncService()
-    report = build_support_report(service, opts)
+    report = build_support_report(service, support_report_request(opts))
     fmt = getattr(opts, "support_report_format", "text") or "text"
     output = getattr(opts, "support_report_output", None)
     if opts.json_output and not output:

@@ -10,11 +10,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..cli_options import CliOptions
+from ..application.requests import SupportReportRequest, resolve_project_wordlist
 from ..command_helpers import sync_run_for
 from ..diagnostics.paths import resolve_app_state_paths
-from ..paths import resolve_wordlist_path
-from ..project_setup.target_settings import load_target_settings_from_options
+from ..project_setup.target_settings import load_target_settings
 from ..push_journal import JournalLoadStatus, load_journal_result
 from ..runtime import installed_package_version
 from ..settings import ConfigStatus
@@ -96,19 +95,21 @@ class SupportReport:
     privacy: PrivacyManifest
 
 
-def build_support_report(service: object, opts: CliOptions) -> SupportReport:
-    wordlist = resolve_wordlist_path(opts.wordlist)
+def build_support_report(service: object, request: SupportReportRequest) -> SupportReport:
+    wordlist = resolve_project_wordlist(request.project)
     validated = build_validated_runtime(wordlist)
     config_valid = validated.config_result.status in (ConfigStatus.VALID, ConfigStatus.ABSENT)
     word_count: int | None = None
     try:
-        run = sync_run_for(opts)
+        run = sync_run_for(request.project)
         word_count = len(run.load_wordlist())
     except Exception:
         word_count = None
     journal = load_journal_result(wordlist)
     pending = journal.status is JournalLoadStatus.VALID_IN_PROGRESS
-    target_settings = load_target_settings_from_options(opts)
+    from ..application.requests import TargetSettingsRequest
+
+    target_settings = load_target_settings(TargetSettingsRequest(project=request.project))
     targets: list[TargetSupportState] = []
     for target in target_settings.targets:
         try:

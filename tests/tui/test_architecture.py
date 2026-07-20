@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import spell_sync.tui as tui_pkg
 from spell_sync.application import SpellSyncService
 from spell_sync.application.reports import PushPreview
+from spell_sync.application.requests import ProjectRef
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.tui.controller import TuiController
 from tests.tui.fake_service import fake_service
@@ -109,14 +110,14 @@ class TestTuiArchitecture(unittest.TestCase):
         self.assertTrue(css_path.is_file())
 
     def test_dashboard_loads_via_service_only(self):
-        controller = TuiController(fake_service(), MagicMock())
+        controller = TuiController(fake_service(), ProjectRef())
         with patch.object(controller._service, "load_dashboard") as load_dashboard:
             controller.dashboard()
         load_dashboard.assert_called_once()
 
     def test_push_execution_goes_through_service(self):
         service = fake_service()
-        controller = TuiController(service, MagicMock())
+        controller = TuiController(service, ProjectRef())
         preview = service.preview
         controller._active_push_preview = preview
         execution = controller.execute_push(preview)
@@ -129,7 +130,7 @@ class TestTuiArchitecture(unittest.TestCase):
         from tests.tui.fake_service import sample_preview
 
         preview = sample_preview(removals=6, additions=28)
-        screen = PushConfirmScreen(TuiController(fake_service(), MagicMock()), preview)
+        screen = PushConfirmScreen(TuiController(fake_service(), ProjectRef()), preview)
         self.assertEqual(screen._preview.removals, 6)
         self.assertEqual(screen._preview.additions, 28)
 
@@ -142,7 +143,7 @@ class TestTuiArchitecture(unittest.TestCase):
 
     def test_tui_setup_goes_through_service(self):
         service = fake_service()
-        controller = TuiController(service, MagicMock())
+        controller = TuiController(service, ProjectRef())
         controller.set_setup_wordlist(Path("/tmp/project/wordlist.txt"))
         controller.prepare_setup_preview()
         self.assertIsNotNone(controller._setup_prepared)
@@ -161,7 +162,7 @@ class TestTuiArchitecture(unittest.TestCase):
 
     def test_target_settings_goes_through_service(self):
         service = fake_service()
-        controller = TuiController(service, MagicMock())
+        controller = TuiController(service, ProjectRef())
         controller.begin_target_settings()
         prepared = controller.prepare_target_settings_update()
         controller.execute_target_settings_update(prepared)

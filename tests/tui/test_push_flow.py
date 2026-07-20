@@ -6,6 +6,7 @@ import unittest
 from dataclasses import replace
 
 from spell_sync.application.reports import OperationOutcome, PushExecution, TargetPreview
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.sync_models import PushResult
@@ -24,7 +25,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             targets=(TargetPreview("chrome", 2, 0, "Ready"),),
         )
         service = fake_service(preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -36,7 +37,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
 
     async def test_typed_confirmation_required(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -64,7 +65,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(preview=prepared_preview)
         # Keep plan id stable for this test
         service.load_push_preview = lambda opts: prepared_preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -100,7 +101,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             ),
         )
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -127,7 +128,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             ),
         )
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -155,7 +156,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             ),
         )
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -167,7 +168,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
 
     async def test_old_preview_invalidated_on_refresh(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))

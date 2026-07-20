@@ -9,6 +9,13 @@ from unittest.mock import MagicMock, patch
 from spell_sync.application import SpellSyncService
 from spell_sync.application.events import OperationEvent
 from spell_sync.application.reports import DashboardSeverity, StatusSnapshot
+from spell_sync.application.requests import (
+    DoctorRequest,
+    ProjectRef,
+    PullRequest,
+    PushRequest,
+    StatusRequest,
+)
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
@@ -25,6 +32,24 @@ def _pull_scope(wordlist: str = "/tmp/w.txt"):
     validated = MagicMock()
     validated.context = ctx
     return validated
+
+
+def _status(wordlist: str | None = None, *, include_word_diffs: bool = False) -> StatusRequest:
+    project = ProjectRef(wordlist=Path(wordlist)) if wordlist else ProjectRef()
+    return StatusRequest(project=project, include_word_diffs=include_word_diffs)
+
+
+def _push(wordlist: str | None = None) -> PushRequest:
+    project = ProjectRef(wordlist=Path(wordlist)) if wordlist else ProjectRef()
+    return PushRequest(project=project)
+
+
+def _pull() -> PullRequest:
+    return PullRequest(project=ProjectRef())
+
+
+def _doctor() -> DoctorRequest:
+    return DoctorRequest(project=ProjectRef())
 
 
 class TestSpellSyncService(unittest.TestCase):
@@ -46,7 +71,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.destructive_push_risk.return_value = None
 
         with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
-            snapshot = service.load_status(CliOptions())
+            snapshot = service.load_status(_status())
 
         self.assertEqual(snapshot.wordlist_count, 2)
         self.assertEqual(snapshot.diffs, (diff,))
@@ -62,7 +87,7 @@ class TestSpellSyncService(unittest.TestCase):
         events: list[OperationEvent] = []
 
         with patch("spell_sync.application.service.plan_fingerprint_conflict", return_value=None):
-            service.prepare_push(run, CliOptions(), event_sink=events.append)
+            service.prepare_push(run, event_sink=events.append)
             service.execute_push(run, prepared, dry_run=False, event_sink=events.append)
 
         stages = [event.stage for event in events]
@@ -132,7 +157,7 @@ class TestSpellSyncService(unittest.TestCase):
                     code = commands_mod._cmd_push_locked(CliOptions(yes=True, dry_run=True))
 
         self.assertEqual(code, 0)
-        service.prepare_push.assert_called_once_with(run, CliOptions(yes=True, dry_run=True))
+        service.prepare_push.assert_called_once_with(run)
         service.execute_push.assert_called_once()
         execute_args, execute_kwargs = service.execute_push.call_args
         self.assertIs(execute_args[0], run)
@@ -167,7 +192,7 @@ class TestSpellSyncService(unittest.TestCase):
                     return_value=None,
                 ):
                     with patch.object(service, "load_status", return_value=snapshot) as load_status:
-                        state = service.load_dashboard(CliOptions(wordlist="/tmp/w.txt"))
+                        state = service.load_dashboard(_status("/tmp/w.txt"))
 
         load_status.assert_called_once()
         self.assertEqual(state.wordlist_path, "/tmp/w.txt")
@@ -222,7 +247,7 @@ class TestSpellSyncService(unittest.TestCase):
                             "load_operation_history",
                             return_value=OperationHistorySnapshot(records=(record,)),
                         ):
-                            state = service.load_dashboard(CliOptions(wordlist="/tmp/w.txt"))
+                            state = service.load_dashboard(_status("/tmp/w.txt"))
 
         self.assertIn("Last: Push", state.last_operation_summary or "")
 
@@ -241,7 +266,7 @@ class TestSpellSyncService(unittest.TestCase):
 
         with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
             with patch.object(service, "prepare_push", return_value=prepared):
-                preview = service.load_push_preview(CliOptions())
+                preview = service.load_push_preview(_push())
 
         self.assertIs(preview.prepared, prepared)
         self.assertIsNone(preview.wordlist_error)
@@ -253,7 +278,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.check_wordlist.return_value = ExitCode.PUSH_ABORT
 
         with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
-            preview = service.load_push_preview(CliOptions())
+            preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.wordlist_error, ExitCode.PUSH_ABORT)
         self.assertIsNone(preview.prepared)
@@ -266,7 +291,7 @@ class TestSpellSyncService(unittest.TestCase):
 
         with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
             with patch.object(service, "prepare_push", return_value=ExitCode.PUSH_ABORT):
-                preview = service.load_push_preview(CliOptions())
+                preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.prepare_error, ExitCode.PUSH_ABORT)
         self.assertIsNone(preview.prepared)
@@ -281,7 +306,7 @@ class TestSpellSyncService(unittest.TestCase):
                 "spell_sync.application.service.build_status_detail_snapshot",
                 return_value=detail,
             ) as builder:
-                result = service.load_status_detail(CliOptions())
+                result = service.load_status_detail(_status())
 
         builder.assert_called_once_with(run)
         self.assertIs(result, detail)
@@ -297,7 +322,7 @@ class TestSpellSyncService(unittest.TestCase):
                     "spell_sync.application.service.build_doctor_snapshot",
                     return_value=snapshot,
                 ) as builder:
-                    result = service.load_doctor(CliOptions())
+                    result = service.load_doctor(_doctor())
 
         builder.assert_called_once_with(report)
         self.assertIs(result, snapshot)
@@ -308,7 +333,7 @@ class TestSpellSyncService(unittest.TestCase):
             "spell_sync.application.service.command_helpers.sync_run_for",
             side_effect=RuntimeError("boom"),
         ):
-            snapshot = service.load_doctor(CliOptions())
+            snapshot = service.load_doctor(_doctor())
         self.assertEqual(snapshot.load_error, "Doctor report could not be loaded.")
 
     def test_run_push_wraps_execute_push_result(self):
@@ -320,7 +345,6 @@ class TestSpellSyncService(unittest.TestCase):
         with patch.object(service, "execute_push", return_value=push_result) as execute_push:
             execution = service.run_push(
                 run,
-                CliOptions(),
                 prepared,
                 dry_run=False,
                 event_sink=[],
@@ -341,7 +365,7 @@ class TestSpellSyncService(unittest.TestCase):
                 "spell_sync.application.service.build_pull_preview",
                 return_value=preview,
             ) as builder:
-                result = service.prepare_pull(CliOptions())
+                result = service.prepare_pull(_pull())
         builder.assert_called_once_with(run)
         self.assertIs(result, preview)
 
@@ -363,12 +387,12 @@ class TestSpellSyncService(unittest.TestCase):
             merged_words=("a", "b"),
             wordlist_fingerprint="abc",
         )
-        bad = service.execute_pull(CliOptions(), preview, confirmed_plan_id="other")
+        bad = service.execute_pull(_pull(), preview, confirmed_plan_id="other")
         self.assertEqual(bad.outcome, OperationOutcome.FAILED)
 
         events: list = []
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
@@ -382,7 +406,7 @@ class TestSpellSyncService(unittest.TestCase):
                     return_value=(preview.before_count, preview.after_count),
                 ) as execute:
                     ok = service.execute_pull(
-                        CliOptions(),
+                        _pull(),
                         preview,
                         confirmed_plan_id="p1",
                         event_sink=events.append,
@@ -414,7 +438,7 @@ class TestSpellSyncService(unittest.TestCase):
             blocked=(),
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -423,7 +447,7 @@ class TestSpellSyncService(unittest.TestCase):
                 return_value="chrome",
             ):
                 conflict = service.execute_push_preview(
-                    CliOptions(),
+                    _push(),
                     preview,
                     confirmed_plan_id="p1",
                 )
@@ -431,7 +455,7 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertEqual(conflict.conflict_target, "chrome")
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -444,7 +468,7 @@ class TestSpellSyncService(unittest.TestCase):
                     return_value=PushResult(word_count=1, written=("demo",)),
                 ):
                     ok = service.execute_push_preview(
-                        CliOptions(),
+                        _push(),
                         preview,
                         confirmed_plan_id="p1",
                     )

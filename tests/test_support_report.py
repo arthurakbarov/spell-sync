@@ -11,6 +11,10 @@ from pathlib import Path
 
 import pytest
 
+from spell_sync.application.requests import (
+    ProjectRef,
+    SupportReportRequest,
+)
 from spell_sync.application.service import SpellSyncService
 from spell_sync.application.support_report import (
     build_support_report,
@@ -75,8 +79,11 @@ def project_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_support_report_json_schema(project_env) -> None:
-    service, opts, *_ = project_env
-    report = build_support_report(service, opts)
+    service, opts, _project, wordlist, _home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     payload = support_report_to_dict(report)
     assert payload["schema_version"] == 1
     assert payload["privacy"]["contains_words"] is False
@@ -86,24 +93,33 @@ def test_support_report_json_schema(project_env) -> None:
 
 
 def test_support_report_text_output(project_env) -> None:
-    service, opts, *_ = project_env
-    report = build_support_report(service, opts)
+    service, opts, _project, wordlist, _home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     text = format_support_report_text(report)
     assert "Spell Sync support report" in text
     assert "Privacy" in text
 
 
 def test_support_report_no_words_or_config(project_env) -> None:
-    service, opts, *_ = project_env
-    report = build_support_report(service, opts)
+    service, opts, _project, wordlist, _home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     serialized = json.dumps(support_report_to_dict(report), sort_keys=True)
     _assert_adversarial_absent(serialized)
     _assert_adversarial_absent(format_support_report_text(report))
 
 
 def test_support_report_path_redaction(project_env) -> None:
-    service, opts, project, _, home = project_env
-    report = build_support_report(service, opts)
+    service, opts, project, wordlist, home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     payload = json.dumps(support_report_to_dict(report))
     assert str(home) not in payload
     assert str(project) not in payload
@@ -111,8 +127,11 @@ def test_support_report_path_redaction(project_env) -> None:
 
 
 def test_export_support_report_atomic_and_collision(project_env, tmp_path: Path) -> None:
-    service, opts, *_ = project_env
-    report = build_support_report(service, opts)
+    service, opts, _project, wordlist, _home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     output = tmp_path / "support-report.json"
     export_support_report(report, output_path=output, fmt="json")
     assert output.is_file()
@@ -134,8 +153,11 @@ def test_export_support_report_atomic_and_collision(project_env, tmp_path: Path)
 
 
 def test_export_support_report_write_failure(project_env, tmp_path: Path, monkeypatch) -> None:
-    service, opts, *_ = project_env
-    report = build_support_report(service, opts)
+    service, opts, _project, wordlist, _home = project_env
+    report = build_support_report(
+        service,
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
     output = tmp_path / "nested" / "report.json"
 
     def fail_replace(self, target):  # type: ignore[no-untyped-def]
@@ -148,10 +170,13 @@ def test_export_support_report_write_failure(project_env, tmp_path: Path, monkey
 
 
 def test_cli_support_report_stdout(project_env, monkeypatch: pytest.MonkeyPatch) -> None:
-    service, opts, *_ = project_env
+    service, opts, _project, wordlist, _home = project_env
     monkeypatch.setattr(
         "spell_sync.support_report_cmd.build_support_report",
-        lambda *_args, **_kwargs: build_support_report(service, opts),
+        lambda *_args, **_kwargs: build_support_report(
+            service,
+            SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+        ),
     )
     code = cmd_support_report(opts)
     assert code == 0
@@ -162,10 +187,13 @@ def test_cli_support_report_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    service, opts, *_ = project_env
+    service, opts, _project, wordlist, _home = project_env
     monkeypatch.setattr(
         "spell_sync.support_report_cmd.build_support_report",
-        lambda *_args, **_kwargs: build_support_report(service, opts),
+        lambda *_args, **_kwargs: build_support_report(
+            service,
+            SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+        ),
     )
     output = tmp_path / "handoff.json"
     code = cmd_support_report(

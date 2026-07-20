@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from spell_sync.application.reports import RecoveryStatus
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
@@ -33,7 +34,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
     async def test_typed_recover_confirmation(self):
         preview = sample_recovery_preview()
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))

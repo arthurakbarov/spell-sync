@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import ProjectRef
 from spell_sync.project_setup.discovery import SetupTarget, SetupTargetDiscovery
 from spell_sync.project_setup.selection import SetupSelection
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
@@ -73,7 +73,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
             )
         )
         service.discover_setup_targets = MagicMock(return_value=discovery)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.set_setup_wordlist(Path("/tmp/setup/wordlist.txt"))
         controller._setup_discovery = discovery
         controller._setup_selection = SetupSelection(

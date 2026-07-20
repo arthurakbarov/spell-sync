@@ -20,8 +20,12 @@ from spell_sync.application.reports import (
     PushPreview,
     TargetPreview,
 )
+from spell_sync.application.requests import (
+    ProjectRef,
+    PullRequest,
+    PushRequest,
+)
 from spell_sync.application.service import SpellSyncService
-from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.push_abort import PushAbort
@@ -171,7 +175,9 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             merged_words=(),
             wordlist_error=ExitCode.PUSH_ABORT,
         )
-        blocked = service.execute_pull(CliOptions(), preview, confirmed_plan_id="p1")
+        blocked = service.execute_pull(
+            PullRequest(project=ProjectRef()), preview, confirmed_plan_id="p1"
+        )
         self.assertEqual(blocked.outcome, OperationOutcome.FAILED)
 
         good = PullPreview(
@@ -189,15 +195,17 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             wordlist_fingerprint="abc",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             scope.return_value.__exit__.return_value = False
-            locked = service.execute_pull(CliOptions(), good, confirmed_plan_id="p1")
+            locked = service.execute_pull(
+                PullRequest(project=ProjectRef()), good, confirmed_plan_id="p1"
+            )
         self.assertEqual(locked.outcome, OperationOutcome.FAILED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
@@ -210,11 +218,13 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     "spell_sync.application.service.file_content_hash",
                     return_value="changed",
                 ):
-                    conflict = service.execute_pull(CliOptions(), good, confirmed_plan_id="p1")
+                    conflict = service.execute_pull(
+                        PullRequest(project=ProjectRef()), good, confirmed_plan_id="p1"
+                    )
         self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
@@ -228,7 +238,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     return_value=ExitCode.PUSH_ABORT,
                 ):
                     write_fail = service.execute_pull(
-                        CliOptions(),
+                        PullRequest(project=ProjectRef()),
                         good,
                         confirmed_plan_id="p1",
                     )
@@ -252,7 +262,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         )
         self.assertEqual(
             service.execute_push_preview(
-                CliOptions(),
+                PushRequest(project=ProjectRef()),
                 empty,
                 confirmed_plan_id="p1",
             ).outcome,
@@ -281,19 +291,19 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             blocked=(),
         )
         mismatch = service.execute_push_preview(
-            CliOptions(),
+            PushRequest(project=ProjectRef()),
             preview,
             confirmed_plan_id="other",
         )
         self.assertEqual(mismatch.outcome, OperationOutcome.FAILED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             scope.return_value.__exit__.return_value = False
             locked = service.execute_push_preview(
-                CliOptions(),
+                PushRequest(project=ProjectRef()),
                 preview,
                 confirmed_plan_id="p1",
             )
@@ -301,7 +311,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
 
         abort = PushAbort(ExitCode.PUSH_ABORT, "write_failed", "boom")
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -318,7 +328,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     ) as journal:
                         journal.return_value.status = JournalLoadStatus.ABSENT
                         stopped = service.execute_push_preview(
-                            CliOptions(),
+                            PushRequest(project=ProjectRef()),
                             preview,
                             confirmed_plan_id="p1",
                         )
@@ -330,7 +340,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             "incomplete",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -343,14 +353,14 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     return_value=recovery_abort,
                 ):
                     recovering = service.execute_push_preview(
-                        CliOptions(),
+                        PushRequest(project=ProjectRef()),
                         preview,
                         confirmed_plan_id="p1",
                     )
         self.assertEqual(recovering.outcome, OperationOutcome.RECOVERY_REQUIRED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -367,7 +377,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     ) as journal:
                         journal.return_value.status = JournalLoadStatus.VALID_IN_PROGRESS
                         exit_recovery = service.execute_push_preview(
-                            CliOptions(),
+                            PushRequest(project=ProjectRef()),
                             preview,
                             confirmed_plan_id="p1",
                         )
@@ -380,7 +390,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             skipped_reasons={"jetbrains": "running"},
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -393,7 +403,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                     return_value=skipped,
                 ):
                     warn = service.execute_push_preview(
-                        CliOptions(),
+                        PushRequest(project=ProjectRef()),
                         preview,
                         confirmed_plan_id="p1",
                     )
@@ -431,14 +441,14 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             "execute_push",
             return_value=ExitCode.PUSH_ABORT,
         ):
-            failed = service.run_push(run, CliOptions(), prepared, dry_run=False)
+            failed = service.run_push(run, prepared, dry_run=False)
         self.assertEqual(failed.outcome, OperationOutcome.FAILED)
         with patch.object(
             service,
             "execute_push",
             return_value=PushResult(word_count=1, written=("a",), skipped=("b",)),
         ):
-            warned = service.run_push(run, CliOptions(), prepared, dry_run=False)
+            warned = service.run_push(run, prepared, dry_run=False)
         self.assertEqual(warned.outcome, OperationOutcome.COMPLETED_WITH_WARNINGS)
 
 

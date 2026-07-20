@@ -7,10 +7,12 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.tui.app import SpellSyncApp, run_app
 from spell_sync.tui.controller import TuiController
-from spell_sync.tui.launch import cmd_ui
+from spell_sync.tui.launch import run_ui
+from spell_sync.ui_cmd import cmd_ui
 from tests.tui.fake_service import fake_service
 
 
@@ -32,11 +34,19 @@ class TestLaunch(unittest.TestCase):
         self.assertIn("TUI failed to start", buf.getvalue())
 
     def test_run_app_starts_textual_app(self):
-        controller = TuiController(fake_service(), CliOptions())
+        controller = TuiController(fake_service(), ProjectRef())
         with patch.object(SpellSyncApp, "run") as run_method:
             code = run_app(controller)
         run_method.assert_called_once()
         self.assertEqual(code, 0)
+
+    def test_run_ui_builds_controller_with_project_ref(self):
+        project = ProjectRef(wordlist=ProjectRef.__dataclass_fields__["wordlist"].default)
+        with patch("spell_sync.tui.launch.run_app", return_value=0) as run_app_fn:
+            code = run_ui(project)
+        self.assertEqual(code, 0)
+        controller = run_app_fn.call_args.args[0]
+        self.assertIs(controller._project, project)
 
 
 if __name__ == "__main__":

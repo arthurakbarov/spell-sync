@@ -9,6 +9,7 @@ from textual.widgets import Button, Input
 from textual.worker import WorkerState
 
 from spell_sync.application.reports import RecoveryStatus
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
@@ -23,7 +24,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_mount_inspection_failure(self):
         service = fake_service(pending_recovery=True)
         service.raise_on_inspect = RuntimeError("boom")
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))
@@ -32,7 +33,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_refresh_and_discard_flow(self):
         preview = sample_recovery_preview(can_discard=True, can_recover=False)
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))
@@ -117,7 +118,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
             detail="Pending rollback",
         )
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))
@@ -132,7 +133,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_confirm_cancel_and_discard_cancel(self):
         preview = sample_recovery_preview(can_discard=True)
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))
@@ -161,7 +162,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_operation_worker(self):
         preview = sample_recovery_preview()
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(

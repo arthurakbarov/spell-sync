@@ -17,12 +17,15 @@ from conftest import DEFAULT_OPTS
 
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.command_helpers import finish_push, sync_run_for, wordlist_file_for
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
 from spell_sync.paths import resolve_wordlist_path
+from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus, PushJournal
+from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_run import PushResult, SyncRun
 
 
@@ -56,7 +59,7 @@ class TestResolveWordlistPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             custom = os.path.join(d, "words.txt")
             Path(custom).write_text("a\n", encoding="utf-8")
-            run = sync_run_for(CliOptions(wordlist=custom))
+            run = sync_run_for(ProjectRef(wordlist=Path(custom)))
             self.assertEqual(str(run.wordlist_file), custom)
 
     def test_finish_push_json_partial(self):
@@ -110,6 +113,103 @@ class TestCommandHelpers(unittest.TestCase):
             self.assertFalse(
                 command_helpers.confirm_push_removals(run, CliOptions(json_output=False))
             )
+
+    def test_invalid_config_exit_from_result_allows_valid_config(self):
+        valid = ConfigLoadResult(ConfigStatus.VALID, {}, ())
+        self.assertIsNone(
+            command_helpers.invalid_config_exit_from_result(CliOptions(), "push", valid)
+        )
+
+    def test_unfinished_journal_exit_from_result_cli_paths(self):
+        opts_json = CliOptions(json_output=True)
+        opts_text = CliOptions(json_output=False)
+        absent = JournalLoadResult(JournalLoadStatus.ABSENT, None)
+        completed = JournalLoadResult(JournalLoadStatus.VALID_COMPLETED, None)
+        self.assertIsNone(
+            command_helpers.unfinished_journal_exit_from_result(opts_json, "recover", absent)
+        )
+        self.assertIsNone(
+            command_helpers.unfinished_journal_exit_from_result(opts_json, "push", absent)
+        )
+        self.assertIsNone(
+            command_helpers.unfinished_journal_exit_from_result(opts_json, "push", completed)
+        )
+
+        corrupt = JournalLoadResult(JournalLoadStatus.CORRUPT, None, detail="bad json")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = command_helpers.unfinished_journal_exit_from_result(
+                opts_json,
+                "push",
+                corrupt,
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["reason"], "corrupt_journal")
+
+        with patch.object(command_helpers.log, "abort") as abort:
+            code = command_helpers.unfinished_journal_exit_from_result(
+                opts_text,
+                "push",
+                corrupt,
+                wordlist=Path("/tmp/w.txt"),
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        abort.assert_called_once()
+
+        journal = PushJournal(
+            schema_version=1,
+            transaction_id="tx",
+            command="push",
+            pid=99,
+            started="2026-01-01T00:00:00+00:00",
+            state="writing",
+            wordlist="/tmp/w.txt",
+            wordlist_hash_before=None,
+            wordlist_hash_after=None,
+            wordlist_backup_path=None,
+        )
+        in_progress = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = command_helpers.unfinished_journal_exit_from_result(
+                opts_json,
+                "push",
+                in_progress,
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["reason"], "unfinished_transaction")
+
+        with patch.object(command_helpers.log, "abort") as abort:
+            code = command_helpers.unfinished_journal_exit_from_result(
+                opts_text,
+                "push",
+                in_progress,
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        abort.assert_called_once()
+
+    def test_unfinished_journal_exit_from_result_for_recovers(self):
+        journal = PushJournal(
+            schema_version=1,
+            transaction_id="tx",
+            command="push",
+            pid=99,
+            started="2026-01-01T00:00:00+00:00",
+            state="writing",
+            wordlist="/tmp/w.txt",
+            wordlist_hash_before=None,
+            wordlist_hash_after=None,
+            wordlist_backup_path=None,
+        )
+        in_progress = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
+        self.assertIsNone(
+            command_helpers.unfinished_journal_exit_from_result_for(
+                "recover",
+                in_progress,
+            )
+        )
 
 
 class TestCommandsJson(unittest.TestCase):

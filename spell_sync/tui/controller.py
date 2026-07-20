@@ -21,12 +21,22 @@ from ..application.reports import (
     StatusDetailSnapshot,
     StatusSnapshot,
 )
+from ..application.requests import (
+    DoctorRequest,
+    PrepareTargetSettingsUpdateRequest,
+    ProjectRef,
+    PullRequest,
+    PushRequest,
+    RecoveryRequest,
+    SetupRequest,
+    StatusRequest,
+    TargetSettingsRequest,
+)
 from ..application.review_session import (
     ReviewSession,
     ReviewSessionReport,
     build_review_session_report,
 )
-from ..cli_options import CliOptions
 from ..project_setup.discovery import SetupTargetDiscovery
 from ..project_setup.draft import SetupDraft
 from ..project_setup.execute import ProjectSetupExecution
@@ -50,21 +60,21 @@ from ..project_setup.target_settings import (
 
 
 class TuiService(Protocol):
-    def load_dashboard(self, opts: CliOptions) -> DashboardState: ...
+    def load_dashboard(self, request: StatusRequest) -> DashboardState: ...
 
-    def load_status(self, opts: CliOptions) -> StatusSnapshot: ...
+    def load_status(self, request: StatusRequest) -> StatusSnapshot: ...
 
-    def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot: ...
+    def load_status_detail(self, request: StatusRequest) -> StatusDetailSnapshot: ...
 
-    def load_push_preview(self, opts: CliOptions) -> PushPreview: ...
+    def load_push_preview(self, request: PushRequest) -> PushPreview: ...
 
-    def load_doctor(self, opts: CliOptions) -> DoctorSnapshot: ...
+    def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot: ...
 
-    def prepare_pull(self, opts: CliOptions) -> PullPreview: ...
+    def prepare_pull(self, request: PullRequest) -> PullPreview: ...
 
     def execute_pull(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: PullPreview,
         *,
         confirmed_plan_id: str,
@@ -73,7 +83,7 @@ class TuiService(Protocol):
 
     def execute_push_preview(
         self,
-        opts: CliOptions,
+        request: PushRequest,
         preview: PushPreview,
         *,
         confirmed_plan_id: str,
@@ -84,11 +94,11 @@ class TuiService(Protocol):
 
     def build_pull_report(self, execution: PullExecution) -> OperationReport: ...
 
-    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview: ...
+    def inspect_recovery(self, request: RecoveryRequest) -> RecoveryPreview: ...
 
     def execute_recovery(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -97,7 +107,7 @@ class TuiService(Protocol):
 
     def execute_recovery_cleanup(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -106,7 +116,7 @@ class TuiService(Protocol):
 
     def execute_recovery_discard(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -115,7 +125,7 @@ class TuiService(Protocol):
 
     def build_recovery_report(self, execution: RecoveryExecution) -> OperationReport: ...
 
-    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState: ...
+    def inspect_project_setup(self, request: SetupRequest) -> ProjectSetupState: ...
 
     def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery: ...
 
@@ -133,17 +143,15 @@ class TuiService(Protocol):
 
     def build_setup_report(self, execution: ProjectSetupExecution) -> OperationReport: ...
 
-    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot: ...
+    def load_target_settings(self, request: TargetSettingsRequest) -> TargetSettingsSnapshot: ...
 
     def prepare_target_settings_update(
         self,
-        opts: CliOptions,
-        selected_target_ids: frozenset[str],
+        request: PrepareTargetSettingsUpdateRequest,
     ) -> PreparedTargetSettingsUpdate: ...
 
     def execute_target_settings_update(
         self,
-        opts: CliOptions,
         prepared: PreparedTargetSettingsUpdate,
         *,
         confirmed_update_id: str,
@@ -176,9 +184,9 @@ class TuiService(Protocol):
 
 
 class TuiController:
-    def __init__(self, service: TuiService, opts: CliOptions) -> None:
+    def __init__(self, service: TuiService, project: ProjectRef) -> None:
         self._service = service
-        self.opts = opts
+        self._project = project
         self._mutation_active = False
         self._active_push_preview: PushPreview | None = None
         self._active_pull_preview: PullPreview | None = None
@@ -192,6 +200,33 @@ class TuiController:
         self._target_settings_selection: SetupSelection | None = None
         self._target_settings_prepared: PreparedTargetSettingsUpdate | None = None
         self._review_session: ReviewSession | None = None
+
+    def _project_ref(self) -> ProjectRef:
+        return self._project
+
+    def _status_request(self) -> StatusRequest:
+        return StatusRequest(project=self._project_ref())
+
+    def _pull_request(self) -> PullRequest:
+        return PullRequest(project=self._project_ref())
+
+    def _push_request(self) -> PushRequest:
+        return PushRequest(project=self._project_ref())
+
+    def _recovery_request(self) -> RecoveryRequest:
+        return RecoveryRequest(project=self._project_ref())
+
+    def _setup_request(self) -> SetupRequest:
+        return SetupRequest(
+            project=self._project_ref(),
+            allow_new_project_wizard=self._project.wordlist is None,
+        )
+
+    def _target_settings_request(self) -> TargetSettingsRequest:
+        return TargetSettingsRequest(project=self._project_ref())
+
+    def set_project_wordlist(self, path: Path) -> None:
+        self._project = replace(self._project, wordlist=path)
 
     @property
     def setup_selected_targets(self) -> tuple[str, ...]:
@@ -223,16 +258,16 @@ class TuiController:
         self._mutation_active = False
 
     def dashboard(self) -> DashboardState:
-        return self._service.load_dashboard(self.opts)
+        return self._service.load_dashboard(self._status_request())
 
     def status(self) -> StatusSnapshot:
-        return self._service.load_status(self.opts)
+        return self._service.load_status(self._status_request())
 
     def status_detail(self) -> StatusDetailSnapshot:
-        return self._service.load_status_detail(self.opts)
+        return self._service.load_status_detail(self._status_request())
 
     def preview(self) -> PushPreview:
-        preview = self._service.load_push_preview(self.opts)
+        preview = self._service.load_push_preview(self._push_request())
         self._active_push_preview = preview
         return preview
 
@@ -243,10 +278,10 @@ class TuiController:
         return self._active_push_preview
 
     def doctor(self) -> DoctorSnapshot:
-        return self._service.load_doctor(self.opts)
+        return self._service.load_doctor(DoctorRequest(project=self._project_ref()))
 
     def prepare_pull(self) -> PullPreview:
-        preview = self._service.prepare_pull(self.opts)
+        preview = self._service.prepare_pull(self._pull_request())
         self._active_pull_preview = preview
         return preview
 
@@ -263,7 +298,7 @@ class TuiController:
         event_sink: EventSink | None = None,
     ) -> PullExecution:
         return self._service.execute_pull(
-            self.opts,
+            self._pull_request(),
             preview,
             confirmed_plan_id=preview.plan_identifier,
             event_sink=event_sink,
@@ -277,7 +312,7 @@ class TuiController:
     ) -> PushExecution:
         # Identity: must use this preview's prepared plan, never re-prepare.
         return self._service.execute_push_preview(
-            self.opts,
+            self._push_request(),
             preview,
             confirmed_plan_id=preview.plan_identifier,
             event_sink=event_sink,
@@ -290,7 +325,7 @@ class TuiController:
         return self._service.build_pull_report(execution)
 
     def inspect_recovery(self) -> RecoveryPreview:
-        preview = self._service.inspect_recovery(self.opts)
+        preview = self._service.inspect_recovery(self._recovery_request())
         self._active_recovery_preview = preview
         return preview
 
@@ -310,7 +345,7 @@ class TuiController:
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         return self._service.execute_recovery(
-            self.opts,
+            self._recovery_request(),
             preview,
             confirmed_transaction_id=preview.preview_fingerprint,
             event_sink=event_sink,
@@ -323,7 +358,7 @@ class TuiController:
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         return self._service.execute_recovery_cleanup(
-            self.opts,
+            self._recovery_request(),
             preview,
             confirmed_transaction_id=preview.preview_fingerprint,
             event_sink=event_sink,
@@ -336,7 +371,7 @@ class TuiController:
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         return self._service.execute_recovery_discard(
-            self.opts,
+            self._recovery_request(),
             preview,
             confirmed_transaction_id=preview.preview_fingerprint,
             event_sink=event_sink,
@@ -372,7 +407,7 @@ class TuiController:
         return current.pending_recovery or current.overall_severity.value == "blocked"
 
     def inspect_project_setup(self) -> ProjectSetupState:
-        return self._service.inspect_project_setup(self.opts)
+        return self._service.inspect_project_setup(self._setup_request())
 
     def setup_wordlist_default(self) -> Path:
         return Path.home() / "spell-words" / "wordlist.txt"
@@ -475,7 +510,7 @@ class TuiController:
             event_sink=event_sink,
         )
         if execution.outcome.value == "completed":
-            self.opts = replace(self.opts, wordlist=str(prepared.wordlist_path))
+            self._project = replace(self._project, wordlist=prepared.wordlist_path)
             self.clear_setup_session()
         return execution
 
@@ -498,13 +533,13 @@ class TuiController:
         )
 
     def load_target_settings(self) -> TargetSettingsSnapshot:
-        snapshot = self._service.load_target_settings(self.opts)
+        snapshot = self._service.load_target_settings(self._target_settings_request())
         self._apply_target_settings_snapshot(snapshot, reset_selection=False)
         return snapshot
 
     def begin_target_settings(self) -> TargetSettingsSnapshot:
         self.clear_target_settings_session()
-        snapshot = self._service.load_target_settings(self.opts)
+        snapshot = self._service.load_target_settings(self._target_settings_request())
         self._apply_target_settings_snapshot(snapshot, reset_selection=True)
         return snapshot
 
@@ -545,7 +580,7 @@ class TuiController:
             else frozenset()
         )
         previous_selection = self._target_settings_selection or SetupSelection(frozenset())
-        snapshot = self._service.load_target_settings(self.opts)
+        snapshot = self._service.load_target_settings(self._target_settings_request())
         self._apply_target_settings_snapshot(snapshot, reset_selection=False)
         if snapshot.load_error:
             return snapshot.load_error
@@ -592,8 +627,10 @@ class TuiController:
 
     def prepare_target_settings_update(self) -> PreparedTargetSettingsUpdate:
         prepared = self._service.prepare_target_settings_update(
-            self.opts,
-            self.target_settings_selection().selected_target_ids,
+            PrepareTargetSettingsUpdateRequest(
+                project=self._project_ref(),
+                selected_target_ids=self.target_settings_selection().selected_target_ids,
+            ),
         )
         self._target_settings_prepared = prepared
         return prepared
@@ -605,7 +642,6 @@ class TuiController:
         event_sink: EventSink | None = None,
     ) -> TargetSettingsExecution:
         return self._service.execute_target_settings_update(
-            self.opts,
             prepared,
             confirmed_update_id=prepared.update_id,
             event_sink=event_sink,
@@ -700,13 +736,17 @@ class TuiController:
         return build_review_session_report(session, pending_recovery=pending)
 
     def export_support_report(self, *, fmt: str = "json") -> Path:
+        from ..application.requests import SupportReportRequest
         from ..application.support_report import (
             build_support_report,
             default_support_report_path,
             export_support_report,
         )
 
-        report = build_support_report(self._service, self.opts)
+        report = build_support_report(
+            self._service,
+            SupportReportRequest(project=self._project_ref()),
+        )
         path = default_support_report_path(fmt=fmt)
         return export_support_report(report, output_path=path, fmt=fmt)
 

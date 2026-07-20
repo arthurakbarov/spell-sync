@@ -10,6 +10,7 @@ from spell_sync.application.reports import (
     PushExecution,
     TargetPreview,
 )
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.sync_models import PushResult
@@ -55,7 +56,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_additions_flow(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -89,7 +90,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_skip_pull_builds_fresh_push_preview(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -104,7 +105,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_fresh_push_preview_after_pull_execution(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -136,7 +137,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
                 message="write failed",
             )
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -156,7 +157,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             unchanged=1,
         )
         service = fake_service(preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -168,7 +169,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_skip_push_session_report(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -180,7 +181,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_push_with_typed_confirmation(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -213,7 +214,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
                 plan_identifier="conflict-plan",
             ),
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -238,7 +239,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
                 plan_identifier="recover-plan",
             ),
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -303,7 +304,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_double_pull_guard(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             screen = ReviewPullScreen(controller)
@@ -317,7 +318,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_history_only_for_real_operations(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -340,7 +341,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
                 plan_identifier="push-plan",
             ),
         )
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
@@ -415,7 +416,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_stale_pull_preview_blocked(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)

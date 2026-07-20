@@ -16,13 +16,13 @@ from spell_sync.application.reports import (
     TargetPreview,
     TargetUpdateReport,
 )
+from spell_sync.application.requests import ProjectRef
 from spell_sync.application.review_session import ReviewSession
 from spell_sync.application.session_report_export import (
     build_session_report_export,
     default_session_report_path,
     export_session_report,
 )
-from spell_sync.cli_options import CliOptions
 from spell_sync.diagnostics.paths import resolve_app_state_paths
 from spell_sync.tui.controller import TuiController
 
@@ -157,7 +157,7 @@ def test_controller_export_does_not_create_history_record(tmp_path: Path) -> Non
     state = resolve_app_state_paths(state_root=tmp_path / "state")
     service = SpellSyncService(state_paths=state, enable_file_logging=False)
     before_count = len(service.load_operation_history(limit=10).records)
-    controller = TuiController(service, CliOptions())
+    controller = TuiController(service, ProjectRef())
     controller.begin_review_session()
     session = controller.review_session()
     assert session is not None

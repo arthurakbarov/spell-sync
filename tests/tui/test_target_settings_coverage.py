@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from textual.worker import WorkerState
 
 from spell_sync.application.reports import OperationOutcome, OperationReport
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import ProjectRef
 from spell_sync.project_setup.discovery import SetupTarget
 from spell_sync.project_setup.target_settings import (
     PreparedTargetSettingsUpdate,
@@ -94,7 +94,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 can_execute=True,
             )
         )
-        return TuiController(service, CliOptions(wordlist=str(snapshot.wordlist_path)))
+        return TuiController(service, ProjectRef(wordlist=snapshot.wordlist_path))
 
     async def test_focus_navigation_refresh_and_escape(self):
         controller = self._controller()

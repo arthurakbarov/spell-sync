@@ -13,6 +13,7 @@ from spell_sync.application.reports import (
     OperationReport,
     TargetPreview,
 )
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.tui.app import SpellSyncApp
@@ -74,7 +75,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_screen_edge_paths(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             controller.begin_review_session()
@@ -140,7 +141,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_complete_and_push_worker_paths(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             controller.begin_review_session()
@@ -272,7 +273,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_prepare_review_pull_stores_prior_push_plan(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.begin_review_session()
         session = controller.review_session()
         assert session is not None

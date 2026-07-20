@@ -20,6 +20,11 @@ from spell_sync.application.reports import (
     RecoveryOutcome,
     RecoveryStatus,
 )
+from spell_sync.application.requests import (
+    ProjectRef,
+    RecoveryRequest,
+    SetupRequest,
+)
 from spell_sync.bundled_files import init_project_directory
 from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
@@ -98,7 +103,11 @@ class TestRemainingCoverage(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             (project / "spell-sync.toml").write_text("[push]\n", encoding="utf-8")
             with patch.dict("os.environ", {"HOME": str(home)}, clear=False):
-                state = inspect_project_setup(CliOptions(wordlist=str(wordlist)))
+                state = inspect_project_setup(
+                    SetupRequest(
+                        project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False
+                    )
+                )
             self.assertEqual(state.status, ProjectSetupStatus.AMBIGUOUS_PROJECT)
 
     def test_validate_existing_unreadable_wordlist(self):
@@ -248,7 +257,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 return_value=DiscardArtifactsResult(False, False, "cleanup failed"),
             ):
                 with patch(
-                    "spell_sync.application.service.command_helpers.mutating_command_scope"
+                    "spell_sync.application.service.command_helpers.mutating_command_scope_for"
                 ) as scope:
                     scope.return_value.__enter__.return_value = MagicMock(
                         journal_result=MagicMock(
@@ -258,7 +267,7 @@ class TestRemainingCoverage(unittest.TestCase):
                     )
                     scope.return_value.__exit__.return_value = False
                     execution = service.execute_recovery(
-                        CliOptions(),
+                        RecoveryRequest(project=ProjectRef()),
                         preview,
                         confirmed_transaction_id=preview.preview_fingerprint,
                     )
@@ -272,7 +281,7 @@ class TestRemainingCoverage(unittest.TestCase):
             can_recover=False,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock(
                 context=MagicMock(wordlist_file=Path("/tmp/w.txt"))
@@ -283,7 +292,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 return_value=(False, "nope"),
             ):
                 execution = service.execute_recovery_discard(
-                    CliOptions(),
+                    RecoveryRequest(project=ProjectRef()),
                     preview,
                     confirmed_transaction_id=preview.preview_fingerprint,
                 )
@@ -454,7 +463,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 wordlist_write_completed=True,
             )
             with patch(
-                "spell_sync.application.service.command_helpers.mutating_command_scope"
+                "spell_sync.application.service.command_helpers.mutating_command_scope_for"
             ) as scope:
                 scope.return_value.__enter__.return_value = MagicMock(
                     context=MagicMock(wordlist_file=wordlist),
@@ -466,7 +475,7 @@ class TestRemainingCoverage(unittest.TestCase):
                     return_value=DiscardArtifactsResult(False, False, "failed"),
                 ):
                     execution = service.execute_recovery_cleanup(
-                        CliOptions(wordlist=str(wordlist)),
+                        RecoveryRequest(project=ProjectRef(wordlist=wordlist)),
                         preview,
                         confirmed_transaction_id=preview.preview_fingerprint,
                     )
@@ -482,10 +491,15 @@ class TestRemainingCoverage(unittest.TestCase):
                 return_value=MagicMock(status=JournalLoadStatus.ABSENT),
             ):
                 with patch(
-                    "spell_sync.project_setup.state.resolve_wordlist_path",
+                    "spell_sync.application.requests.resolve_wordlist_path",
                     return_value=Path("/tmp/unknown/wordlist.txt"),
                 ):
-                    state = inspect_project_setup(CliOptions(wordlist="/tmp/unknown/wordlist.txt"))
+                    state = inspect_project_setup(
+                        SetupRequest(
+                            project=ProjectRef(wordlist="/tmp/unknown/wordlist.txt"),
+                            allow_new_project_wizard=False,
+                        )
+                    )
         self.assertEqual(state.status, ProjectSetupStatus.MISSING_PROJECT)
 
     def test_execute_stopped_when_can_execute_false(self):
@@ -669,7 +683,11 @@ class TestRemainingCoverage(unittest.TestCase):
                     "spell_sync.project_setup.state.load_journal_result",
                     return_value=MagicMock(status=JournalLoadStatus.ABSENT),
                 ):
-                    state = inspect_project_setup(CliOptions(wordlist=str(wordlist)))
+                    state = inspect_project_setup(
+                        SetupRequest(
+                            project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False
+                        )
+                    )
             self.assertEqual(state.status, ProjectSetupStatus.MISSING_PROJECT)
             self.assertIn("could not be determined", state.detail or "")
 

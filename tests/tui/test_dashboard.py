@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from spell_sync.application.reports import DashboardIssue, DashboardSeverity
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.tui.app import SpellSyncApp
@@ -292,7 +293,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
         home_wordlist = str(Path.home() / "spell-words" / "wordlist.txt")
         service = fake_service()
         service.dashboard_state = sample_dashboard(wordlist_path=home_wordlist)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "~/")

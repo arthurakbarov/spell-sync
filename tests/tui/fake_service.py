@@ -35,7 +35,16 @@ from spell_sync.application.reports import (
     TargetPreview,
     TargetStatusRow,
 )
-from spell_sync.cli_options import CliOptions
+from spell_sync.application.requests import (
+    DoctorRequest,
+    PrepareTargetSettingsUpdateRequest,
+    PullRequest,
+    PushRequest,
+    RecoveryRequest,
+    SetupRequest,
+    StatusRequest,
+    TargetSettingsRequest,
+)
 from spell_sync.exit_codes import ExitCode
 from spell_sync.project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
 from spell_sync.project_setup.draft import SetupDraft
@@ -81,16 +90,16 @@ class FakeTuiService:
     target_settings_execution: TargetSettingsExecution | None = None
     execute_target_settings_calls: int = 0
 
-    def load_dashboard(self, opts: CliOptions) -> DashboardState:
+    def load_dashboard(self, request: StatusRequest) -> DashboardState:
         return self.dashboard_state
 
-    def load_status(self, opts: CliOptions) -> StatusSnapshot:
+    def load_status(self, request: StatusRequest) -> StatusSnapshot:
         return self.status_snapshot
 
-    def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot:
+    def load_status_detail(self, request: StatusRequest) -> StatusDetailSnapshot:
         return self.status_detail
 
-    def load_push_preview(self, opts: CliOptions) -> PushPreview:
+    def load_push_preview(self, request: PushRequest) -> PushPreview:
         self.preview_counter += 1
         if self.preview.prepared is not None:
             return replace(
@@ -99,10 +108,10 @@ class FakeTuiService:
             )
         return self.preview
 
-    def load_doctor(self, opts: CliOptions) -> DoctorSnapshot:
+    def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
         return self.doctor
 
-    def prepare_pull(self, opts: CliOptions) -> PullPreview:
+    def prepare_pull(self, request: PullRequest) -> PullPreview:
         self.pull_counter += 1
         return replace(
             self.pull_preview,
@@ -111,7 +120,7 @@ class FakeTuiService:
 
     def execute_pull(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: PullPreview,
         *,
         confirmed_plan_id: str,
@@ -156,7 +165,7 @@ class FakeTuiService:
 
     def execute_push_preview(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: PushPreview,
         *,
         confirmed_plan_id: str,
@@ -222,14 +231,14 @@ class FakeTuiService:
     def build_pull_report(self, execution: PullExecution):
         return build_pull_operation_report(execution)
 
-    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview:
+    def inspect_recovery(self, request: RecoveryRequest) -> RecoveryPreview:
         if self.raise_on_inspect is not None:
             raise self.raise_on_inspect
         return self.recovery_preview or sample_recovery_preview()
 
     def execute_recovery(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -267,7 +276,7 @@ class FakeTuiService:
 
     def execute_recovery_cleanup(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -282,7 +291,7 @@ class FakeTuiService:
 
     def execute_recovery_discard(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -298,7 +307,7 @@ class FakeTuiService:
     def build_recovery_report(self, execution: RecoveryExecution):
         return build_recovery_operation_report(execution)
 
-    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState:
+    def inspect_project_setup(self, request: SetupRequest) -> ProjectSetupState:
         if self.setup_state is not None:
             return self.setup_state
         return ProjectSetupState(
@@ -347,7 +356,7 @@ class FakeTuiService:
     def build_setup_report(self, execution: ProjectSetupExecution):
         return build_setup_operation_report(execution)
 
-    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot:
+    def load_target_settings(self, request: TargetSettingsRequest) -> TargetSettingsSnapshot:
         if self.target_settings_snapshot is not None:
             return self.target_settings_snapshot
         return TargetSettingsSnapshot(
@@ -359,9 +368,9 @@ class FakeTuiService:
 
     def prepare_target_settings_update(
         self,
-        opts: CliOptions,
-        selected_target_ids: frozenset[str],
+        request: PrepareTargetSettingsUpdateRequest,
     ) -> PreparedTargetSettingsUpdate:
+        selected_target_ids = request.selected_target_ids
         if self.target_settings_prepared is not None:
             return self.target_settings_prepared
         return PreparedTargetSettingsUpdate(
@@ -380,7 +389,6 @@ class FakeTuiService:
 
     def execute_target_settings_update(
         self,
-        opts: CliOptions,
         prepared: PreparedTargetSettingsUpdate,
         *,
         confirmed_update_id: str,

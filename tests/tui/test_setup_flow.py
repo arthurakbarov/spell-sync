@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from spell_sync.application.reports import OperationOutcome
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.project_setup.prepare import prepare_project_setup
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
@@ -49,7 +50,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
             detail=None,
         )
         service = fake_service(setup_state=missing)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#welcome-content", "Welcome")
@@ -145,7 +146,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
             detail=None,
         )
         service = fake_service(setup_state=missing)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await pilot.click("#btn-open")
@@ -221,7 +222,7 @@ class TestSetupPreviewScreen(unittest.IsolatedAsyncioTestCase):
             detail=None,
         )
         service = fake_service(setup_state=missing)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
             await pilot.click("#btn-setup")

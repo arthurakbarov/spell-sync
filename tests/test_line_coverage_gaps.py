@@ -22,6 +22,7 @@ from spell_sync.application.reports import (
     RecoveryOutcome,
     RecoveryStatus,
 )
+from spell_sync.application.requests import ProjectRef, PullRequest, RecoveryRequest
 from spell_sync.application.service import SpellSyncService
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
@@ -70,11 +71,13 @@ class TestLineCoverageGaps(unittest.TestCase):
             wordlist_fingerprint="abc",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope("/tmp/w.txt")
             scope.return_value.__exit__.return_value = False
-            result = service.execute_pull(CliOptions(), preview, confirmed_plan_id="p1")
+            result = service.execute_pull(
+                PullRequest(project=ProjectRef()), preview, confirmed_plan_id="p1"
+            )
         self.assertEqual(result.outcome, OperationOutcome.FAILED)
 
     def test_execute_prepared_pull_unreadable_wordlist(self):
@@ -124,12 +127,12 @@ class TestLineCoverageGaps(unittest.TestCase):
         scope.context.wordlist_file = Path("/tmp/w.txt")
         scope.journal_result = JournalLoadResult(JournalLoadStatus.ABSENT, None)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
             stale = service.execute_recovery(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 preview,
                 confirmed_transaction_id=preview.preview_fingerprint,
             )
@@ -138,7 +141,7 @@ class TestLineCoverageGaps(unittest.TestCase):
         scope.journal_result = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
         events: list = []
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -148,7 +151,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             ):
                 with patch("spell_sync.application.service.cleanup_after_successful_recovery"):
                     executed = service.execute_recovery(
-                        CliOptions(),
+                        RecoveryRequest(project=ProjectRef()),
                         preview,
                         confirmed_transaction_id=preview.preview_fingerprint,
                         event_sink=events.append,
@@ -162,12 +165,12 @@ class TestLineCoverageGaps(unittest.TestCase):
             can_cleanup=True,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             mutating.return_value.__exit__.return_value = False
             locked_cleanup = service.execute_recovery_cleanup(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 cleanup_preview,
                 confirmed_transaction_id=cleanup_preview.preview_fingerprint,
             )
@@ -175,12 +178,12 @@ class TestLineCoverageGaps(unittest.TestCase):
 
         scope.journal_result = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
             missing_completed = service.execute_recovery_cleanup(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 cleanup_preview,
                 confirmed_transaction_id=cleanup_preview.preview_fingerprint,
             )
@@ -188,7 +191,7 @@ class TestLineCoverageGaps(unittest.TestCase):
 
         self.assertEqual(
             service.execute_recovery_discard(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 sample_recovery_preview(can_discard=True),
                 confirmed_transaction_id="wrong",
             ).outcome,
@@ -196,19 +199,19 @@ class TestLineCoverageGaps(unittest.TestCase):
         )
         self.assertEqual(
             service.execute_recovery_discard(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 sample_recovery_preview(can_discard=False),
                 confirmed_transaction_id=sample_recovery_preview().preview_fingerprint,
             ).outcome,
             RecoveryOutcome.FAILED,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             mutating.return_value.__exit__.return_value = False
             locked_discard = service.execute_recovery_discard(
-                CliOptions(),
+                RecoveryRequest(project=ProjectRef()),
                 sample_recovery_preview(can_discard=True),
                 confirmed_transaction_id=sample_recovery_preview().preview_fingerprint,
             )
@@ -219,13 +222,13 @@ class TestLineCoverageGaps(unittest.TestCase):
             can_discard=True,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope"
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
         ) as mutating:
             mutating.return_value.__enter__.return_value = MagicMock()
             mutating.return_value.__exit__.return_value = False
             with patch("spell_sync.application.service.discard_completed_journal"):
                 discarded = service.execute_recovery_discard(
-                    CliOptions(),
+                    RecoveryRequest(project=ProjectRef()),
                     discard_preview,
                     confirmed_transaction_id=discard_preview.preview_fingerprint,
                 )
@@ -506,7 +509,7 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_screen_guards_and_callbacks(self):
         preview = sample_recovery_preview()
         service = fake_service(pending_recovery=True, recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(RecoveryScreen(controller))
@@ -551,7 +554,7 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
             can_cleanup=True,
         )
         service = fake_service(recovery_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.execute_recovery_cleanup(preview)
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:

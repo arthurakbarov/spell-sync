@@ -8,8 +8,8 @@ from pathlib import Path
 
 from spell_sync.application.builders import build_pull_preview, build_push_preview
 from spell_sync.application.reports import OperationOutcome
+from spell_sync.application.requests import ProjectRef, PullRequest, PushRequest
 from spell_sync.application.service import SpellSyncService
-from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words
@@ -17,7 +17,7 @@ from spell_sync.sync_run import SyncRun
 
 
 class TestTuiMutationSafety(unittest.TestCase):
-    def _project(self, tmp: str) -> tuple[Path, Path, SyncRun, CliOptions]:
+    def _project(self, tmp: str) -> tuple[Path, Path, SyncRun, PullRequest]:
         root = Path(tmp)
         wordlist = root / "wordlist.txt"
         dictionary = root / "local.txt"
@@ -28,18 +28,19 @@ class TestTuiMutationSafety(unittest.TestCase):
             wordlist=wordlist,
             dictionaries=[Dictionary("custom", str(dictionary), DictionaryFormat.TEXT)],
         )
-        opts = CliOptions(wordlist=str(wordlist))
-        return wordlist, dictionary, run, opts
+        request = PullRequest(project=ProjectRef(wordlist=wordlist))
+        return wordlist, dictionary, run, request
 
     def test_execute_push_preview_keeps_prepared_identity(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            _wordlist, _dictionary, run, opts = self._project(tmp)
-            prepared = service.prepare_push(run, opts)
+            _wordlist, _dictionary, run, request = self._project(tmp)
+            prepared = service.prepare_push(run)
             self.assertNotIsInstance(prepared, ExitCode)
             preview = build_push_preview(prepared)
+            push_request = PushRequest(project=request.project)
             result = service.execute_push_preview(
-                opts,
+                push_request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -49,8 +50,8 @@ class TestTuiMutationSafety(unittest.TestCase):
     def test_fingerprint_conflict_does_not_delete_extra_words(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            _wordlist, dictionary, run, opts = self._project(tmp)
-            prepared = service.prepare_push(run, opts)
+            _wordlist, dictionary, run, request = self._project(tmp)
+            prepared = service.prepare_push(run)
             self.assertNotIsInstance(prepared, ExitCode)
             preview = build_push_preview(prepared)
             self.assertEqual(preview.removals, 1)
@@ -60,7 +61,7 @@ class TestTuiMutationSafety(unittest.TestCase):
                 encoding="utf-8",
             )
             execution = service.execute_push_preview(
-                opts,
+                PushRequest(project=request.project),
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -73,13 +74,13 @@ class TestTuiMutationSafety(unittest.TestCase):
     def test_pull_preview_execute_writes_prepared_merge(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            wordlist, dictionary, run, opts = self._project(tmp)
+            wordlist, dictionary, run, request = self._project(tmp)
             dictionary.write_text("alpha\nbeta\ndelta\n", encoding="utf-8")
             preview = build_pull_preview(run)
             self.assertEqual(preview.additions, 1)
             self.assertIn("delta", preview.addition_words)
             execution = service.execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id=preview.plan_identifier,
             )
@@ -90,10 +91,10 @@ class TestTuiMutationSafety(unittest.TestCase):
     def test_pull_plan_id_mismatch_rejects_execution(self):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
-            _wordlist, _dictionary, run, opts = self._project(tmp)
+            _wordlist, _dictionary, run, request = self._project(tmp)
             preview = build_pull_preview(run)
             execution = service.execute_pull(
-                opts,
+                request,
                 preview,
                 confirmed_plan_id="not-the-plan",
             )

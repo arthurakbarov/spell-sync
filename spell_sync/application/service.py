@@ -6,8 +6,18 @@ from dataclasses import replace
 from pathlib import Path
 
 from .. import command_helpers
-from ..cli_options import CliOptions
-from ..config import push_strict_enabled
+from ..application.requests import (
+    DoctorRequest,
+    PrepareTargetSettingsUpdateRequest,
+    PullRequest,
+    PushRequest,
+    RecoveryRequest,
+    SetupRequest,
+    StatusRequest,
+    TargetSettingsRequest,
+    effective_push_strict,
+    resolve_project_wordlist,
+)
 from ..diagnostics.history_builder import HistoryBuildContext, build_history_record
 from ..diagnostics.history_store import OperationHistoryStore
 from ..diagnostics.paths import AppStatePaths, resolve_app_state_paths
@@ -24,7 +34,6 @@ from ..diagnostics.types import (
 from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
 from ..operation_lock import read_active_operation_lock
-from ..paths import resolve_wordlist_path
 from ..project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
 from ..project_setup.draft import SetupDraft
 from ..project_setup.execute import ProjectSetupExecution, execute_project_setup
@@ -35,8 +44,8 @@ from ..project_setup.target_settings import (
     TargetSettingsExecution,
     TargetSettingsSnapshot,
     execute_target_settings_update,
-    load_target_settings_from_options,
-    prepare_target_settings_from_options,
+    load_target_settings,
+    prepare_target_settings_update_request,
 )
 from ..push_abort import PushAbort
 from ..push_journal import (
@@ -187,8 +196,8 @@ class SpellSyncService:
         warnings = report.warnings + (_HISTORY_SAVE_WARNING,)
         return replace(report, warnings=warnings)
 
-    def load_status(self, opts: CliOptions) -> StatusSnapshot:
-        run = command_helpers.sync_run_for(opts)
+    def load_status(self, request: StatusRequest) -> StatusSnapshot:
+        run = command_helpers.sync_run_for(request.project)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return StatusSnapshot(
@@ -201,21 +210,21 @@ class SpellSyncService:
         words = run.load_wordlist()
         return StatusSnapshot(
             wordlist_count=len(words),
-            diffs=tuple(run.status_diffs(verbose=opts.verbose)),
+            diffs=tuple(run.status_diffs(verbose=request.include_word_diffs)),
             skipped_unreadable=run.skipped_unreadable_dictionary_names(),
             skipped_corrupt=run.skipped_corrupt_dictionary_names(),
             destructive_risk=run.destructive_push_risk(),
             empty_wordlist=not words,
         )
 
-    def load_status_detail(self, opts: CliOptions) -> StatusDetailSnapshot:
-        run = command_helpers.sync_run_for(opts)
+    def load_status_detail(self, request: StatusRequest) -> StatusDetailSnapshot:
+        run = command_helpers.sync_run_for(request.project)
         return build_status_detail_snapshot(run)
 
-    def load_dashboard(self, opts: CliOptions) -> DashboardState:
-        wordlist = resolve_wordlist_path(opts.wordlist)
+    def load_dashboard(self, request: StatusRequest) -> DashboardState:
+        wordlist = resolve_project_wordlist(request.project)
         validated = build_validated_runtime(wordlist)
-        snapshot = self.load_status(opts)
+        snapshot = self.load_status(request)
         lock_info = read_active_operation_lock(wordlist)
         last_operation_summary = None
         history = self.load_operation_history(limit=1)
@@ -230,20 +239,20 @@ class SpellSyncService:
             last_operation_summary=last_operation_summary,
         )
 
-    def load_push_preview(self, opts: CliOptions) -> PushPreview:
-        strict = opts.strict or push_strict_enabled()
-        run = command_helpers.sync_run_for(opts, strict_push=strict)
+    def load_push_preview(self, request: PushRequest) -> PushPreview:
+        strict = effective_push_strict(request)
+        run = command_helpers.sync_run_for(request.project, strict_push=strict)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return build_push_preview(None, wordlist_error=wordlist_error)
-        prepared = self.prepare_push(run, opts)
+        prepared = self.prepare_push(run)
         if isinstance(prepared, ExitCode):
             return build_push_preview(None, prepare_error=prepared)
         return build_push_preview(prepared)
 
-    def load_doctor(self, opts: CliOptions) -> DoctorSnapshot:
+    def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
         try:
-            run = command_helpers.sync_run_for(opts)
+            run = command_helpers.sync_run_for(request.project)
             report = build_doctor_report(run)
             return build_doctor_snapshot(report)
         except Exception:
@@ -253,13 +262,13 @@ class SpellSyncService:
                 load_error="Doctor report could not be loaded.",
             )
 
-    def prepare_pull(self, opts: CliOptions) -> PullPreview:
-        run = command_helpers.sync_run_for(opts)
+    def prepare_pull(self, request: PullRequest) -> PullPreview:
+        run = command_helpers.sync_run_for(request.project)
         return build_pull_preview(run)
 
     def execute_pull(
         self,
-        opts: CliOptions,
+        request: PullRequest,
         preview: PullPreview,
         *,
         confirmed_plan_id: str,
@@ -284,7 +293,7 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PULL, "validating", "Validating pull preview"),
         )
-        with command_helpers.mutating_command_scope(opts, "pull") as scope:
+        with command_helpers.mutating_command_scope_for(request.project, "pull") as scope:
             if isinstance(scope, int):
                 _emit(
                     event_sink,
@@ -403,7 +412,6 @@ class SpellSyncService:
     def prepare_push(
         self,
         run: SyncRun,
-        opts: CliOptions,
         *,
         event_sink: EventSink | None = None,
     ) -> PreparedPush | ExitCode:
@@ -415,7 +423,7 @@ class SpellSyncService:
                 "Building push plan",
             ),
         )
-        skip_names = command_helpers.push_skip_running_app_dicts(run, opts)
+        skip_names = command_helpers.push_skip_running_app_dicts(run)
         prepared = run.prepare_push_operation(skip_names=skip_names)
         if isinstance(prepared, ExitCode):
             _emit(
@@ -488,7 +496,6 @@ class SpellSyncService:
     def run_push(
         self,
         run: SyncRun,
-        opts: CliOptions,
         prepared: PreparedPush,
         *,
         dry_run: bool,
@@ -562,7 +569,7 @@ class SpellSyncService:
 
     def execute_push_preview(
         self,
-        opts: CliOptions,
+        request: PushRequest,
         preview: PushPreview,
         *,
         confirmed_plan_id: str,
@@ -594,9 +601,9 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PUSH, "validating", "Validating configuration"),
         )
-        strict = opts.strict or push_strict_enabled()
-        with command_helpers.mutating_command_scope(
-            opts,
+        strict = effective_push_strict(request)
+        with command_helpers.mutating_command_scope_for(
+            request.project,
             "push",
             strict_push=strict,
         ) as scope:
@@ -825,14 +832,14 @@ class SpellSyncService:
             push_preview=preview,
         )
 
-    def inspect_recovery(self, opts: CliOptions) -> RecoveryPreview:
-        wordlist = resolve_wordlist_path(opts.wordlist)
+    def inspect_recovery(self, request: RecoveryRequest) -> RecoveryPreview:
+        wordlist = resolve_project_wordlist(request.project)
         validated = build_validated_runtime(wordlist, validate_journal_wordlist=True)
         return build_recovery_preview(validated)
 
     def execute_recovery(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -857,8 +864,8 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.RECOVER, "validating_journal", "Validating journal"),
         )
-        with command_helpers.mutating_command_scope(
-            opts,
+        with command_helpers.mutating_command_scope_for(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -1041,7 +1048,7 @@ class SpellSyncService:
 
     def execute_recovery_cleanup(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -1061,8 +1068,8 @@ class SpellSyncService:
                 outcome=RecoveryOutcome.FAILED,
                 message="Cleanup is not available for this preview.",
             )
-        with command_helpers.mutating_command_scope(
-            opts,
+        with command_helpers.mutating_command_scope_for(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -1108,7 +1115,7 @@ class SpellSyncService:
 
     def execute_recovery_discard(
         self,
-        opts: CliOptions,
+        request: RecoveryRequest,
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
@@ -1128,8 +1135,8 @@ class SpellSyncService:
                 outcome=RecoveryOutcome.FAILED,
                 message="Discard is not available for this preview.",
             )
-        with command_helpers.mutating_command_scope(
-            opts,
+        with command_helpers.mutating_command_scope_for(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -1167,8 +1174,8 @@ class SpellSyncService:
                 message="Recovery metadata discarded.",
             )
 
-    def inspect_project_setup(self, opts: CliOptions) -> ProjectSetupState:
-        return inspect_project_setup(opts)
+    def inspect_project_setup(self, request: SetupRequest) -> ProjectSetupState:
+        return inspect_project_setup(request)
 
     def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery:
         return discover_setup_targets(selected_targets=draft.selected_targets)
@@ -1212,19 +1219,17 @@ class SpellSyncService:
         report = build_setup_operation_report(execution)
         return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
-    def load_target_settings(self, opts: CliOptions) -> TargetSettingsSnapshot:
-        return load_target_settings_from_options(opts)
+    def load_target_settings(self, request: TargetSettingsRequest) -> TargetSettingsSnapshot:
+        return load_target_settings(request)
 
     def prepare_target_settings_update(
         self,
-        opts: CliOptions,
-        selected_target_ids: frozenset[str],
+        request: PrepareTargetSettingsUpdateRequest,
     ) -> PreparedTargetSettingsUpdate:
-        return prepare_target_settings_from_options(opts, selected_target_ids)
+        return prepare_target_settings_update_request(request)
 
     def execute_target_settings_update(
         self,
-        opts: CliOptions,
         prepared: PreparedTargetSettingsUpdate,
         *,
         confirmed_update_id: str,

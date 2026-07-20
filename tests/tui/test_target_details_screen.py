@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from spell_sync.application.requests import ProjectRef
 from spell_sync.application.target_details import build_target_details, format_target_details_text
-from spell_sync.cli_options import CliOptions
 from spell_sync.project_setup.discovery import SetupTarget
 from spell_sync.project_setup.target_settings import TargetSettingsSnapshot
 from spell_sync.target_capabilities import TargetFilterKind, capability_by_id
@@ -95,7 +95,7 @@ class TestTargetDetails(unittest.IsolatedAsyncioTestCase):
         )
         service = fake_service()
         service.load_target_settings = MagicMock(return_value=snapshot)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(80, 24)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
@@ -119,7 +119,7 @@ class TestTargetDetails(unittest.IsolatedAsyncioTestCase):
         )
         service = fake_service()
         service.load_target_settings = MagicMock(return_value=snapshot)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))

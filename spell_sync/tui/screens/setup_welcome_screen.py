@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Static
@@ -93,7 +91,7 @@ class SetupOpenProjectScreen(Screen[None]):
             except ValueError as exc:
                 self.notify(str(exc), severity="error")
                 return
-            self._controller.opts = replace(self._controller.opts, wordlist=str(path))
+            self._controller.set_project_wordlist(path)
             self.app.pop_screen()
             self.app.pop_screen()
             from .dashboard import DashboardScreen

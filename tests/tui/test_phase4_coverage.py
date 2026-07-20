@@ -15,6 +15,7 @@ from spell_sync.application.reports import (
     OperationReport,
     TargetUpdateReport,
 )
+from spell_sync.application.requests import ProjectRef
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
 from spell_sync.tui.app import SpellSyncApp
@@ -33,7 +34,7 @@ from tests.tui.test_helpers import wait_for_text
 class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_operation_event_and_cancel_policy(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             preview = sample_pull_preview()
@@ -45,7 +46,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_operation_blocked_second_mutation(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         controller.begin_mutation()
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
@@ -61,7 +62,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_operation_apply_event_branches(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             screen = OperationScreen(
@@ -95,7 +96,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_report_details_rebuild_and_quit(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         report = OperationReport(
             operation="push",
@@ -135,7 +136,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_push_confirm_invalid_preview(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         preview = sample_preview(removals=0, plan_identifier="gone")
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
@@ -156,7 +157,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_confirm_invalid_preview(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         preview = sample_pull_preview(plan_identifier="gone")
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
@@ -169,7 +170,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_pull_screen_view_additions_and_error_preview(self):
         preview = sample_pull_preview(wordlist_error=ExitCode.PUSH_ABORT)
         service = fake_service(pull_preview=preview)
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -204,7 +205,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         preview = sample_preview(plan_identifier="fixed")
         service = fake_service(preview=preview)
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -311,7 +312,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_screen_refresh_and_run_guards(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -349,7 +350,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_pull_screen_mount_exception(self):
         service = fake_service()
         service.prepare_pull = lambda opts: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -359,7 +360,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         preview = sample_preview(removals=0, plan_identifier="fixed")
         service = fake_service(preview=preview)
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
@@ -375,7 +376,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_push_confirm_cancel_and_prepared_mismatch(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         preview = sample_preview(removals=0, plan_identifier="p1")
         other = sample_preview(removals=0, plan_identifier="p1")
         controller._active_push_preview = other
@@ -462,7 +463,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         from spell_sync.application.reports import PullExecution
 
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             op = OperationScreen(
@@ -492,7 +493,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_pull_worker_exception_and_token_mismatch(self):
         service = fake_service()
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
@@ -541,7 +542,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         preview_obj = sample_preview(removals=0, plan_identifier="fixed")
         service = fake_service(preview=preview_obj)
         service.load_push_preview = lambda opts: preview_obj  # type: ignore[method-assign]
-        controller = TuiController(service, CliOptions())
+        controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))

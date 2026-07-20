@@ -81,10 +81,10 @@ class TestRunningAppGuard(unittest.TestCase):
                 stdin = stack.enter_context(patch.object(commands.sys, "stdin"))
                 stdin.isatty.return_value = True
                 self.assertEqual(
-                    command_helpers.push_skip_running_app_dicts(run, CliOptions(yes=False)),
+                    command_helpers.push_skip_running_app_dicts(run),
                     frozenset(),
                 )
-                skip = command_helpers.push_skip_running_app_dicts(run, CliOptions(yes=True))
+                skip = command_helpers.push_skip_running_app_dicts(run)
                 self.assertEqual(skip, frozenset())
 
     def test_cmd_push_yes_skips_running_chrome_dictionary(self):

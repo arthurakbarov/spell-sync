@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .cli_options import CliOptions
+from .cli_request_adapter import project_ref
 from .command_helpers import quiet_json_output, sync_run_for
 from .dictionaries import DictionaryFormat
 from .dictionary_hints import warn_missing_optional_apps
@@ -75,7 +76,7 @@ def _cmd_doctor_targets(opts: CliOptions, run) -> int:
 
 def cmd_doctor(opts: CliOptions) -> int:
     with quiet_json_output(opts):
-        run = sync_run_for(opts)
+        run = sync_run_for(project_ref(opts))
         if opts.show_targets:
             return _cmd_doctor_targets(opts, run)
 
