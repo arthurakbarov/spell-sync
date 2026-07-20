@@ -26,18 +26,18 @@ description: >-
 2. Run focused tests first:
 
 ```bash
-python3.11 -m pytest tests/tui/test_<area>.py -q
-python3.11 -m pytest tests/test_<area>.py -q
+python3 -m pytest tests/tui/test_<area>.py -q
+python3 -m pytest tests/test_<area>.py -q
 ```
 
 3. Run static checks:
 
 ```bash
-python3.11 -m ruff check spell_sync tests
-python3.11 -m ruff format --check spell_sync tests
-python3.11 -m mypy spell_sync
-python3.11 scripts/check-agent-config.py
-python3.11 scripts/check-docs-contract.py
+python3 -m ruff check spell_sync tests scripts
+python3 -m ruff format --check spell_sync tests scripts
+python3 -m mypy spell_sync
+python3 scripts/check-agent-config.py
+python3 scripts/check-docs-contract.py
 ```
 
 4. Run full CI:
@@ -47,8 +47,9 @@ scripts/ci.sh
 ```
 
 Read `CI_LOG` and `CI_SUMMARY` from the printed paths. On failure, use `CI_FAILED_ID` as the
-primary gate identifier. Summary schema version 2 includes `runId`, `historyLogPath`, and
-`historySummaryPath`. Do not ask the owner to diagnose failures.
+primary gate identifier. Summary schema version 2 includes `runId`, `historyLogPath`,
+`historySummaryPath`, and `failedCheckId`. Installed-wheel smoke runs outside the checkout.
+Do not ask the owner to diagnose failures.
 
 ## What ci.sh enforces
 
@@ -68,7 +69,7 @@ Via `scripts/ci_runner.py`:
 | `coverage.policy` | 100% lines, ≥96% branches on `spell_sync/` |
 | `packaging.build` | wheel + sdist build |
 | `packaging.twine` | Artifact validation |
-| `packaging.wheel-smoke` | Installed wheel commands |
+| `packaging.wheel-smoke` | Installed wheel outside checkout (install, metadata, origin, CLI) |
 | `smoke.init` / `smoke.lint` | Temporary project smoke |
 | `smoke.tui` | Headless CLI scenarios |
 

@@ -83,7 +83,7 @@ ship an interactive GUI harness.
 
 ## Version
 
-Single source: `version` in `pyproject.toml` (currently **0.2.1**).
+The package version source of truth is `project.version` in `pyproject.toml`.
 
 ## Maintainer layout (optional)
 

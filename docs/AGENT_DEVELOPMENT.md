@@ -59,9 +59,15 @@ Do not ask the owner to diagnose failures or read raw logs.
 ## CI artifacts
 
 - Entry point: `scripts/ci.sh` (non-interactive).
-- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 1).
-- Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed runs).
+- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 2).
+- Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed run pairs).
 - Final stdout block prints `CI_RESULT`, `CI_EXIT`, optional `CI_FAILED_ID`, `CI_SUMMARY`, `CI_LOG`.
+
+Schema v2 fields include `schemaVersion`, `runId`, `historyLogPath`, `historySummaryPath`, and
+`failedCheckId` when a check fails.
+
+Installed-wheel smoke runs outside the repository checkout so the local tree cannot shadow the
+installed package.
 
 ## Prohibited repository content
 
@@ -71,6 +77,6 @@ processes.
 
 ## Phase boundaries
 
-Current package version comes from `pyproject.toml`. Phase 2B (typed application boundary)
-is complete. Phase 2C (deterministic agent workflow and machine-readable CI) completes with
-the automation commit. Phase 3 (explicit runtime / ContextVar removal) is **not** started.
+Current package version comes from `pyproject.toml`. Phase 2D (deterministic CI contracts) is
+complete. Phase 2E (portable deterministic CI hardening) is complete. Phase 3 (explicit runtime /
+ContextVar removal) is **next and has not started**.

@@ -43,6 +43,13 @@ CURRENT_PHASE_HEADING = "## Current phase"
 ARCHITECTURE_STATUS_START = "[architecture-status:start]"
 ARCHITECTURE_STATUS_END = "[architecture-status:end]"
 KNOWN_STATUSES = frozenset({"complete", "in-progress", "not-started", "planned"})
+AGENT_WORKFLOW_DOCS = (
+    "AGENTS.md",
+    "docs/AGENT_DEVELOPMENT.md",
+    ".cursor/skills/spell-sync-ci/SKILL.md",
+)
+PINNED_PYTHON = re.compile(r"python3\.\d+")
+DEVELOPMENT_VERSION = Path("docs/DEVELOPMENT.md")
 HISTORICAL_DOC_PATHS = frozenset(
     {
         "docs/UX_0_2_IMPLEMENTATION.md",
@@ -260,6 +267,109 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
                 )
             )
 
+    if current and current in statuses and statuses[current] == "complete":
+        violations.append(
+            ContractViolation(
+                "PHASE-009",
+                tracker,
+                None,
+                f"current phase points to completed phase: {current}",
+                "set current to an in-progress or not-started phase",
+            )
+        )
+
+    return violations
+
+
+def _ci_summary_schema(root: Path) -> int:
+    ci_runner = root / "scripts" / "ci_runner.py"
+    text = ci_runner.read_text(encoding="utf-8")
+    match = re.search(r"^SUMMARY_SCHEMA\s*=\s*(\d+)", text, re.MULTILINE)
+    if not match:
+        raise RuntimeError("scripts/ci_runner.py missing SUMMARY_SCHEMA")
+    return int(match.group(1))
+
+
+def _check_agent_workflow_docs(root: Path) -> list[ContractViolation]:
+    violations: list[ContractViolation] = []
+    schema: int | None = None
+    ci_runner = root / "scripts" / "ci_runner.py"
+    if ci_runner.is_file():
+        schema = _ci_summary_schema(root)
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
+    if schema is not None and agent_dev.is_file():
+        text = agent_dev.read_text(encoding="utf-8")
+        if re.search(r"schema version 1\b", text, re.IGNORECASE):
+            violations.append(
+                ContractViolation(
+                    "AGENT-002",
+                    agent_dev,
+                    None,
+                    "AGENT_DEVELOPMENT.md documents schema version 1",
+                    f"document CI summary schema version {schema}",
+                )
+            )
+        schema_ok = (
+            f"schema version {schema}" in text.lower() or f"schema v{schema}" in text.lower()
+        )
+        if not schema_ok:
+            violations.append(
+                ContractViolation(
+                    "AGENT-003",
+                    agent_dev,
+                    None,
+                    f"AGENT_DEVELOPMENT.md missing schema version {schema}",
+                    (
+                        "document schemaVersion, runId, historyLogPath, "
+                        "historySummaryPath, failedCheckId"
+                    ),
+                )
+            )
+
+    for rel in AGENT_WORKFLOW_DOCS:
+        path = root / rel
+        if not path.is_file():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_no, line in enumerate(lines, start=1):
+            if PINNED_PYTHON.search(line):
+                violations.append(
+                    ContractViolation(
+                        "AGENT-004",
+                        path,
+                        line_no,
+                        line.strip(),
+                        "use portable python3 or PYTHON_BIN=${PYTHON_BIN:-python3}",
+                    )
+                )
+            if "ruff" in line and ("check" in line or "format" in line):
+                if "spell_sync" in line and "scripts" not in line:
+                    violations.append(
+                        ContractViolation(
+                            "AGENT-005",
+                            path,
+                            line_no,
+                            line.strip(),
+                            "include scripts in ruff check/format examples",
+                        )
+                    )
+
+    development = root / DEVELOPMENT_VERSION
+    if development.is_file():
+        version = _project_version(root)
+        dev_lines = development.read_text(encoding="utf-8").splitlines()
+        for line_no, line in enumerate(dev_lines, start=1):
+            if "currently" in line.lower() and version in line:
+                violations.append(
+                    ContractViolation(
+                        "VERSION-002",
+                        development,
+                        line_no,
+                        line.strip(),
+                        "do not duplicate current package version; reference pyproject.toml",
+                    )
+                )
+
     return violations
 
 
@@ -382,6 +492,7 @@ def check_repository(root: Path) -> list[ContractViolation]:
 
     violations.extend(_check_current_phase_section(root))
     violations.extend(_check_stale_version_claims(root, version))
+    violations.extend(_check_agent_workflow_docs(root))
     return violations
 
 

@@ -56,13 +56,13 @@ No-args on a TTY launches the TUI when a project is ready. See `spell_sync/cli.p
 ## Critical commands
 
 ```bash
-python3.11 -m ruff check spell_sync tests
-python3.11 -m ruff format --check spell_sync tests
-python3.11 -m mypy spell_sync
-python3.11 -m pytest <focused tests> -q
+python3 -m ruff check spell_sync tests scripts
+python3 -m ruff format --check spell_sync tests scripts
+python3 -m mypy spell_sync
+python3 -m pytest <focused tests> -q
 scripts/ci.sh
-python3.11 scripts/check-agent-config.py
-python3.11 scripts/check-docs-contract.py
+python3 scripts/check-agent-config.py
+python3 scripts/check-docs-contract.py
 ```
 
 `scripts/ci.sh` is the single CI entry point. On completion it prints `CI_RESULT`, `CI_EXIT`,

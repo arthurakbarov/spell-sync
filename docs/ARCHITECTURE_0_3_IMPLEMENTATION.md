@@ -113,15 +113,16 @@ blocking, and privacy rules.
 
 ## Current phase
 
-Phase 2D complete: hardened deterministic CI and documentation contracts.
+Phase 2E complete. Phase 3 is next and has not started.
 
 [architecture-status:start]
-current: phase-2d
+current: phase-3
 phase-1: complete
 phase-2: complete
 phase-2b: complete
 phase-2c: complete
 phase-2d: complete
+phase-2e: complete
 phase-3: not-started
 [architecture-status:end]
 

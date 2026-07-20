@@ -318,6 +318,81 @@ class TestDocsContract(unittest.TestCase):
             version = mod._project_version(root)
             self.assertEqual(version, "99.0.0", msg="[DOCS-CONTRACT-016] dynamic version read")
 
+    def test_current_points_to_complete_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            status = "\n".join(
+                [
+                    "current: phase-2d",
+                    "phase-2d: complete",
+                ]
+            )
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                        body="Invalid current pointer.",
+                        status_block=status,
+                    ),
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id == "PHASE-009"]
+            self.assertEqual(len(violations), 1, msg="[DOCS-CONTRACT-017] complete current fails")
+
+    def test_current_points_to_not_started_passes(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            status = "\n".join(
+                [
+                    "current: phase-3",
+                    "phase-2e: complete",
+                    "phase-3: not-started",
+                ]
+            )
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                        body="Phase 3 is next.",
+                        status_block=status,
+                    ),
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id.startswith("PHASE-")]
+            self.assertEqual(violations, [], msg="[DOCS-CONTRACT-018] not-started current passes")
+
+    def test_pinned_python_in_agent_docs_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {
+                    "AGENTS.md": "# Agents\n\n```bash\npython3.11 -m pytest\n```\n",
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id == "AGENT-004"]
+            self.assertEqual(len(violations), 1, msg="[DOCS-CONTRACT-019] pinned python fails")
+
+    def test_development_version_duplication_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/DEVELOPMENT.md": "Version currently 9.9.9 in pyproject.\n",
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id == "VERSION-002"]
+            self.assertEqual(
+                len(violations),
+                1,
+                msg="[DOCS-CONTRACT-020] version duplication fails",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
