@@ -16,7 +16,7 @@ import spell_sync.io as io_mod
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 def _can_create_symlinks() -> bool:
@@ -92,7 +92,7 @@ class TestDictionaryDedup(unittest.TestCase):
                     Dictionary("second", link, DictionaryFormat.TEXT),
                 ]
             )
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries)
+            run = make_sync_run(wordlist, dictionaries=dictionaries)
             result = run.push_from_wordlist()
             self.assertEqual(result.written, ("first",))
             self.assertTrue(os.path.islink(link))
@@ -110,8 +110,8 @@ class TestPullReadableGuard(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["beta"], "utf-8", False, quiet=True)
             blocked_dict = Dictionary("blocked", dict_path, DictionaryFormat.TEXT)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[blocked_dict],
             )
             with patch("spell_sync.read_outcome.is_path_readable", return_value=False):
@@ -180,8 +180,8 @@ class TestWordlistSymlinkRollback(unittest.TestCase):
             real.write_text("alpha\n", encoding="utf-8")
             link.symlink_to(real)
             write_text_words(str(dict_path), ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(link),
+            run = make_sync_run(
+                str(link),
                 dictionaries=[
                     Dictionary("s", str(dict_path), DictionaryFormat.TEXT),
                 ],
@@ -202,7 +202,7 @@ class TestExportThroughSymlink(unittest.TestCase):
             link = root / "wordlist.txt"
             link.symlink_to("missing-target.txt")
             self.assertFalse(io_mod.wordlist_unreadable(link))
-            run = SyncRun(wordlist=str(link), dictionaries=[])
+            run = make_sync_run(str(link), dictionaries=[])
             result = run.push_from_wordlist()
             self.assertEqual(result, ExitCode.PUSH_ABORT)
 
@@ -214,8 +214,8 @@ class TestExportThroughSymlink(unittest.TestCase):
             link.symlink_to(target.name)
             dict_path = root / "dict.txt"
             write_text_words(str(dict_path), ["beta"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(link),
+            run = make_sync_run(
+                str(link),
                 dictionaries=[
                     Dictionary("s", str(dict_path), DictionaryFormat.TEXT),
                 ],
@@ -249,8 +249,8 @@ class TestStrictPushSymlinkBackup(unittest.TestCase):
                     raise OSError("backup denied")
                 return original_copy(src, dst, **kwargs)
 
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                     Dictionary("linked", link, DictionaryFormat.TEXT),

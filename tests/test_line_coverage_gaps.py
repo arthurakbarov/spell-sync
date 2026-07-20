@@ -36,7 +36,6 @@ from spell_sync.push_journal import (
     plan_recovery_from_journal,
 )
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
-from spell_sync.sync_run import SyncRun
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.operation_screen import OperationScreen
@@ -48,6 +47,7 @@ from tests.journal_test_utils import (
     write_restore_scenario_journal,
     write_test_journal,
 )
+from tests.runtime_helpers import make_sync_run
 from tests.test_phase4_facade_coverage import _pull_scope
 from tests.tui.fake_service import fake_service, sample_recovery_preview
 from tests.tui.test_helpers import wait_for_text
@@ -71,7 +71,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             wordlist_fingerprint="abc",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope("/tmp/w.txt")
             scope.return_value.__exit__.return_value = False
@@ -82,7 +82,7 @@ class TestLineCoverageGaps(unittest.TestCase):
 
     def test_execute_prepared_pull_unreadable_wordlist(self):
         with tempfile.TemporaryDirectory() as tmp:
-            run = SyncRun(wordlist=Path(tmp) / "missing.txt")
+            run = make_sync_run(Path(tmp) / "missing.txt")
             with patch.object(run, "check_wordlist", return_value=ExitCode.PUSH_ABORT):
                 result = run.execute_prepared_pull(
                     merged_words=("a",),
@@ -127,7 +127,7 @@ class TestLineCoverageGaps(unittest.TestCase):
         scope.context.wordlist_file = Path("/tmp/w.txt")
         scope.journal_result = JournalLoadResult(JournalLoadStatus.ABSENT, None)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -141,7 +141,7 @@ class TestLineCoverageGaps(unittest.TestCase):
         scope.journal_result = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
         events: list = []
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -165,7 +165,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             can_cleanup=True,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             mutating.return_value.__exit__.return_value = False
@@ -178,7 +178,7 @@ class TestLineCoverageGaps(unittest.TestCase):
 
         scope.journal_result = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -206,7 +206,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             RecoveryOutcome.FAILED,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             mutating.return_value.__exit__.return_value = False
@@ -222,7 +222,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             can_discard=True,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = MagicMock()
             mutating.return_value.__exit__.return_value = False

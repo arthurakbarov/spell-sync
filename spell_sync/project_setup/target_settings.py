@@ -131,7 +131,7 @@ def _enabled_from_loaded_config(config: dict[str, dict[str, Any]] | None) -> fro
 
 def load_target_settings_snapshot(*, wordlist: Path) -> TargetSettingsSnapshot:
     config_path = _project_config_path(wordlist)
-    config_result = load_config_result(wordlist=wordlist, reload=True)
+    config_result = load_config_result(wordlist=wordlist)
     if config_result.status is ConfigStatus.ABSENT:
         return TargetSettingsSnapshot(
             config_path=config_path,
@@ -174,7 +174,7 @@ def prepare_target_settings_update(
     pending_recovery: bool = False,
 ) -> PreparedTargetSettingsUpdate:
     config_path = _project_config_path(wordlist)
-    config_result = load_config_result(wordlist=wordlist, reload=True)
+    config_result = load_config_result(wordlist=wordlist)
     warnings: list[str] = []
     can_execute = True
 
@@ -319,7 +319,7 @@ def execute_target_settings_update(
             emit("writing_configuration", "Writing spell-sync.toml")
             atomic_write(prepared.config_path, prepared.rendered_config_bytes, keep_backup=True)
             emit("verifying_configuration", "Verifying configuration")
-            config_result = load_config_result(wordlist=prepared.wordlist_path, reload=True)
+            config_result = load_config_result(wordlist=prepared.wordlist_path)
             if config_result.status in (
                 ConfigStatus.SYNTAX_ERROR,
                 ConfigStatus.INVALID_TYPE,

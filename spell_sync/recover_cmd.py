@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from .application import SpellSyncService
 from .application.reports import RecoveryStatus
@@ -14,16 +13,9 @@ from .config import CONFIRM_YES
 from .exit_codes import ExitCode
 from .json_output import base_payload, emit_json
 from .log import log
-from .push_journal import RecoverResult, journal_payload, load_journal_result
+from .push_journal import RecoverResult
 
 _SERVICE = SpellSyncService(enable_file_logging=False)
-
-
-def _journal_payload_for_preview(preview) -> dict[str, object]:
-    result = load_journal_result(Path(preview.wordlist_path), validate_wordlist=True)
-    if result.journal is None:
-        return {}
-    return journal_payload(result.journal)
 
 
 def _emit_recover_text(result: RecoverResult, *, dry_run: bool) -> int:
@@ -147,7 +139,7 @@ def cmd_recover(opts: CliOptions) -> int:
                         {
                             **base_payload("recover", exit=int(ExitCode.PUSH_ABORT)),
                             "reason": "confirmation_required",
-                            "journal": _journal_payload_for_preview(preview),
+                            "journal": preview.journal_summary,
                         }
                     )
                     return int(ExitCode.PUSH_ABORT)
@@ -196,7 +188,7 @@ def cmd_recover(opts: CliOptions) -> int:
             if preview.transaction_state == "rollback_incomplete":
                 payload["reason"] = "rollback_incomplete"
             if isinstance(result, RecoverResult):
-                payload["journal"] = _journal_payload_for_preview(preview)
+                payload["journal"] = preview.journal_summary
             emit_json(payload)
             return exit_code
 

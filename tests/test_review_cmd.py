@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import spell_sync.removal_review as removal_mod
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
-from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 class TestReviewInteractive(unittest.TestCase):
@@ -22,8 +22,8 @@ class TestReviewInteractive(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with patch.object(removal_mod.sys.stdin, "isatty", return_value=False):
@@ -35,8 +35,8 @@ class TestReviewInteractive(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
@@ -51,8 +51,8 @@ class TestReviewInteractive(unittest.TestCase):
             Path(wordlist).write_text("stay\n", encoding="utf-8")
             dict_path = os.path.join(d, "dict.txt")
             Path(dict_path).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             self.assertTrue(removal_mod.review_removals_interactive(run))
@@ -63,8 +63,8 @@ class TestReviewInteractive(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
@@ -79,8 +79,8 @@ class TestReviewInteractive(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             diffs = removal_mod.list_removals(run)

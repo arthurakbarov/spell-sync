@@ -30,6 +30,7 @@ from ..application.requests import (
     RecoveryRequest,
     SetupRequest,
     StatusRequest,
+    SupportReportRequest,
     TargetSettingsRequest,
 )
 from ..application.review_session import (
@@ -181,6 +182,8 @@ class TuiService(Protocol):
         max_lines: int = 200,
         max_bytes: int = 128 * 1024,
     ): ...
+
+    def load_support_report(self, request: SupportReportRequest): ...
 
 
 class TuiController:
@@ -738,15 +741,12 @@ class TuiController:
     def export_support_report(self, *, fmt: str = "json") -> Path:
         from ..application.requests import SupportReportRequest
         from ..application.support_report import (
-            build_support_report,
             default_support_report_path,
             export_support_report,
         )
 
-        report = build_support_report(
-            self._service,
-            SupportReportRequest(project=self._project_ref()),
-        )
+        request = SupportReportRequest(project=self._project_ref())
+        report = self._service.load_support_report(request)
         path = default_support_report_path(fmt=fmt)
         return export_support_report(report, output_path=path, fmt=fmt)
 

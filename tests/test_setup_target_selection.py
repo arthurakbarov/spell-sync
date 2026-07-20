@@ -144,7 +144,7 @@ def test_config_round_trip_preserves_selection(tmp_path: Path) -> None:
     config_path = tmp_path / "spell-sync.toml"
     config_path.write_bytes(config)
     (tmp_path / "wordlist.txt").write_text("alpha\n", encoding="utf-8")
-    result = load_config_result(wordlist=tmp_path / "wordlist.txt", reload=True)
+    result = load_config_result(wordlist=tmp_path / "wordlist.txt")
     assert result.config is not None
     assert result.config["dictionaries"]["chrome"] is True
     assert result.config["dictionaries"]["firefox"] is True

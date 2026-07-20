@@ -12,7 +12,8 @@ import spell_sync.log as log_module
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestSyncRun(unittest.TestCase):
@@ -30,7 +31,7 @@ class TestSyncRun(unittest.TestCase):
             Dictionary("a", path_a, DictionaryFormat.TEXT),
             Dictionary("b", path_b, DictionaryFormat.TEXT),
         ]
-        run = SyncRun(wordlist=wordlist, dictionaries=dictionaries)
+        run = make_sync_run(wordlist, dictionaries=dictionaries)
         return run, wordlist, path_a, path_b
 
     def test_pull_unions_words(self):
@@ -136,7 +137,7 @@ class TestSyncRun(unittest.TestCase):
                 Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                 Dictionary("blocked", path_blocked, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries)
+            run = make_sync_run(wordlist, dictionaries=dictionaries)
 
             def readable(path):
                 return str(path) != path_blocked
@@ -160,8 +161,8 @@ class TestSyncRun(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_a, ["stale"], "utf-8", False, quiet=True)
             dict_a = Dictionary("a", path_a, DictionaryFormat.TEXT)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[dict_a],
             )
             with patch("spell_sync.read_outcome.is_path_readable", return_value=False):
@@ -200,8 +201,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             bad = os.path.join(d, "bad.xml")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(bad).write_text("<broken", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary(
                         "jetbrains:IDEA",
@@ -219,7 +220,7 @@ class TestSyncRunEdgeCases(unittest.TestCase):
     def test_save_wordlist_writes_sorted_merged_words(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             self.assertTrue(run.save_wordlist({"Beta", "alpha"}))
             self.assertEqual(read_text_words(wordlist, quiet=True), {"Beta", "alpha"})
 
@@ -233,8 +234,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             buf = io.StringIO()
@@ -256,8 +257,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             buf = io.StringIO()
@@ -277,8 +278,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(good, ["beta"], "utf-8", False, quiet=True)
             Path(bad).write_text("<broken", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("good", good, DictionaryFormat.TEXT),
                     Dictionary(
@@ -300,8 +301,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
@@ -317,7 +318,7 @@ class TestSyncRunEdgeCases(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             self.assertTrue(wordlist_needs_rewrite(run.context, {"alpha"}))
 
     def test_setup_push_returns_unreadable(self):
@@ -327,7 +328,7 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             path = Path(wordlist)
             path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch("spell_sync.push_setup.wordlist_unreadable", return_value=True):
                 self.assertEqual(run.check_wordlist(), ExitCode.WORDLIST_UNREADABLE)
 
@@ -335,13 +336,13 @@ class TestSyncRunEdgeCases(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             open(wordlist, "w", encoding="utf-8").close()
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             self.assertEqual(run.push_from_wordlist(), ExitCode.PUSH_ABORT)
 
     def test_push_aborts_when_wordlist_unreadable_in_transaction(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch.object(
                 run,
                 "check_wordlist",
@@ -362,8 +363,8 @@ class TestSyncRunEdgeCases(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             mock_tx = MagicMock()

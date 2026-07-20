@@ -19,7 +19,6 @@ from .command_helpers import (
     emit_command_exit,
     finish_push,
     guard_exit_code,
-    mutating_command_scope,
     print_status_diff,
     quiet_json_output,
 )
@@ -34,15 +33,21 @@ from .runtime import installed_package_version
 _SERVICE = SpellSyncService()
 
 
-def _running_apps_check_for_push(opts: CliOptions) -> bool | None:
+def _running_apps_check_for_push(opts: CliOptions, preview) -> bool | None:
     interactive = sys.stdin.isatty() and not opts.yes and not opts.json_output
+    prepared = preview.prepared
+    settings = prepared.ctx.settings if prepared is not None else None
+    if settings is None:
+        from .runtime_settings import RuntimeSettings
+
+        settings = RuntimeSettings.defaults()
     for confirm in (
-        confirm_chrome_before_push,
-        confirm_edge_before_push,
-        confirm_firefox_before_push,
-        confirm_obsidian_before_push,
+        lambda: confirm_chrome_before_push(interactive=interactive, settings=settings),
+        lambda: confirm_edge_before_push(interactive=interactive, settings=settings),
+        lambda: confirm_firefox_before_push(interactive=interactive, settings=settings),
+        lambda: confirm_obsidian_before_push(interactive=interactive, settings=settings),
     ):
-        choice = confirm(interactive=interactive)
+        choice = confirm()
         if choice is None or not choice:
             return choice
     return True
@@ -78,14 +83,14 @@ def cmd_status(opts: CliOptions) -> int:
 
 def cmd_pull(opts: CliOptions) -> int:
     with quiet_json_output(opts):
-        with mutating_command_scope(opts, "pull") as scope:
-            if isinstance(scope, int):
-                return scope
-            return _cmd_pull_via_service(opts)
+        return _cmd_pull_via_service(opts)
 
 
 def _cmd_pull_via_service(opts: CliOptions) -> int:
     request = pull_request(opts)
+    blocked = _SERVICE.mutating_config_exit_code(request, "pull")
+    if blocked is not None:
+        return int(blocked)
     preview = _SERVICE.prepare_pull(request)
     if not preview.is_executable:
         code = preview.wordlist_error or preview.prepare_error or ExitCode.PUSH_ABORT
@@ -121,17 +126,7 @@ def _cmd_pull_via_service(opts: CliOptions) -> int:
 
 def cmd_push(opts: CliOptions) -> int:
     with quiet_json_output(opts):
-        from .application.project_resolution import effective_push_strict
-        from .cli_request_adapter import push_request as _push_request_adapter
-
-        with mutating_command_scope(
-            opts,
-            "push",
-            strict_push=effective_push_strict(_push_request_adapter(opts)),
-        ) as scope:
-            if isinstance(scope, int):
-                return scope
-            return _cmd_push_via_service(opts)
+        return _cmd_push_via_service(opts)
 
 
 def _cmd_push_via_service(opts: CliOptions) -> int:
@@ -140,13 +135,16 @@ def _cmd_push_via_service(opts: CliOptions) -> int:
     log.section(f"push{mode}: wordlist OVERWRITES all dictionaries")
     warn_missing_optional_apps()
     request = push_request(opts)
+    blocked = _SERVICE.mutating_config_exit_code(request, "push")
+    if blocked is not None:
+        return int(blocked)
     preview = _SERVICE.load_push_preview(request)
     if not preview.is_executable:
         code = preview.wordlist_error or preview.prepare_error or ExitCode.PUSH_ABORT
         return finish_push(code, opts, dry_run=dry_run, command="push")
     if not dry_run:
         exit_code = guard_exit_code(
-            _running_apps_check_for_push(opts),
+            _running_apps_check_for_push(opts, preview),
             cancelled=ExitCode.CANCELLED,
             quiet=opts.json_output,
         )

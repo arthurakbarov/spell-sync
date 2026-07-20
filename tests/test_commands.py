@@ -23,7 +23,8 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestCommands(unittest.TestCase):
@@ -50,8 +51,8 @@ class TestCommands(unittest.TestCase):
             path_a = os.path.join(d, "a.txt")
             path_b = os.path.join(d, "b.txt")
             self._write_fixture(wordlist, path_a, path_b)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
             with patch_commands_service(load_status=status_snapshot_from_run(run)):
@@ -70,8 +71,8 @@ class TestCommands(unittest.TestCase):
             path_a = os.path.join(d, "a.txt")
             path_b = os.path.join(d, "b.txt")
             self._write_fixture(wordlist, path_a, path_b)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
             snapshot = status_snapshot_from_run(run, include_word_diffs=True)
@@ -92,7 +93,7 @@ class TestWordlistUnreadable(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch("spell_sync.push_setup.wordlist_unreadable", return_value=True):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
@@ -104,7 +105,7 @@ class TestWordlistUnreadable(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             open(wordlist, "w").close()
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch("spell_sync.push_setup.wordlist_unreadable", return_value=True),
                 patch_commands_service(load_status=status_snapshot_from_run(run)),
@@ -167,7 +168,7 @@ class TestPullAddFrom(unittest.TestCase):
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
             external = os.path.join(d, "extra.txt")
             Path(external).write_text("beta\ngamma\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             result = run.pull_add_from(external)
             self.assertIsInstance(result, tuple)
             before, after = result
@@ -185,6 +186,18 @@ class TestPullAddFrom(unittest.TestCase):
             words = read_text_words(wordlist, quiet=True)
             self.assertIn("one", words)
             self.assertIn("two", words)
+
+
+class TestPushServiceGate(unittest.TestCase):
+    def test_cmd_push_returns_blocked_exit_from_service(self) -> None:
+        opts = CliOptions(yes=True, json_output=True)
+        with patch.object(
+            commands._SERVICE, "mutating_config_exit_code", return_value=ExitCode.LINT_FAILED
+        ):
+            with patch.object(commands._SERVICE, "load_push_preview") as load_preview:
+                code = commands._cmd_push_via_service(opts)
+        self.assertEqual(code, int(ExitCode.LINT_FAILED))
+        load_preview.assert_not_called()
 
 
 if __name__ == "__main__":

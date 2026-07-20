@@ -11,6 +11,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import spell_sync.neovim_mkspell as mkspell_mod
+from spell_sync.runtime_settings import RuntimeSettings
+
+_SETTINGS = RuntimeSettings.defaults()
+_MKSPELL_ENABLED = RuntimeSettings.from_config_dict({"neovim": {"mkspell_after_push": True}})
 
 
 class TestNeovimMkspell(unittest.TestCase):
@@ -34,47 +38,32 @@ class TestNeovimMkspell(unittest.TestCase):
             self.assertIn("fnameescape", run.call_args[0][0][3])
 
     def test_mkspell_after_neovim_writes_disabled(self):
-        with patch("spell_sync.config.neovim_mkspell_after_push", return_value=False):
-            with patch.object(mkspell_mod, "run_mkspell_for_add_file") as run:
-                mkspell_mod.mkspell_after_neovim_writes(("nvim-en",))
-            run.assert_not_called()
+        with patch.object(mkspell_mod, "run_mkspell_for_add_file") as run:
+            mkspell_mod.mkspell_after_neovim_writes(("nvim-en",), settings=_SETTINGS)
+        run.assert_not_called()
 
 
 class TestMkspellAfterPush(unittest.TestCase):
     def test_mkspell_after_neovim_writes_skips_when_disabled(self):
-        with patch(
-            "spell_sync.config.neovim_mkspell_after_push",
-            return_value=False,
-        ):
-            with patch.object(mkspell_mod, "run_mkspell_for_add_file") as mkspell:
-                mkspell_mod.mkspell_after_neovim_writes(("nvim-en",))
-            mkspell.assert_not_called()
+        with patch.object(mkspell_mod, "run_mkspell_for_add_file") as mkspell:
+            mkspell_mod.mkspell_after_neovim_writes(("nvim-en",), settings=_SETTINGS)
+        mkspell.assert_not_called()
 
     def test_mkspell_after_neovim_writes_runs_for_nvim_dict(self):
         add_path = Path("/tmp/nvim-en.utf-8.add")
         with (
-            patch(
-                "spell_sync.config.neovim_mkspell_after_push",
-                return_value=True,
-            ),
             patch(
                 "spell_sync.paths.neovim_dict_paths",
                 return_value=[("nvim-en", add_path)],
             ),
             patch.object(mkspell_mod, "run_mkspell_for_add_file", return_value=True) as mkspell,
         ):
-            mkspell_mod.mkspell_after_neovim_writes(("nvim-en",))
+            mkspell_mod.mkspell_after_neovim_writes(("nvim-en",), settings=_MKSPELL_ENABLED)
         mkspell.assert_called_once_with(add_path)
 
     def test_mkspell_after_skips_non_nvim_names(self):
-        with (
-            patch(
-                "spell_sync.config.neovim_mkspell_after_push",
-                return_value=True,
-            ),
-            patch.object(mkspell_mod, "run_mkspell_for_add_file") as mkspell,
-        ):
-            mkspell_mod.mkspell_after_neovim_writes(("chrome:Default",))
+        with patch.object(mkspell_mod, "run_mkspell_for_add_file") as mkspell:
+            mkspell_mod.mkspell_after_neovim_writes(("chrome:Default",), settings=_MKSPELL_ENABLED)
         mkspell.assert_not_called()
 
     def test_run_mkspell_success(self):

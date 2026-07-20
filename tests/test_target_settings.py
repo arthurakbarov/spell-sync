@@ -30,13 +30,7 @@ from spell_sync.project_setup.target_settings import (
     resolve_enabled_targets,
 )
 from spell_sync.push_journal import file_content_hash
-from spell_sync.settings import clear_settings_cache
 from tests.journal_test_utils import write_test_journal
-
-
-@pytest.fixture(autouse=True)
-def _clear_config_cache() -> None:
-    clear_settings_cache()
 
 
 def _target(

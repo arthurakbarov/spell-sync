@@ -54,7 +54,7 @@ from .paths import (
     sublime_packages_dir,
     vivaldi_dict_paths,
 )
-from .settings import load_user_settings
+from .runtime_settings import RuntimeSettings
 from .words import WordSet, subset_english, subset_russian
 
 SubsetFn = Callable[[WordSet], WordSet]
@@ -276,7 +276,7 @@ def _discover_libreoffice() -> List[Dictionary]:
 
 
 def _optional_dictionary_sources(
-    settings: dict[str, dict[str, object]],
+    settings: RuntimeSettings,
 ) -> tuple[DictionarySource, ...]:
     """Build optional sources at call time so tests can patch enable_* helpers."""
     return (
@@ -310,16 +310,14 @@ def _optional_dictionary_sources(
     )
 
 
-def discover_dictionaries(
-    settings: dict[str, dict[str, object]] | None = None,
-) -> List[Dictionary]:
+def discover_dictionaries(settings: RuntimeSettings) -> List[Dictionary]:
     """Discover application custom dictionary files for Pull and Push.
 
     Returns paths to user-maintained custom dictionary storage only. Built-in
     language dictionaries and application spell-check lexicons are not discovered
     or inspected.
     """
-    resolved = settings if settings is not None else load_user_settings()
+    resolved = settings
     dictionaries = _platform_dictionaries()
     dictionaries.extend(_discover_sublime())
     dictionaries.extend(discover_from_sources(_optional_dictionary_sources(resolved)))

@@ -21,7 +21,8 @@ import spell_sync.commands as commands
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestDryRun(unittest.TestCase):
@@ -31,8 +32,8 @@ class TestDryRun(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.plan_push()
@@ -50,8 +51,8 @@ class TestDryRun(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_a, ["stale-a"], "utf-8", False, quiet=True)
             write_text_words(path_b, ["stale-b"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("a", path_a, DictionaryFormat.TEXT),
                     Dictionary("b", path_b, DictionaryFormat.TEXT),
@@ -79,8 +80,8 @@ class TestDryRun(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_a, ["stale-a"], "utf-8", False, quiet=True)
             write_text_words(path_b, ["stale-b"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("a", path_a, DictionaryFormat.TEXT),
                     Dictionary("b", path_b, DictionaryFormat.TEXT),
@@ -106,8 +107,8 @@ class TestDryRun(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha", "beta"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             result = PushResult(1, ("a",), ())

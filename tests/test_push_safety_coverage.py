@@ -48,9 +48,11 @@ from spell_sync.push_render import (
 )
 from spell_sync.push_transaction import PushTransaction, RollbackResult, txn_snapshot_root
 from spell_sync.recover_cmd import cmd_recover
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.sync_run import PushResult, SyncRun
 from spell_sync.validated_runtime import build_validated_runtime
 from tests.journal_test_utils import write_test_journal
+from tests.runtime_helpers import make_sync_run
 
 
 class TestPushRenderCoverage(unittest.TestCase):
@@ -123,7 +125,7 @@ class TestPushRenderCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "out.txt"
             bad = RenderedWrite(b"wrong\n", "0" * 64)
-            self.assertFalse(write_rendered(path, bad))
+            self.assertFalse(write_rendered(path, bad, settings=RuntimeSettings.defaults()))
 
 
 class TestJournalSchemaCoverage(unittest.TestCase):
@@ -254,15 +256,15 @@ class TestPushPreparedCoverage(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("old\n", encoding="utf-8")
             dict_path.write_text("old\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
             assert not isinstance(prepared, ExitCode)
             with patch(
                 "spell_sync.push_prepared.write_rendered",
-                side_effect=lambda path, rendered: path.name != "dict.txt",
+                side_effect=lambda path, rendered, *, settings: path.name != "dict.txt",
             ):
                 result = execute_prepared_push(
                     prepared,
@@ -278,8 +280,8 @@ class TestPushPreparedCoverage(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             write_text_words(str(wordlist), ["a"], "utf-8", False, quiet=True)
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -379,7 +381,7 @@ class TestSyncRunCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            run = make_sync_run(str(wordlist), dictionaries=[])
             prepared = run.prepare_push_operation()
             assert not isinstance(prepared, ExitCode)
             self.assertEqual(run.max_push_removals_from_prepared(prepared), 0)
@@ -392,8 +394,8 @@ class TestPushPreparedWordlistPath(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("stale\n", encoding="utf-8")
             dict_path.write_text("stale\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -422,8 +424,8 @@ class TestPushPreparedWordlistPath(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             write_text_words(str(wordlist), ["a", "b"], "utf-8", False, quiet=True)
             write_text_words(str(dict_path), ["a", "b"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -633,8 +635,8 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             write_text_words(str(wordlist), ["a"], "utf-8", False, quiet=True)
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -662,8 +664,8 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("stale\n", encoding="utf-8")
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -687,8 +689,8 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("stale\n", encoding="utf-8")
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -701,7 +703,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             )
             with patch(
                 "spell_sync.push_prepared.write_rendered",
-                side_effect=lambda path, payload: path.name != "wordlist.txt",
+                side_effect=lambda path, payload, *, settings: path.name != "wordlist.txt",
             ):
                 result = execute_prepared_push(
                     prepared,
@@ -736,8 +738,8 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             write_text_words(str(wordlist), ["a"], "utf-8", False, quiet=True)
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
@@ -771,7 +773,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             write_text_words(str(wordlist), ["a"], "utf-8", False, quiet=True)
             write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
             dictionary = Dictionary("d", str(dict_path), DictionaryFormat.TEXT)
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[dictionary])
+            run = make_sync_run(str(wordlist), dictionaries=[dictionary])
             prepared = run.prepare_push_operation()
             assert not isinstance(prepared, ExitCode)
             prepared = replace(prepared, targets=())

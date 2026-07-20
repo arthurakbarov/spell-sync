@@ -10,6 +10,7 @@ import pytest
 
 from spell_sync.dictionaries import discover_dictionaries
 from spell_sync.project_setup.discovery import _CONFIG_TARGET_IDS
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.target_capabilities import (
     DICTIONARY_FILTER_KINDS,
     TARGET_CAPABILITIES,
@@ -65,7 +66,7 @@ def test_dictionary_subset_functions_match_metadata(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr("spell_sync.dictionaries.is_windows", lambda: True)
     monkeypatch.setattr("spell_sync.dictionaries.is_macos", lambda: False)
     config = {"dictionaries": {name: True for name in _CONFIG_TARGET_IDS}, "push": {}, "io": {}}
-    dictionaries = discover_dictionaries(config)
+    dictionaries = discover_dictionaries(RuntimeSettings.from_config_dict(config))
     by_name = {item.name: item for item in dictionaries}
     assert by_name["win-en"].subset is subset_english
     assert by_name["win-en-gb"].subset is subset_english

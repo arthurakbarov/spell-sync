@@ -256,7 +256,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 return_value=DiscardArtifactsResult(False, False, "cleanup failed"),
             ):
                 with patch(
-                    "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+                    "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
                 ) as scope:
                     scope.return_value.__enter__.return_value = MagicMock(
                         journal_result=MagicMock(
@@ -280,7 +280,7 @@ class TestRemainingCoverage(unittest.TestCase):
             can_recover=False,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock(
                 context=MagicMock(wordlist_file=Path("/tmp/w.txt"))
@@ -462,7 +462,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 wordlist_write_completed=True,
             )
             with patch(
-                "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+                "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
             ) as scope:
                 scope.return_value.__enter__.return_value = MagicMock(
                     context=MagicMock(wordlist_file=wordlist),
@@ -906,9 +906,13 @@ class TestPhase2BCliCoverage(unittest.TestCase):
     def test_confirm_push_removals_for_preview(self):
         import spell_sync.command_helpers as command_helpers
         from spell_sync.application.reports import PushPreview
+        from spell_sync.runtime_settings import RuntimeSettings
 
         prepared = MagicMock()
         prepared.max_removals.return_value = 100
+        prepared.ctx.settings = RuntimeSettings.from_config_dict(
+            {"push": {"max_removals_without_confirm": 50}}
+        )
         preview = PushPreview(
             prepared=prepared,
             targets=(),

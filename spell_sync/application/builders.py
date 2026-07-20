@@ -12,12 +12,12 @@ from ..operation_lock import OperationLockInfo
 from ..project_setup.discovery import (
     _CONFIG_TARGET_IDS,
     discover_setup_targets,
-    enabled_dictionary_targets,
 )
 from ..push_journal import (
     JOURNAL_STATE_ROLLBACK_INCOMPLETE,
     JournalLoadStatus,
     file_content_hash,
+    journal_payload,
     plan_recovery_from_journal,
 )
 from ..push_prepared import PreparedPush
@@ -227,8 +227,8 @@ def _compute_application_counts(
     validated: ValidatedRuntime,
     snapshot: StatusSnapshot,
 ) -> tuple[int, int, int, int]:
-    config = validated.context.config
-    enabled_ids = enabled_dictionary_targets(config)
+    settings = validated.context.settings
+    enabled_ids = settings.enabled_dictionary_target_ids()
     discovery = discover_setup_targets(enabled_targets=enabled_ids)
     unreadable_ids = {_target_family_id(name) for name in snapshot.skipped_unreadable}
     corrupt_ids = {_target_family_id(name) for name in snapshot.skipped_corrupt}
@@ -1019,6 +1019,7 @@ def build_recovery_preview(validated: ValidatedRuntime) -> RecoveryPreview:
             can_cleanup=True,
             snapshots_valid=True,
             preview_fingerprint=journal.transaction_id,
+            journal_summary=journal_payload(journal),
             detail="Only cleanup is required.",
         )
 
@@ -1080,6 +1081,7 @@ def build_recovery_preview(validated: ValidatedRuntime) -> RecoveryPreview:
         can_cleanup=False,
         snapshots_valid=snapshots_valid,
         preview_fingerprint=journal.transaction_id,
+        journal_summary=journal_payload(journal),
     )
 
 

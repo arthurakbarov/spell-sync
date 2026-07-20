@@ -30,17 +30,20 @@ class DoctorRequest:
 class PullRequest:
     project: ProjectRef
     add_from: Path | None = None
+    json_output: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class PushRequest:
     project: ProjectRef
     strict_override: bool | None = None
+    json_output: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class RecoveryRequest:
     project: ProjectRef
+    json_output: bool = False
 
 
 @dataclass(frozen=True, slots=True)

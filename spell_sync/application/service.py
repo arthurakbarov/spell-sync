@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from .. import command_helpers
 from ..application.project_resolution import effective_push_strict, resolve_project_wordlist
 from ..application.requests import (
     DoctorRequest,
@@ -15,6 +14,7 @@ from ..application.requests import (
     RecoveryRequest,
     SetupRequest,
     StatusRequest,
+    SupportReportRequest,
     TargetSettingsRequest,
 )
 from ..diagnostics.history_builder import HistoryBuildContext, build_history_record
@@ -33,6 +33,7 @@ from ..diagnostics.types import (
 from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
 from ..health.types import DoctorReport
+from ..mutation_guards import invalid_config_exit_from_scope
 from ..operation_lock import read_active_operation_lock
 from ..project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
 from ..project_setup.draft import SetupDraft
@@ -58,6 +59,7 @@ from ..push_journal import (
     safe_discard_journal_file,
 )
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
+from ..settings import config_blocks_mutating
 from ..sync_models import DictionaryDiff, PushResult
 from ..sync_run import SyncRun
 from .builders import (
@@ -107,14 +109,39 @@ def _emit(
         sink(event)
 
 
-def _running_app_skip_reasons(dictionary_names) -> dict[str, str]:
+def _running_app_skip_reasons_for(settings):
     from ..app_process_check import running_app_skip_reasons
 
-    return running_app_skip_reasons(dictionary_names)
+    def _fn(dictionary_names):
+        return running_app_skip_reasons(dictionary_names, settings=settings)
+
+    return _fn
 
 
 class SpellSyncService:
     """UI-neutral entry point for spell-sync operations."""
+
+    def _effective_push_strict(self, request: PushRequest) -> bool:
+        resolved = self._runtime.resolve_read(request.project)
+        return effective_push_strict(request, settings=resolved.context.settings)
+
+    def mutating_config_exit_code(
+        self,
+        request: PullRequest | PushRequest | RecoveryRequest,
+        command: str,
+    ) -> int | None:
+        """Return an exit code when config blocks mutation; emit JSON when requested."""
+        strict = False
+        if isinstance(request, PushRequest):
+            strict = self._effective_push_strict(request)
+        resolved = self._runtime.resolve_read(request.project, strict_push=strict)
+        if not config_blocks_mutating(resolved.config_result):
+            return None
+        return invalid_config_exit_from_scope(
+            command,
+            resolved.config_result,
+            json_output=request.json_output,
+        )
 
     def __init__(
         self,
@@ -174,6 +201,13 @@ class SpellSyncService:
             max_lines=max_lines,
             max_bytes=max_bytes,
         )
+
+    def load_support_report(self, request: SupportReportRequest):
+        from ..application.support_report import build_support_report
+
+        resolved = self._runtime.resolve_read(request.project)
+        run = SyncRun(context=resolved.context)
+        return build_support_report(self, request, resolved=resolved, run=run)
 
     def _finalize_report(
         self,
@@ -245,7 +279,7 @@ class SpellSyncService:
         )
 
     def load_push_preview(self, request: PushRequest) -> PushPreview:
-        strict = effective_push_strict(request)
+        strict = self._effective_push_strict(request)
         run = self._runtime.sync_run(request.project, strict_push=strict)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
@@ -298,7 +332,7 @@ class SpellSyncService:
         )
 
     def load_push_removals(self, request: PushRequest) -> tuple[DictionaryDiff, ...]:
-        strict = effective_push_strict(request)
+        strict = self._effective_push_strict(request)
         run = self._runtime.sync_run(request.project, strict_push=strict)
         return tuple(diff for diff in run.status_diffs(verbose=True) if diff.to_remove > 0)
 
@@ -308,14 +342,14 @@ class SpellSyncService:
         *,
         verbose: bool = False,
     ) -> tuple[PushPreview, tuple[DictionaryDiff, ...], PushResult | ExitCode]:
-        strict = effective_push_strict(request)
+        strict = self._effective_push_strict(request)
         run = self._runtime.sync_run(request.project, strict_push=strict)
         preview = self.load_push_preview(request)
         diffs = tuple(run.status_diffs(verbose=verbose))
         if not preview.is_executable or preview.prepared is None:
             error = preview.prepare_error or preview.wordlist_error or ExitCode.PUSH_ABORT
             return preview, diffs, error
-        skip_names = command_helpers.push_skip_running_app_dicts(run)
+        skip_names: frozenset[str] = frozenset()
         result = run.plan_push(skip_names=skip_names)
         return preview, diffs, result
 
@@ -330,12 +364,12 @@ class SpellSyncService:
                 plan_identifier=preview.plan_identifier,
                 push_preview=preview,
             )
-        strict = effective_push_strict(request)
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        strict = self._effective_push_strict(request)
+        with self._runtime.mutation_scope(
+            request.project,
             "push",
             strict_push=strict,
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 return PushExecution(
@@ -394,10 +428,10 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PULL, "validating", "Validating pull preview"),
         )
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        with self._runtime.mutation_scope(
+            request.project,
             "pull",
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -528,7 +562,7 @@ class SpellSyncService:
                 "Building push plan",
             ),
         )
-        skip_names = command_helpers.push_skip_running_app_dicts(run)
+        skip_names: frozenset[str] = frozenset()
         prepared = run.prepare_push_operation(skip_names=skip_names)
         if isinstance(prepared, ExitCode):
             _emit(
@@ -706,12 +740,12 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PUSH, "validating", "Validating configuration"),
         )
-        strict = effective_push_strict(request)
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        strict = self._effective_push_strict(request)
+        with self._runtime.mutation_scope(
+            request.project,
             "push",
             strict_push=strict,
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -812,7 +846,7 @@ class SpellSyncService:
             result = execute_prepared_push(
                 prepared,
                 dry_run=False,
-                running_app_skip_reasons_fn=_running_app_skip_reasons,
+                running_app_skip_reasons_fn=_running_app_skip_reasons_for(prepared.ctx.settings),
             )
             return self._finalize_push_preview_result(
                 prepared,
@@ -973,11 +1007,11 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.RECOVER, "validating_journal", "Validating journal"),
         )
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        with self._runtime.mutation_scope(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 _emit(
@@ -1197,11 +1231,11 @@ class SpellSyncService:
                 outcome=RecoveryOutcome.FAILED,
                 message="Cleanup is not available for this preview.",
             )
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        with self._runtime.mutation_scope(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 return RecoveryExecution(
@@ -1265,11 +1299,11 @@ class SpellSyncService:
                 outcome=RecoveryOutcome.FAILED,
                 message="Discard is not available for this preview.",
             )
-        with command_helpers.mutating_command_scope_for(
-            resolve_project_wordlist(request.project),
+        with self._runtime.mutation_scope(
+            request.project,
             "recover",
             allow_unfinished_journal=True,
-            bound=self._runtime.bound,
+            json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
                 return RecoveryExecution(
@@ -1424,6 +1458,19 @@ class SpellSyncService:
     ) -> OperationReport:
         report = build_pull_operation_report(execution)
         return self._finalize_report(report, source=execution, duration_ms=duration_ms)
+
+    def build_support_report(self, request: SupportReportRequest):
+        from ..sync_run import SyncRun
+        from .support_report import build_support_report as _build_support_report
+
+        resolved = self._runtime.resolve_read(request.project)
+        run = SyncRun(context=resolved.context)
+        return _build_support_report(
+            self,
+            request,
+            resolved=resolved,
+            run=run,
+        )
 
     def build_recovery_report(
         self,

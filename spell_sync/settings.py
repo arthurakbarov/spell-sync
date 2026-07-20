@@ -8,6 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
 
+from .runtime_settings import RuntimeSettings
+
 _CONFIG_FILENAME = "spell-sync.toml"
 _CONFIG_DIR_NAME = "spell-sync"
 
@@ -61,6 +63,11 @@ class ConfigLoadResult:
     status: ConfigStatus
     config: Dict[str, Dict[str, Any]] | None
     diagnostics: tuple[ConfigDiagnostic, ...]
+
+    def runtime_settings(self) -> RuntimeSettings:
+        if self.config is None:
+            return RuntimeSettings.defaults()
+        return RuntimeSettings.from_config_dict(self.config)
 
 
 def _parse_toml_with_issues(path: Path) -> Tuple[Dict[str, Dict[str, Any]], list[str]]:
@@ -121,17 +128,6 @@ def config_paths(*, wordlist: Path | None = None) -> list[Path]:
     return [home_config, project_config]
 
 
-_settings_cache: ConfigLoadResult | None = None
-_settings_cache_key: tuple[str, ...] | None = None
-
-
-def clear_settings_cache() -> None:
-    """Drop cached settings (tests and long-lived processes)."""
-    global _settings_cache, _settings_cache_key
-    _settings_cache = None
-    _settings_cache_key = None
-
-
 def _load_config_uncached(*, wordlist: Path | None = None) -> ConfigLoadResult:
     merged: Dict[str, Dict[str, Any]] = {}
     diagnostics: list[ConfigDiagnostic] = []
@@ -175,17 +171,8 @@ def _load_config_uncached(*, wordlist: Path | None = None) -> ConfigLoadResult:
 def load_config_result(
     *,
     wordlist: Path | None = None,
-    reload: bool = False,
 ) -> ConfigLoadResult:
-    global _settings_cache, _settings_cache_key
-    cache_key = tuple(str(p) for p in config_paths(wordlist=wordlist))
-    if reload:
-        clear_settings_cache()
-    if _settings_cache is not None and _settings_cache_key == cache_key:
-        return _settings_cache
-    _settings_cache = _load_config_uncached(wordlist=wordlist)
-    _settings_cache_key = cache_key
-    return _settings_cache
+    return _load_config_uncached(wordlist=wordlist)
 
 
 def config_blocks_mutating(result: ConfigLoadResult) -> bool:
@@ -201,9 +188,8 @@ def config_blocks_mutating(result: ConfigLoadResult) -> bool:
 def load_user_settings_with_issues(
     *,
     wordlist: Path | None = None,
-    reload: bool = False,
 ) -> tuple[Dict[str, Dict[str, Any]], list[str]]:
-    result = load_config_result(wordlist=wordlist, reload=reload)
+    result = load_config_result(wordlist=wordlist)
     issues = [d.message for d in result.diagnostics]
     if result.config is None:
         return {}, issues
@@ -213,9 +199,8 @@ def load_user_settings_with_issues(
 def load_user_settings(
     *,
     wordlist: Path | None = None,
-    reload: bool = False,
 ) -> Dict[str, Dict[str, Any]]:
-    settings, _issues = load_user_settings_with_issues(wordlist=wordlist, reload=reload)
+    settings, _issues = load_user_settings_with_issues(wordlist=wordlist)
     return settings
 
 
@@ -272,37 +257,33 @@ def push_int(
     key: str,
     default: int,
     *,
-    settings: Dict[str, Dict[str, Any]] | None = None,
+    settings: Dict[str, Dict[str, Any]],
 ) -> int:
-    cfg = settings if settings is not None else load_user_settings()
-    return _section_int(cfg, "push", key, default)
+    return _section_int(settings, "push", key, default)
 
 
 def push_flag(
     key: str,
     default: bool,
     *,
-    settings: Dict[str, Dict[str, Any]] | None = None,
+    settings: Dict[str, Dict[str, Any]],
 ) -> bool:
-    cfg = settings if settings is not None else load_user_settings()
-    return _section_bool(cfg, "push", key, default)
+    return _section_bool(settings, "push", key, default)
 
 
 def io_int(
     key: str,
     default: int,
     *,
-    settings: Dict[str, Dict[str, Any]] | None = None,
+    settings: Dict[str, Dict[str, Any]],
 ) -> int:
-    cfg = settings if settings is not None else load_user_settings()
-    return _section_int(cfg, "io", key, default)
+    return _section_int(settings, "io", key, default)
 
 
 def neovim_flag(
     key: str,
     default: bool,
     *,
-    settings: Dict[str, Dict[str, Any]] | None = None,
+    settings: Dict[str, Dict[str, Any]],
 ) -> bool:
-    cfg = settings if settings is not None else load_user_settings()
-    return _section_bool(cfg, "neovim", key, default)
+    return _section_bool(settings, "neovim", key, default)

@@ -14,6 +14,7 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words
 from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 class TestTuiMutationSafety(unittest.TestCase):
@@ -24,8 +25,8 @@ class TestTuiMutationSafety(unittest.TestCase):
         wordlist.write_text("alpha\nbeta\n", encoding="utf-8")
         dictionary.write_text("alpha\nbeta\ngamma\n", encoding="utf-8")
         (root / "spell-sync.toml").write_text("[dictionaries]\neditors = false\n", encoding="utf-8")
-        run = SyncRun(
-            wordlist=wordlist,
+        run = make_sync_run(
+            wordlist,
             dictionaries=[Dictionary("custom", str(dictionary), DictionaryFormat.TEXT)],
         )
         request = PullRequest(project=ProjectRef(wordlist=wordlist))

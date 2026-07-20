@@ -22,7 +22,8 @@ import spell_sync.dictionary_hints as hints_mod
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestPushTransaction(unittest.TestCase):
@@ -85,9 +86,9 @@ class TestPushTransaction(unittest.TestCase):
                 Dictionary("a", path_a, DictionaryFormat.TEXT),
                 Dictionary("b", path_b, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries)
+            run = make_sync_run(wordlist, dictionaries=dictionaries)
 
-            def flaky_render(path, rendered):
+            def flaky_render(path, rendered, *, settings):
                 if Path(path).name == "b.txt":
                     return False
                 return True

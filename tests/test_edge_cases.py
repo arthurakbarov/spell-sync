@@ -23,7 +23,9 @@ import spell_sync.io as io_mod
 import spell_sync.lint as lint_mod
 import spell_sync.push_transaction as push_tx_mod
 from spell_sync.exit_codes import ExitCode
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestAppProcessEdgePlatforms(unittest.TestCase):
@@ -124,7 +126,7 @@ class TestDiscoverDictionariesExtras(unittest.TestCase):
                 return_value=[("personal", lo_dict)],
             ),
         ):
-            names = {d.name for d in dict_mod.discover_dictionaries()}
+            names = {d.name for d in dict_mod.discover_dictionaries(RuntimeSettings.defaults())}
         self.assertIn("edge:Default", names)
         self.assertIn("libreoffice:personal", names)
 
@@ -134,7 +136,7 @@ class TestDoctorConfigAndEdge(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            run = make_sync_run(str(wordlist), dictionaries=[])
         with (
             patch.object(
                 report_mod,
@@ -222,7 +224,7 @@ class TestLintWhitelist(unittest.TestCase):
 
 class TestSyncRunImportAddFrom(unittest.TestCase):
     def test_pull_add_from_wordlist_unreadable(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
+        run = make_sync_run("/tmp/x", dictionaries=[])
         with patch.object(
             run,
             "check_wordlist",
@@ -235,7 +237,7 @@ class TestSyncRunImportAddFrom(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             result = run.pull_add_from(os.path.join(d, "missing.txt"))
         self.assertEqual(result, ExitCode.PUSH_ABORT)
 
@@ -245,7 +247,7 @@ class TestSyncRunImportAddFrom(unittest.TestCase):
             source = os.path.join(d, "extra.dic")
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
             Path(source).write_text("beta\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             result = run.pull_add_from(source)
         assert isinstance(result, tuple)
         self.assertEqual(result, (1, 2))
@@ -256,7 +258,7 @@ class TestSyncRunImportAddFrom(unittest.TestCase):
             source = os.path.join(d, "extra.txt")
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
             Path(source).write_text("beta\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch.object(run, "_write_wordlist", return_value=False):
                 result = run.pull_add_from(source)
         self.assertEqual(result, ExitCode.PUSH_ABORT)

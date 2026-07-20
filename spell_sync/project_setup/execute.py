@@ -109,7 +109,7 @@ def execute_project_setup(
                 created.append(item.path)
 
             emit("verifying_project", "Verifying project files")
-            config_result = load_config_result(wordlist=prepared.wordlist_path, reload=True)
+            config_result = load_config_result(wordlist=prepared.wordlist_path)
             if config_result.status not in (ConfigStatus.VALID, ConfigStatus.UNKNOWN_KEY):
                 raise RuntimeError("Created configuration failed validation.")
     except OperationLocked:

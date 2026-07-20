@@ -13,7 +13,8 @@ import spell_sync.lint as lint_mod
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestLimitationBackupFail(unittest.TestCase):
@@ -28,8 +29,8 @@ class TestLimitationBackupFail(unittest.TestCase):
             write_text_words(wordlist, words, "utf-8", False, quiet=True)
             write_text_words(path_a, ["stale-a"], "utf-8", False, quiet=True)
             write_text_words(path_b, ["stale-b"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("a", path_a, DictionaryFormat.TEXT),
                     Dictionary("b", path_b, DictionaryFormat.TEXT),
@@ -42,7 +43,7 @@ class TestLimitationBackupFail(unittest.TestCase):
                     raise OSError("backup failed")
                 return original_copy2(src, dst, *args, **kwargs)
 
-            def flaky_render(path, rendered):
+            def flaky_render(path, rendered, *, settings):
                 if Path(path).name == "b.txt":
                     return False
                 return True
@@ -69,8 +70,8 @@ class TestLimitationBackupFail(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             side_effect = OSError("snap fail")
@@ -90,8 +91,8 @@ class TestLimitationBackupFail(unittest.TestCase):
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             original_copy2 = shutil.copy2
@@ -120,8 +121,8 @@ class TestLimitationReadableProxy(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["only-here"], "utf-8", False, quiet=True)
             blocked_dict = Dictionary("blocked", dict_path, DictionaryFormat.TEXT)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[blocked_dict],
             )
             with patch("spell_sync.read_outcome.is_path_readable", return_value=False):
@@ -137,8 +138,8 @@ class TestLimitationReadableProxy(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
@@ -160,8 +161,8 @@ class TestLimitationBlockedImport(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(blocked, ["secret"], "utf-8", False, quiet=True)
             blocked_dict = Dictionary("blocked", blocked, DictionaryFormat.TEXT)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[blocked_dict],
             )
 
@@ -210,8 +211,8 @@ class TestDestructivePushGuard(unittest.TestCase):
                 False,
                 quiet=True,
             )
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("s", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.push_from_wordlist()
@@ -226,8 +227,8 @@ class TestDestructivePushGuard(unittest.TestCase):
             words = [f"word{i}" for i in range(15)]
             write_text_words(wordlist, words, "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("s", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.push_from_wordlist()
@@ -245,8 +246,8 @@ class TestDestructivePushGuard(unittest.TestCase):
                 False,
                 quiet=True,
             )
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("s", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.plan_push()

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Union
 
 from .app_process_check import running_app_skip_reasons
 from .dictionaries import Dictionary
@@ -25,9 +26,9 @@ from .push_setup import (
     skipped_dictionary_names,
 )
 from .read_outcome import ReadStatus
-from .sync_context import RuntimeContext, as_dictionary_list, runtime_context_for
+from .resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from .sync_context import RuntimeContext, as_dictionary_list
 from .sync_models import DictionaryDiff, PushResult
-from .validated_runtime import ValidatedRuntime
 from .words import WordSet, clean_words, merge_case_duplicates, sort_words
 
 # Re-export public result types for existing imports.
@@ -39,20 +40,10 @@ class SyncRun:
 
     def __init__(
         self,
-        wordlist: Path | str | None = None,
-        dictionaries: Optional[List[Dictionary]] = None,
         *,
-        strict_push: bool = False,
-        context: RuntimeContext | None = None,
+        context: RuntimeContext,
     ) -> None:
-        if context is not None:
-            self._ctx = context
-        else:
-            self._ctx = RuntimeContext.build(
-                wordlist=wordlist,
-                dictionaries=dictionaries,
-                strict_push=strict_push,
-            )
+        self._ctx = context
 
     @property
     def wordlist_file(self) -> Path:
@@ -307,7 +298,10 @@ class SyncRun:
         result = execute_prepared_push(
             prepared,
             dry_run=dry_run,
-            running_app_skip_reasons_fn=running_app_skip_reasons,
+            running_app_skip_reasons_fn=lambda names: running_app_skip_reasons(
+                names,
+                settings=self._ctx.settings,
+            ),
         )
         if isinstance(result, PushAbort):
             return result.exit_code
@@ -318,13 +312,13 @@ def sync_run_for(
     wordlist: Path,
     *,
     strict_push: bool = False,
-    validated: ValidatedRuntime | None = None,
+    validated: ResolvedRuntime | None = None,
 ) -> SyncRun:
     """Build SyncRun from an effective wordlist path."""
-    return SyncRun(
-        context=runtime_context_for(
-            wordlist,
-            strict_push=strict_push,
-            validated=validated,
-        )
-    )
+    if validated is not None:
+        ctx = validated.context
+        if strict_push != ctx.strict_push:
+            ctx = replace(ctx, strict_push=strict_push)
+        return SyncRun(context=ctx)
+    resolved = build_resolved_runtime(wordlist, strict_push=strict_push)
+    return SyncRun(context=resolved.context)

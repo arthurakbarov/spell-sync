@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from spell_sync.dictionaries import discover_dictionaries
+from spell_sync.runtime_settings import RuntimeSettings
 
 
 class TestBraveVivaldiDiscovery(unittest.TestCase):
@@ -42,7 +43,7 @@ class TestBraveVivaldiDiscovery(unittest.TestCase):
                     return_value=[("Default", vivaldi_custom)],
                 ),
             ):
-                names = [d.name for d in discover_dictionaries()]
+                names = [d.name for d in discover_dictionaries(RuntimeSettings.defaults())]
             self.assertIn("brave:Default", names)
             self.assertIn("vivaldi:Default", names)
 
@@ -68,7 +69,7 @@ class TestBraveVivaldiDiscovery(unittest.TestCase):
                     return_value=[("Default", chrome_custom)],
                 ),
             ):
-                names = [item.name for item in discover_dictionaries()]
+                names = [item.name for item in discover_dictionaries(RuntimeSettings.defaults())]
             self.assertIn("chrome:Default", names)
 
 

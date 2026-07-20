@@ -32,7 +32,7 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
-from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 class TestJsonContract(unittest.TestCase):
@@ -57,8 +57,8 @@ class TestJsonContract(unittest.TestCase):
             bad_xml = os.path.join(d, "cachedDictionary.xml")
             with open(bad_xml, "w", encoding="utf-8") as handle:
                 handle.write("not xml")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary(
                         "jetbrains:IDEA",
@@ -96,7 +96,7 @@ class TestJsonContract(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             buf = io.StringIO()
             with (
                 patch.object(
@@ -134,7 +134,7 @@ class TestJsonContract(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             buf = io.StringIO()
             with (
                 patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)),

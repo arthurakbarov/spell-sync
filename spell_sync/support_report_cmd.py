@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from .application.support_report import (
-    build_support_report,
     default_support_report_path,
     export_support_report,
     format_support_report_text,
@@ -21,7 +20,7 @@ def cmd_support_report(opts: CliOptions) -> int:
     from .application.service import SpellSyncService
 
     service = SpellSyncService()
-    report = build_support_report(service, support_report_request(opts))
+    report = service.build_support_report(support_report_request(opts))
     fmt = getattr(opts, "support_report_format", "text") or "text"
     output = getattr(opts, "support_report_output", None)
     if opts.json_output and not output:

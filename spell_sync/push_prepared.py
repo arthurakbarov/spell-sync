@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from .exit_codes import ExitCode
 from .io import atomic_write
@@ -25,10 +24,9 @@ from .push_setup import (
     wordlist_needs_rewrite,
 )
 from .push_transaction import PushTransaction
+from .runtime_settings import RuntimeSettings
+from .sync_context import RuntimeContext
 from .sync_models import PushResult
-
-if TYPE_CHECKING:
-    from .sync_context import RuntimeContext
 
 
 @dataclass(frozen=True)
@@ -100,9 +98,9 @@ def plan_fingerprint_conflict(prepared: PreparedPush) -> str | None:
     return None
 
 
-def write_rendered(path: Path, rendered: RenderedWrite) -> bool:
+def write_rendered(path: Path, rendered: RenderedWrite, *, settings: RuntimeSettings) -> bool:
     try:
-        atomic_write(path, rendered.payload)
+        atomic_write(path, rendered.payload, settings=settings)
     except OSError as exc:
         log.warn(f"no write access {path}: {exc}")
         return False
@@ -161,7 +159,11 @@ def execute_prepared_push(
                     journal_update_failed=True,
                 )
             tx.mark_wordlist_write_started()
-            if not write_rendered(ctx.wordlist_file, prepared.wordlist_rendered):
+            if not write_rendered(
+                ctx.wordlist_file,
+                prepared.wordlist_rendered,
+                settings=ctx.settings,
+            ):
                 return handle_failed_push_rollback(
                     tx,
                     journal_session,
@@ -218,7 +220,7 @@ def execute_prepared_push(
                     journal_update_failed=True,
                 )
             tx.mark_write_started(dictionary)
-            ok = write_rendered(Path(dictionary.path), item.rendered)
+            ok = write_rendered(Path(dictionary.path), item.rendered, settings=ctx.settings)
             outcomes.append((dictionary.name, ok))
             if ok:
                 tx.mark_write_completed(dictionary)
@@ -241,7 +243,7 @@ def execute_prepared_push(
                 )
 
         written = tuple(name for name, ok in outcomes if ok)
-        mkspell_after_neovim_writes(written)
+        mkspell_after_neovim_writes(written, settings=prepared.ctx.settings)
         try:
             journal_session.complete()
         except OSError:

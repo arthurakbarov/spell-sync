@@ -43,15 +43,16 @@ from spell_sync.push_journal import (
     recover_from_journal,
 )
 from spell_sync.push_transaction import PushTransaction, txn_snapshot_root
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
 from tests.journal_test_utils import write_restore_scenario_journal, write_test_journal
+from tests.runtime_helpers import make_sync_run
 
 
 def _locked_patch(wordlist: Path):
     info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
     lock_path = lock_path_for_wordlist(wordlist)
     return patch(
-        "spell_sync.command_helpers.acquire_operation_lock",
+        "spell_sync.mutation_guards.acquire_operation_lock",
         side_effect=OperationLocked(info, lock_path),
     )
 
@@ -65,6 +66,24 @@ def _write_journal(wordlist: Path, *, command: str = "push") -> None:
     )
 
 
+def _disable_all_targets(wordlist: Path) -> None:
+    (wordlist.parent / "spell-sync.toml").write_text(
+        "[dictionaries]\n"
+        "editors = false\n"
+        "chrome = false\n"
+        "edge = false\n"
+        "brave = false\n"
+        "vivaldi = false\n"
+        "firefox = false\n"
+        "neovim = false\n"
+        "jetbrains = false\n"
+        "hunspell = false\n"
+        "obsidian = false\n"
+        "libreoffice = false\n",
+        encoding="utf-8",
+    )
+
+
 class TestPushJournalLifecycle(unittest.TestCase):
     def test_successful_push_removes_journal(self):
         with tempfile.TemporaryDirectory() as d:
@@ -72,8 +91,8 @@ class TestPushJournalLifecycle(unittest.TestCase):
             dict_path = os.path.join(d, "dict.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("d", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.push_from_wordlist()
@@ -86,8 +105,8 @@ class TestPushJournalLifecycle(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             with patch("spell_sync.push_setup.wordlist_needs_rewrite", return_value=True):
@@ -100,8 +119,8 @@ class TestPushJournalLifecycle(unittest.TestCase):
             path_a = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha", "beta"], "utf-8", False, quiet=True)
             write_text_words(path_a, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", path_a, DictionaryFormat.TEXT)],
             )
             with patch("spell_sync.push_prepared.write_rendered", return_value=False):
@@ -121,16 +140,18 @@ class TestPushJournalLifecycle(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
+            _disable_all_targets(wordlist)
             _write_journal(wordlist)
             buf = io.StringIO()
             with redirect_stdout(buf):
-                code = commands.cmd_push(
-                    CliOptions(wordlist=str(wordlist), yes=True, json_output=True),
+                code = commands.cmd_pull(
+                    CliOptions(wordlist=str(wordlist), json_output=True),
                 )
             payload = json.loads(buf.getvalue())
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
             self.assertEqual(payload["reason"], "unfinished_transaction")
             self.assertIn("journal", payload)
+            self.assertEqual(payload["command"], "pull")
 
     def test_recover_allowed_with_unfinished_journal(self):
         with tempfile.TemporaryDirectory() as d:
@@ -291,8 +312,8 @@ class TestPushJournalHelpers(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             tx = PushTransaction.begin(wordlist, run.dictionaries, dry_run=False)
@@ -325,7 +346,7 @@ class TestPushJournalHelpers(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            run = make_sync_run(str(wordlist), dictionaries=[])
             report = doctor_mod.build_doctor_report(run)
             self.assertTrue(report.has_errors)
             self.assertTrue(
@@ -427,8 +448,8 @@ class TestPushJournalHelpers(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             tx = PushTransaction.begin(wordlist, run.dictionaries, dry_run=False)
@@ -459,8 +480,8 @@ class TestPushJournalHelpers(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
             )
             tx = PushTransaction.begin(wordlist, run.dictionaries, dry_run=False)

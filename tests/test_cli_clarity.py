@@ -34,7 +34,8 @@ from spell_sync.application.reports import PushPreview, StatusSnapshot
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestPullPushAliases(unittest.TestCase):
@@ -120,8 +121,8 @@ class TestDoctorTargets(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             dict_path = Path(d) / "dict.txt"
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(Path(d) / "wordlist.txt"),
+            run = make_sync_run(
+                str(Path(d) / "wordlist.txt"),
                 dictionaries=[Dictionary("demo", str(dict_path), DictionaryFormat.TEXT)],
             )
             with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
@@ -142,7 +143,7 @@ class TestPlan(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            run = make_sync_run(str(wordlist), dictionaries=[])
             result = PushResult(
                 word_count=1,
                 written=("demo",),
@@ -247,7 +248,7 @@ class TestStage3HumanOutput(unittest.TestCase):
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_plan_json_abort(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
+        run = make_sync_run("/tmp/x", dictionaries=[])
         plan = push_plan_tuple(run, ExitCode.PUSH_ABORT)
         with patch_plan_service(
             load_push_plan=plan,
@@ -277,8 +278,8 @@ class TestStage3HumanOutput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             dict_path = Path(d) / "dict.txt"
             dict_path.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(Path(d) / "wordlist.txt"),
+            run = make_sync_run(
+                str(Path(d) / "wordlist.txt"),
                 dictionaries=[Dictionary("demo", str(dict_path), DictionaryFormat.TEXT)],
             )
             with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
@@ -286,7 +287,7 @@ class TestStage3HumanOutput(unittest.TestCase):
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_doctor_targets_human_empty(self):
-        run = SyncRun(wordlist="/tmp/wordlist.txt", dictionaries=[])
+        run = make_sync_run("/tmp/wordlist.txt", dictionaries=[])
         with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
             code = doctor_mod.cmd_doctor(CliOptions(show_targets=True))
         self.assertEqual(code, int(ExitCode.OK))
@@ -295,8 +296,8 @@ class TestStage3HumanOutput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[Dictionary("demo", str(wordlist), DictionaryFormat.TEXT)],
             )
             result = PushResult(
@@ -352,7 +353,7 @@ class TestStage3HumanOutput(unittest.TestCase):
             info = OperationLockInfo(1, "2026-01-01T00:00:00+00:00", "pull", str(wordlist))
             lock_path = lock_path_for_wordlist(wordlist)
             with patch(
-                "spell_sync.command_helpers.acquire_operation_lock",
+                "spell_sync.mutation_guards.acquire_operation_lock",
                 side_effect=OperationLocked(info, lock_path),
             ):
                 code = commands_mod.cmd_pull(CliOptions(wordlist=str(wordlist)))
@@ -371,7 +372,7 @@ class TestStage3HumanOutput(unittest.TestCase):
             info = OperationLockInfo(1, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
             lock_path = lock_path_for_wordlist(wordlist)
             with patch(
-                "spell_sync.command_helpers.acquire_operation_lock",
+                "spell_sync.mutation_guards.acquire_operation_lock",
                 side_effect=OperationLocked(info, lock_path),
             ):
                 code = commands_mod.cmd_push(CliOptions(wordlist=str(wordlist)))

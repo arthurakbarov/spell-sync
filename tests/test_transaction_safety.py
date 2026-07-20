@@ -22,7 +22,9 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
 from spell_sync.read_outcome import ReadStatus, dictionary_read_result
-from spell_sync.sync_run import SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from spell_sync.sync_context import RuntimeContext
+from tests.runtime_helpers import make_sync_run
 
 
 def _run_cli(
@@ -175,7 +177,10 @@ class TestFingerprintConflictPreservesExternalEdits(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["old"], "utf-8", False, quiet=True)
             dictionary = Dictionary("a", dict_path, DictionaryFormat.TEXT)
-            run = SyncRun(wordlist=wordlist, dictionaries=[dictionary])
+            run = make_sync_run(
+                wordlist,
+                dictionaries=[dictionary],
+            )
 
             original_begin = push_tx_mod.PushTransaction.begin
 
@@ -446,20 +451,19 @@ class TestCoverage101(unittest.TestCase):
             self.assertIn("d2", partial.failed)
 
     def test_runtime_context_explicit_config(self):
-        from spell_sync.sync_context import RuntimeContext
-
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            ctx = RuntimeContext.build(
+            settings = RuntimeSettings.from_config_dict({"dictionaries": {"chrome": False}})
+            RuntimeContext.build(
                 wordlist=wordlist,
-                config={"dictionaries": {"chrome": False}},
+                dictionaries=[],
+                settings=settings,
             )
-            self.assertFalse(ctx.config["dictionaries"]["chrome"])
+            self.assertFalse(settings.dictionaries.chrome)
 
     def test_max_local_without_explicit_words(self):
         from spell_sync.push_setup import max_local_dictionary_count
-        from spell_sync.sync_context import RuntimeContext
 
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
@@ -469,16 +473,20 @@ class TestCoverage101(unittest.TestCase):
             ctx = RuntimeContext.build(
                 wordlist=wordlist,
                 dictionaries=[Dictionary("d", dict_path, DictionaryFormat.TEXT)],
+                settings=RuntimeSettings.defaults(),
             )
             self.assertEqual(max_local_dictionary_count(ctx), 2)
 
     def test_max_local_returns_zero_when_plan_aborts(self):
         from spell_sync.push_setup import max_local_dictionary_count
-        from spell_sync.sync_context import RuntimeContext
 
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
-            ctx = RuntimeContext.build(wordlist=wordlist, dictionaries=[])
+            ctx = RuntimeContext.build(
+                wordlist=wordlist,
+                dictionaries=[],
+                settings=RuntimeSettings.defaults(),
+            )
             with patch(
                 "spell_sync.push_setup.build_push_plan",
                 return_value=ExitCode.PUSH_ABORT,
@@ -512,8 +520,8 @@ class TestCoverage101(unittest.TestCase):
             dict_path = os.path.join(d, "dict.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
@@ -767,8 +775,8 @@ class TestImmutablePushPlan(unittest.TestCase):
             words = [f"word{i:02d}" for i in range(11)]
             write_text_words(wordlist, words, "utf-8", False, quiet=True)
             write_text_words(dict_path, words, "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("d", dict_path, DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()

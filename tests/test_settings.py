@@ -50,23 +50,30 @@ class TestUserSettings(unittest.TestCase):
 
     def test_push_max_removals_explicit_config(self):
         import spell_sync.config as config_mod
+        from spell_sync.runtime_settings import RuntimeSettings
 
+        settings = RuntimeSettings.from_config_dict({"push": {"max_removals_without_confirm": 99}})
         with patch.object(
             settings_mod,
             "load_user_settings",
             return_value={"push": {"max_removals_without_confirm": 99}},
         ):
-            self.assertEqual(config_mod.push_max_removals_without_confirm(), 99)
+            self.assertEqual(config_mod.push_max_removals_without_confirm(settings=settings), 99)
 
     def test_push_and_backup_defaults(self):
         import spell_sync.config as config_mod
+        from spell_sync.runtime_settings import RuntimeSettings
 
+        settings = RuntimeSettings.defaults()
         with patch.object(settings_mod, "load_user_settings", return_value={}):
             self.assertEqual(
-                config_mod.push_max_removals_without_confirm(),
+                config_mod.push_max_removals_without_confirm(settings=settings),
                 config_mod.PUSH_MAX_REMOVALS_WITHOUT_CONFIRM_DEFAULT,
             )
-            self.assertEqual(config_mod.backup_keep_count(), config_mod.BACKUP_KEEP_DEFAULT)
+            self.assertEqual(
+                config_mod.backup_keep_count(settings=settings),
+                config_mod.BACKUP_KEEP_DEFAULT,
+            )
 
     def test_project_config_overrides_home(self):
         with tempfile.TemporaryDirectory() as d:

@@ -22,14 +22,15 @@ from spell_sync.operation_lock import (
 )
 from spell_sync.read_outcome import ReadStatus, dictionary_read_result
 from spell_sync.skip_reasons import PushSkipReason
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 def _locked_patch(wordlist: Path):
     info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
     lock_path = lock_path_for_wordlist(wordlist)
     return patch(
-        "spell_sync.command_helpers.acquire_operation_lock",
+        "spell_sync.mutation_guards.acquire_operation_lock",
         side_effect=OperationLocked(info, lock_path),
     )
 
@@ -65,7 +66,7 @@ class TestPushSafetyEdges(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             result = run.push_from_wordlist()
             self.assertIsInstance(result, PushResult)
             assert not isinstance(result, ExitCode)
@@ -77,8 +78,8 @@ class TestPushSafetyEdges(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["beta"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             result = run.push_from_wordlist(skip_names=frozenset({"a"}))

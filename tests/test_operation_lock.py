@@ -91,19 +91,27 @@ class TestOperationLock(unittest.TestCase):
     def test_operation_lock_scope_json(self):
         wordlist = Path(tempfile.mkdtemp()) / "wordlist.txt"
         wordlist.write_text("alpha\n", encoding="utf-8")
-        info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
+        (wordlist.parent / "spell-sync.toml").write_text(
+            "[dictionaries]\n"
+            "editors = false\nchrome = false\nedge = false\nbrave = false\n"
+            "vivaldi = false\nfirefox = false\nneovim = false\njetbrains = false\n"
+            "hunspell = false\nobsidian = false\nlibreoffice = false\n",
+            encoding="utf-8",
+        )
+        info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "pull", str(wordlist))
         lock_path = lock_path_for_wordlist(wordlist)
         with patch(
-            "spell_sync.command_helpers.acquire_operation_lock",
+            "spell_sync.mutation_guards.acquire_operation_lock",
             side_effect=OperationLocked(info, lock_path),
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                code = commands.cmd_push(CliOptions(json_output=True, wordlist=str(wordlist)))
+                code = commands.cmd_pull(CliOptions(json_output=True, wordlist=str(wordlist)))
         self.assertEqual(code, int(ExitCode.PUSH_ABORT))
         payload = json.loads(buf.getvalue())
         self.assertEqual(payload["reason"], "operation_locked")
         self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "pull")
 
     def test_operation_lock_scope_human(self):
         wordlist = Path(tempfile.mkdtemp()) / "wordlist.txt"
@@ -111,7 +119,7 @@ class TestOperationLock(unittest.TestCase):
         info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
         lock_path = lock_path_for_wordlist(wordlist)
         with patch(
-            "spell_sync.command_helpers.acquire_operation_lock",
+            "spell_sync.mutation_guards.acquire_operation_lock",
             side_effect=OperationLocked(info, lock_path),
         ):
             code = commands.cmd_push(CliOptions(wordlist=str(wordlist), yes=True))

@@ -26,8 +26,18 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.skip_reasons import PushSkipReason
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
+
+_SETTINGS = RuntimeSettings.defaults()
+
+
+def _push_preview() -> MagicMock:
+    preview = MagicMock()
+    preview.prepared.ctx.settings = _SETTINGS
+    return preview
 
 
 class TestPushStrict(unittest.TestCase):
@@ -43,7 +53,7 @@ class TestPushStrict(unittest.TestCase):
                 Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                 Dictionary("blocked", path_blocked, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries, strict_push=True)
+            run = make_sync_run(wordlist, dictionaries=dictionaries, strict_push=True)
 
             def readable(path):
                 return str(path) != path_blocked
@@ -69,7 +79,7 @@ class TestPushStrict(unittest.TestCase):
                 Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                 Dictionary("fail", path_fail, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries, strict_push=True)
+            run = make_sync_run(wordlist, dictionaries=dictionaries, strict_push=True)
             original_copy2 = shutil.copy2
 
             def selective_copy2(src, dst, *args, **kwargs):
@@ -99,7 +109,7 @@ class TestPushStrict(unittest.TestCase):
                 Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                 Dictionary("blocked", path_blocked, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries, strict_push=False)
+            run = make_sync_run(wordlist, dictionaries=dictionaries, strict_push=False)
 
             def readable(path):
                 return str(path) != path_blocked
@@ -150,7 +160,7 @@ class TestFirefoxGuard(unittest.TestCase):
         import spell_sync.app_process_check as guard
 
         with patch.object(guard, "firefox_dictionaries_enabled", return_value=False):
-            self.assertTrue(guard.confirm_firefox_before_push(interactive=True))
+            self.assertTrue(guard.confirm_firefox_before_push(interactive=True, settings=_SETTINGS))
 
     def test_skips_when_firefox_not_running(self):
         import spell_sync.app_process_check as guard
@@ -159,7 +169,7 @@ class TestFirefoxGuard(unittest.TestCase):
             patch.object(guard, "firefox_dictionaries_enabled", return_value=True),
             patch.object(guard, "is_firefox_running", return_value=False),
         ):
-            self.assertTrue(guard.confirm_firefox_before_push(interactive=True))
+            self.assertTrue(guard.confirm_firefox_before_push(interactive=True, settings=_SETTINGS))
 
     def test_non_interactive_warns_and_proceeds(self):
         import spell_sync.app_process_check as guard
@@ -170,7 +180,9 @@ class TestFirefoxGuard(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(guard.confirm_firefox_before_push(interactive=False))
+                self.assertTrue(
+                    guard.confirm_firefox_before_push(interactive=False, settings=_SETTINGS)
+                )
             self.assertIn("Firefox is running", buf.getvalue())
 
     def test_running_apps_check_also_runs_firefox(self):
@@ -178,7 +190,7 @@ class TestFirefoxGuard(unittest.TestCase):
             patch.object(commands, "confirm_chrome_before_push", return_value=True),
             patch.object(commands, "confirm_firefox_before_push", return_value=False),
         ):
-            self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS))
+            self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS, _push_preview()))
 
     def test_pgrep_running_interpretation(self):
         import spell_sync.app_process_check as guard
@@ -238,7 +250,9 @@ class TestFirefoxGuard(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(guard.confirm_firefox_before_push(interactive=False))
+                self.assertTrue(
+                    guard.confirm_firefox_before_push(interactive=False, settings=_SETTINGS)
+                )
             self.assertIn("Could not check whether Firefox is running", buf.getvalue())
 
     def test_doctor_warns_firefox_running(self):
@@ -248,7 +262,7 @@ class TestFirefoxGuard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(report_mod, "firefox_dictionaries_enabled", return_value=True),
                 patch.object(report_mod, "is_firefox_running", return_value=True),
@@ -266,9 +280,8 @@ class TestRemovalWarning(unittest.TestCase):
             write_text_words(wordlist, ["keep"], "utf-8", False, quiet=True)
             many = [f"word{i}" for i in range(60)]
             write_text_words(dict_path, ["keep", *many], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             limit_patch = "spell_sync.command_helpers.push_max_removals_without_confirm"
             with (
@@ -286,9 +299,8 @@ class TestRemovalWarning(unittest.TestCase):
             write_text_words(wordlist, ["keep"], "utf-8", False, quiet=True)
             many = [f"word{i}" for i in range(60)]
             write_text_words(dict_path, ["keep", *many], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             limit_patch = "spell_sync.command_helpers.push_max_removals_without_confirm"
             with (
@@ -306,9 +318,8 @@ class TestRemovalWarning(unittest.TestCase):
             write_text_words(wordlist, ["keep"], "utf-8", False, quiet=True)
             many = [f"word{i}" for i in range(60)]
             write_text_words(dict_path, ["keep", *many], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             limit_patch = "spell_sync.command_helpers.push_max_removals_without_confirm"
             with patch(limit_patch, return_value=50):
@@ -339,7 +350,7 @@ class TestRemovalWarning(unittest.TestCase):
                 return_value=True,
             ) as removals,
         ):
-            self.assertTrue(commands._running_apps_check_for_push(DEFAULT_OPTS))
+            self.assertTrue(commands._running_apps_check_for_push(DEFAULT_OPTS, _push_preview()))
             self.assertTrue(commands.confirm_push_removals_for_preview(preview, DEFAULT_OPTS))
             removals.assert_called_once()
 
@@ -365,9 +376,8 @@ class TestLintCaseDedupe(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["Alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha", "beta"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             result = run.pull_into_wordlist()
             self.assertEqual(result, (1, 2))

@@ -55,16 +55,24 @@ def pull_request(options: CliOptions) -> PullRequest:
     add_from = None
     if options.add_from:
         add_from = Path(options.add_from)
-    return PullRequest(project=project_ref(options), add_from=add_from)
+    return PullRequest(
+        project=project_ref(options),
+        add_from=add_from,
+        json_output=options.json_output,
+    )
 
 
 def push_request(options: CliOptions) -> PushRequest:
     strict_override = True if options.strict else None
-    return PushRequest(project=project_ref(options), strict_override=strict_override)
+    return PushRequest(
+        project=project_ref(options),
+        strict_override=strict_override,
+        json_output=options.json_output,
+    )
 
 
 def recovery_request(options: CliOptions) -> RecoveryRequest:
-    return RecoveryRequest(project=project_ref(options))
+    return RecoveryRequest(project=project_ref(options), json_output=options.json_output)
 
 
 def setup_request(options: CliOptions) -> SetupRequest:

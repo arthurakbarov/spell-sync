@@ -16,6 +16,7 @@ from .paths import (
     is_windows,
     obsidian_dict_paths,
 )
+from .runtime_settings import RuntimeSettings
 from .subprocess_utils import trim_subprocess_text
 
 # True — running, False — not running, None — check failed.
@@ -148,20 +149,20 @@ def is_obsidian_running() -> ObsidianState:
     return _linux_pgrep_first_resolved("obsidian", "Obsidian")
 
 
-def chrome_dictionaries_enabled() -> bool:
-    return enable_chrome() and bool(chrome_dict_paths())
+def chrome_dictionaries_enabled(*, settings: RuntimeSettings) -> bool:
+    return enable_chrome(settings=settings) and bool(chrome_dict_paths())
 
 
-def edge_dictionaries_enabled() -> bool:
-    return enable_edge() and bool(edge_dict_paths())
+def edge_dictionaries_enabled(*, settings: RuntimeSettings) -> bool:
+    return enable_edge(settings=settings) and bool(edge_dict_paths())
 
 
-def firefox_dictionaries_enabled() -> bool:
-    return enable_firefox() and bool(firefox_dict_paths())
+def firefox_dictionaries_enabled(*, settings: RuntimeSettings) -> bool:
+    return enable_firefox(settings=settings) and bool(firefox_dict_paths())
 
 
-def obsidian_dictionaries_enabled() -> bool:
-    return enable_obsidian() and bool(obsidian_dict_paths())
+def obsidian_dictionaries_enabled(*, settings: RuntimeSettings) -> bool:
+    return enable_obsidian(settings=settings) and bool(obsidian_dict_paths())
 
 
 def _confirm_risky_push(*, interactive: bool, reason: str, close_hint: str) -> Optional[bool]:
@@ -205,11 +206,11 @@ def _confirm_app_before_push(
     )
 
 
-def confirm_chrome_before_push(*, interactive: bool) -> Optional[bool]:
+def confirm_chrome_before_push(*, interactive: bool, settings: RuntimeSettings) -> Optional[bool]:
     """True — continue push, False — cancel, None — interrupted (Ctrl+C)."""
     return _confirm_app_before_push(
         interactive=interactive,
-        enabled=chrome_dictionaries_enabled(),
+        enabled=chrome_dictionaries_enabled(settings=settings),
         is_running=is_chrome_running(),
         close_hint="Close Chrome or continue push at your own risk.",
         running_reason="Google Chrome is running — dictionary may be overwritten on exit.",
@@ -217,11 +218,11 @@ def confirm_chrome_before_push(*, interactive: bool) -> Optional[bool]:
     )
 
 
-def confirm_edge_before_push(*, interactive: bool) -> Optional[bool]:
+def confirm_edge_before_push(*, interactive: bool, settings: RuntimeSettings) -> Optional[bool]:
     """True — continue push, False — cancel, None — interrupted (Ctrl+C)."""
     return _confirm_app_before_push(
         interactive=interactive,
-        enabled=edge_dictionaries_enabled(),
+        enabled=edge_dictionaries_enabled(settings=settings),
         is_running=is_edge_running(),
         close_hint="Close Edge or continue push at your own risk.",
         running_reason="Microsoft Edge is running — dictionary may be overwritten on exit.",
@@ -229,11 +230,11 @@ def confirm_edge_before_push(*, interactive: bool) -> Optional[bool]:
     )
 
 
-def confirm_firefox_before_push(*, interactive: bool) -> Optional[bool]:
+def confirm_firefox_before_push(*, interactive: bool, settings: RuntimeSettings) -> Optional[bool]:
     """True — continue push, False — cancel, None — interrupted (Ctrl+C)."""
     return _confirm_app_before_push(
         interactive=interactive,
-        enabled=firefox_dictionaries_enabled(),
+        enabled=firefox_dictionaries_enabled(settings=settings),
         is_running=is_firefox_running(),
         close_hint="Close Firefox or continue push at your own risk.",
         running_reason="Firefox is running — persdict.dat may be overwritten on exit.",
@@ -241,11 +242,11 @@ def confirm_firefox_before_push(*, interactive: bool) -> Optional[bool]:
     )
 
 
-def confirm_obsidian_before_push(*, interactive: bool) -> Optional[bool]:
+def confirm_obsidian_before_push(*, interactive: bool, settings: RuntimeSettings) -> Optional[bool]:
     """True — continue push, False — cancel, None — interrupted (Ctrl+C)."""
     return _confirm_app_before_push(
         interactive=interactive,
-        enabled=obsidian_dictionaries_enabled(),
+        enabled=obsidian_dictionaries_enabled(settings=settings),
         is_running=is_obsidian_running(),
         close_hint="Close Obsidian or continue push at your own risk.",
         running_reason=("Obsidian is running — Custom Dictionary.txt may be overwritten on exit."),
@@ -261,37 +262,47 @@ def confirm_obsidian_before_push(*, interactive: bool) -> Optional[bool]:
 @dataclass(frozen=True)
 class _RunningAppRule:
     label: str
-    enabled: Callable[[], bool]
-    is_running: Callable[[], Optional[bool]]
     name_prefix: str
 
 
 _RUNNING_APP_RULES = (
     _RunningAppRule(
         "Google Chrome",
-        lambda: chrome_dictionaries_enabled(),
-        lambda: is_chrome_running(),
         "chrome:",
     ),
     _RunningAppRule(
         "Microsoft Edge",
-        lambda: edge_dictionaries_enabled(),
-        lambda: is_edge_running(),
         "edge:",
     ),
     _RunningAppRule(
         "Firefox",
-        lambda: firefox_dictionaries_enabled(),
-        lambda: is_firefox_running(),
         "firefox:",
     ),
     _RunningAppRule(
         "Obsidian",
-        lambda: obsidian_dictionaries_enabled(),
-        lambda: is_obsidian_running(),
         "obsidian",
     ),
 )
+
+
+def _rule_enabled(rule: _RunningAppRule, settings: RuntimeSettings) -> bool:
+    if rule.name_prefix == "chrome:":
+        return chrome_dictionaries_enabled(settings=settings)
+    if rule.name_prefix == "edge:":
+        return edge_dictionaries_enabled(settings=settings)
+    if rule.name_prefix == "firefox:":
+        return firefox_dictionaries_enabled(settings=settings)
+    return obsidian_dictionaries_enabled(settings=settings)
+
+
+def _rule_is_running(rule: _RunningAppRule) -> RunningState:
+    if rule.name_prefix == "chrome:":
+        return is_chrome_running()
+    if rule.name_prefix == "edge:":
+        return is_edge_running()
+    if rule.name_prefix == "firefox:":
+        return is_firefox_running()
+    return is_obsidian_running()
 
 
 def _dictionary_matches_rule(name: str, prefix: str) -> bool:
@@ -306,13 +317,17 @@ def _running_state_reason(label: str, state: Optional[bool]) -> str:
     return f"could not verify {label} is quit"
 
 
-def running_app_skip_reasons(dictionary_names: Sequence[str]) -> dict[str, str]:
+def running_app_skip_reasons(
+    dictionary_names: Sequence[str],
+    *,
+    settings: RuntimeSettings,
+) -> dict[str, str]:
     """Mapping of dictionary name -> skip reason (no logging)."""
     reasons: dict[str, str] = {}
     for rule in _RUNNING_APP_RULES:
-        if not rule.enabled():
+        if not _rule_enabled(rule, settings):
             continue
-        state = rule.is_running()
+        state = _rule_is_running(rule)
         if state is False:
             continue
         matching = {
@@ -326,6 +341,10 @@ def running_app_skip_reasons(dictionary_names: Sequence[str]) -> dict[str, str]:
     return reasons
 
 
-def running_app_skip_names(dictionary_names: Sequence[str]) -> frozenset[str]:
+def running_app_skip_names(
+    dictionary_names: Sequence[str],
+    *,
+    settings: RuntimeSettings,
+) -> frozenset[str]:
     """Dictionary names to skip because the parent app is running or unknown (no logging)."""
-    return frozenset(running_app_skip_reasons(dictionary_names))
+    return frozenset(running_app_skip_reasons(dictionary_names, settings=settings))

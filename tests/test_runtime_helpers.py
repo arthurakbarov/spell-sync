@@ -30,7 +30,7 @@ from spell_sync.runtime import (
     path_export_for_script,
     read_pyproject_version,
 )
-from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 class TestRuntimeHelpers(unittest.TestCase):
@@ -124,8 +124,8 @@ class TestGreenfieldCoverageGaps(unittest.TestCase):
             bad_xml = os.path.join(d, "cachedDictionary.xml")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(bad_xml).write_text("not xml", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("jetbrains:IDEA", bad_xml, DictionaryFormat.JETBRAINS),
                 ],
@@ -280,8 +280,8 @@ class TestPlanRemovalsHuman(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             removal_mod.print_removals(removal_mod.list_removals(run))

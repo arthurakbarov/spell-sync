@@ -10,11 +10,11 @@ from unittest.mock import patch
 from spell_sync.application.project_resolution import effective_push_strict
 from spell_sync.application.requests import ProjectRef, PushRequest
 from spell_sync.application.runtime_resolver import RuntimeResolver
-from spell_sync.command_helpers import mutating_command_scope_for
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
+from spell_sync.resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
-from spell_sync.validated_runtime import ValidatedRuntime
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPELL_SYNC = _REPO_ROOT / "spell_sync"
@@ -32,6 +32,20 @@ def _source_has_contextvar(path: Path) -> bool:
     return False
 
 
+def _source_has_global_mutation_state(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {
+                    "_mutating_scope_validated",
+                    "_settings_cache",
+                    "_settings_cache_key",
+                }:
+                    return True
+    return False
+
+
 class TestExplicitRuntimeGuards(unittest.TestCase):
     def test_settings_and_command_helpers_have_no_contextvar(self) -> None:
         for rel in ("settings.py", "command_helpers.py"):
@@ -39,6 +53,14 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             self.assertFalse(
                 _source_has_contextvar(path),
                 msg=f"[ARCH-RT-001] {rel} must not import ContextVar",
+            )
+
+    def test_no_module_level_mutation_or_settings_cache(self) -> None:
+        for rel in ("settings.py", "command_helpers.py"):
+            path = _SPELL_SYNC / rel
+            self.assertFalse(
+                _source_has_global_mutation_state(path),
+                msg=f"[ARCH-RT-003] {rel} must not keep module-level runtime cache",
             )
 
     def test_spell_sync_package_has_no_implicit_runtime_contextvars(self) -> None:
@@ -50,50 +72,44 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
         self.assertEqual(hits, [], msg=f"[ARCH-RT-002] implicit runtime symbols remain: {hits}")
 
     def test_runtime_resolver_bound_reuses_validated(self) -> None:
-        context = RuntimeContext.build(Path("/tmp/wordlist.txt"), dictionaries=[])
-        validated = ValidatedRuntime(
+        context = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+        )
+        validated = ResolvedRuntime(
             context,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
         )
         resolver = RuntimeResolver(bound=validated)
         project = ProjectRef(wordlist=Path("/tmp/other.txt"))
-        with patch("spell_sync.application.runtime_resolver.build_validated_runtime") as build:
-            self.assertIs(resolver.validated(project), validated)
+        with patch("spell_sync.resolved_runtime.build_resolved_runtime") as build:
+            with self.assertRaises(ProjectRuntimeMismatchError):
+                resolver.resolve_read(project)
             build.assert_not_called()
-        with patch("spell_sync.application.runtime_resolver.sync_run_for") as sync_run_for:
-            run = resolver.sync_run(project)
-            sync_run_for.assert_not_called()
-            self.assertIs(run.context, context)
 
-    def test_effective_push_strict_uses_explicit_config(self) -> None:
+    def test_effective_push_strict_uses_explicit_settings(self) -> None:
         request = PushRequest(project=ProjectRef())
-        self.assertTrue(
-            effective_push_strict(
-                request,
-                config={"push": {"strict": True}},
-            )
-        )
-        self.assertFalse(
-            effective_push_strict(
-                request,
-                config={"push": {"strict": False}},
-            )
-        )
+        settings = RuntimeSettings.from_config_dict({"push": {"strict": True}})
+        self.assertTrue(effective_push_strict(request, settings=settings))
+        relaxed = RuntimeSettings.from_config_dict({"push": {"strict": False}})
+        self.assertFalse(effective_push_strict(request, settings=relaxed))
 
     def test_runtime_resolver_sync_run_applies_strict_push_override(self) -> None:
         context = RuntimeContext.build(
             Path("/tmp/wordlist.txt"),
-            dictionaries=[],
+            [],
+            settings=RuntimeSettings.defaults(),
             strict_push=False,
         )
-        validated = ValidatedRuntime(
+        validated = ResolvedRuntime(
             context,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
         )
         resolver = RuntimeResolver(bound=validated)
-        run = resolver.sync_run(ProjectRef(), strict_push=True)
+        run = resolver.sync_run(ProjectRef(wordlist=Path("/tmp/wordlist.txt")), strict_push=True)
         self.assertTrue(run.strict_push)
 
     def test_application_exports_runtime_resolver(self) -> None:
@@ -101,21 +117,148 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
 
         self.assertIs(application_pkg.RuntimeResolver, RuntimeResolver)
 
-    def test_mutating_scope_reuses_bound_without_lock(self) -> None:
-        context = RuntimeContext.build(Path("/tmp/wordlist.txt"), dictionaries=[])
-        validated = ValidatedRuntime(
+    def test_mutation_scope_acquires_lock_despite_bound_preview(self) -> None:
+        context = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+        )
+        validated = ResolvedRuntime(
             context,
             ConfigLoadResult(ConfigStatus.VALID, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
         )
-        with patch("spell_sync.command_helpers.operation_lock_scope_for") as lock_scope:
-            with mutating_command_scope_for(
-                Path("/tmp/wordlist.txt"),
-                "push",
-                bound=validated,
-            ) as scope:
-                self.assertIs(scope, validated)
-            lock_scope.assert_not_called()
+        fresh = ResolvedRuntime(
+            context,
+            ConfigLoadResult(ConfigStatus.VALID, {}, ()),
+            JournalLoadResult(JournalLoadStatus.ABSENT, None),
+        )
+        resolver = RuntimeResolver(bound=validated)
+        with patch("spell_sync.application.mutation_scope.operation_lock_scope_for") as lock_scope:
+            lock_scope.return_value.__enter__.return_value = None
+            lock_scope.return_value.__exit__.return_value = False
+            with patch(
+                "spell_sync.application.mutation_scope.build_resolved_runtime",
+                return_value=fresh,
+            ) as build:
+                with resolver.mutation_scope(
+                    ProjectRef(wordlist=Path("/tmp/wordlist.txt")),
+                    "push",
+                ) as scope:
+                    self.assertIs(scope, fresh)
+                lock_scope.assert_called_once()
+                build.assert_called_once()
+
+    def test_effective_push_strict_requires_explicit_settings(self) -> None:
+        with self.assertRaises(ValueError):
+            effective_push_strict(PushRequest(project=ProjectRef()))
+
+    def test_assert_bound_project_noop_without_bound(self) -> None:
+        RuntimeResolver()._assert_bound_project(ProjectRef())
+
+    def test_settings_helpers_use_defaults_for_invalid_types(self) -> None:
+        from spell_sync.settings import io_int, neovim_flag, push_flag, push_int
+
+        cfg = {
+            "push": {"strict": "bad", "count": "bad"},
+            "io": {"size": "bad"},
+            "neovim": {"enabled": "bad"},
+        }
+        self.assertTrue(push_flag("strict", True, settings=cfg))
+        self.assertEqual(push_int("count", 7, settings=cfg), 7)
+        self.assertEqual(io_int("size", 9, settings=cfg), 9)
+        self.assertTrue(neovim_flag("enabled", True, settings=cfg))
+        valid = {"push": {"count": 11}, "io": {"size": 12}, "neovim": {"enabled": False}}
+        self.assertEqual(push_int("count", 7, settings=valid), 11)
+
+    def test_sync_run_for_applies_strict_push_override(self) -> None:
+        from spell_sync.sync_run import sync_run_for
+
+        context = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+            strict_push=False,
+        )
+        validated = ResolvedRuntime(
+            context,
+            ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
+            JournalLoadResult(JournalLoadStatus.ABSENT, None),
+        )
+        run = sync_run_for(Path("/tmp/wordlist.txt"), strict_push=True, validated=validated)
+        self.assertTrue(run.strict_push)
+
+
+class TestExplicitRuntimeCoverage(unittest.TestCase):
+    def test_config_push_helpers_read_runtime_settings(self) -> None:
+        from spell_sync.config import push_guard_local_min, push_strict_enabled
+
+        settings = RuntimeSettings.defaults()
+        self.assertIsInstance(push_strict_enabled(settings=settings), bool)
+        self.assertIsInstance(push_guard_local_min(settings=settings), int)
+
+    def test_support_report_tolerates_wordlist_load_failure(self) -> None:
+        from spell_sync.application.requests import SupportReportRequest
+        from spell_sync.application.support_report import build_support_report
+        from spell_sync.diagnostics.types import OperationHistorySnapshot
+        from tests.runtime_helpers import make_sync_run
+
+        context = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+        )
+        resolved = ResolvedRuntime(
+            context,
+            ConfigLoadResult(ConfigStatus.VALID, {}, ()),
+            JournalLoadResult(JournalLoadStatus.ABSENT, None),
+        )
+        run = make_sync_run(wordlist=Path("/tmp/wordlist.txt"))
+        service = type(
+            "Service",
+            (),
+            {"load_operation_history": lambda self, limit=5: OperationHistorySnapshot(records=())},
+        )()
+        with patch.object(run, "load_wordlist", side_effect=OSError("boom")):
+            with patch(
+                "spell_sync.application.support_report.load_target_settings_snapshot",
+                return_value=type("Snapshot", (), {"targets": ()})(),
+            ):
+                report = build_support_report(
+                    service,
+                    SupportReportRequest(project=ProjectRef()),
+                    resolved=resolved,
+                    run=run,
+                )
+        self.assertIsNone(report.project.wordlist_count)
+
+    def test_running_apps_check_uses_defaults_without_prepared_settings(self) -> None:
+        import spell_sync.commands as commands_mod
+        from spell_sync.cli_options import CliOptions
+
+        preview = type("Preview", (), {"prepared": None})()
+        opts = CliOptions(yes=True, json_output=True)
+        with patch.object(commands_mod, "confirm_chrome_before_push", return_value=True):
+            with patch.object(commands_mod, "confirm_edge_before_push", return_value=True):
+                with patch.object(commands_mod, "confirm_firefox_before_push", return_value=True):
+                    with patch.object(
+                        commands_mod,
+                        "confirm_obsidian_before_push",
+                        return_value=True,
+                    ):
+                        self.assertTrue(commands_mod._running_apps_check_for_push(opts, preview))
+
+    def test_app_process_running_rules_cover_edge_and_firefox(self) -> None:
+        import spell_sync.app_process_check as guard
+
+        edge_rule = next(rule for rule in guard._RUNNING_APP_RULES if rule.name_prefix == "edge:")
+        firefox_rule = next(
+            rule for rule in guard._RUNNING_APP_RULES if rule.name_prefix == "firefox:"
+        )
+        with patch.object(guard, "is_edge_running", return_value=True):
+            self.assertTrue(guard._rule_is_running(edge_rule))
+        with patch.object(guard, "is_firefox_running", return_value=False):
+            self.assertFalse(guard._rule_is_running(firefox_rule))
 
 
 if __name__ == "__main__":

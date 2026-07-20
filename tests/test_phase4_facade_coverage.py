@@ -34,6 +34,7 @@ from spell_sync.push_prepared import PreparedPush
 from spell_sync.read_outcome import DictionaryReadResult, ReadStatus
 from spell_sync.sync_models import PushResult
 from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 def _pull_scope(wordlist: str = "/tmp/w.txt"):
@@ -56,8 +57,8 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             ok_dict.write_text("alpha\nbeta\n", encoding="utf-8")
             corrupt.write_text("{not-json", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", str(ok_dict), DictionaryFormat.TEXT),
                     Dictionary("corrupt", str(corrupt), DictionaryFormat.JSON),
@@ -69,7 +70,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             self.assertIn("corrupt", preview.sources_skipped)
 
             with patch.object(SyncRun, "check_wordlist", return_value=ExitCode.WORDLIST_UNREADABLE):
-                bad = SyncRun(wordlist=root / "nope.txt", dictionaries=[])
+                bad = make_sync_run(root / "nope.txt", dictionaries=[])
                 blocked = build_pull_preview(bad)
             self.assertIsNotNone(blocked.wordlist_error)
             self.assertEqual(blocked.plan_identifier, "unavailable")
@@ -78,8 +79,8 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             unreadable.write_text("secret\n", encoding="utf-8")
             unreadable.chmod(0o000)
             try:
-                locked_run = SyncRun(
-                    wordlist=wordlist,
+                locked_run = make_sync_run(
+                    wordlist,
                     dictionaries=[
                         Dictionary("locked", str(unreadable), DictionaryFormat.TEXT),
                     ],
@@ -195,7 +196,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             wordlist_fingerprint="abc",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             scope.return_value.__exit__.return_value = False
@@ -205,7 +206,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         self.assertEqual(locked.outcome, OperationOutcome.FAILED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
@@ -224,7 +225,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
@@ -298,7 +299,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         self.assertEqual(mismatch.outcome, OperationOutcome.FAILED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             scope.return_value.__exit__.return_value = False
@@ -311,7 +312,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
 
         abort = PushAbort(ExitCode.PUSH_ABORT, "write_failed", "boom")
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -340,7 +341,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             "incomplete",
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -360,7 +361,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         self.assertEqual(recovering.outcome, OperationOutcome.RECOVERY_REQUIRED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False
@@ -390,7 +391,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             skipped_reasons={"jetbrains": "running"},
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = MagicMock()
             scope.return_value.__exit__.return_value = False

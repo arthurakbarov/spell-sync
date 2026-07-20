@@ -81,6 +81,6 @@ class TestSettingsDiagnostics(unittest.TestCase):
             project = Path(d) / "spell-sync.toml"
             project.write_text("[dictionaries]\nchrome = true\n", encoding="utf-8")
             with patch.object(settings_mod, "config_paths", return_value=[project]):
-                merged, issues = settings_mod.load_user_settings_with_issues(reload=True)
+                merged, issues = settings_mod.load_user_settings_with_issues()
             self.assertTrue(merged["dictionaries"]["chrome"])
             self.assertEqual(issues, [])

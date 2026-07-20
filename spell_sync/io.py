@@ -15,6 +15,7 @@ from typing import Iterable, Iterator, Union
 
 from .config import CHROME_CHECKSUM_PREFIX, backup_keep_count
 from .log import log
+from .runtime_settings import RuntimeSettings
 from .words import WordSet, normalize_token, sort_words
 
 PathLike = Union[str, Path]
@@ -171,7 +172,11 @@ def rotate_backup_chain(backup: Path, *, keep: int) -> None:
             pass
 
 
-def create_bak_backup(destination: Path) -> bool:
+def create_bak_backup(
+    destination: Path,
+    *,
+    settings: RuntimeSettings | None = None,
+) -> bool:
     """
     Create/rotate `.bak` backup for an existing file.
 
@@ -179,7 +184,7 @@ def create_bak_backup(destination: Path) -> bool:
     """
     if not destination.exists():
         return True
-    keep = backup_keep_count()
+    keep = backup_keep_count(settings=settings or RuntimeSettings.defaults())
     if keep <= 0:
         return True
     backup = destination.with_suffix(destination.suffix + ".bak")
@@ -237,12 +242,18 @@ def wordlist_unreadable(path: PathLike) -> bool:
     return target.exists() and not is_path_readable(path)
 
 
-def atomic_write(path: PathLike, data: bytes, *, keep_backup: bool = True) -> None:
+def atomic_write(
+    path: PathLike,
+    data: bytes,
+    *,
+    keep_backup: bool = True,
+    settings: RuntimeSettings | None = None,
+) -> None:
     target = Path(path)
     destination = physical_path(target)
     ensure_parent_dir(destination)
     if keep_backup and destination.exists() and _backups_allowed():
-        create_bak_backup(destination)
+        create_bak_backup(destination, settings=settings)
     # Create a unique temp file in the destination directory to avoid collisions
     # in parallel runs and to keep os.replace() on the same filesystem.
     fd, temp_name = tempfile.mkstemp(

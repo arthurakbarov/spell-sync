@@ -7,26 +7,33 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from .application.mutation_scope import mutation_scope_for
 from .application.project_resolution import resolve_project_wordlist
 from .application.reports import PushPreview
 from .application.requests import ProjectRef
 from .cli_options import CliOptions
 from .config import CONFIRM_YES, push_max_removals_without_confirm
 from .exit_codes import ExitCode
-from .json_output import base_payload, emit_json, push_result_payload
+from .json_output import (
+    base_payload,
+    emit_json,
+    json_emitted,
+    push_result_payload,
+    reset_json_emission,
+)
 from .log import log
-from .operation_lock import OperationLocked, acquire_operation_lock, lock_info_payload
-from .paths import wordlist_path
+from .mutation_guards import (
+    operation_lock_scope_for,
+)
 from .push_journal import (
     JournalLoadResult,
     JournalLoadStatus,
     journal_payload,
 )
+from .resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from .runtime_settings import RuntimeSettings
 from .settings import config_blocks_mutating
 from .sync_run import DictionaryDiff, PushResult, SyncRun, sync_run_for  # noqa: F401
-from .validated_runtime import ValidatedRuntime, build_validated_runtime
-
-_mutating_scope_validated: ValidatedRuntime | None = None
 
 
 def invalid_config_exit_from_result(
@@ -59,16 +66,15 @@ def invalid_config_exit_from_result(
 
 
 def invalid_config_exit(opts: CliOptions, command: str) -> int | None:
-    """Pre-lock config check; prefer ``mutating_command_scope`` for mutating commands."""
+    """Pre-lock config check; prefer service mutation scope for mutating commands."""
     from .cli_request_adapter import project_ref
-    from .validated_runtime import build_validated_runtime
 
     wordlist = wordlist_path_for(project_ref(opts))
-    validated = build_validated_runtime(wordlist)
+    validated = build_resolved_runtime(wordlist)
     return invalid_config_exit_from_result(opts, command, validated.config_result)
 
 
-def run_from_scope(scope: ValidatedRuntime | int) -> SyncRun | int:
+def run_from_scope(scope: ResolvedRuntime | int) -> SyncRun | int:
     if isinstance(scope, int):
         return scope
     return SyncRun(context=scope.context)
@@ -178,7 +184,7 @@ def mutating_command_scope(
     *,
     allow_unfinished_journal: bool = False,
     strict_push: bool = False,
-) -> Iterator[ValidatedRuntime | int]:
+) -> Iterator[ResolvedRuntime | int]:
     from .cli_request_adapter import project_ref
 
     with mutating_command_scope_for(
@@ -196,6 +202,7 @@ def quiet_json_output(opts: CliOptions) -> Iterator[None]:
     was_quiet = log.quiet
     if opts.json_output:
         log.quiet = True
+        reset_json_emission()
     try:
         yield
     finally:
@@ -209,6 +216,8 @@ def emit_command_exit(
     **extra: object,
 ) -> int:
     if opts.json_output:
+        if json_emitted():
+            return int(code)
         emit_json({**base_payload(command, exit=int(code)), **extra})
     return int(code)
 
@@ -307,156 +316,16 @@ def mutating_command_scope_for(
     allow_unfinished_journal: bool = False,
     strict_push: bool = False,
     json_output: bool = False,
-    bound: ValidatedRuntime | None = None,
-) -> Iterator[ValidatedRuntime | int]:
+) -> Iterator[ResolvedRuntime | int]:
     """Acquire lock, then load config and journal once for mutating commands."""
-    global _mutating_scope_validated
-    if bound is not None:
-        yield bound
-        return
-    if _mutating_scope_validated is not None:
-        yield _mutating_scope_validated
-        return
-    with operation_lock_scope_for(wordlist, command, json_output=json_output) as lock_exit:
-        if lock_exit is not None:
-            yield lock_exit
-            return
-        validated = build_validated_runtime(wordlist, strict_push=strict_push)
-        config_exit = invalid_config_exit_from_scope(
-            command,
-            validated.config_result,
-            json_output=json_output,
-        )
-        if config_exit is not None:
-            yield config_exit
-            return
-        journal_exit = None
-        if not allow_unfinished_journal:
-            journal_exit = unfinished_journal_exit_from_result_for(
-                command,
-                validated.journal_result,
-                json_output=json_output,
-                wordlist=wordlist,
-            )
-        if journal_exit is not None:
-            yield journal_exit
-            return
-        _mutating_scope_validated = validated
-        try:
-            yield validated
-        finally:
-            _mutating_scope_validated = None
-
-
-@contextmanager
-def operation_lock_scope_for(
-    wordlist: Path,
-    command: str,
-    *,
-    json_output: bool = False,
-) -> Iterator[int | None]:
-    try:
-        with acquire_operation_lock(wordlist, command):
-            yield None
-    except OperationLocked as exc:
-        if json_output:
-            emit_json(
-                {
-                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
-                    "reason": "operation_locked",
-                    "lock": lock_info_payload(exc.info),
-                }
-            )
-        else:
-            log.abort(
-                "operation aborted — another spell-sync process is running "
-                f"({exc.info.command}, pid {exc.info.pid}). "
-                f"Lock file: {exc.lock_path}"
-            )
-        yield int(ExitCode.PUSH_ABORT)
-
-
-def invalid_config_exit_from_scope(
-    command: str,
-    result,
-    *,
-    json_output: bool = False,
-) -> int | None:
-    if not config_blocks_mutating(result):
-        return None
-    diagnostics = [
-        {"path": item.path, "message": item.message, "kind": item.kind.value}
-        for item in result.diagnostics
-    ]
-    if json_output:
-        emit_json(
-            {
-                **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
-                "reason": "invalid_config",
-                "config_status": result.status.value,
-                "diagnostics": diagnostics,
-            }
-        )
-    else:
-        log.abort(
-            "operation aborted — invalid spell-sync.toml "
-            f"({result.status.value}). Fix config before mutating commands."
-        )
-    return int(ExitCode.PUSH_ABORT)
-
-
-def unfinished_journal_exit_from_result_for(
-    command: str,
-    result: JournalLoadResult,
-    *,
-    json_output: bool = False,
-    wordlist=None,
-) -> int | None:
-    if command == "recover":
-        return None
-    if result.status is JournalLoadStatus.ABSENT:
-        return None
-    if result.status is JournalLoadStatus.VALID_COMPLETED:
-        return None
-    if result.status in (
-        JournalLoadStatus.CORRUPT,
-        JournalLoadStatus.UNSUPPORTED_SCHEMA,
-    ):
-        reason = "corrupt_journal"
-        detail = result.detail or result.status.value
-        if json_output:
-            emit_json(
-                {
-                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
-                    "reason": reason,
-                    "detail": detail,
-                }
-            )
-        else:
-            wl = wordlist if wordlist is not None else wordlist_path()
-            log.abort(
-                "operation aborted — push journal is corrupt or unsupported "
-                f"({detail}). Inspect or remove "
-                f"{wl.resolve().parent / '.spell-sync.journal.json'} carefully."
-            )
-        return int(ExitCode.PUSH_ABORT)
-    journal = result.journal
-    assert journal is not None
-    if json_output:
-        emit_json(
-            {
-                **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
-                "reason": "unfinished_transaction",
-                "journal": journal_payload(journal),
-            }
-        )
-    else:
-        log.abort(
-            "operation aborted — unfinished push journal found "
-            f"({journal.started}, pid {journal.pid}). "
-            "Run `spell-sync recover` before mutating commands."
-        )
-    return int(ExitCode.PUSH_ABORT)
+    with mutation_scope_for(
+        wordlist,
+        command,
+        allow_unfinished_journal=allow_unfinished_journal,
+        strict_push=strict_push,
+        json_output=json_output,
+    ) as scope:
+        yield scope
 
 
 def guard_exit_code(
@@ -480,7 +349,8 @@ def confirm_push_removals_for_preview(
 ) -> bool | None:
     prepared = preview.prepared
     peak = prepared.max_removals() if prepared is not None else 0
-    limit = push_max_removals_without_confirm()
+    settings = prepared.ctx.settings if prepared is not None else RuntimeSettings.defaults()
+    limit = push_max_removals_without_confirm(settings=settings)
     if peak <= limit or opts.yes or opts.dry_run:
         return True
     log.warn(
@@ -510,7 +380,7 @@ def confirm_push_removals(
     peak_removals: int | None = None,
 ) -> bool | None:
     peak = peak_removals if peak_removals is not None else run.max_push_removals()
-    limit = push_max_removals_without_confirm()
+    limit = push_max_removals_without_confirm(settings=run.context.settings)
     if peak <= limit or opts.yes or opts.dry_run:
         return True
     log.warn(

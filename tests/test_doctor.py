@@ -23,7 +23,8 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
-from spell_sync.sync_run import SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from tests.runtime_helpers import make_sync_run
 
 
 class TestFirefoxNeovimPaths(unittest.TestCase):
@@ -76,7 +77,12 @@ class TestFirefoxNeovimPaths(unittest.TestCase):
                     return_value=[("p", profile / "persdict.dat")],
                 ),
             ):
-                names = [item.name for item in dict_mod.discover_dictionaries()]
+                names = [
+                    item.name
+                    for item in dict_mod.discover_dictionaries(
+                        RuntimeSettings.defaults(),
+                    )
+                ]
             self.assertIn("firefox:p", names)
 
 
@@ -85,8 +91,8 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[],
             )
             report = doctor_mod.build_doctor_report(run)
@@ -96,7 +102,7 @@ class TestDoctor(unittest.TestCase):
     def test_doctor_missing_wordlist_error(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             report = doctor_mod.build_doctor_report(run)
             self.assertTrue(report.has_errors)
             self.assertEqual(report.checks[0].level, "error")
@@ -108,7 +114,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             os.symlink("missing-target.txt", wordlist)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             report = doctor_mod.build_doctor_report(run)
             self.assertTrue(report.has_errors)
             self.assertIn("broken symlink", report.checks[0].message)
@@ -117,7 +123,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             report = doctor_mod.build_doctor_report(run)
             levels = [check.level for check in report.checks]
             self.assertIn("warn", levels)
@@ -128,8 +134,8 @@ class TestDoctor(unittest.TestCase):
             blocked = os.path.join(d, "blocked.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(blocked).write_text("secret\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("blocked", blocked, DictionaryFormat.TEXT),
                 ],
@@ -151,8 +157,8 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("a", os.path.join(d, "a.txt"), DictionaryFormat.TEXT),
                 ],
@@ -177,8 +183,8 @@ class TestDoctor(unittest.TestCase):
             blocked = os.path.join(d, "LocalDictionary")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(blocked).write_text("secret\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary(
                         "macos-applespell",
@@ -211,8 +217,8 @@ class TestDoctor(unittest.TestCase):
             blocked = os.path.join(d, "blocked.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(blocked).write_text("secret\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("blocked", blocked, DictionaryFormat.TEXT),
                 ],
@@ -236,7 +242,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             report = doctor_mod.build_doctor_report(run)
             self.assertTrue(report.package_version)
             payload = doctor_mod.doctor_payload(report)
@@ -246,7 +252,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(health_inspect_mod.shutil, "which", return_value=None),
                 patch.object(health_inspect_mod, "discover_pip_script", return_value=None),
@@ -272,7 +278,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch.object(report_mod, "inspect_cli", return_value=cli_status):
                 report = doctor_mod.build_doctor_report(run)
             self.assertEqual(report.cli.pip_script, str(pip_script))
@@ -287,7 +293,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             cli_status = doctor_mod.CliStatus(
                 on_path=False,
                 argv=("python3", "-m", "spell_sync"),
@@ -308,7 +314,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             cli_status = doctor_mod.CliStatus(
                 on_path=False,
                 argv=("python3", "-m", "spell_sync"),
@@ -329,7 +335,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             err = io.StringIO()
             with (
                 patch.object(
@@ -362,8 +368,8 @@ class TestDoctor(unittest.TestCase):
             blocked = os.path.join(d, "LocalDictionary")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             Path(blocked).write_text("secret\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary(
                         "macos-applespell",
@@ -411,7 +417,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(
                     report_mod,
@@ -437,7 +443,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             err = io.StringIO()
             with (
                 patch.object(run, "check_wordlist", return_value=ExitCode.WORDLIST_UNREADABLE),
@@ -494,7 +500,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(report_mod, "chrome_dictionaries_enabled", return_value=True),
                 patch.object(report_mod, "is_chrome_running", return_value=True),
@@ -508,7 +514,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(report_mod, "obsidian_dictionaries_enabled", return_value=True),
                 patch.object(report_mod, "is_obsidian_running", return_value=True),
@@ -522,7 +528,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             hooks_dir = Path(d) / ".git" / "hooks"
             hooks_dir.mkdir(parents=True)
             report = doctor_mod.build_doctor_report(run)
@@ -534,7 +540,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             hooks_dir = Path(d) / ".git" / "hooks"
             hooks_dir.mkdir(parents=True)
             (hooks_dir / "pre-push").write_text(
@@ -553,7 +559,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             hooks_dir = Path(d) / ".git" / "hooks"
             hooks_dir.mkdir(parents=True)
             report = doctor_mod.build_doctor_report(run)
@@ -579,8 +585,8 @@ class TestDoctor(unittest.TestCase):
                 False,
                 quiet=True,
             )
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("s", dict_path, DictionaryFormat.TEXT)],
             )
             report = doctor_mod.build_doctor_report(run)
@@ -592,7 +598,7 @@ class TestDoctor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("alpha\n", encoding="utf-8")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            run = make_sync_run(wordlist, dictionaries=[])
             with patch.object(run, "check_wordlist", return_value=ExitCode.WORDLIST_UNREADABLE):
                 report = doctor_mod.build_doctor_report(run)
             self.assertTrue(report.has_errors)

@@ -77,7 +77,7 @@ def inspect_project_setup(
             diagnostics=tuple(diagnostics),
         )
 
-    config_result = load_config_result(wordlist=wordlist, reload=True)
+    config_result = load_config_result(wordlist=wordlist)
     project_config = config_path
     home_config = project.config_paths[0] if project.config_paths else None
     if (

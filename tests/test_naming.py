@@ -19,7 +19,8 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat, discover_dicti
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
 from spell_sync.paths import project_root, wordlist_path
-from spell_sync.sync_run import SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from tests.runtime_helpers import make_sync_run
 
 
 class TestModuleLayout(unittest.TestCase):
@@ -107,7 +108,7 @@ class TestPublicExports(unittest.TestCase):
             patch("spell_sync.dictionaries.is_windows", return_value=False),
             patch("spell_sync.dictionaries.is_macos", return_value=False),
         ):
-            items = discover_dictionaries()
+            items = discover_dictionaries(RuntimeSettings.defaults())
         self.assertIsInstance(items, list)
         for item in items:
             self.assertIsInstance(item, Dictionary)
@@ -137,8 +138,8 @@ class TestJsonNaming(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("a", dict_path, DictionaryFormat.TEXT),
                 ],

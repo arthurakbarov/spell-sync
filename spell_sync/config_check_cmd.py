@@ -18,7 +18,6 @@ def cmd_config_check(opts: CliOptions) -> int:
         project = ProjectContext.build(resolve_wordlist_path(opts.wordlist))
         loaded, issues = settings.load_user_settings_with_issues(
             wordlist=project.wordlist,
-            reload=True,
         )
         unknown = settings.unknown_config_keys(loaded)
         paths = [str(path) for path in project.config_paths if path.is_file()]

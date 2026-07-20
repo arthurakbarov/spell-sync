@@ -18,7 +18,8 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
 from spell_sync.skip_reasons import PushSkipReason
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestPushSkipClassification(unittest.TestCase):
@@ -30,8 +31,8 @@ class TestPushSkipClassification(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_ok, ["stale"], "utf-8", False, quiet=True)
             write_text_words(path_blocked, ["other"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                     Dictionary("blocked", path_blocked, DictionaryFormat.TEXT),
@@ -55,8 +56,8 @@ class TestPushSkipClassification(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_ok, ["stale"], "utf-8", False, quiet=True)
             write_text_words(path_secret, ["x"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                     Dictionary("secret", path_secret, DictionaryFormat.TEXT),

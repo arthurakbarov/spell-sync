@@ -190,17 +190,19 @@ class TestApplicationRequests(unittest.TestCase):
 
     def test_project_scope_helpers_cover_json_and_early_returns(self) -> None:
         from spell_sync import command_helpers
+        from spell_sync.mutation_guards import (
+            invalid_config_exit_from_scope,
+            unfinished_journal_exit_from_result_for,
+        )
         from spell_sync.operation_lock import OperationLocked, OperationLockInfo
         from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
         from spell_sync.settings import ConfigLoadResult, ConfigStatus
 
         project = ProjectRef(wordlist=Path("/tmp/w.txt"))
         absent = JournalLoadResult(JournalLoadStatus.ABSENT, None)
-        self.assertIsNone(command_helpers.unfinished_journal_exit_from_result_for("push", absent))
+        self.assertIsNone(unfinished_journal_exit_from_result_for("push", absent))
         completed = JournalLoadResult(JournalLoadStatus.VALID_COMPLETED, None)
-        self.assertIsNone(
-            command_helpers.unfinished_journal_exit_from_result_for("push", completed)
-        )
+        self.assertIsNone(unfinished_journal_exit_from_result_for("push", completed))
         invalid = ConfigLoadResult(
             status=ConfigStatus.SYNTAX_ERROR,
             config=None,
@@ -208,7 +210,7 @@ class TestApplicationRequests(unittest.TestCase):
         )
         buf = io.StringIO()
         with redirect_stdout(buf):
-            code = command_helpers.invalid_config_exit_from_scope(
+            code = invalid_config_exit_from_scope(
                 "push",
                 invalid,
                 json_output=True,
@@ -219,7 +221,7 @@ class TestApplicationRequests(unittest.TestCase):
 
         info = OperationLockInfo(1, "t", "push", "/tmp/w.txt")
         with patch(
-            "spell_sync.command_helpers.acquire_operation_lock",
+            "spell_sync.mutation_guards.acquire_operation_lock",
             side_effect=OperationLocked(info, Path("/tmp/.lock")),
         ):
             with command_helpers.operation_lock_scope(
@@ -229,7 +231,7 @@ class TestApplicationRequests(unittest.TestCase):
                 self.assertEqual(lock_exit, int(ExitCode.PUSH_ABORT))
 
         with patch(
-            "spell_sync.command_helpers.build_validated_runtime",
+            "spell_sync.application.mutation_scope.build_resolved_runtime",
         ) as build:
             build.return_value = MagicMock(
                 config_result=invalid,

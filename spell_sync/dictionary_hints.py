@@ -26,27 +26,29 @@ from .paths import (
     sublime_text_installed,
     vivaldi_dict_paths,
 )
+from .runtime_settings import RuntimeSettings
 
 
-def warn_missing_optional_apps() -> None:
+def warn_missing_optional_apps(*, settings: RuntimeSettings | None = None) -> None:
     """Call before push — does not block execution."""
+    runtime_settings = settings or RuntimeSettings.defaults()
     if not sublime_text_installed():
         log.warn("Sublime Text not found — sublime dictionary will be created on push.")
-    if enable_editors() and editor_uses_fallback():
+    if enable_editors(settings=runtime_settings) and editor_uses_fallback():
         log.warn("No code editor install found — spell-sync-words.txt will use the default path.")
-    if enable_chrome() and not chrome_dict_paths():
+    if enable_chrome(settings=runtime_settings) and not chrome_dict_paths():
         log.detail("Google Chrome not found. Chrome dictionaries skipped.")
-    if enable_edge() and not edge_dict_paths():
+    if enable_edge(settings=runtime_settings) and not edge_dict_paths():
         log.detail("Microsoft Edge not found. Edge dictionaries skipped.")
-    if enable_brave() and not brave_dict_paths():
+    if enable_brave(settings=runtime_settings) and not brave_dict_paths():
         log.detail("Brave not found. Brave dictionaries skipped.")
-    if enable_vivaldi() and not vivaldi_dict_paths():
+    if enable_vivaldi(settings=runtime_settings) and not vivaldi_dict_paths():
         log.detail("Vivaldi not found. Vivaldi dictionaries skipped.")
-    if enable_firefox() and not firefox_dict_paths():
+    if enable_firefox(settings=runtime_settings) and not firefox_dict_paths():
         log.detail("Firefox not found. Firefox dictionaries skipped.")
-    if enable_jetbrains() and not jetbrains_dict_paths():
+    if enable_jetbrains(settings=runtime_settings) and not jetbrains_dict_paths():
         log.detail("JetBrains IDE not found. JetBrains dictionaries skipped.")
-    if enable_hunspell() and not hunspell_dict_paths():
+    if enable_hunspell(settings=runtime_settings) and not hunspell_dict_paths():
         log.detail("Hunspell personal dictionary not found. Hunspell dictionaries skipped.")
-    if enable_obsidian() and not obsidian_dict_paths():
+    if enable_obsidian(settings=runtime_settings) and not obsidian_dict_paths():
         log.detail("Obsidian not found. Obsidian dictionary skipped.")

@@ -23,16 +23,10 @@ from spell_sync.push_journal import (
     PushJournalSession,
     load_journal_result,
 )
-from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
 
 
 class TestTomlConsistentSemantics(unittest.TestCase):
-    def setUp(self) -> None:
-        settings_mod.clear_settings_cache()
-
-    def tearDown(self) -> None:
-        settings_mod.clear_settings_cache()
-
     def _write(self, path: Path, content: str) -> None:
         path.write_text(content, encoding="utf-8")
 
@@ -137,17 +131,17 @@ class TestBackupKeepZeroRollback(unittest.TestCase):
                 Dictionary("a", a, DictionaryFormat.TEXT),
                 Dictionary("b", b, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=str(wordlist), dictionaries=dictionaries)
+            run = make_sync_run(str(wordlist), dictionaries=dictionaries)
 
             write_count = {"n": 0}
             import spell_sync.push_prepared as push_prepared
 
             original_write_rendered = push_prepared.write_rendered
 
-            def flaky_write_rendered(path, rendered):
+            def flaky_write_rendered(path, rendered, *, settings):
                 write_count["n"] += 1
                 if write_count["n"] == 1:
-                    return original_write_rendered(path, rendered)
+                    return original_write_rendered(path, rendered, settings=settings)
                 return False
 
             with (
@@ -190,7 +184,7 @@ class TestFingerprintConflict(unittest.TestCase):
             target.write_text("alpha\n", encoding="utf-8")
 
             dictionary = Dictionary("dict", target, DictionaryFormat.TEXT)
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[dictionary])
+            run = make_sync_run(str(wordlist), dictionaries=[dictionary])
             from spell_sync.push_transaction import PushTransaction
 
             original_begin = PushTransaction.begin
@@ -573,7 +567,7 @@ class TestSafetyCoverageExtras(unittest.TestCase):
             path = Path(d) / "spell-sync.toml"
             path.write_text("orphan = true\n[dictionaries]\nchrome = true\n", encoding="utf-8")
             with patch.object(settings_mod, "config_paths", return_value=[path]):
-                result = settings_mod.load_config_result(reload=True)
+                result = settings_mod.load_config_result()
             self.assertEqual(result.status, settings_mod.ConfigStatus.INVALID_TYPE)
             assert result.config is not None
             self.assertTrue(result.config["dictionaries"]["chrome"])
@@ -583,9 +577,8 @@ class TestSafetyCoverageExtras(unittest.TestCase):
             path = Path(d) / "spell-sync.toml"
             path.write_text("[dictionaries]\nchrome = true\nweird = true\n", encoding="utf-8")
             with patch.object(settings_mod, "config_paths", return_value=[path]):
-                result = settings_mod.load_config_result(reload=True)
+                result = settings_mod.load_config_result()
             self.assertEqual(result.status, settings_mod.ConfigStatus.UNKNOWN_KEY)
-        settings_mod.clear_settings_cache()
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "spell-sync.toml"
             path.write_text("[push]\nstrict = true\n", encoding="utf-8")
@@ -594,7 +587,7 @@ class TestSafetyCoverageExtras(unittest.TestCase):
             self.assertEqual(data, {})
             self.assertTrue(issues)
             with patch.object(settings_mod, "config_paths", return_value=[]):
-                result = settings_mod.load_config_result(reload=True)
+                result = settings_mod.load_config_result()
             self.assertEqual(result.status, settings_mod.ConfigStatus.ABSENT)
             self.assertTrue(
                 settings_mod.config_blocks_mutating(
@@ -611,7 +604,7 @@ class TestSafetyCoverageExtras(unittest.TestCase):
                 "_parse_toml_with_issues",
                 return_value=({}, ["hard fail"]),
             ):
-                result = settings_mod.load_config_result(reload=True)
+                result = settings_mod.load_config_result()
             # config_paths still empty → ABSENT
             with patch.object(
                 settings_mod,
@@ -621,8 +614,7 @@ class TestSafetyCoverageExtras(unittest.TestCase):
                 path.write_text("[push]\nstrict = true\nbad\n", encoding="utf-8")
                 # invalid file via tomllib
                 path.write_text("[push]\nstrict = true\nstrict = false\n", encoding="utf-8")
-                settings_mod.clear_settings_cache()
-                result = settings_mod.load_config_result(reload=True)
+                result = settings_mod.load_config_result()
                 self.assertEqual(result.status, settings_mod.ConfigStatus.SYNTAX_ERROR)
 
     def test_pid_alive_permission_error_covered(self):

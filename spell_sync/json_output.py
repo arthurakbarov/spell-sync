@@ -10,11 +10,24 @@ from .sync_run import DictionaryDiff, PushResult
 
 SCHEMA_VERSION = 1
 
+_json_emitted = False
+
+
+def reset_json_emission() -> None:
+    global _json_emitted
+    _json_emitted = False
+
+
+def json_emitted() -> bool:
+    return _json_emitted
+
 
 def emit_json(payload: Dict[str, Any]) -> None:
+    global _json_emitted
     if "command" not in payload or "exit" not in payload:
         missing = [k for k in ("command", "exit") if k not in payload]
         raise ValueError(f"JSON payload missing keys: {', '.join(missing)}")
+    _json_emitted = True
     json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -33,6 +34,17 @@ from spell_sync.push_prepared import PreparedPush
 from spell_sync.settings import ConfigStatus
 from spell_sync.sync_models import DictionaryDiff, PushResult
 from spell_sync.sync_run import SyncRun
+from tests.runtime_helpers import make_sync_run
+
+
+@contextmanager
+def _patch_mutation_scope(yield_value):
+    @contextmanager
+    def _fake_scope(_self, _project, _command, **_kwargs):
+        yield yield_value
+
+    with patch.object(RuntimeResolver, "mutation_scope", _fake_scope):
+        yield
 
 
 def _pull_scope(wordlist: str = "/tmp/w.txt"):
@@ -170,6 +182,7 @@ class TestSpellSyncService(unittest.TestCase):
             blocked=(),
         )
         service = MagicMock()
+        service.mutating_config_exit_code.return_value = None
         service.load_push_preview.return_value = preview
         service.execute_push_dry_run.return_value = PushExecution(
             prepared=prepared,
@@ -427,11 +440,7 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertEqual(bad.outcome, OperationOutcome.FAILED)
 
         events: list = []
-        with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
-        ) as scope:
-            scope.return_value.__enter__.return_value = _pull_scope()
-            scope.return_value.__exit__.return_value = False
+        with _patch_mutation_scope(_pull_scope()):
             with patch(
                 "spell_sync.application.service.file_content_hash",
                 return_value="abc",
@@ -473,11 +482,7 @@ class TestSpellSyncService(unittest.TestCase):
             corrupt=(),
             blocked=(),
         )
-        with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
-        ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
-            scope.return_value.__exit__.return_value = False
+        with _patch_mutation_scope(MagicMock()):
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
                 return_value="chrome",
@@ -490,11 +495,7 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
         self.assertEqual(conflict.conflict_target, "chrome")
 
-        with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
-        ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
-            scope.return_value.__exit__.return_value = False
+        with _patch_mutation_scope(MagicMock()):
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
                 return_value=None,
@@ -551,8 +552,8 @@ class TestServiceFacadePaths(unittest.TestCase):
             dict_path = os.path.join(d, "dict.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             service = SpellSyncService(enable_file_logging=False)
@@ -625,11 +626,7 @@ class TestServiceFacadePaths(unittest.TestCase):
         )
         self.assertEqual(blocked.result, ExitCode.PUSH_ABORT)
 
-        with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for",
-        ) as scope:
-            scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
-            scope.return_value.__exit__.return_value = False
+        with _patch_mutation_scope(int(ExitCode.PUSH_ABORT)):
             locked = service.execute_push_dry_run(_push(), preview)
         self.assertEqual(locked.result, ExitCode.PUSH_ABORT)
 
@@ -644,7 +641,7 @@ class TestServiceFacadePaths(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             missing = Path(d) / "missing.txt"
             service = SpellSyncService(enable_file_logging=False)
-            unreadable = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            unreadable = make_sync_run(wordlist, dictionaries=[])
             with (
                 patch.object(RuntimeResolver, "sync_run", return_value=unreadable),
                 patch.object(
@@ -700,8 +697,8 @@ class TestServiceFacadePaths(unittest.TestCase):
             dict_path = os.path.join(d, "dict.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             service = SpellSyncService(enable_file_logging=False)

@@ -40,8 +40,9 @@ from spell_sync.health.types import (
 from spell_sync.io import write_text_words
 from spell_sync.json_output import push_result_payload
 from spell_sync.skip_reasons import PUSH_SKIP_DETAILS, PushSkipReason
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
 from spell_sync.words import merge_case_duplicates
+from tests.runtime_helpers import make_sync_run
 
 
 def _skip_reason_constants(cls: type) -> set[str]:
@@ -341,8 +342,8 @@ class TestPushPlanInvariants(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_ok, ["stale"], "utf-8", False, quiet=True)
             write_text_words(path_skip, ["other"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                     Dictionary("skip", path_skip, DictionaryFormat.TEXT),
@@ -364,8 +365,8 @@ class TestPushPlanInvariants(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(path_ok, ["stale"], "utf-8", False, quiet=True)
             write_text_words(path_skip, ["other"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("ok", path_ok, DictionaryFormat.TEXT),
                     Dictionary("skip", path_skip, DictionaryFormat.TEXT),

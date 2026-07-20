@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..exit_codes import ExitCode
@@ -298,6 +298,7 @@ class RecoveryPreview:
     can_discard: bool
     snapshots_valid: bool
     preview_fingerprint: str
+    journal_summary: dict[str, object] = field(default_factory=dict)
     can_cleanup: bool = False
     detail: str | None = None
 

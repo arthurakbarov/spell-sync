@@ -34,7 +34,8 @@ from spell_sync.io import write_text_words
 from spell_sync.paths import resolve_wordlist_path
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus, PushJournal
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
 
 
 class TestResolveWordlistPath(unittest.TestCase):
@@ -111,7 +112,7 @@ class TestCommandHelpers(unittest.TestCase):
         self.assertIn("Cancelled", buf.getvalue())
 
     def test_confirm_push_removals_non_interactive_aborts(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
+        run = make_sync_run("/tmp/x", dictionaries=[])
         run.max_push_removals = lambda: 100  # type: ignore[method-assign]
         with (
             patch.object(command_helpers, "push_max_removals_without_confirm", return_value=5),
@@ -212,8 +213,10 @@ class TestCommandHelpers(unittest.TestCase):
             wordlist_backup_path=None,
         )
         in_progress = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
+        from spell_sync import mutation_guards as mutation_guards_mod
+
         self.assertIsNone(
-            command_helpers.unfinished_journal_exit_from_result_for(
+            mutation_guards_mod.unfinished_journal_exit_from_result_for(
                 "recover",
                 in_progress,
             )
@@ -305,8 +308,8 @@ class TestCommandsJson(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             result = PushResult(1, ("a",), ())
@@ -355,29 +358,47 @@ class TestCommandsSyncFlow(unittest.TestCase):
             self.assertIn("wordlist:", buf.getvalue())
 
     def test_running_apps_check_for_push_delegates(self):
+        preview = MagicMock()
+        preview.prepared.ctx.settings = __import__(
+            "spell_sync.runtime_settings",
+            fromlist=["RuntimeSettings"],
+        ).RuntimeSettings.defaults()
         with (
             patch.object(commands.sys, "stdin") as stdin,
             patch.object(commands, "confirm_chrome_before_push", return_value=True) as chrome,
             patch.object(commands, "confirm_firefox_before_push", return_value=True) as firefox,
         ):
             stdin.isatty.return_value = True
-            self.assertTrue(commands._running_apps_check_for_push(DEFAULT_OPTS))
-            chrome.assert_called_once_with(interactive=True)
-            firefox.assert_called_once_with(interactive=True)
+            self.assertTrue(commands._running_apps_check_for_push(DEFAULT_OPTS, preview))
+            chrome.assert_called_once_with(interactive=True, settings=preview.prepared.ctx.settings)
+            firefox.assert_called_once_with(
+                interactive=True,
+                settings=preview.prepared.ctx.settings,
+            )
 
     def test_running_apps_check_for_push_yes_skips_prompt(self):
+        preview = MagicMock()
+        preview.prepared.ctx.settings = __import__(
+            "spell_sync.runtime_settings",
+            fromlist=["RuntimeSettings"],
+        ).RuntimeSettings.defaults()
         with (
             patch.object(commands.sys, "stdin") as stdin,
             patch.object(commands, "confirm_chrome_before_push", return_value=True) as chrome,
             patch.object(commands, "confirm_firefox_before_push", return_value=True) as firefox,
         ):
             stdin.isatty.return_value = True
-            self.assertTrue(commands._running_apps_check_for_push(CliOptions(yes=True)))
-            chrome.assert_called_once_with(interactive=False)
-            firefox.assert_called_once_with(interactive=False)
+            self.assertTrue(commands._running_apps_check_for_push(CliOptions(yes=True), preview))
+            chrome.assert_called_once_with(
+                interactive=False, settings=preview.prepared.ctx.settings
+            )
+            firefox.assert_called_once_with(
+                interactive=False,
+                settings=preview.prepared.ctx.settings,
+            )
 
     def test_status_unreadable_json(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
+        run = make_sync_run("/tmp/x", dictionaries=[])
         run.check_wordlist = lambda: ExitCode.WORDLIST_UNREADABLE  # type: ignore
         with patch_commands_service(load_status=status_snapshot_from_run(run)):
             buf = io.StringIO()
@@ -401,8 +422,8 @@ class TestCommandsSyncFlow(unittest.TestCase):
                 False,
                 quiet=True,
             )
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with patch_commands_service(load_status=status_snapshot_from_run(run)):

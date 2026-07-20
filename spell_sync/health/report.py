@@ -37,7 +37,6 @@ def build_doctor_report(run) -> DoctorReport:
 
     settings, settings_issues = load_user_settings_with_issues(
         wordlist=wordlist,
-        reload=True,
     )
     for issue in settings_issues:
         checks.append(DoctorCheck("warn", f"config: {issue}"))
@@ -109,7 +108,9 @@ def build_doctor_report(run) -> DoctorReport:
             ),
         )
 
-    if chrome_dictionaries_enabled() and is_chrome_running() is True:
+    settings = run.context.settings
+
+    if chrome_dictionaries_enabled(settings=settings) and is_chrome_running() is True:
         checks.append(
             DoctorCheck(
                 "warn",
@@ -118,7 +119,7 @@ def build_doctor_report(run) -> DoctorReport:
             ),
         )
 
-    if edge_dictionaries_enabled() and is_edge_running() is True:
+    if edge_dictionaries_enabled(settings=settings) and is_edge_running() is True:
         checks.append(
             DoctorCheck(
                 "warn",
@@ -126,7 +127,7 @@ def build_doctor_report(run) -> DoctorReport:
             ),
         )
 
-    if firefox_dictionaries_enabled() and is_firefox_running() is True:
+    if firefox_dictionaries_enabled(settings=settings) and is_firefox_running() is True:
         checks.append(
             DoctorCheck(
                 "warn",
@@ -134,7 +135,7 @@ def build_doctor_report(run) -> DoctorReport:
             ),
         )
 
-    if obsidian_dictionaries_enabled() and is_obsidian_running() is True:
+    if obsidian_dictionaries_enabled(settings=settings) and is_obsidian_running() is True:
         checks.append(
             DoctorCheck(
                 "warn",

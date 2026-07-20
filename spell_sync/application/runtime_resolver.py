@@ -2,17 +2,52 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from typing import Iterator
 
-from ..sync_run import SyncRun, sync_run_for
-from ..validated_runtime import ValidatedRuntime, build_validated_runtime
+from ..resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime, build_resolved_runtime
+from ..sync_run import SyncRun
+from .mutation_scope import mutation_scope_for
 from .project_resolution import resolve_project_wordlist
 from .requests import ProjectRef
+
+__all__ = [
+    "ProjectRuntimeMismatchError",
+    "ResolvedRuntime",
+    "RuntimeResolver",
+    "build_resolved_runtime",
+]
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimeResolver:
-    bound: ValidatedRuntime | None = None
+    bound: ResolvedRuntime | None = None
+
+    def _assert_bound_project(self, project: ProjectRef) -> None:
+        if self.bound is None:
+            return
+        self.bound.assert_wordlist(resolve_project_wordlist(project))
+
+    def resolve_read(
+        self,
+        project: ProjectRef,
+        *,
+        strict_push: bool = False,
+        validate_journal_wordlist: bool = False,
+    ) -> ResolvedRuntime:
+        if self.bound is not None:
+            self._assert_bound_project(project)
+            if strict_push != self.bound.context.strict_push:
+                ctx = replace(self.bound.context, strict_push=strict_push)
+                return replace(self.bound, context=ctx)
+            return self.bound
+        wordlist = resolve_project_wordlist(project)
+        return build_resolved_runtime(
+            wordlist,
+            strict_push=strict_push,
+            validate_journal_wordlist=validate_journal_wordlist,
+        )
 
     def validated(
         self,
@@ -20,20 +55,33 @@ class RuntimeResolver:
         *,
         strict_push: bool = False,
         validate_journal_wordlist: bool = False,
-    ) -> ValidatedRuntime:
-        if self.bound is not None:
-            return self.bound
-        wordlist = resolve_project_wordlist(project)
-        return build_validated_runtime(
-            wordlist,
+    ) -> ResolvedRuntime:
+        return self.resolve_read(
+            project,
             strict_push=strict_push,
             validate_journal_wordlist=validate_journal_wordlist,
         )
 
     def sync_run(self, project: ProjectRef, *, strict_push: bool = False) -> SyncRun:
-        if self.bound is not None:
-            ctx = self.bound.context
-            if strict_push != ctx.strict_push:
-                ctx = replace(ctx, strict_push=strict_push)
-            return SyncRun(context=ctx)
-        return sync_run_for(resolve_project_wordlist(project), strict_push=strict_push)
+        resolved = self.resolve_read(project, strict_push=strict_push)
+        return SyncRun(context=resolved.context)
+
+    @contextmanager
+    def mutation_scope(
+        self,
+        project: ProjectRef,
+        command: str,
+        *,
+        allow_unfinished_journal: bool = False,
+        strict_push: bool = False,
+        json_output: bool = False,
+    ) -> Iterator[ResolvedRuntime | int]:
+        wordlist = resolve_project_wordlist(project)
+        with mutation_scope_for(
+            wordlist,
+            command,
+            allow_unfinished_journal=allow_unfinished_journal,
+            strict_push=strict_push,
+            json_output=json_output,
+        ) as scope:
+            yield scope

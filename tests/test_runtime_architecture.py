@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Runtime architecture: settings cache, dictionary registry, sync context."""
+"""Runtime architecture: typed settings, dictionary registry, sync context."""
 
 from __future__ import annotations
 
+import ast
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,18 +14,24 @@ from unittest.mock import patch
 import spell_sync.settings as settings_mod
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.dictionary_registry import DictionarySource, discover_from_sources
+from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
+from spell_sync.resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from spell_sync.runtime_settings import RuntimeSettings
+from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
 from spell_sync.sync_run import SyncRun, sync_run_for
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SPELL_SYNC = _REPO_ROOT / "spell_sync"
+_COMMAND_MODULES = (
+    _SPELL_SYNC / "commands.py",
+    _SPELL_SYNC / "recover_cmd.py",
+    _SPELL_SYNC / "support_report_cmd.py",
+)
 
-class TestSettingsCache(unittest.TestCase):
-    def setUp(self) -> None:
-        settings_mod.clear_settings_cache()
 
-    def tearDown(self) -> None:
-        settings_mod.clear_settings_cache()
-
-    def test_load_user_settings_is_cached(self):
+class TestSettingsFreshLoad(unittest.TestCase):
+    def test_load_user_settings_reads_fresh_each_call(self):
         with tempfile.TemporaryDirectory() as d:
             project = Path(d) / "spell-sync.toml"
             project.write_text("[dictionaries]\nchrome = true\n", encoding="utf-8")
@@ -32,28 +40,15 @@ class TestSettingsCache(unittest.TestCase):
                 project.write_text("[dictionaries]\nchrome = false\n", encoding="utf-8")
                 second = settings_mod.load_user_settings()
             self.assertTrue(first["dictionaries"]["chrome"])
-            self.assertTrue(second["dictionaries"]["chrome"])
+            self.assertFalse(second["dictionaries"]["chrome"])
 
-    def test_reload_clears_cache(self):
-        with tempfile.TemporaryDirectory() as d:
-            project = Path(d) / "spell-sync.toml"
-            project.write_text("[dictionaries]\nchrome = true\n", encoding="utf-8")
-            with patch.object(settings_mod, "config_paths", return_value=[project]):
-                settings_mod.load_user_settings()
-                project.write_text("[dictionaries]\nchrome = false\n", encoding="utf-8")
-                reloaded = settings_mod.load_user_settings(reload=True)
-            self.assertFalse(reloaded["dictionaries"]["chrome"])
-
-    def test_clear_settings_cache(self):
-        with tempfile.TemporaryDirectory() as d:
-            project = Path(d) / "spell-sync.toml"
-            project.write_text("[dictionaries]\nchrome = true\n", encoding="utf-8")
-            with patch.object(settings_mod, "config_paths", return_value=[project]):
-                settings_mod.load_user_settings_with_issues()
-                settings_mod.clear_settings_cache()
-                project.write_text("[dictionaries]\nchrome = false\n", encoding="utf-8")
-                settings, _issues = settings_mod.load_user_settings_with_issues()
-            self.assertFalse(settings["dictionaries"]["chrome"])
+    def test_config_load_result_runtime_settings(self):
+        result = ConfigLoadResult(
+            ConfigStatus.VALID,
+            {"push": {"strict": True}},
+            (),
+        )
+        self.assertTrue(result.runtime_settings().push.strict)
 
 
 class TestDictionaryRegistry(unittest.TestCase):
@@ -85,6 +80,7 @@ class TestRuntimeContext(unittest.TestCase):
             ctx = RuntimeContext.build(
                 wordlist=wordlist,
                 dictionaries=dictionaries,
+                settings=RuntimeSettings.defaults(),
                 strict_push=True,
             )
             self.assertEqual(ctx.wordlist_file, wordlist)
@@ -93,7 +89,12 @@ class TestRuntimeContext(unittest.TestCase):
             self.assertEqual(ctx.dictionary_names(), ("a",))
 
     def test_sync_run_exposes_strict_push(self):
-        ctx = RuntimeContext.build(strict_push=True)
+        ctx = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+            strict_push=True,
+        )
         run = SyncRun(context=ctx)
         self.assertTrue(run.strict_push)
 
@@ -104,6 +105,7 @@ class TestRuntimeContext(unittest.TestCase):
             ctx = RuntimeContext.build(
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+                settings=RuntimeSettings.defaults(),
             )
             run = SyncRun(context=ctx)
             self.assertIs(run.context, ctx)
@@ -114,7 +116,69 @@ class TestRuntimeContext(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
             wordlist = f.name
         try:
-            run = sync_run_for(Path(wordlist))
+            with patch.object(
+                settings_mod,
+                "config_paths",
+                return_value=[Path("/nonexistent/spell-sync.toml")],
+            ):
+                run = sync_run_for(Path(wordlist))
             self.assertEqual(str(run.wordlist_file), wordlist)
         finally:
             Path(wordlist).unlink(missing_ok=True)
+
+    def test_build_resolved_runtime_is_explicit(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            resolved = build_resolved_runtime(wordlist)
+            self.assertIsInstance(resolved, ResolvedRuntime)
+            self.assertEqual(resolved.context.wordlist, wordlist)
+
+    def test_sync_run_for_with_validated_does_not_load_config(self):
+        ctx = RuntimeContext.build(
+            Path("/tmp/wordlist.txt"),
+            [],
+            settings=RuntimeSettings.defaults(),
+        )
+        validated = ResolvedRuntime(
+            ctx,
+            ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
+            JournalLoadResult(JournalLoadStatus.ABSENT, None),
+        )
+        with patch("spell_sync.sync_run.build_resolved_runtime") as build:
+            run = sync_run_for(Path("/tmp/wordlist.txt"), validated=validated)
+            build.assert_not_called()
+        self.assertIs(run.context, ctx)
+
+    def test_cli_command_modules_do_not_construct_runtime_resolver(self):
+        for path in _COMMAND_MODULES:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    func = node.func
+                    if isinstance(func, ast.Name) and func.id == "RuntimeResolver":
+                        self.fail(f"{path.name} must not construct RuntimeResolver()")
+                    if isinstance(func, ast.Call) and isinstance(func.func, ast.Name):
+                        if func.func.id == "RuntimeResolver":
+                            self.fail(f"{path.name} must not construct RuntimeResolver()")
+
+    def test_mutation_scope_module_always_acquires_lock(self):
+        from spell_sync.application import mutation_scope as mutation_scope_mod
+
+        source = inspect.getsource(mutation_scope_mod.mutation_scope_for)
+        self.assertNotIn("if bound is not None", source)
+        self.assertNotIn("yield bound", source)
+
+    def test_no_reload_parameter_in_load_config_result(self):
+        signature = inspect.signature(settings_mod.load_config_result)
+        self.assertNotIn("reload", signature.parameters)
+
+    def test_write_rendered_requires_explicit_settings(self):
+        from spell_sync.push_prepared import write_rendered
+
+        signature = inspect.signature(write_rendered)
+        self.assertIn("settings", signature.parameters)
+        self.assertEqual(
+            signature.parameters["settings"].kind,
+            inspect.Parameter.KEYWORD_ONLY,
+        )

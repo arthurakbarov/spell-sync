@@ -20,8 +20,12 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.skip_reasons import PushSkipReason
-from spell_sync.sync_run import PushResult, SyncRun
+from spell_sync.sync_run import PushResult
+from tests.runtime_helpers import make_sync_run
+
+_SETTINGS = RuntimeSettings.defaults()
 
 
 class TestRunningAppGuard(unittest.TestCase):
@@ -54,7 +58,10 @@ class TestRunningAppGuard(unittest.TestCase):
     def test_running_app_skip_names_chrome_profile(self):
         with ExitStack() as stack:
             self._enter_chrome_running(stack)
-            skipped = guard.running_app_skip_names(["chrome:Default", "editor:vscode"])
+            skipped = guard.running_app_skip_names(
+                ["chrome:Default", "editor:vscode"],
+                settings=_SETTINGS,
+            )
         self.assertEqual(skipped, frozenset({"chrome:Default"}))
 
     def test_running_app_skip_empty_when_app_not_running(self):
@@ -62,7 +69,7 @@ class TestRunningAppGuard(unittest.TestCase):
             patch("spell_sync.app_process_check.is_chrome_running", return_value=False),
             patch("spell_sync.app_process_check.chrome_dictionaries_enabled", return_value=True),
         ):
-            skipped = guard.running_app_skip_names(["chrome:Default"])
+            skipped = guard.running_app_skip_names(["chrome:Default"], settings=_SETTINGS)
         self.assertEqual(skipped, frozenset())
 
     def test_push_skip_running_only_when_yes(self):
@@ -77,7 +84,7 @@ class TestRunningAppGuard(unittest.TestCase):
                 Dictionary("chrome:Default", chrome_path, DictionaryFormat.TEXT),
                 Dictionary("editor:vscode", other_path, DictionaryFormat.TEXT),
             ]
-            run = SyncRun(wordlist=wordlist, dictionaries=dictionaries)
+            run = make_sync_run(wordlist, dictionaries=dictionaries)
             with ExitStack() as stack:
                 self._enter_chrome_running(stack)
                 stdin = stack.enter_context(patch.object(commands.sys, "stdin"))
@@ -97,8 +104,8 @@ class TestRunningAppGuard(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(chrome_path, ["stale"], "utf-8", False, quiet=True)
             write_text_words(other_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("chrome:Default", chrome_path, DictionaryFormat.TEXT),
                     Dictionary("editor:vscode", other_path, DictionaryFormat.TEXT),
@@ -124,8 +131,8 @@ class TestRunningAppGuard(unittest.TestCase):
             chrome_path = os.path.join(d, "chrome.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(chrome_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[
                     Dictionary("chrome:Default", chrome_path, DictionaryFormat.TEXT),
                 ],
@@ -160,7 +167,7 @@ class TestRunningAppGuard(unittest.TestCase):
                 return_value=False,
             ),
         ):
-            skipped = guard.running_app_skip_names(["chrome:Default"])
+            skipped = guard.running_app_skip_names(["chrome:Default"], settings=_SETTINGS)
             self.assertEqual(skipped, frozenset({"chrome:Default"}))
 
     def test_obsidian_name_match_exact(self):
@@ -182,7 +189,10 @@ class TestRunningAppGuard(unittest.TestCase):
                 return_value=False,
             ),
         ):
-            skipped = guard.running_app_skip_names(["obsidian", "obsidian-extra"])
+            skipped = guard.running_app_skip_names(
+                ["obsidian", "obsidian-extra"],
+                settings=_SETTINGS,
+            )
         self.assertEqual(skipped, frozenset({"obsidian"}))
 
 

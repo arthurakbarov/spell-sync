@@ -6,7 +6,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .config import neovim_mkspell_after_push
 from .log import log
+from .runtime_settings import RuntimeSettings
 from .subprocess_utils import trim_subprocess_text
 
 
@@ -59,11 +61,13 @@ def run_mkspell_for_add_file(add_path: Path) -> bool:
     return True
 
 
-def mkspell_after_neovim_writes(written_names: tuple[str, ...]) -> None:
+def mkspell_after_neovim_writes(
+    written_names: tuple[str, ...],
+    *,
+    settings: RuntimeSettings,
+) -> None:
     """Run mkspell for each written Neovim dictionary when configured."""
-    from .config import neovim_mkspell_after_push
-
-    if not neovim_mkspell_after_push():
+    if not neovim_mkspell_after_push(settings=settings):
         return
     for name in written_names:
         if not name.startswith("nvim-"):

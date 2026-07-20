@@ -22,7 +22,10 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from tests.runtime_helpers import make_sync_run
+
+_SETTINGS = RuntimeSettings.defaults()
 
 
 class TestChromeCheck(unittest.TestCase):
@@ -30,7 +33,7 @@ class TestChromeCheck(unittest.TestCase):
         import spell_sync.app_process_check as guard
 
         with patch.object(guard, "chrome_dictionaries_enabled", return_value=False):
-            self.assertTrue(guard.confirm_chrome_before_push(interactive=True))
+            self.assertTrue(guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS))
 
     def test_skips_when_chrome_not_running(self):
         import spell_sync.app_process_check as guard
@@ -39,7 +42,7 @@ class TestChromeCheck(unittest.TestCase):
             patch.object(guard, "chrome_dictionaries_enabled", return_value=True),
             patch.object(guard, "is_chrome_running", return_value=False),
         ):
-            self.assertTrue(guard.confirm_chrome_before_push(interactive=True))
+            self.assertTrue(guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS))
 
     def test_non_interactive_warns_and_proceeds(self):
         import spell_sync.app_process_check as guard
@@ -50,7 +53,9 @@ class TestChromeCheck(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(guard.confirm_chrome_before_push(interactive=False))
+                self.assertTrue(
+                    guard.confirm_chrome_before_push(interactive=False, settings=_SETTINGS)
+                )
             self.assertIn("Chrome is running", buf.getvalue())
 
     def test_interactive_cancel(self):
@@ -61,7 +66,7 @@ class TestChromeCheck(unittest.TestCase):
             patch.object(guard, "is_chrome_running", return_value=True),
             patch("builtins.input", return_value="n"),
         ):
-            self.assertFalse(guard.confirm_chrome_before_push(interactive=True))
+            self.assertFalse(guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS))
 
     def test_unknown_chrome_state_warns(self):
         import spell_sync.app_process_check as guard
@@ -72,7 +77,9 @@ class TestChromeCheck(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(guard.confirm_chrome_before_push(interactive=False))
+                self.assertTrue(
+                    guard.confirm_chrome_before_push(interactive=False, settings=_SETTINGS)
+                )
             self.assertIn("Could not check", buf.getvalue())
 
     def test_pgrep_error_returns_unknown(self):
@@ -103,7 +110,7 @@ class TestChromeCheck(unittest.TestCase):
             patch("spell_sync.config.enable_chrome", return_value=True),
             patch.object(guard, "chrome_dict_paths", return_value=[]),
         ):
-            self.assertFalse(guard.chrome_dictionaries_enabled())
+            self.assertFalse(guard.chrome_dictionaries_enabled(settings=_SETTINGS))
 
     def test_interactive_yes(self):
         import spell_sync.app_process_check as guard
@@ -113,7 +120,7 @@ class TestChromeCheck(unittest.TestCase):
             patch.object(guard, "is_chrome_running", return_value=True),
             patch("builtins.input", return_value="y"),
         ):
-            self.assertTrue(guard.confirm_chrome_before_push(interactive=True))
+            self.assertTrue(guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS))
 
     def test_interactive_eof_returns_none(self):
         import spell_sync.app_process_check as guard
@@ -125,7 +132,9 @@ class TestChromeCheck(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertIsNone(guard.confirm_chrome_before_push(interactive=True))
+                self.assertIsNone(
+                    guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS)
+                )
             self.assertIn("Cancelled", buf.getvalue())
 
     def test_interactive_keyboard_interrupt_returns_none(self):
@@ -137,7 +146,7 @@ class TestChromeCheck(unittest.TestCase):
             patch("builtins.input", side_effect=KeyboardInterrupt),
         ):
             self.assertIsNone(
-                guard.confirm_chrome_before_push(interactive=True),
+                guard.confirm_chrome_before_push(interactive=True, settings=_SETTINGS),
             )
 
     def test_is_chrome_running_windows(self):
@@ -327,9 +336,8 @@ class TestPushChromeGuard(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             with patch_isolated_push(run):
                 with redirect_stdout(io.StringIO()):
@@ -352,9 +360,8 @@ class TestPushChromeGuard(unittest.TestCase):
                 dict_path = os.path.join(d, "a.txt")
                 write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
                 write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-                run = SyncRun(
-                    wordlist=wordlist,
-                    dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+                run = make_sync_run(
+                    wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
                 )
                 with patch_isolated_push(run):
                     with patch.object(commands.sys, "stdin") as stdin:
@@ -373,9 +380,8 @@ class TestChromeGuard(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             open(wordlist, "w", encoding="utf-8").close()
             write_text_words(dict_path, ["beta"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             snapshot = status_snapshot_from_run(run)
             with patch_commands_service(load_status=snapshot):
@@ -410,9 +416,8 @@ class TestChromeGuard(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            run = make_sync_run(
+                wordlist, dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)]
             )
             with (
                 patch_isolated_push(run),
@@ -432,7 +437,7 @@ class TestEdgeProcessCheck(unittest.TestCase):
         import spell_sync.app_process_check as guard
 
         with patch.object(guard, "edge_dictionaries_enabled", return_value=False):
-            self.assertTrue(guard.confirm_edge_before_push(interactive=True))
+            self.assertTrue(guard.confirm_edge_before_push(interactive=True, settings=_SETTINGS))
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ from spell_sync.io import (
 )
 from spell_sync.lint import analyze_words
 from spell_sync.paths import editor_dict_paths
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.words import (
     has_cyrillic,
     has_latin,
@@ -193,7 +194,7 @@ class TestLinuxPaths(unittest.TestCase):
             patch.object(dict_mod, "is_macos", return_value=False),
             patch("spell_sync.config.enable_chrome", return_value=False),
         ):
-            names = [s.name for s in dict_mod.discover_dictionaries()]
+            names = [s.name for s in dict_mod.discover_dictionaries(RuntimeSettings.defaults())]
             self.assertNotIn("macos", names)
             self.assertNotIn("macos-applespell", names)
 
@@ -213,7 +214,7 @@ class TestDictionaryDiscoverPlatforms(unittest.TestCase):
                 return_value=[("macos", Path("/tmp/macos"))],
             ),
         ):
-            names = [d.name for d in dict_mod.discover_dictionaries()]
+            names = [d.name for d in dict_mod.discover_dictionaries(RuntimeSettings.defaults())]
             self.assertIn("macos", names)
             self.assertIn("sublime", names)
         with (
@@ -223,7 +224,7 @@ class TestDictionaryDiscoverPlatforms(unittest.TestCase):
             patch.object(dict_mod, "enable_editors", return_value=False),
             patch.object(dict_mod, "app_support_dir", return_value=Path("/appdata")),
         ):
-            names = [d.name for d in dict_mod.discover_dictionaries()]
+            names = [d.name for d in dict_mod.discover_dictionaries(RuntimeSettings.defaults())]
             self.assertIn("win-ru", names)
             self.assertIn("win-en", names)
             self.assertIn("win-en-gb", names)

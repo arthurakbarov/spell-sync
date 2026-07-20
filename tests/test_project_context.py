@@ -10,14 +10,17 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+from spell_sync.application.requests import ProjectRef
+from spell_sync.application.runtime_resolver import RuntimeResolver
 from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
 from spell_sync.config_check_cmd import cmd_config_check
 from spell_sync.project import ProjectContext
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
+from spell_sync.resolved_runtime import ResolvedRuntime
+from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
-from spell_sync.sync_context import RuntimeContext, runtime_context_for
-from spell_sync.validated_runtime import ValidatedRuntime
+from spell_sync.sync_context import RuntimeContext
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -48,14 +51,21 @@ def test_project_context_uses_resolved_wordlist_parent(tmp_path: Path) -> None:
     assert context.config_paths[-1] == context.project_dir / "spell-sync.toml"
 
 
-def test_runtime_context_reuses_validated_context(tmp_path: Path) -> None:
-    context = RuntimeContext.build(tmp_path / "wordlist.txt", dictionaries=[])
-    validated = ValidatedRuntime(
+def test_runtime_resolver_bound_reuses_context(tmp_path: Path) -> None:
+    wordlist = tmp_path / "wordlist.txt"
+    context = RuntimeContext.build(
+        wordlist,
+        [],
+        settings=RuntimeSettings.defaults(),
+    )
+    validated = ResolvedRuntime(
         context,
         ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
         JournalLoadResult(JournalLoadStatus.ABSENT, None),
     )
-    assert runtime_context_for(tmp_path / "wordlist.txt", validated=validated) is context
+    resolver = RuntimeResolver(bound=validated)
+    resolved = resolver.resolve_read(ProjectRef(wordlist=wordlist))
+    assert resolved.context is context
 
 
 def test_human_config_check_lists_explicit_project_config(tmp_path: Path) -> None:

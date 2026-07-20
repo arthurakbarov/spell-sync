@@ -12,7 +12,6 @@ from spell_sync.application.reports import OperationOutcome
 from spell_sync.application.requests import ProjectRef, PullRequest
 from spell_sync.application.service import SpellSyncService
 from spell_sync.cli_options import CliOptions
-from spell_sync.command_helpers import mutating_command_scope
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.operation_lock import OperationLocked, OperationLockInfo, lock_path_for_wordlist
@@ -21,6 +20,7 @@ from spell_sync.push_journal import (
 )
 from spell_sync.sync_run import SyncRun
 from tests.journal_test_utils import write_test_journal
+from tests.runtime_helpers import make_sync_run
 
 
 class TestPullSafety(unittest.TestCase):
@@ -31,8 +31,8 @@ class TestPullSafety(unittest.TestCase):
         wordlist.write_text("alpha\nbeta\n", encoding="utf-8")
         dictionary.write_text("alpha\nbeta\ngamma\n", encoding="utf-8")
         (root / "spell-sync.toml").write_text("[dictionaries]\neditors = false\n", encoding="utf-8")
-        run = SyncRun(
-            wordlist=wordlist,
+        run = make_sync_run(
+            wordlist,
             dictionaries=[Dictionary("custom", str(dictionary), DictionaryFormat.TEXT)],
         )
         opts = CliOptions(wordlist=str(wordlist))
@@ -46,7 +46,7 @@ class TestPullSafety(unittest.TestCase):
             info = OperationLockInfo(99, "2026-01-01T00:00:00+00:00", "push", str(wordlist))
             lock_path = lock_path_for_wordlist(wordlist)
             with patch(
-                "spell_sync.command_helpers.acquire_operation_lock",
+                "spell_sync.mutation_guards.acquire_operation_lock",
                 side_effect=OperationLocked(info, lock_path),
             ):
                 execution = SpellSyncService().execute_pull(
@@ -161,22 +161,12 @@ class TestPullSafety(unittest.TestCase):
                 "execute_prepared_pull",
                 return_value=expected,
             ) as execute:
-                with mutating_command_scope(opts, "pull") as scope:
-                    self.assertNotIsInstance(scope, int)
-                    cli_run = SyncRun(context=scope.context)
-                    cli_result = cli_run.execute_prepared_pull(
-                        merged_words=preview.merged_words,
-                        before_count=preview.before_count,
-                        after_count=preview.after_count,
-                        wordlist_fingerprint=preview.wordlist_fingerprint,
-                    )
                 service_result = SpellSyncService().execute_pull(
                     request,
                     preview,
                     confirmed_plan_id=preview.plan_identifier,
                 )
-            self.assertEqual(execute.call_count, 2)
-            self.assertEqual(cli_result, expected)
+            execute.assert_called_once()
             self.assertEqual(service_result.outcome, OperationOutcome.COMPLETED)
 
     def test_pull_into_wordlist_delegates_to_execute_prepared_pull(self):

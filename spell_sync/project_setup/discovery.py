@@ -8,6 +8,7 @@ from pathlib import Path
 from ..dictionaries import Dictionary, discover_dictionaries
 from ..paths import is_macos, is_windows
 from ..read_outcome import ReadStatus, dictionary_read_result
+from ..runtime_settings import RuntimeSettings
 from .draft import ProjectConfigDraft, SafetyConfig
 
 _CONFIG_TARGET_IDS = frozenset(
@@ -160,7 +161,7 @@ def discover_setup_targets(
     enabled_targets: frozenset[str] | None = None,
 ) -> SetupTargetDiscovery:
     config = _default_discovery_config(selected_targets or ())
-    dictionaries = discover_dictionaries(config)
+    dictionaries = discover_dictionaries(RuntimeSettings.from_config_dict(config))
     grouped: dict[str, list[Dictionary]] = {}
     for dictionary in dictionaries:
         grouped.setdefault(_family_id(dictionary), []).append(dictionary)

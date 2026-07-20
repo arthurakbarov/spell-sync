@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from conftest import DEFAULT_OPTS
 from service_test_utils import patch_isolated_push
@@ -23,7 +23,10 @@ import spell_sync.paths as paths_mod
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import SyncRun
+from spell_sync.runtime_settings import RuntimeSettings
+from tests.runtime_helpers import make_sync_run
+
+_SETTINGS = RuntimeSettings.defaults()
 
 
 class TestHunspellIo(unittest.TestCase):
@@ -130,8 +133,8 @@ class TestHunspellIo(unittest.TestCase):
             write_text_words(str(wordlist), ["alpha"], "utf-8", False, quiet=True)
             good.write_text("beta\n", encoding="utf-8")
             corrupt.write_bytes(b"\xff\xfe\xfd")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[
                     Dictionary(
                         "hunspell:good",
@@ -172,8 +175,8 @@ class TestHunspellIo(unittest.TestCase):
             write_text_words(str(wordlist), ["alpha"], "utf-8", False, quiet=True)
             good.write_text("local\n", encoding="utf-8")
             corrupt.write_bytes(b"\xff\xfe\xfd")
-            run = SyncRun(
-                wordlist=str(wordlist),
+            run = make_sync_run(
+                str(wordlist),
                 dictionaries=[
                     Dictionary(
                         "hunspell:good",
@@ -276,7 +279,9 @@ class TestHunspellPaths(unittest.TestCase):
                         ):
                             found = [
                                 item.name
-                                for item in dict_mod.discover_dictionaries()
+                                for item in dict_mod.discover_dictionaries(
+                                    RuntimeSettings.defaults()
+                                )
                                 if item.name.startswith("hunspell:")
                             ]
             self.assertEqual(found, ["hunspell:default"])
@@ -323,7 +328,9 @@ class TestObsidianPaths(unittest.TestCase):
                         ):
                             found = [
                                 item.name
-                                for item in dict_mod.discover_dictionaries()
+                                for item in dict_mod.discover_dictionaries(
+                                    RuntimeSettings.defaults()
+                                )
                                 if item.name == "obsidian"
                             ]
             self.assertEqual(found, ["obsidian"])
@@ -350,7 +357,9 @@ class TestObsidianIo(unittest.TestCase):
 class TestObsidianCheck(unittest.TestCase):
     def test_skips_when_obsidian_disabled(self):
         with patch.object(obsidian_guard, "obsidian_dictionaries_enabled", return_value=False):
-            self.assertTrue(obsidian_guard.confirm_obsidian_before_push(interactive=True))
+            self.assertTrue(
+                obsidian_guard.confirm_obsidian_before_push(interactive=True, settings=_SETTINGS),
+            )
 
     def test_non_interactive_warns_when_running(self):
         with (
@@ -359,16 +368,22 @@ class TestObsidianCheck(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(obsidian_guard.confirm_obsidian_before_push(interactive=False))
+                self.assertTrue(
+                    obsidian_guard.confirm_obsidian_before_push(
+                        interactive=False, settings=_SETTINGS
+                    ),
+                )
             self.assertIn("Obsidian is running", buf.getvalue())
 
     def test_push_check_runs_obsidian_guard(self):
+        preview = MagicMock()
+        preview.prepared.ctx.settings = _SETTINGS
         with (
             patch.object(commands, "confirm_chrome_before_push", return_value=True),
             patch.object(commands, "confirm_firefox_before_push", return_value=True),
             patch.object(commands, "confirm_obsidian_before_push", return_value=False),
         ):
-            self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS))
+            self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS, preview))
 
     def test_is_obsidian_running_macos(self):
         fake = type("R", (), {"returncode": 0})()
@@ -382,10 +397,9 @@ class TestObsidianCheck(unittest.TestCase):
 
     def test_obsidian_dictionaries_disabled_without_paths(self):
         with (
-            patch("spell_sync.config.enable_obsidian", return_value=True),
             patch.object(obsidian_guard, "obsidian_dict_paths", return_value=[]),
         ):
-            self.assertFalse(obsidian_guard.obsidian_dictionaries_enabled())
+            self.assertFalse(obsidian_guard.obsidian_dictionaries_enabled(settings=_SETTINGS))
 
     def test_interactive_cancel(self):
         with (
@@ -393,7 +407,9 @@ class TestObsidianCheck(unittest.TestCase):
             patch.object(obsidian_guard, "is_obsidian_running", return_value=True),
             patch("builtins.input", return_value="n"),
         ):
-            self.assertFalse(obsidian_guard.confirm_obsidian_before_push(interactive=True))
+            self.assertFalse(
+                obsidian_guard.confirm_obsidian_before_push(interactive=True, settings=_SETTINGS),
+            )
 
     def test_unknown_state_non_interactive(self):
         with (
@@ -402,7 +418,11 @@ class TestObsidianCheck(unittest.TestCase):
         ):
             buf = io.StringIO()
             with redirect_stdout(buf):
-                self.assertTrue(obsidian_guard.confirm_obsidian_before_push(interactive=False))
+                self.assertTrue(
+                    obsidian_guard.confirm_obsidian_before_push(
+                        interactive=False, settings=_SETTINGS
+                    ),
+                )
             self.assertIn("Could not check", buf.getvalue())
 
     def test_is_obsidian_running_linux(self):
@@ -459,7 +479,7 @@ class TestPullPushIntegration(unittest.TestCase):
                 str(dic),
                 DictionaryFormat.HUNSPELL,
             )
-            run = SyncRun(wordlist=str(wordlist), dictionaries=[dictionary])
+            run = make_sync_run(str(wordlist), dictionaries=[dictionary])
             before, after = run.pull_into_wordlist()
             self.assertEqual((before, after), (0, 1))
             write_text_words(str(wordlist), ["alpha", "local"], "utf-8", False, quiet=True)

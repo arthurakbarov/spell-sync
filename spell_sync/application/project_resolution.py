@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..config import push_strict_enabled
 from ..paths import resolve_wordlist_path
-from ..settings import push_flag
-from ..sync_context import RuntimeConfig
+from ..runtime_settings import RuntimeSettings
 from .requests import ProjectRef, PushRequest
 
 
@@ -21,11 +19,11 @@ def resolve_project_wordlist(project: ProjectRef) -> Path:
 def effective_push_strict(
     request: PushRequest,
     *,
-    config: RuntimeConfig | None = None,
+    settings: RuntimeSettings | None = None,
 ) -> bool:
-    """Resolve Push strict mode from request override or explicit runtime config."""
+    """Resolve Push strict mode from request override or explicit runtime settings."""
     if request.strict_override is not None:
         return request.strict_override
-    if config is not None:
-        return push_flag("strict", False, settings=config)
-    return push_strict_enabled()
+    if settings is not None:
+        return settings.push.strict
+    raise ValueError("explicit runtime settings required for push strict mode")

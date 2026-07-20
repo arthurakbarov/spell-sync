@@ -78,7 +78,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
         self.assertEqual(blocked.outcome, RecoveryOutcome.FAILED)
 
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
             scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
             scope.return_value.__exit__.return_value = False
@@ -101,7 +101,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             )
             scope = _recovery_scope(wordlist, journal=journal)
             with patch(
-                "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+                "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
             ) as mutating:
                 mutating.return_value.__enter__.return_value = scope
                 mutating.return_value.__exit__.return_value = False
@@ -132,7 +132,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
         )
         scope = _recovery_scope(Path("/tmp/w.txt"), journal=journal)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -171,7 +171,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
         )
         scope = _recovery_scope(Path("/tmp/w.txt"), journal=journal)
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
@@ -225,7 +225,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
                 journal=MagicMock(),
             )
             with patch(
-                "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+                "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
             ) as mutating:
                 mutating.return_value.__enter__.return_value = scope
                 mutating.return_value.__exit__.return_value = False
@@ -245,7 +245,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             can_recover=False,
         )
         with patch(
-            "spell_sync.application.service.command_helpers.mutating_command_scope_for"
+            "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
             mutating.return_value.__enter__.return_value = _recovery_scope(Path("/tmp/w.txt"))
             mutating.return_value.__exit__.return_value = False

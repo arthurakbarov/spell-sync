@@ -26,7 +26,6 @@ from spell_sync.application.support_report import (
     RecoverySupportState,
     SupportNotice,
     SupportReport,
-    build_support_report,
     default_support_report_path,
     export_support_report,
     format_support_report_text,
@@ -108,14 +107,10 @@ def test_support_report_notices_and_text(tmp_path: Path, monkeypatch: pytest.Mon
         state_paths=resolve_app_state_paths(state_root=tmp_path / "state"),
         enable_file_logging=False,
     )
-    with patch(
-        "spell_sync.application.support_report.sync_run_for",
-        side_effect=RuntimeError("boom"),
-    ):
-        report = build_support_report(
-            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
-        )
-    assert report.project.wordlist_count is None
+    report = service.load_support_report(
+        SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
+    )
+    assert report.project.wordlist_count == 1
     text = format_support_report_text(report)
     assert "Notices" in text or "Invalid configuration" in text
 
@@ -142,8 +137,8 @@ def test_support_report_corrupt_target_reason(
         "spell_sync.application.support_report.load_target_settings_snapshot",
         return_value=MagicMock(targets=(corrupt,)),
     ):
-        report = build_support_report(
-            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        report = service.load_support_report(
+            SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
         )
     assert any(item.reason_code == "target_corrupt" for item in report.targets)
 
@@ -267,13 +262,13 @@ def test_support_report_unreadable_and_pending(
         "spell_sync.application.support_report.load_target_settings_snapshot",
         return_value=MagicMock(targets=(unreadable,)),
     ):
-        report = build_support_report(
-            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        report = service.load_support_report(
+            SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
         )
     assert any(item.reason_code == "target_unreadable" for item in report.targets)
     with (
         patch(
-            "spell_sync.application.support_report.load_journal_result",
+            "spell_sync.resolved_runtime.load_journal_result",
             return_value=MagicMock(
                 status=__import__(
                     "spell_sync.push_journal", fromlist=["JournalLoadStatus"]
@@ -285,8 +280,8 @@ def test_support_report_unreadable_and_pending(
             return_value=MagicMock(targets=()),
         ),
     ):
-        pending = build_support_report(
-            service, SupportReportRequest(project=ProjectRef(wordlist=wordlist))
+        pending = service.load_support_report(
+            SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
         )
     assert pending.recovery.pending_recovery is True
 
@@ -298,7 +293,7 @@ def test_support_report_cmd_existing_output(
     output = tmp_path / "exists.json"
     output.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
-        "spell_sync.support_report_cmd.build_support_report",
+        "spell_sync.application.support_report.build_support_report",
         lambda *_a, **_k: MagicMock(),
     )
     monkeypatch.setattr(
@@ -425,7 +420,7 @@ def test_session_export_text_and_recovery() -> None:
 
 def test_support_report_cmd_json_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "spell_sync.support_report_cmd.build_support_report",
+        "spell_sync.application.support_report.build_support_report",
         lambda *_a, **_k: MagicMock(
             spell_sync_version="0.2.1",
             generated_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),

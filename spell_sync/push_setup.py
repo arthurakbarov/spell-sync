@@ -210,12 +210,12 @@ def destructive_push_would_block(
     plan: PushPlan | None = None,
 ) -> bool:
     wordlist_count = len(words)
-    if wordlist_count > push_guard_wordlist_max():
+    if wordlist_count > push_guard_wordlist_max(settings=ctx.settings):
         return False
     max_local = (
         max_local_word_count(plan) if plan is not None else max_local_dictionary_count(ctx, words)
     )
-    return max_local > push_guard_local_min() and wordlist_count < max_local
+    return max_local > push_guard_local_min(settings=ctx.settings) and wordlist_count < max_local
 
 
 def max_local_dictionary_count(ctx: RuntimeContext, words: WordSet | None = None) -> int:

@@ -12,8 +12,8 @@ from spell_sync.application.reports import OperationOutcome, PullExecution, Push
 from spell_sync.cli import _build_parser
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.sync_models import PushResult
-from spell_sync.sync_run import SyncRun
 from spell_sync.words import subset_english, subset_russian
+from tests.runtime_helpers import make_sync_run
 from tests.tui.fake_service import sample_preview, sample_pull_preview
 
 USER_FACING_FILES = (
@@ -94,8 +94,8 @@ class TestUserFacingDictionaryScope(unittest.TestCase):
             custom = root / "custom.txt"
             wordlist.write_text("PersonalTerm\n", encoding="utf-8")
             custom.write_text("Other\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("custom", str(custom), DictionaryFormat.TEXT)],
             )
             result = run.push_from_wordlist()
@@ -111,8 +111,8 @@ class TestUserFacingDictionaryScope(unittest.TestCase):
             # Simulates a word the app may already know via built-in dictionary (fixture only).
             wordlist.write_text("RedundantExample\n", encoding="utf-8")
             custom.write_text("", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
+            run = make_sync_run(
+                wordlist,
                 dictionaries=[Dictionary("custom", str(custom), DictionaryFormat.TEXT)],
             )
             prepared = run.prepare_push_operation()
