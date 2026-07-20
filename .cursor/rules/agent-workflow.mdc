@@ -13,7 +13,9 @@ alwaysApply: true
 6. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.
 7. Update tests, docs, contracts, and ADRs together with code changes.
 8. Do not claim pass without command evidence.
-9. Do not advance to the next phase without owner approval (`advance-current-phase`).
-10. Do not push, tag, release, or publish without explicit owner request.
+9. Capture baseline Git state for all three workspace repositories at task start.
+10. After modifying tasks, finalize the owner-controlled workspace snapshot before the final report.
+11. Do not advance to the next phase without owner approval (`advance-current-phase`).
+12. Do not push, tag, release, or publish without explicit owner request.
 
 SSOT: `@docs/AGENT_DEVELOPMENT.md`

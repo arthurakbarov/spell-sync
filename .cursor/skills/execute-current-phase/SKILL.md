@@ -113,3 +113,12 @@ If the status update requires a docs-only follow-up, commit it locally and rerun
 ## Step 11 — report and stop
 
 Return the final report contract from `docs/AGENT_DEVELOPMENT.md`. Stop. Do not start the next phase.
+
+## Finalize workspace snapshot
+
+When this task changed workspace state in any repository:
+
+1. Compare final Git metadata to the baseline captured at task start.
+2. Follow skill `create-code-snapshot` in the private maintainer repository (`spell-sync-dev`).
+3. Do not finish the success report until `$HOME/code.zip` is validated when recreation was required.
+4. Include the **Workspace snapshot** section in the final report.

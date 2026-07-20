@@ -42,3 +42,12 @@ description: Mark an explicitly approved phase complete and make the next planne
 - Exactly one `current` field
 - `current` must not point to `complete`
 - At most one `in-progress` and one `awaiting-approval` across all phases
+
+## Finalize workspace snapshot
+
+When this task changed workspace state in any repository:
+
+1. Compare final Git metadata to the baseline captured at task start.
+2. Follow skill `create-code-snapshot` in the private maintainer repository (`spell-sync-dev`).
+3. Do not finish the success report until `$HOME/code.zip` is validated when recreation was required.
+4. Include the **Workspace snapshot** section in the final report.

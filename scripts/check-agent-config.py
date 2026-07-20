@@ -75,12 +75,31 @@ REQUIRED_SKILLS = (
 
 BANNED_WORKFLOW_TERMS = [
     (re.compile(r"\breview\s+zip\b", re.I), "review ZIP"),
-    (re.compile(r"\bcode\.zip\b", re.I), "code.zip handoff"),
     (re.compile(r"\bUPLOAD_THIS_FILE\b"), "UPLOAD_THIS_FILE"),
     (re.compile(r"\bupload handoff\b", re.I), "upload handoff"),
     (re.compile(r"\bexternal reviewer\b", re.I), "external reviewer"),
     (re.compile(r"\barchive handoff\b", re.I), "archive handoff"),
 ]
+
+MODIFYING_SKILLS = (
+    "execute-current-phase",
+    "apply-phase-fixes",
+    "advance-current-phase",
+    "architecture-refactor",
+    "release-candidate",
+    "spell-sync-ci",
+)
+
+SNAPSHOT_FINALIZATION_MARKER = "Finalize workspace snapshot"
+
+TIMESTAMPED_ARCHIVE_PATTERN = re.compile(
+    r"code[-_]\d{4}[-_]\d{2}[-_]\d{2}|code-\d+\.zip",
+    re.I,
+)
+
+OWNER_SNAPSHOT_FORBIDDEN_IN_PUBLIC = re.compile(
+    r"create-code-snapshot\.py|OWNER_WORKSPACE_SNAPSHOT",
+)
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
@@ -220,6 +239,29 @@ def scan_banned_workflow_terms(text: str) -> list[str]:
     return hits
 
 
+def scan_timestamped_archive_names(text: str) -> list[str]:
+    if TIMESTAMPED_ARCHIVE_PATTERN.search(text):
+        return ["timestamped owner archive name"]
+    return []
+
+
+def check_snapshot_tooling_absent_from_public_package(root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel in git_ls_files(root):
+        if OWNER_SNAPSHOT_FORBIDDEN_IN_PUBLIC.search(rel):
+            errors.append(f"snapshot tooling must not ship in public package: {rel}")
+    wheel_paths = [root / "spell_sync", root / "scripts"]
+    for base in wheel_paths:
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if path.is_file() and "create-code-snapshot" in path.name:
+                errors.append(
+                    f"snapshot script must not live in public package tree: {path.relative_to(root)}"
+                )
+    return errors
+
+
 def validate_agent_config(root: Path) -> list[str]:
     errors: list[str] = []
     cursor = root / ".cursor"
@@ -237,6 +279,7 @@ def validate_agent_config(root: Path) -> list[str]:
 
     expected_cli = _expected_commands(cli_file)
     errors.extend(check_tracked_forbidden_files(root))
+    errors.extend(check_snapshot_tooling_absent_from_public_package(root))
 
     if not rules.is_dir():
         errors.append("missing .cursor/rules/")
@@ -259,6 +302,8 @@ def validate_agent_config(root: Path) -> list[str]:
                 errors.append(f"{rel}: contains {label}")
             for label in scan_banned_workflow_terms(text):
                 errors.append(f"{rel}: contains banned workflow term ({label})")
+            for label in scan_timestamped_archive_names(text):
+                errors.append(f"{rel}: contains {label}")
             for _ in scan_private_paths(text):
                 errors.append(f"{rel}: contains private path or topology reference")
 
@@ -295,6 +340,8 @@ def validate_agent_config(root: Path) -> list[str]:
                 errors.append(f"{rel}: contains {label}")
             for label in scan_banned_workflow_terms(text):
                 errors.append(f"{rel}: contains banned workflow term ({label})")
+            for label in scan_timestamped_archive_names(text):
+                errors.append(f"{rel}: contains {label}")
             for _ in scan_private_paths(text):
                 errors.append(f"{rel}: contains private path or topology reference")
             if PUBLISH_PATTERN.search(text) and not GUARD_PATTERN.search(text):
@@ -303,6 +350,17 @@ def validate_agent_config(root: Path) -> list[str]:
                 errors.append(f"{rel}: missing 'When to use' section")
             if "Do not use" not in text:
                 errors.append(f"{rel}: missing 'Do not use' section")
+            if skill_dir.name in MODIFYING_SKILLS:
+                if SNAPSHOT_FINALIZATION_MARKER not in text:
+                    errors.append(
+                        f"{rel}: modifying skill missing '{SNAPSHOT_FINALIZATION_MARKER}' section"
+                    )
+                if skill_dir.name != "release-candidate" and re.search(
+                    r"git archive.*owner|owner.*git archive",
+                    text,
+                    re.I,
+                ):
+                    errors.append(f"{rel}: git archive forbidden for owner workspace snapshot")
             marked_paths, path_issues = parse_marked_paths(text, str(rel))
             errors.extend(path_issues)
             for marked in marked_paths:

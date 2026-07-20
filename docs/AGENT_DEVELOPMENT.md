@@ -38,7 +38,7 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 
 1. Read `AGENTS.md` and applicable `.cursor/rules/**` / `.cursor/skills/**`.
 2. Read the architecture status block in `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
-3. Capture Git baseline (`git status --short`, branch, HEAD).
+3. Capture Git baseline for all three workspace repositories (`HEAD`, branch, `git status --porcelain=v2 --untracked-files=all`).
 4. Identify affected architecture boundaries (CLI, application, core, TUI).
 5. Read implementation code and existing tests for the changed scope.
 6. Make the smallest coherent change for the **current phase only**.
@@ -171,6 +171,49 @@ Every completed phase or corrective task returns:
 
 ## 13. Scope confirmations
 - next phase not started; no push/tag/release; no unrelated product changes
+```
+
+When the task changed workspace state in any repository, section **14. Workspace snapshot** must include:
+
+```markdown
+## 14. Workspace snapshot
+
+- result: success
+- created: true
+- path: `<home>/code.zip`
+- SHA-256: `...`
+- size: `... bytes`
+- archive file count: `...`
+- repositories included:
+  - spell-sync
+  - spell-sync-dev
+  - spell-words
+- previous archive replaced: yes
+```
+
+When workspace state did not change:
+
+```markdown
+## 14. Workspace snapshot
+
+- result: skipped
+- created: false
+- reason: workspace unchanged
+- existing path: `<home>/code.zip`
+```
+
+Modifying tasks must finalize the owner-controlled workspace snapshot via the private maintainer
+skill `create-code-snapshot` before the final report. Full owner-controlled workspace snapshot for
+offline inspection and preservation of the exact completed task state.
+
+Modifying-task reports end with:
+
+```text
+CODE_ARCHIVE
+<absolute path to $HOME/code.zip>
+
+SHA256
+<digest>
 ```
 
 Do not include huge raw logs. Include failed check ID and a short relevant excerpt only when unresolved.
