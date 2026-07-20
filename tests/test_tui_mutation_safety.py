@@ -35,7 +35,7 @@ class TestTuiMutationSafety(unittest.TestCase):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
             _wordlist, _dictionary, run, request = self._project(tmp)
-            prepared = service.prepare_push(run)
+            prepared = service._prepare_push_for_run(run)
             self.assertNotIsInstance(prepared, ExitCode)
             preview = build_push_preview(prepared)
             push_request = PushRequest(project=request.project)
@@ -51,7 +51,7 @@ class TestTuiMutationSafety(unittest.TestCase):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
             _wordlist, dictionary, run, request = self._project(tmp)
-            prepared = service.prepare_push(run)
+            prepared = service._prepare_push_for_run(run)
             self.assertNotIsInstance(prepared, ExitCode)
             preview = build_push_preview(prepared)
             self.assertEqual(preview.removals, 1)

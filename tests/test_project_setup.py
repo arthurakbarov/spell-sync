@@ -12,6 +12,7 @@ from spell_sync.application import SpellSyncService
 from spell_sync.application.requests import ProjectRef, SetupRequest
 from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
+from spell_sync.paths import resolve_wordlist_path
 from spell_sync.project_setup.discovery import discover_setup_targets
 from spell_sync.project_setup.draft import SetupDraft
 from spell_sync.project_setup.execute import (
@@ -40,7 +41,7 @@ def test_setup_ready_project(tmp_path: Path, service: SpellSyncService) -> None:
     wordlist.write_text("alpha\n", encoding="utf-8")
     (tmp_path / "spell-sync.toml").write_text("[push]\nstrict = false\n", encoding="utf-8")
     state = service.inspect_project_setup(
-        SetupRequest(project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False)
+        SetupRequest(project=ProjectRef(wordlist=wordlist), allow_project_creation=False)
     )
     assert state.status is ProjectSetupStatus.READY
     assert state.can_start_wizard is False
@@ -52,7 +53,7 @@ def test_setup_missing_project(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.chdir(home)
     monkeypatch.setattr("spell_sync.paths.project_root", lambda: home)
-    state = inspect_project_setup(SetupRequest(project=ProjectRef(), allow_new_project_wizard=True))
+    state = inspect_project_setup(resolve_wordlist_path(None), allow_project_creation=True)
     assert state.status is ProjectSetupStatus.MISSING_PROJECT
     assert state.can_start_wizard is True
 
@@ -60,9 +61,7 @@ def test_setup_missing_project(tmp_path: Path, monkeypatch) -> None:
 def test_setup_missing_config(tmp_path: Path) -> None:
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("alpha\n", encoding="utf-8")
-    state = inspect_project_setup(
-        SetupRequest(project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False)
-    )
+    state = inspect_project_setup(wordlist, allow_project_creation=False)
     assert state.status is ProjectSetupStatus.MISSING_CONFIG
     assert state.can_start_wizard is False
 
@@ -71,9 +70,7 @@ def test_setup_invalid_config(tmp_path: Path) -> None:
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("alpha\n", encoding="utf-8")
     (tmp_path / "spell-sync.toml").write_text("not valid toml [[[\n", encoding="utf-8")
-    state = inspect_project_setup(
-        SetupRequest(project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False)
-    )
+    state = inspect_project_setup(wordlist, allow_project_creation=False)
     assert state.status is ProjectSetupStatus.INVALID_CONFIG
     assert state.can_start_wizard is False
 
@@ -83,9 +80,7 @@ def test_setup_unreadable_wordlist(tmp_path: Path) -> None:
     wordlist.write_text("alpha\n", encoding="utf-8")
     wordlist.chmod(0)
     try:
-        state = inspect_project_setup(
-            SetupRequest(project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False)
-        )
+        state = inspect_project_setup(wordlist, allow_project_creation=False)
     finally:
         wordlist.chmod(stat.S_IWUSR | stat.S_IRUSR)
     assert state.status is ProjectSetupStatus.UNREADABLE_WORDLIST
@@ -96,9 +91,7 @@ def test_setup_recovery_required(tmp_path: Path) -> None:
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("alpha\n", encoding="utf-8")
     write_test_journal(wordlist, wordlist_write_started=True)
-    state = inspect_project_setup(
-        SetupRequest(project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False)
-    )
+    state = inspect_project_setup(wordlist, allow_project_creation=False)
     assert state.status is ProjectSetupStatus.RECOVERY_REQUIRED
     assert state.can_start_wizard is False
 
@@ -309,9 +302,8 @@ def test_setup_missing_wordlist_with_config(tmp_path: Path) -> None:
     config = tmp_path / "spell-sync.toml"
     config.write_text("[push]\n", encoding="utf-8")
     state = inspect_project_setup(
-        SetupRequest(
-            project=ProjectRef(wordlist=tmp_path / "wordlist.txt"), allow_new_project_wizard=False
-        )
+        tmp_path / "wordlist.txt",
+        allow_project_creation=False,
     )
     assert state.status is ProjectSetupStatus.MISSING_WORDLIST
 

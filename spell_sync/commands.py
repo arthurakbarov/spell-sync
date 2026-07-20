@@ -13,38 +13,25 @@ from .app_process_check import (
 )
 from .application import SpellSyncService
 from .cli_options import CliOptions
-from .cli_request_adapter import (
-    effective_push_strict,
-    project_ref,
-    pull_request,
-    push_request,
-    status_request,
-)
+from .cli_request_adapter import pull_request, push_request, status_request
 from .command_helpers import (
-    confirm_push_removals,
+    confirm_push_removals_for_preview,
     emit_command_exit,
     finish_push,
     guard_exit_code,
     mutating_command_scope,
     print_status_diff,
     quiet_json_output,
-    sync_run_for,
-    wordlist_file_for,
 )
 from .dictionary_hints import warn_missing_optional_apps
 from .exit_codes import ExitCode
 from .json_output import base_payload, dictionary_diff_payload, emit_json
 from .lint import run_lint
 from .log import log
-from .removal_review import review_removals_interactive
+from .removal_review import review_removals_for_preview
 from .runtime import installed_package_version
-from .sync_run import PushResult, SyncRun
 
 _SERVICE = SpellSyncService()
-
-
-def _effective_push_strict(opts: CliOptions) -> bool:
-    return effective_push_strict(push_request(opts))
 
 
 def _running_apps_check_for_push(opts: CliOptions) -> bool | None:
@@ -59,17 +46,6 @@ def _running_apps_check_for_push(opts: CliOptions) -> bool | None:
         if choice is None or not choice:
             return choice
     return True
-
-
-def _before_push_checks(run: SyncRun, opts: CliOptions) -> bool | None:
-    choice = _running_apps_check_for_push(opts)
-    if choice is None or not choice:
-        return choice
-    if opts.review_removals:
-        choice = review_removals_interactive(run, interactive=not opts.json_output)
-        if choice is None or not choice:
-            return choice
-    return confirm_push_removals(run, opts)
 
 
 def cmd_status(opts: CliOptions) -> int:
@@ -105,22 +81,28 @@ def cmd_pull(opts: CliOptions) -> int:
         with mutating_command_scope(opts, "pull") as scope:
             if isinstance(scope, int):
                 return scope
-            return _cmd_pull_locked(opts)
+            return _cmd_pull_via_service(opts)
 
 
-def _cmd_pull_locked(opts: CliOptions) -> int:
-    preview = _SERVICE.prepare_pull(pull_request(opts))
-    run = sync_run_for(project_ref(opts))
+def _cmd_pull_via_service(opts: CliOptions) -> int:
+    request = pull_request(opts)
+    preview = _SERVICE.prepare_pull(request)
+    if not preview.is_executable:
+        code = preview.wordlist_error or preview.prepare_error or ExitCode.PUSH_ABORT
+        return emit_command_exit(opts, "pull", code)
     if opts.add_from:
         log.section(f"pull: merge words from {opts.add_from} -> wordlist")
-        result = run.pull_add_from(opts.add_from)
     else:
         log.section("pull: merge new words from dictionaries -> wordlist (union)")
-        result = run.pull_into_wordlist()
-    if isinstance(result, ExitCode):
-        return emit_command_exit(opts, "pull", result)
-    before, after = result
-    _SERVICE.build_pull_report(_SERVICE.pull_execution_from_result(preview, (before, after)))
+    execution = _SERVICE.execute_pull(
+        request,
+        preview,
+        confirmed_plan_id=preview.plan_identifier,
+    )
+    if isinstance(execution.result, ExitCode):
+        return emit_command_exit(opts, "pull", execution.result)
+    before, after = execution.result
+    _SERVICE.build_pull_report(execution)
     source = opts.add_from
     if opts.json_output:
         emit_json(
@@ -139,25 +121,29 @@ def _cmd_pull_locked(opts: CliOptions) -> int:
 
 def cmd_push(opts: CliOptions) -> int:
     with quiet_json_output(opts):
+        from .application.project_resolution import effective_push_strict
+        from .cli_request_adapter import push_request as _push_request_adapter
+
         with mutating_command_scope(
             opts,
             "push",
-            strict_push=_effective_push_strict(opts),
+            strict_push=effective_push_strict(_push_request_adapter(opts)),
         ) as scope:
             if isinstance(scope, int):
                 return scope
-            return _cmd_push_locked(opts)
+            return _cmd_push_via_service(opts)
 
 
-def _cmd_push_locked(opts: CliOptions) -> int:
+def _cmd_push_via_service(opts: CliOptions) -> int:
     dry_run = opts.dry_run
     mode = " (dry-run)" if dry_run else ""
     log.section(f"push{mode}: wordlist OVERWRITES all dictionaries")
     warn_missing_optional_apps()
-    run = sync_run_for(project_ref(opts), strict_push=_effective_push_strict(opts))
-    prepared = _SERVICE.prepare_push(run)
-    if isinstance(prepared, ExitCode):
-        return finish_push(prepared, opts, dry_run=dry_run, command="push")
+    request = push_request(opts)
+    preview = _SERVICE.load_push_preview(request)
+    if not preview.is_executable:
+        code = preview.wordlist_error or preview.prepare_error or ExitCode.PUSH_ABORT
+        return finish_push(code, opts, dry_run=dry_run, command="push")
     if not dry_run:
         exit_code = guard_exit_code(
             _running_apps_check_for_push(opts),
@@ -177,7 +163,10 @@ def _cmd_push_locked(opts: CliOptions) -> int:
             )
         if opts.review_removals:
             exit_code = guard_exit_code(
-                review_removals_interactive(run),
+                review_removals_for_preview(
+                    preview,
+                    interactive=not opts.json_output,
+                ),
                 cancelled=ExitCode.CANCELLED,
                 quiet=opts.json_output,
             )
@@ -193,7 +182,7 @@ def _cmd_push_locked(opts: CliOptions) -> int:
                     reason="review_removals",
                 )
         exit_code = guard_exit_code(
-            confirm_push_removals(run, opts, peak_removals=prepared.max_removals()),
+            confirm_push_removals_for_preview(preview, opts),
             cancelled=ExitCode.CANCELLED,
             quiet=opts.json_output,
         )
@@ -208,18 +197,25 @@ def _cmd_push_locked(opts: CliOptions) -> int:
                 action=action,
                 reason="confirm_push_removals",
             )
-    result = _SERVICE.execute_push(run, prepared, dry_run=dry_run)
-    if dry_run and isinstance(result, PushResult) and not opts.json_output:
+    if dry_run:
+        execution = _SERVICE.execute_push_dry_run(request, preview)
+    else:
+        execution = _SERVICE.execute_push_preview(
+            request,
+            preview,
+            confirmed_plan_id=preview.plan_identifier,
+        )
+    result = execution.result
+    if dry_run and not isinstance(result, ExitCode) and not opts.json_output:
         snapshot = _SERVICE.load_status(status_request(opts))
         for diff in snapshot.diffs:
             print_status_diff(diff, verbose=opts.verbose)
     if not dry_run and not isinstance(result, ExitCode):
-        _SERVICE.build_push_report(_SERVICE.push_execution_from_result(prepared, result))
+        _SERVICE.build_push_report(execution)
     return finish_push(result, opts, dry_run=dry_run, command="push")
 
 
 def cmd_init(opts: CliOptions) -> int:
-    from .application import SpellSyncService
     from .paths import resolve_wordlist_path
     from .project_setup.discovery import discover_setup_targets
     from .project_setup.draft import SetupDraft
@@ -280,18 +276,20 @@ def cmd_init(opts: CliOptions) -> int:
 
 
 def cmd_lint(opts: CliOptions) -> int:
+    from .command_helpers import mutating_command_scope, wordlist_file_for
+
     with quiet_json_output(opts):
         if opts.fix:
             with mutating_command_scope(opts, "lint") as scope:
                 if isinstance(scope, int):
                     return scope
-                return _cmd_lint_locked(opts)
-        return _cmd_lint_locked(opts)
+                return _cmd_lint_locked(opts, wordlist_file_for(opts))
+        return _cmd_lint_locked(opts, wordlist_file_for(opts))
 
 
-def _cmd_lint_locked(opts: CliOptions) -> int:
+def _cmd_lint_locked(opts: CliOptions, wordlist) -> int:
     code = run_lint(
-        wordlist_file_for(opts),
+        wordlist,
         fix=opts.fix,
         strict=opts.strict,
     )

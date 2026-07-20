@@ -5,9 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .application.requests import (
-    ConfigCheckRequest,
     DoctorRequest,
-    LintRequest,
     ProjectRef,
     PullRequest,
     PushRequest,
@@ -16,15 +14,11 @@ from .application.requests import (
     StatusRequest,
     SupportReportRequest,
     TargetSettingsRequest,
-    effective_push_strict,
 )
 from .cli_options import CliOptions
 
 __all__ = [
-    "config_check_request",
     "doctor_request",
-    "effective_push_strict",
-    "lint_request",
     "project_ref",
     "pull_request",
     "push_request",
@@ -50,7 +44,11 @@ def status_request(options: CliOptions) -> StatusRequest:
 
 
 def doctor_request(options: CliOptions) -> DoctorRequest:
-    return DoctorRequest(project=project_ref(options))
+    return DoctorRequest(
+        project=project_ref(options),
+        list_targets=options.show_targets,
+        health_check=options.health_check,
+    )
 
 
 def pull_request(options: CliOptions) -> PullRequest:
@@ -73,7 +71,7 @@ def setup_request(options: CliOptions) -> SetupRequest:
     explicit = options.wordlist is not None and bool(options.wordlist.strip())
     return SetupRequest(
         project=project_ref(options),
-        allow_new_project_wizard=not explicit,
+        allow_project_creation=not explicit,
     )
 
 
@@ -83,15 +81,3 @@ def target_settings_request(options: CliOptions) -> TargetSettingsRequest:
 
 def support_report_request(options: CliOptions) -> SupportReportRequest:
     return SupportReportRequest(project=project_ref(options))
-
-
-def config_check_request(options: CliOptions) -> ConfigCheckRequest:
-    return ConfigCheckRequest(project=project_ref(options))
-
-
-def lint_request(options: CliOptions) -> LintRequest:
-    return LintRequest(
-        project=project_ref(options),
-        fix=options.fix,
-        strict=options.strict,
-    )

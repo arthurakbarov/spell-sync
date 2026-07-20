@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from spell_sync.application import SpellSyncService
 from spell_sync.application.events import OperationEvent
-from spell_sync.application.reports import DashboardSeverity, StatusSnapshot
+from spell_sync.application.reports import (
+    DashboardSeverity,
+    PullPreview,
+    PushPreview,
+    StatusSnapshot,
+)
 from spell_sync.application.requests import (
     DoctorRequest,
     ProjectRef,
@@ -17,7 +24,9 @@ from spell_sync.application.requests import (
     StatusRequest,
 )
 from spell_sync.cli_options import CliOptions
+from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
+from spell_sync.io import write_text_words
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.settings import ConfigStatus
@@ -70,7 +79,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.skipped_corrupt_dictionary_names.return_value = ()
         run.destructive_push_risk.return_value = None
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
             snapshot = service.load_status(_status())
 
         self.assertEqual(snapshot.wordlist_count, 2)
@@ -87,8 +96,8 @@ class TestSpellSyncService(unittest.TestCase):
         events: list[OperationEvent] = []
 
         with patch("spell_sync.application.service.plan_fingerprint_conflict", return_value=None):
-            service.prepare_push(run, event_sink=events.append)
-            service.execute_push(run, prepared, dry_run=False, event_sink=events.append)
+            service._prepare_push_for_run(run, event_sink=events.append)
+            service._execute_push_for_run(run, prepared, dry_run=False, event_sink=events.append)
 
         stages = [event.stage for event in events]
         self.assertEqual(
@@ -96,14 +105,14 @@ class TestSpellSyncService(unittest.TestCase):
             ["building_plan", "verifying_plan", "creating_snapshots", "completed"],
         )
 
-    def test_execute_push_uses_prepared_without_replan(self):
+    def test_execute_push_for_run_uses_prepared_without_replan(self):
         service = SpellSyncService()
         prepared = MagicMock(spec=PreparedPush)
         run = MagicMock()
         run.push_from_wordlist.return_value = PushResult(word_count=1, written=("demo",))
 
         with patch("spell_sync.application.service.plan_fingerprint_conflict", return_value=None):
-            result = service.execute_push(run, prepared, dry_run=False)
+            result = service._execute_push_for_run(run, prepared, dry_run=False)
 
         run.prepare_push_operation.assert_not_called()
         run.push_from_wordlist.assert_called_once_with(prepared=prepared)
@@ -118,7 +127,7 @@ class TestSpellSyncService(unittest.TestCase):
             "spell_sync.application.service.plan_fingerprint_conflict",
             return_value="cursor",
         ):
-            result = service.execute_push(run, prepared, dry_run=False)
+            result = service._execute_push_for_run(run, prepared, dry_run=False)
 
         run.push_from_wordlist.assert_not_called()
         self.assertEqual(result, ExitCode.PUSH_ABORT)
@@ -139,31 +148,52 @@ class TestSpellSyncService(unittest.TestCase):
                 text = Path(source_path).read_text(encoding="utf-8")
                 self.assertNotIn("textual", text.lower())
 
-    def test_cmd_push_passes_same_prepared_to_execute_without_reprepare(self):
+    def test_cmd_push_passes_same_preview_to_dry_run_without_reprepare(self):
         import spell_sync.commands as commands_mod
+        from spell_sync.application.reports import OperationOutcome, PushExecution, PushPreview
 
         prepared = MagicMock(spec=PreparedPush)
         prepared.max_removals.return_value = 0
-        run = MagicMock()
+        preview = PushPreview(
+            prepared=prepared,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p1",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
         service = MagicMock()
-        service.prepare_push.return_value = prepared
-        service.execute_push.return_value = PushResult(word_count=1, written=("demo",))
+        service.load_push_preview.return_value = preview
+        service.execute_push_dry_run.return_value = PushExecution(
+            prepared=prepared,
+            result=PushResult(word_count=1, written=("demo",)),
+            outcome=OperationOutcome.COMPLETED,
+            message="Push completed.",
+            plan_identifier="p1",
+            push_preview=preview,
+        )
+        service.load_status.return_value = StatusSnapshot(
+            wordlist_count=1,
+            diffs=(),
+            skipped_unreadable=(),
+            skipped_corrupt=(),
+        )
 
         with patch.object(commands_mod, "_SERVICE", service):
-            with patch.object(commands_mod, "sync_run_for", return_value=run):
-                with patch.object(commands_mod, "mutating_command_scope") as scope_cm:
-                    scope_cm.return_value.__enter__.return_value = MagicMock()
-                    scope_cm.return_value.__exit__.return_value = False
-                    code = commands_mod._cmd_push_locked(CliOptions(yes=True, dry_run=True))
+            code = commands_mod.cmd_push(CliOptions(yes=True, dry_run=True))
 
         self.assertEqual(code, 0)
-        service.prepare_push.assert_called_once_with(run)
-        service.execute_push.assert_called_once()
-        execute_args, execute_kwargs = service.execute_push.call_args
-        self.assertIs(execute_args[0], run)
-        self.assertIs(execute_args[1], prepared)
-        self.assertTrue(execute_kwargs["dry_run"])
-        service.push_execution_from_result.assert_not_called()
+        service.load_push_preview.assert_called_once()
+        service.execute_push_dry_run.assert_called_once()
+        execute_args = service.execute_push_dry_run.call_args
+        self.assertIs(execute_args[0][1], preview)
+        service.execute_push_preview.assert_not_called()
         service.build_push_report.assert_not_called()
 
     def test_load_dashboard_composes_runtime_and_status(self):
@@ -264,8 +294,8 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = None
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
-            with patch.object(service, "prepare_push", return_value=prepared):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+            with patch.object(service, "_prepare_push_for_run", return_value=prepared):
                 preview = service.load_push_preview(_push())
 
         self.assertIs(preview.prepared, prepared)
@@ -277,7 +307,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = ExitCode.PUSH_ABORT
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
             preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.wordlist_error, ExitCode.PUSH_ABORT)
@@ -289,8 +319,8 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.check_wordlist.return_value = None
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
-            with patch.object(service, "prepare_push", return_value=ExitCode.PUSH_ABORT):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+            with patch.object(service, "_prepare_push_for_run", return_value=ExitCode.PUSH_ABORT):
                 preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.prepare_error, ExitCode.PUSH_ABORT)
@@ -301,7 +331,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         detail = MagicMock()
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
             with patch(
                 "spell_sync.application.service.build_status_detail_snapshot",
                 return_value=detail,
@@ -316,7 +346,7 @@ class TestSpellSyncService(unittest.TestCase):
         report = MagicMock()
         snapshot = MagicMock()
 
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=MagicMock()):
+        with patch("spell_sync.application.service.sync_run_for", return_value=MagicMock()):
             with patch("spell_sync.application.service.build_doctor_report", return_value=report):
                 with patch(
                     "spell_sync.application.service.build_doctor_snapshot",
@@ -330,20 +360,22 @@ class TestSpellSyncService(unittest.TestCase):
     def test_load_doctor_returns_controlled_error(self):
         service = SpellSyncService()
         with patch(
-            "spell_sync.application.service.command_helpers.sync_run_for",
+            "spell_sync.application.service.sync_run_for",
             side_effect=RuntimeError("boom"),
         ):
             snapshot = service.load_doctor(_doctor())
         self.assertEqual(snapshot.load_error, "Doctor report could not be loaded.")
 
-    def test_run_push_wraps_execute_push_result(self):
+    def test_run_push_for_run_wraps_execute_push_result(self):
         service = SpellSyncService()
         prepared = MagicMock(spec=PreparedPush)
         run = MagicMock()
         push_result = PushResult(word_count=1, written=("demo",))
 
-        with patch.object(service, "execute_push", return_value=push_result) as execute_push:
-            execution = service.run_push(
+        with patch.object(
+            service, "_execute_push_for_run", return_value=push_result
+        ) as execute_push:
+            execution = service._run_push_for_run(
                 run,
                 prepared,
                 dry_run=False,
@@ -360,7 +392,7 @@ class TestSpellSyncService(unittest.TestCase):
         service = SpellSyncService()
         run = MagicMock()
         preview = MagicMock(spec=PullPreview)
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
             with patch(
                 "spell_sync.application.service.build_pull_preview",
                 return_value=preview,
@@ -484,7 +516,7 @@ class TestSpellSyncService(unittest.TestCase):
             "load_status",
             wraps=service.load_status,
         ) as load_status:
-            with patch("spell_sync.command_helpers.sync_run_for") as sync_run_for:
+            with patch("spell_sync.application.service.sync_run_for") as sync_run_for:
                 run = MagicMock()
                 run.check_wordlist.return_value = None
                 run.load_wordlist.return_value = {"alpha"}
@@ -496,6 +528,210 @@ class TestSpellSyncService(unittest.TestCase):
                 code = commands_mod.cmd_status(CliOptions())
         load_status.assert_called_once()
         self.assertEqual(code, 0)
+
+
+class TestServiceFacadePaths(unittest.TestCase):
+    def test_load_status_wordlist_error(self):
+        service = SpellSyncService()
+        run = MagicMock()
+        run.check_wordlist.return_value = ExitCode.WORDLIST_UNREADABLE
+        run.skipped_unreadable_dictionary_names.return_value = ("a",)
+        run.skipped_corrupt_dictionary_names.return_value = ()
+        with patch("spell_sync.application.service.sync_run_for", return_value=run):
+            snapshot = service.load_status(_status("/tmp/w.txt"))
+        self.assertEqual(snapshot.wordlist_error, ExitCode.WORDLIST_UNREADABLE)
+
+    def test_load_doctor_targets_and_push_plan(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = os.path.join(d, "wordlist.txt")
+            dict_path = os.path.join(d, "dict.txt")
+            write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
+            write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
+            run = SyncRun(
+                wordlist=wordlist,
+                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            )
+            service = SpellSyncService(enable_file_logging=False)
+            with patch("spell_sync.application.service.sync_run_for", return_value=run):
+                targets = service.load_doctor_targets(
+                    DoctorRequest(project=ProjectRef(wordlist=Path(wordlist))),
+                )
+                self.assertEqual(len(targets.targets), 1)
+                removals = service.load_push_removals(
+                    PushRequest(project=ProjectRef(wordlist=Path(wordlist))),
+                )
+                self.assertTrue(removals)
+                preview, diffs, result = service.load_push_plan(
+                    PushRequest(project=ProjectRef(wordlist=Path(wordlist))),
+                    verbose=True,
+                )
+            self.assertTrue(diffs)
+            self.assertIsInstance(result, PushResult)
+
+    def test_execute_push_dry_run_and_pull_execution_error(self):
+        service = SpellSyncService(enable_file_logging=False)
+        prepared = MagicMock(spec=PreparedPush)
+        preview = PushPreview(
+            prepared=prepared,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p1",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        pull_preview = PullPreview(
+            wordlist_path="/tmp/w.txt",
+            additions=0,
+            before_count=0,
+            after_count=0,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at="t",
+            plan_identifier="pull",
+            merged_words=(),
+        )
+        failed_pull = service.pull_execution_from_result(pull_preview, ExitCode.PUSH_ABORT)
+        self.assertEqual(failed_pull.result, ExitCode.PUSH_ABORT)
+
+        blocked = service.execute_push_dry_run(
+            _push(),
+            PushPreview(
+                prepared=None,
+                targets=(),
+                additions=0,
+                removals=0,
+                warnings=(),
+                created_at="t",
+                plan_identifier="blocked",
+                targets_to_update=0,
+                unchanged=0,
+                skipped=(),
+                corrupt=(),
+                blocked=(),
+                prepare_error=ExitCode.PUSH_ABORT,
+            ),
+        )
+        self.assertEqual(blocked.result, ExitCode.PUSH_ABORT)
+
+        with patch(
+            "spell_sync.application.service.command_helpers.mutating_command_scope_for",
+        ) as scope:
+            scope.return_value.__enter__.return_value = int(ExitCode.PUSH_ABORT)
+            scope.return_value.__exit__.return_value = False
+            locked = service.execute_push_dry_run(_push(), preview)
+        self.assertEqual(locked.result, ExitCode.PUSH_ABORT)
+
+        run = MagicMock()
+        with patch.object(service, "_execute_push_for_run", return_value=PushResult(1, ("a",), ())):
+            execution = service._run_push_for_run(run, prepared, dry_run=True)
+        self.assertEqual(execution.result.word_count, 1)
+
+    def test_prepare_pull_add_from_paths(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            missing = Path(d) / "missing.txt"
+            service = SpellSyncService(enable_file_logging=False)
+            unreadable = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            with (
+                patch("spell_sync.application.service.sync_run_for", return_value=unreadable),
+                patch.object(
+                    unreadable,
+                    "check_wordlist",
+                    return_value=ExitCode.WORDLIST_UNREADABLE,
+                ),
+            ):
+                preview = service.prepare_pull(
+                    PullRequest(project=ProjectRef(wordlist=wordlist), add_from=str(missing)),
+                )
+            self.assertEqual(preview.wordlist_error, ExitCode.WORDLIST_UNREADABLE)
+            preview = service.prepare_pull(
+                PullRequest(project=ProjectRef(wordlist=wordlist), add_from=str(missing)),
+            )
+            self.assertEqual(preview.prepare_error, ExitCode.PUSH_ABORT)
+            hunspell = Path(d) / "extra.dic"
+            hunspell.write_text("beta\n", encoding="utf-8")
+            preview = service.prepare_pull(
+                PullRequest(project=ProjectRef(wordlist=wordlist), add_from=str(hunspell)),
+            )
+            self.assertGreater(preview.after_count, preview.before_count)
+
+    def test_load_push_plan_blocked_preview(self):
+        service = SpellSyncService(enable_file_logging=False)
+        run = MagicMock()
+        run.status_diffs.return_value = []
+        blocked = PushPreview(
+            prepared=None,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="blocked",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+            prepare_error=ExitCode.PUSH_ABORT,
+        )
+        with (
+            patch("spell_sync.application.service.sync_run_for", return_value=run),
+            patch.object(service, "load_push_preview", return_value=blocked),
+        ):
+            preview, diffs, result = service.load_push_plan(_push("/tmp/w.txt"))
+        self.assertEqual(result, ExitCode.PUSH_ABORT)
+
+    def test_execute_push_dry_run_success_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = os.path.join(d, "wordlist.txt")
+            dict_path = os.path.join(d, "dict.txt")
+            write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
+            write_text_words(dict_path, ["alpha"], "utf-8", False, quiet=True)
+            run = SyncRun(
+                wordlist=wordlist,
+                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            )
+            service = SpellSyncService(enable_file_logging=False)
+            with patch("spell_sync.application.service.sync_run_for", return_value=run):
+                preview = service.load_push_preview(_push(wordlist))
+                execution = service.execute_push_dry_run(_push(wordlist), preview)
+            self.assertIsInstance(execution.result, PushResult)
+
+    def test_pull_and_push_execution_from_result_paths(self):
+        service = SpellSyncService(enable_file_logging=False)
+        pull_preview = PullPreview(
+            wordlist_path="/tmp/w.txt",
+            additions=3,
+            before_count=1,
+            after_count=4,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at="t",
+            plan_identifier="pull",
+            merged_words=(),
+        )
+        pull_execution = service.pull_execution_from_result(pull_preview, (1, 4))
+        self.assertEqual(pull_execution.result, (1, 4))
+
+        bad_prepared = MagicMock()
+        bad_prepared.targets = [object()]
+        push_execution = service.push_execution_from_result(
+            bad_prepared,
+            PushResult(1, ("a",), ()),
+        )
+        self.assertIsInstance(push_execution.result, PushResult)
+        self.assertIsNone(push_execution.push_preview)
 
 
 if __name__ == "__main__":

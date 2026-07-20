@@ -714,6 +714,91 @@ def build_pull_preview(run: SyncRun) -> PullPreview:
     )
 
 
+def build_pull_add_from_preview(run: SyncRun, source: Path) -> PullPreview:
+    """Preview merging words from an external file into the canonical wordlist."""
+    from ..io import read_hunspell_words, read_text_words
+    from ..words import clean_words, merge_case_duplicates, sort_words
+
+    created_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    wordlist_path = run.wordlist_str
+    wordlist_error = run.check_wordlist()
+    if wordlist_error is not None:
+        return PullPreview(
+            wordlist_path=wordlist_path,
+            additions=0,
+            before_count=0,
+            after_count=0,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at=created_at,
+            plan_identifier="unavailable",
+            merged_words=(),
+            wordlist_error=wordlist_error,
+        )
+
+    source_path = Path(source)
+    if not source_path.is_file():
+        return PullPreview(
+            wordlist_path=wordlist_path,
+            additions=0,
+            before_count=0,
+            after_count=0,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at=created_at,
+            plan_identifier="unavailable",
+            merged_words=(),
+            prepare_error=ExitCode.PUSH_ABORT,
+        )
+
+    if source_path.suffix.lower() == ".dic":
+        external = read_hunspell_words(source_path, quiet=False)
+    else:
+        external = read_text_words(source_path, quiet=False)
+
+    words = clean_words(read_text_words(wordlist_path))
+    before = len(words)
+    ordered = sort_words(words)
+    seen_casefold = {word.casefold() for word in ordered}
+    addition_words: set[str] = set()
+    for word in sort_words(external):
+        key = word.casefold()
+        if key not in seen_casefold:
+            ordered.append(word)
+            seen_casefold.add(key)
+            addition_words.add(word)
+    merged = merge_case_duplicates(ordered)
+    after = len(merged)
+    digest = file_content_hash(Path(wordlist_path))
+    plan_id = (digest or f"{before}-{after}")[:8]
+    source_label = str(source_path)
+    return PullPreview(
+        wordlist_path=wordlist_path,
+        additions=after - before,
+        before_count=before,
+        after_count=after,
+        sources_used=(source_label,),
+        sources_skipped=(),
+        source_rows=(
+            PullSourcePreview(
+                source_label,
+                "used",
+                words_contributed=len(addition_words),
+            ),
+        ),
+        warnings=(),
+        created_at=created_at,
+        plan_identifier=plan_id,
+        merged_words=tuple(merged),
+        addition_words=frozenset(addition_words),
+        wordlist_fingerprint=digest,
+    )
+
+
 def build_target_updates_from_preview(preview: PushPreview) -> tuple[TargetUpdateReport, ...]:
     return build_push_target_updates(preview, None)
 

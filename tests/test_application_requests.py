@@ -15,19 +15,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from spell_sync.application import requests as requests_mod
-from spell_sync.application.requests import (
-    ProjectRef,
-    PushRequest,
+from spell_sync.application.project_resolution import (
     effective_push_strict,
     resolve_project_wordlist,
 )
+from spell_sync.application.requests import ProjectRef, PushRequest
 from spell_sync.application.service import SpellSyncService
 from spell_sync.cli import COMMANDS
 from spell_sync.cli_options import CliOptions
 from spell_sync.cli_request_adapter import (
-    config_check_request,
     doctor_request,
-    lint_request,
     project_ref,
     pull_request,
     push_request,
@@ -154,25 +151,23 @@ class TestApplicationRequests(unittest.TestCase):
             "push",
             "recover",
             "support-report",
-            "config-check",
-            "lint",
             "ui",
         }
-        presentation_only = {"version", "init", "plan"}
+        presentation_only = {"version", "init", "plan", "config-check", "lint"}
         self.assertEqual(set(COMMANDS), mapped | presentation_only)
+
+    def test_requests_module_has_no_resolution_helpers(self) -> None:
+        self.assertFalse(hasattr(requests_mod, "effective_push_strict"))
+        self.assertFalse(hasattr(requests_mod, "resolve_project_wordlist"))
 
     def test_remaining_cli_request_mappers(self) -> None:
         opts = CliOptions(wordlist="/tmp/w.txt", fix=True, strict=True)
         self.assertIsInstance(doctor_request(opts).project, ProjectRef)
         self.assertIsInstance(recovery_request(opts).project, ProjectRef)
-        self.assertTrue(setup_request(CliOptions()).allow_new_project_wizard)
-        self.assertFalse(setup_request(opts).allow_new_project_wizard)
+        self.assertTrue(setup_request(CliOptions()).allow_project_creation)
+        self.assertFalse(setup_request(opts).allow_project_creation)
         self.assertIsInstance(target_settings_request(opts).project, ProjectRef)
         self.assertIsInstance(support_report_request(opts).project, ProjectRef)
-        self.assertIsInstance(config_check_request(opts).project, ProjectRef)
-        lint = lint_request(opts)
-        self.assertTrue(lint.fix)
-        self.assertTrue(lint.strict)
 
     def test_project_scope_helpers_cover_json_and_early_returns(self) -> None:
         from spell_sync import command_helpers
@@ -222,7 +217,7 @@ class TestApplicationRequests(unittest.TestCase):
                 journal_result=absent,
             )
             gen = command_helpers.mutating_command_scope_for(
-                project,
+                resolve_project_wordlist(project),
                 "push",
                 json_output=True,
             )

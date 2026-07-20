@@ -8,9 +8,14 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from conftest import DEFAULT_OPTS
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    push_execution,
+)
 
 import spell_sync.commands as commands
 import spell_sync.dictionary_hints as hints_mod
@@ -119,13 +124,18 @@ class TestDictionaryWarnings(unittest.TestCase):
 
     def test_cmd_push_warns_missing_apps(self):
         push_result = PushResult(1, ("a",), ())
+        preview = executable_push_preview()
+        execution = push_execution(push_result, preview=preview)
         with (
             patch.object(commands, "warn_missing_optional_apps") as warn,
             patch.object(commands, "_running_apps_check_for_push", return_value=True),
-            patch.object(commands, "confirm_push_removals", return_value=True),
-            patch.object(commands, "sync_run_for") as session_cls,
+            patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+            patch_commands_service(
+                load_push_preview=preview,
+                execute_push_preview=execution,
+                build_push_report=MagicMock(),
+            ),
         ):
-            session_cls.return_value.push_from_wordlist.return_value = push_result
             with redirect_stdout(io.StringIO()):
                 commands.cmd_push(DEFAULT_OPTS)
             warn.assert_called_once()

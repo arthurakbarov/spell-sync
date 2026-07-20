@@ -12,15 +12,29 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from service_test_utils import (
+    doctor_targets_from_run,
+    executable_push_preview,
+    patch_commands_service,
+    patch_doctor_service,
+    patch_plan_service,
+    pull_execution,
+    pull_preview_executable,
+    push_execution,
+    push_plan_tuple,
+    status_snapshot_from_run,
+)
+
 import spell_sync.commands as commands_mod
 import spell_sync.config_check_cmd as config_check_mod
 import spell_sync.doctor as doctor_mod
 import spell_sync.plan_cmd as plan_mod
 import spell_sync.settings as settings_mod
+from spell_sync.application.reports import PushPreview, StatusSnapshot
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
-from spell_sync.sync_run import DictionaryDiff, PushResult
+from spell_sync.sync_run import PushResult, SyncRun
 
 
 class TestPullPushAliases(unittest.TestCase):
@@ -28,9 +42,13 @@ class TestPullPushAliases(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            mock_run = MagicMock()
-            mock_run.pull_into_wordlist.return_value = (1, 2)
-            with patch("spell_sync.commands.sync_run_for", return_value=mock_run):
+            preview = pull_preview_executable(str(wordlist), 1, 2)
+            execution = pull_execution(1, 2, preview=preview)
+            with patch_commands_service(
+                prepare_pull=preview,
+                execute_pull=execution,
+                build_pull_report=MagicMock(),
+            ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands_mod.cmd_pull(
@@ -51,12 +69,21 @@ class TestPullPushAliases(unittest.TestCase):
                 skipped_reasons={},
                 skipped_details={},
             )
+            preview = executable_push_preview()
+            execution = push_execution(fake_result, preview=preview)
             with (
-                patch("spell_sync.commands.sync_run_for") as sync_run_for,
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_dry_run=execution,
+                    load_status=StatusSnapshot(
+                        wordlist_count=1,
+                        diffs=(),
+                        skipped_unreadable=(),
+                        skipped_corrupt=(),
+                    ),
+                ),
                 patch("spell_sync.commands.finish_push", return_value=int(ExitCode.OK)) as finish,
             ):
-                sync_run_for.return_value.check_wordlist.return_value = None
-                sync_run_for.return_value.plan_push.return_value = fake_result
                 code = commands_mod.cmd_push(
                     CliOptions(wordlist=str(wordlist), dry_run=True, yes=True),
                 )
@@ -93,19 +120,11 @@ class TestDoctorTargets(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             dict_path = Path(d) / "dict.txt"
             dict_path.write_text("alpha\n", encoding="utf-8")
-            with patch(
-                "spell_sync.doctor.sync_run_for",
-                return_value=type(
-                    "Run",
-                    (),
-                    {
-                        "wordlist_str": str(Path(d) / "wordlist.txt"),
-                        "dictionaries": [
-                            Dictionary("demo", str(dict_path), DictionaryFormat.TEXT),
-                        ],
-                    },
-                )(),
-            ):
+            run = SyncRun(
+                wordlist=str(Path(d) / "wordlist.txt"),
+                dictionaries=[Dictionary("demo", str(dict_path), DictionaryFormat.TEXT)],
+            )
+            with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = doctor_mod.cmd_doctor(
@@ -123,18 +142,19 @@ class TestPlan(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            with patch("spell_sync.plan_cmd.sync_run_for") as sync_run_for:
-                run = sync_run_for.return_value
-                run.check_wordlist.return_value = None
-                run.load_wordlist.return_value = {"alpha"}
-                run.status_diffs.return_value = []
-                run.plan_push.return_value = PushResult(
-                    word_count=1,
-                    written=("demo",),
-                    skipped=(),
-                    skipped_reasons={},
-                    skipped_details={},
-                )
+            run = SyncRun(wordlist=str(wordlist), dictionaries=[])
+            result = PushResult(
+                word_count=1,
+                written=("demo",),
+                skipped=(),
+                skipped_reasons={},
+                skipped_details={},
+            )
+            plan = push_plan_tuple(run, result)
+            with patch_plan_service(
+                load_push_plan=plan,
+                load_status=status_snapshot_from_run(run),
+            ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = plan_mod.cmd_plan(CliOptions(wordlist=str(wordlist), json_output=True))
@@ -227,11 +247,12 @@ class TestStage3HumanOutput(unittest.TestCase):
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_plan_json_abort(self):
-        with patch("spell_sync.plan_cmd.sync_run_for") as sync_run_for:
-            sync_run_for.return_value.check_wordlist.return_value = None
-            sync_run_for.return_value.load_wordlist.return_value = {"alpha"}
-            sync_run_for.return_value.status_diffs.return_value = []
-            sync_run_for.return_value.plan_push.return_value = ExitCode.PUSH_ABORT
+        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
+        plan = push_plan_tuple(run, ExitCode.PUSH_ABORT)
+        with patch_plan_service(
+            load_push_plan=plan,
+            load_status=status_snapshot_from_run(run),
+        ):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = plan_mod.cmd_plan(CliOptions(json_output=True))
@@ -256,31 +277,17 @@ class TestStage3HumanOutput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             dict_path = Path(d) / "dict.txt"
             dict_path.write_text("alpha\n", encoding="utf-8")
-            with patch(
-                "spell_sync.doctor.sync_run_for",
-                return_value=type(
-                    "Run",
-                    (),
-                    {
-                        "wordlist_str": str(Path(d) / "wordlist.txt"),
-                        "dictionaries": [
-                            Dictionary("demo", str(dict_path), DictionaryFormat.TEXT),
-                        ],
-                    },
-                )(),
-            ):
+            run = SyncRun(
+                wordlist=str(Path(d) / "wordlist.txt"),
+                dictionaries=[Dictionary("demo", str(dict_path), DictionaryFormat.TEXT)],
+            )
+            with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
                 code = doctor_mod.cmd_doctor(CliOptions(show_targets=True))
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_doctor_targets_human_empty(self):
-        with patch(
-            "spell_sync.doctor.sync_run_for",
-            return_value=type(
-                "Run",
-                (),
-                {"wordlist_str": "/tmp/wordlist.txt", "dictionaries": []},
-            )(),
-        ):
+        run = SyncRun(wordlist="/tmp/wordlist.txt", dictionaries=[])
+        with patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)):
             code = doctor_mod.cmd_doctor(CliOptions(show_targets=True))
         self.assertEqual(code, int(ExitCode.OK))
 
@@ -288,35 +295,48 @@ class TestStage3HumanOutput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            with patch("spell_sync.plan_cmd.sync_run_for") as sync_run_for:
-                run = sync_run_for.return_value
-                run.check_wordlist.return_value = None
-                run.load_wordlist.return_value = {"alpha"}
-                run.status_diffs.return_value = [
-                    DictionaryDiff(
-                        name="demo",
-                        target_count=1,
-                        local_count=1,
-                        to_add=0,
-                        to_remove=0,
-                        add_words=(),
-                        remove_words=(),
-                    ),
-                ]
-                run.plan_push.return_value = PushResult(
-                    word_count=1,
-                    written=("demo",),
-                    skipped=(),
-                    skipped_reasons={},
-                    skipped_details={},
-                )
+            run = SyncRun(
+                wordlist=str(wordlist),
+                dictionaries=[Dictionary("demo", str(wordlist), DictionaryFormat.TEXT)],
+            )
+            result = PushResult(
+                word_count=1,
+                written=("demo",),
+                skipped=(),
+                skipped_reasons={},
+                skipped_details={},
+            )
+            plan = push_plan_tuple(
+                run,
+                result,
+                verbose=False,
+            )
+            with patch_plan_service(
+                load_push_plan=plan,
+                load_status=status_snapshot_from_run(run),
+            ):
                 code = plan_mod.cmd_plan(CliOptions(wordlist=str(wordlist)))
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_plan_wordlist_error(self):
-        with patch("spell_sync.plan_cmd.sync_run_for") as sync_run_for:
-            sync_run_for.return_value.check_wordlist.return_value = ExitCode.WORDLIST_UNREADABLE
-            code = plan_mod.cmd_plan(CliOptions())
+        preview = executable_push_preview()
+        preview = PushPreview(
+            prepared=None,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="2026-01-01T00:00:00+00:00",
+            plan_identifier="blocked",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+            wordlist_error=ExitCode.WORDLIST_UNREADABLE,
+        )
+        with patch_plan_service(load_push_preview=preview):
+            code = plan_mod.cmd_plan(CliOptions(plan_removals=True))
         self.assertEqual(code, int(ExitCode.WORDLIST_UNREADABLE))
 
     def test_pull_lock_exit(self):

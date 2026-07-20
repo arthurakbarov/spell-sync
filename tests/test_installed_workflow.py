@@ -12,7 +12,7 @@ import pytest
 
 from spell_sync.config import EDITOR_DICT_FILENAME
 from spell_sync.paths import is_macos
-from tests.journal_test_utils import write_test_journal
+from tests.journal_test_utils import write_restore_scenario_journal
 
 
 def _repo_root() -> Path:
@@ -161,7 +161,14 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
     assert push_result.returncode == 0, push_result.stderr
     assert "gamma" in editor_dict.read_text(encoding="utf-8")
 
-    write_test_journal(wordlist)
+    write_restore_scenario_journal(
+        wordlist,
+        editor_dict,
+        current_wordlist=wordlist.read_text(encoding="utf-8"),
+        backup_wordlist="alpha\nbeta\n",
+        current_dict=editor_dict.read_text(encoding="utf-8"),
+        backup_dict="alpha\nbeta\n",
+    )
     recover_result = _run(
         venv_python,
         home=home,

@@ -7,11 +7,19 @@ import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    patch_isolated_sync_run,
+    push_execution,
+)
 
 import spell_sync.cli as cli_mod
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
+from spell_sync.application.reports import PullPreview
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
@@ -53,12 +61,21 @@ class TestPullPushInteraction(unittest.TestCase):
     def test_pull_import_fail_skips_wordlist_done_line(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
-            abort = ExitCode.PUSH_ABORT
-            with (
-                patch.object(run, "pull_into_wordlist", return_value=abort),
-                patch.object(commands, "sync_run_for", return_value=run),
-            ):
+            preview = PullPreview(
+                wordlist_path=wordlist,
+                additions=0,
+                before_count=0,
+                after_count=0,
+                sources_used=(),
+                sources_skipped=(),
+                source_rows=(),
+                warnings=(),
+                created_at="2026-01-01T00:00:00+00:00",
+                plan_identifier="blocked",
+                merged_words=(),
+                prepare_error=ExitCode.PUSH_ABORT,
+            )
+            with patch_commands_service(prepare_pull=preview):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_pull(CliOptions(yes=True, wordlist=wordlist))
@@ -69,21 +86,21 @@ class TestPullPushInteraction(unittest.TestCase):
     def test_push_push_fail_no_push_done_line(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
-            abort = ExitCode.PUSH_ABORT
+            preview = executable_push_preview()
+            execution = push_execution(ExitCode.PUSH_ABORT, preview=preview)
             with (
-                patch.object(run, "push_from_wordlist", return_value=abort),
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_preview=execution,
+                    build_push_report=MagicMock(),
+                ),
                 patch.object(
                     commands,
                     "_running_apps_check_for_push",
                     return_value=True,
                 ),
+                patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
                 patch.object(commands, "warn_missing_optional_apps"),
             ):
                 buf = io.StringIO()
@@ -107,21 +124,22 @@ class TestPullPushInteraction(unittest.TestCase):
     def test_cmd_push_done_line_lists_skipped(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
             push_result = PushResult(1, ("a",), ("skipped-one",))
+            preview = executable_push_preview()
+            execution = push_execution(push_result, preview=preview)
             with (
                 patch.object(
                     commands,
                     "_running_apps_check_for_push",
                     return_value=True,
                 ),
-                patch.object(commands, "sync_run_for", return_value=run),
-                patch.object(run, "push_from_wordlist", return_value=push_result),
+                patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_preview=execution,
+                    build_push_report=MagicMock(),
+                ),
             ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
@@ -139,16 +157,14 @@ class TestPullPushInteraction(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with (
-                patch.object(commands, "sync_run_for", return_value=run),
-                patch.object(commands, "warn_missing_optional_apps"),
-            ):
+            preview = executable_push_preview()
+            with patch_isolated_sync_run(run):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     pull_code = commands.cmd_pull(CliOptions(yes=True, wordlist=wordlist))
                 self.assertEqual(pull_code, int(ExitCode.OK))
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(load_push_preview=preview),
                 patch.object(
                     commands,
                     "_running_apps_check_for_push",
@@ -162,7 +178,7 @@ class TestPullPushInteraction(unittest.TestCase):
                 out = buf.getvalue()
                 self.assertEqual(push_code, int(ExitCode.CANCELLED))
                 self.assertIn("Cancelled", out)
-                self.assertEqual(run.load_wordlist(), {"alpha", "beta"})
+                self.assertEqual(read_text_words(wordlist, quiet=True), {"alpha", "beta"})
                 self.assertEqual(read_text_words(dict_path, quiet=True), {"beta"})
 
 

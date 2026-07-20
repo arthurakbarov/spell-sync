@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from .application.requests import ProjectRef, resolve_project_wordlist
 from .dictionaries import Dictionary, discover_dictionaries
 from .paths import wordlist_path
 from .project import ProjectContext
@@ -64,14 +63,14 @@ class RuntimeContext(ProjectContext):
         )
 
 
-def runtime_context_for(project: ProjectRef, *, strict_push: bool = False) -> RuntimeContext:
-    """Build context from project reference; config is adjacent to effective wordlist."""
+def runtime_context_for(wordlist: Path, *, strict_push: bool = False) -> RuntimeContext:
+    """Build context from effective wordlist; config is adjacent to wordlist."""
     from .command_helpers import active_validated_runtime
 
     validated = active_validated_runtime()
     if validated is not None:
         return validated.context
-    wl = resolve_project_wordlist(project)
+    wl = wordlist
     project_ctx = ProjectContext.build(wl)
     result = load_config_result(wordlist=wl, reload=True)
     config: RuntimeConfig = dict(result.config) if result.config is not None else {}

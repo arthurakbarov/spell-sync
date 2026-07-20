@@ -10,11 +10,18 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    push_execution,
+    status_snapshot_from_run,
+)
+
 import spell_sync.commands as commands
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.io import read_text_words, write_text_words
-from spell_sync.sync_run import SyncRun
+from spell_sync.sync_run import PushResult, SyncRun
 
 
 class TestDryRun(unittest.TestCase):
@@ -103,8 +110,15 @@ class TestDryRun(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
+            result = PushResult(1, ("a",), ())
+            preview = executable_push_preview()
+            execution = push_execution(result, preview=preview)
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_dry_run=execution,
+                    load_status=status_snapshot_from_run(run),
+                ),
                 patch.object(commands, "warn_missing_optional_apps"),
             ):
                 buf = io.StringIO()

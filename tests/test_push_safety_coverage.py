@@ -47,7 +47,7 @@ from spell_sync.push_render import (
     render_wordlist,
 )
 from spell_sync.push_transaction import PushTransaction, RollbackResult, txn_snapshot_root
-from spell_sync.recover_cmd import _cmd_recover_locked
+from spell_sync.recover_cmd import cmd_recover
 from spell_sync.sync_run import PushResult, SyncRun
 from spell_sync.validated_runtime import build_validated_runtime
 from tests.journal_test_utils import write_test_journal
@@ -318,10 +318,8 @@ class TestRecoverCmdCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
-            validated = build_validated_runtime(wordlist)
-            code = _cmd_recover_locked(
+            code = cmd_recover(
                 CliOptions(wordlist=str(wordlist), json_output=True),
-                validated=validated,
             )
             self.assertEqual(code, int(ExitCode.OK))
 
@@ -622,11 +620,8 @@ class TestRecoverCmdValidatedFallback(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
-            validated = build_validated_runtime(wordlist)
-            object.__setattr__(validated, "journal_result", None)
-            code = _cmd_recover_locked(
+            code = cmd_recover(
                 CliOptions(wordlist=str(wordlist), json_output=True),
-                validated=validated,
             )
             self.assertEqual(code, int(ExitCode.OK))
 

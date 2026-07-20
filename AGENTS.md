@@ -21,8 +21,9 @@ filesystem adapters (dictionaries, io, paths)
 ```
 
 CLI/TUI adapters create immutable application requests. The application layer does not
-depend on `CliOptions`. Runtime settings are still implicit in 0.2.1 (ContextVar); explicit
-runtime is Phase 3.
+depend on `CliOptions`. Mutation CLI commands route through `SpellSyncService`; `config-check`
+and `lint` are CLI utilities. Runtime settings are still implicit in 0.2.1 (ContextVar);
+explicit runtime is Phase 3.
 
 Canonical references:
 

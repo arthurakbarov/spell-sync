@@ -23,11 +23,11 @@ from spell_sync.application.reports import (
 from spell_sync.application.requests import (
     ProjectRef,
     RecoveryRequest,
-    SetupRequest,
 )
 from spell_sync.bundled_files import init_project_directory
 from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
+from spell_sync.exit_codes import ExitCode
 from spell_sync.project_setup.discovery import discover_setup_targets
 from spell_sync.project_setup.draft import SetupDraft
 from spell_sync.project_setup.execute import (
@@ -104,9 +104,8 @@ class TestRemainingCoverage(unittest.TestCase):
             (project / "spell-sync.toml").write_text("[push]\n", encoding="utf-8")
             with patch.dict("os.environ", {"HOME": str(home)}, clear=False):
                 state = inspect_project_setup(
-                    SetupRequest(
-                        project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False
-                    )
+                    wordlist,
+                    allow_project_creation=False,
                 )
             self.assertEqual(state.status, ProjectSetupStatus.AMBIGUOUS_PROJECT)
 
@@ -490,16 +489,10 @@ class TestRemainingCoverage(unittest.TestCase):
                 "spell_sync.project_setup.state.load_journal_result",
                 return_value=MagicMock(status=JournalLoadStatus.ABSENT),
             ):
-                with patch(
-                    "spell_sync.application.requests.resolve_wordlist_path",
-                    return_value=Path("/tmp/unknown/wordlist.txt"),
-                ):
-                    state = inspect_project_setup(
-                        SetupRequest(
-                            project=ProjectRef(wordlist="/tmp/unknown/wordlist.txt"),
-                            allow_new_project_wizard=False,
-                        )
-                    )
+                state = inspect_project_setup(
+                    Path("/tmp/unknown/wordlist.txt"),
+                    allow_project_creation=False,
+                )
         self.assertEqual(state.status, ProjectSetupStatus.MISSING_PROJECT)
 
     def test_execute_stopped_when_can_execute_false(self):
@@ -684,9 +677,8 @@ class TestRemainingCoverage(unittest.TestCase):
                     return_value=MagicMock(status=JournalLoadStatus.ABSENT),
                 ):
                     state = inspect_project_setup(
-                        SetupRequest(
-                            project=ProjectRef(wordlist=wordlist), allow_new_project_wizard=False
-                        )
+                        wordlist,
+                        allow_project_creation=False,
                     )
             self.assertEqual(state.status, ProjectSetupStatus.MISSING_PROJECT)
             self.assertIn("could not be determined", state.detail or "")
@@ -823,6 +815,271 @@ class TestRemainingCoverage(unittest.TestCase):
                 ok, detail = safe_discard_journal_file(wordlist)
             self.assertFalse(ok)
             self.assertIn("outside project", detail or "")
+
+
+class TestPhase2BCliCoverage(unittest.TestCase):
+    def test_review_removals_for_preview_and_list(self):
+        from spell_sync.application.reports import PushPreview, TargetPreview
+        from spell_sync.removal_review import (
+            list_removals_from_preview,
+            review_removals_for_preview,
+        )
+
+        preview = PushPreview(
+            prepared=MagicMock(),
+            targets=(
+                TargetPreview(
+                    name="a",
+                    additions=0,
+                    removals=2,
+                    status="update",
+                    removal_words=frozenset({"gone", "lost"}),
+                ),
+            ),
+            additions=0,
+            removals=2,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p",
+            targets_to_update=1,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        self.assertTrue(review_removals_for_preview(preview, interactive=False))
+        diffs = list_removals_from_preview(preview)
+        self.assertEqual(len(diffs), 1)
+        self.assertEqual(diffs[0].to_remove, 2)
+        with (
+            patch("builtins.input", return_value="y"),
+            patch("sys.stdin.isatty", return_value=True),
+        ):
+            self.assertTrue(review_removals_for_preview(preview, interactive=True))
+        with (
+            patch("builtins.input", side_effect=EOFError),
+            patch("sys.stdin.isatty", return_value=True),
+        ):
+            self.assertIsNone(review_removals_for_preview(preview, interactive=True))
+
+        empty_removals = PushPreview(
+            prepared=MagicMock(),
+            targets=(TargetPreview(name="a", additions=1, removals=0, status="add"),),
+            additions=1,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p",
+            targets_to_update=1,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        self.assertTrue(review_removals_for_preview(empty_removals, interactive=False))
+        mixed_preview = PushPreview(
+            prepared=MagicMock(),
+            targets=(
+                TargetPreview(name="a", additions=1, removals=0, status="add"),
+                TargetPreview(
+                    name="b",
+                    additions=0,
+                    removals=1,
+                    status="update",
+                    removal_words=frozenset({"x"}),
+                ),
+            ),
+            additions=1,
+            removals=1,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p",
+            targets_to_update=1,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        mixed = list_removals_from_preview(mixed_preview)
+        self.assertEqual(len(mixed), 1)
+
+    def test_confirm_push_removals_for_preview(self):
+        import spell_sync.command_helpers as command_helpers
+        from spell_sync.application.reports import PushPreview
+
+        prepared = MagicMock()
+        prepared.max_removals.return_value = 100
+        preview = PushPreview(
+            prepared=prepared,
+            targets=(),
+            additions=0,
+            removals=100,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        limit_patch = "spell_sync.command_helpers.push_max_removals_without_confirm"
+        opts = CliOptions()
+        with patch(limit_patch, return_value=50), patch("sys.stdin.isatty", return_value=False):
+            self.assertFalse(command_helpers.confirm_push_removals_for_preview(preview, opts))
+        self.assertTrue(
+            command_helpers.confirm_push_removals_for_preview(preview, CliOptions(dry_run=True)),
+        )
+        with (
+            patch(limit_patch, return_value=50),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("builtins.input", return_value="y"),
+        ):
+            self.assertTrue(command_helpers.confirm_push_removals_for_preview(preview, opts))
+        with (
+            patch(limit_patch, return_value=50),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("builtins.input", side_effect=EOFError),
+        ):
+            self.assertIsNone(command_helpers.confirm_push_removals_for_preview(preview, opts))
+
+    def test_plan_cmd_removals_and_wordlist_error(self):
+        from service_test_utils import patch_plan_service
+
+        import spell_sync.plan_cmd as plan_mod
+        from spell_sync.application.reports import PushPreview, TargetPreview
+
+        preview = PushPreview(
+            prepared=MagicMock(),
+            targets=(
+                TargetPreview(
+                    name="a",
+                    additions=0,
+                    removals=1,
+                    status="update",
+                    removal_words=frozenset({"x"}),
+                ),
+            ),
+            additions=0,
+            removals=1,
+            warnings=(),
+            created_at="t",
+            plan_identifier="p",
+            targets_to_update=1,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+        )
+        with patch_plan_service(load_push_preview=preview):
+            code = plan_mod.cmd_plan(CliOptions(plan_removals=True))
+        self.assertEqual(code, int(ExitCode.OK))
+
+        bad = PushPreview(
+            prepared=None,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="t",
+            plan_identifier="u",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+            wordlist_error=ExitCode.WORDLIST_UNREADABLE,
+        )
+        with patch_plan_service(load_push_preview=bad):
+            code = plan_mod.cmd_plan(CliOptions(plan_removals=True, json_output=True))
+        self.assertEqual(code, int(ExitCode.WORDLIST_UNREADABLE))
+
+        blocked_plan = (
+            bad,
+            (),
+            ExitCode.PUSH_ABORT,
+        )
+        with patch_plan_service(load_push_plan=blocked_plan):
+            code = plan_mod.cmd_plan(CliOptions(json_output=True))
+        self.assertEqual(code, int(ExitCode.WORDLIST_UNREADABLE))
+
+    def test_cmd_pull_execution_exit_code(self):
+        from service_test_utils import (
+            patch_commands_service,
+            pull_execution,
+            pull_preview_executable,
+        )
+
+        import spell_sync.commands as commands_mod
+
+        preview = pull_preview_executable("/tmp/w.txt", 1, 1)
+        execution = pull_execution(1, 1, preview=preview, result=ExitCode.PUSH_ABORT)
+        with patch_commands_service(prepare_pull=preview, execute_pull=execution):
+            code = commands_mod.cmd_pull(CliOptions(json_output=True))
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+
+    def test_recover_cmd_remaining_paths(self):
+        from service_test_utils import (
+            patch_recover_service,
+            recoverable_preview,
+            recovery_execution,
+        )
+
+        import spell_sync.recover_cmd as recover_mod
+        from spell_sync.application.reports import RecoveryExecution, RecoveryOutcome
+
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            preview = replace(
+                recoverable_preview(str(wordlist)),
+                can_recover=False,
+                status=RecoveryStatus.CONFLICTED,
+                detail="not recoverable",
+            )
+            with patch_recover_service(inspect_recovery=preview):
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    code = recover_mod.cmd_recover(
+                        CliOptions(wordlist=str(wordlist), json_output=True),
+                    )
+                self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload["reason"], RecoveryStatus.CONFLICTED.value)
+
+            preview_ok = recoverable_preview(str(wordlist))
+            with (
+                patch_recover_service(inspect_recovery=preview_ok),
+                patch("sys.stdin.isatty", return_value=False),
+            ):
+                code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist)))
+            self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+
+            execution = RecoveryExecution(
+                preview=preview_ok,
+                result=0,
+                outcome=RecoveryOutcome.RECOVERED,
+                message="",
+            )
+            with patch_recover_service(
+                inspect_recovery=preview_ok,
+                execute_recovery=execution,
+            ):
+                code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist), yes=True))
+            self.assertEqual(code, int(ExitCode.OK))
+
+            execution_ok = recovery_execution(RecoverResult((), (), ()), preview=preview_ok)
+            with patch_recover_service(
+                inspect_recovery=preview_ok,
+                execute_recovery=execution_ok,
+            ):
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    code = recover_mod.cmd_recover(
+                        CliOptions(wordlist=str(wordlist), yes=True, json_output=True),
+                    )
+                self.assertEqual(code, int(ExitCode.OK))
+                self.assertEqual(json.loads(buf.getvalue()).get("journal"), {})
 
 
 if __name__ == "__main__":

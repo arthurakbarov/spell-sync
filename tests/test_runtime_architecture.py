@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import spell_sync.settings as settings_mod
-from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.dictionary_registry import DictionarySource, discover_from_sources
 from spell_sync.sync_context import RuntimeContext
@@ -115,8 +114,7 @@ class TestRuntimeContext(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
             wordlist = f.name
         try:
-            opts = CliOptions(wordlist=wordlist)
-            run = sync_run_for(opts)
+            run = sync_run_for(Path(wordlist))
             self.assertEqual(str(run.wordlist_file), wordlist)
         finally:
             Path(wordlist).unlink(missing_ok=True)

@@ -1,13 +1,9 @@
-"""Immutable UI-neutral application requests."""
+"""Immutable UI-neutral application request DTOs."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
-
-from ..config import push_strict_enabled
-from ..paths import resolve_wordlist_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,18 +11,6 @@ class ProjectRef:
     """Unresolved project wordlist selection from the caller."""
 
     wordlist: Path | None = None
-
-
-def resolve_project_wordlist(project: ProjectRef) -> Path:
-    """Resolve effective wordlist path using standard project rules."""
-    if project.wordlist is None:
-        return resolve_wordlist_path(None)
-    return resolve_wordlist_path(str(project.wordlist))
-
-
-class OperationSource(str, Enum):
-    CLI = "cli"
-    TUI = "tui"
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +22,8 @@ class StatusRequest:
 @dataclass(frozen=True, slots=True)
 class DoctorRequest:
     project: ProjectRef
+    list_targets: bool = False
+    health_check: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +46,7 @@ class RecoveryRequest:
 @dataclass(frozen=True, slots=True)
 class SetupRequest:
     project: ProjectRef
-    allow_new_project_wizard: bool = True
+    allow_project_creation: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,21 +63,3 @@ class PrepareTargetSettingsUpdateRequest:
 @dataclass(frozen=True, slots=True)
 class SupportReportRequest:
     project: ProjectRef
-
-
-@dataclass(frozen=True, slots=True)
-class ConfigCheckRequest:
-    project: ProjectRef
-
-
-@dataclass(frozen=True, slots=True)
-class LintRequest:
-    project: ProjectRef
-    fix: bool = False
-    strict: bool = False
-
-
-def effective_push_strict(request: PushRequest) -> bool:
-    if request.strict_override is not None:
-        return request.strict_override
-    return push_strict_enabled()

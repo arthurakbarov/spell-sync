@@ -11,13 +11,21 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from conftest import DEFAULT_OPTS
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    pull_execution,
+    pull_preview_executable,
+    push_execution,
+    status_snapshot_from_run,
+)
 
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
-from spell_sync.application.requests import ProjectRef
+from spell_sync.application.reports import PullPreview
 from spell_sync.cli_options import CliOptions
 from spell_sync.command_helpers import finish_push, sync_run_for, wordlist_file_for
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
@@ -59,7 +67,7 @@ class TestResolveWordlistPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             custom = os.path.join(d, "words.txt")
             Path(custom).write_text("a\n", encoding="utf-8")
-            run = sync_run_for(ProjectRef(wordlist=Path(custom)))
+            run = sync_run_for(Path(custom))
             self.assertEqual(str(run.wordlist_file), custom)
 
     def test_finish_push_json_partial(self):
@@ -214,9 +222,13 @@ class TestCommandHelpers(unittest.TestCase):
 
 class TestCommandsJson(unittest.TestCase):
     def test_cmd_pull_json(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        run.pull_into_wordlist = lambda: (1, 3)  # type: ignore[method-assign]
-        with patch.object(commands, "sync_run_for", return_value=run):
+        preview = pull_preview_executable("/tmp/x", 1, 3)
+        execution = pull_execution(1, 3, preview=preview)
+        with patch_commands_service(
+            prepare_pull=preview,
+            execute_pull=execution,
+            build_pull_report=MagicMock(),
+        ):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_pull(CliOptions(json_output=True))
@@ -225,9 +237,22 @@ class TestCommandsJson(unittest.TestCase):
             self.assertEqual(data["added"], 2)
 
     def test_cmd_pull_abort_json(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        run.pull_into_wordlist = lambda: ExitCode.WORDLIST_UNREADABLE  # type: ignore
-        with patch.object(commands, "sync_run_for", return_value=run):
+        preview = pull_preview_executable("/tmp/x", 0, 0)
+        preview = PullPreview(
+            wordlist_path="/tmp/x",
+            additions=0,
+            before_count=0,
+            after_count=0,
+            sources_used=(),
+            sources_skipped=(),
+            source_rows=(),
+            warnings=(),
+            created_at="2026-01-01T00:00:00+00:00",
+            plan_identifier="blocked",
+            merged_words=(),
+            wordlist_error=ExitCode.WORDLIST_UNREADABLE,
+        )
+        with patch_commands_service(prepare_pull=preview):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_pull(CliOptions(json_output=True))
@@ -236,13 +261,18 @@ class TestCommandsJson(unittest.TestCase):
 
     def test_cmd_push_json_success(self):
         result = PushResult(2, ("a", "b"), ())
+        preview = executable_push_preview()
+        execution = push_execution(result, preview=preview)
         with (
             patch.object(commands, "warn_missing_optional_apps"),
             patch.object(commands, "_running_apps_check_for_push", return_value=True),
-            patch.object(commands, "confirm_push_removals", return_value=True),
-            patch.object(commands, "sync_run_for") as run_cls,
+            patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+            patch_commands_service(
+                load_push_preview=preview,
+                execute_push_preview=execution,
+                build_push_report=MagicMock(),
+            ),
         ):
-            run_cls.return_value.push_from_wordlist.return_value = result
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_push(CliOptions(json_output=True))
@@ -252,13 +282,18 @@ class TestCommandsJson(unittest.TestCase):
             self.assertEqual(data["exit"], 0)
 
     def test_cmd_push_json_abort(self):
+        preview = executable_push_preview()
+        execution = push_execution(ExitCode.PUSH_ABORT, preview=preview)
         with (
             patch.object(commands, "warn_missing_optional_apps"),
             patch.object(commands, "_running_apps_check_for_push", return_value=True),
-            patch.object(commands, "confirm_push_removals", return_value=True),
-            patch.object(commands, "sync_run_for") as run_cls,
+            patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+            patch_commands_service(
+                load_push_preview=preview,
+                execute_push_preview=execution,
+                build_push_report=MagicMock(),
+            ),
         ):
-            run_cls.return_value.push_from_wordlist.return_value = ExitCode.PUSH_ABORT
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_push(CliOptions(json_output=True))
@@ -274,8 +309,15 @@ class TestCommandsJson(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
+            result = PushResult(1, ("a",), ())
+            preview = executable_push_preview()
+            execution = push_execution(result, preview=preview)
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_dry_run=execution,
+                    load_status=status_snapshot_from_run(run),
+                ),
                 patch.object(commands, "warn_missing_optional_apps"),
             ):
                 buf = io.StringIO()
@@ -299,9 +341,13 @@ class TestCommandsJson(unittest.TestCase):
 
 class TestCommandsSyncFlow(unittest.TestCase):
     def test_cmd_pull_text_success(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        run.pull_into_wordlist = lambda: (2, 5)  # type: ignore[method-assign]
-        with patch.object(commands, "sync_run_for", return_value=run):
+        preview = pull_preview_executable("/tmp/x", 2, 5)
+        execution = pull_execution(2, 5, preview=preview)
+        with patch_commands_service(
+            prepare_pull=preview,
+            execute_pull=execution,
+            build_pull_report=MagicMock(),
+        ):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_pull(DEFAULT_OPTS)
@@ -333,7 +379,7 @@ class TestCommandsSyncFlow(unittest.TestCase):
     def test_status_unreadable_json(self):
         run = SyncRun(wordlist="/tmp/x", dictionaries=[])
         run.check_wordlist = lambda: ExitCode.WORDLIST_UNREADABLE  # type: ignore
-        with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+        with patch_commands_service(load_status=status_snapshot_from_run(run)):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = commands.cmd_status(CliOptions(json_output=True))
@@ -359,7 +405,7 @@ class TestCommandsSyncFlow(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            with patch_commands_service(load_status=status_snapshot_from_run(run)):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_status(DEFAULT_OPTS)

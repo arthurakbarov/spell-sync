@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..application.requests import SupportReportRequest, resolve_project_wordlist
+from ..application.project_resolution import resolve_project_wordlist
+from ..application.requests import SupportReportRequest
 from ..command_helpers import sync_run_for
 from ..diagnostics.paths import resolve_app_state_paths
-from ..project_setup.target_settings import load_target_settings
+from ..project_setup.target_settings import load_target_settings_snapshot
 from ..push_journal import JournalLoadStatus, load_journal_result
 from ..runtime import installed_package_version
 from ..settings import ConfigStatus
@@ -101,15 +102,14 @@ def build_support_report(service: object, request: SupportReportRequest) -> Supp
     config_valid = validated.config_result.status in (ConfigStatus.VALID, ConfigStatus.ABSENT)
     word_count: int | None = None
     try:
-        run = sync_run_for(request.project)
+        run = sync_run_for(wordlist)
         word_count = len(run.load_wordlist())
     except Exception:
         word_count = None
     journal = load_journal_result(wordlist)
     pending = journal.status is JournalLoadStatus.VALID_IN_PROGRESS
-    from ..application.requests import TargetSettingsRequest
 
-    target_settings = load_target_settings(TargetSettingsRequest(project=request.project))
+    target_settings = load_target_settings_snapshot(wordlist=wordlist)
     targets: list[TargetSupportState] = []
     for target in target_settings.targets:
         try:

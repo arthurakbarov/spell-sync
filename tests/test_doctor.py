@@ -332,7 +332,6 @@ class TestDoctor(unittest.TestCase):
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             err = io.StringIO()
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
                 patch.object(
                     report_mod,
                     "inspect_cli",
@@ -345,9 +344,15 @@ class TestDoctor(unittest.TestCase):
                     ),
                 ),
                 patch.object(report_mod, "inspect_git_hooks", return_value=None),
+            ):
+                report = doctor_mod.build_doctor_report(run)
+            with (
+                patch.object(doctor_mod._SERVICE, "load_doctor_report", return_value=report),
                 redirect_stderr(err),
             ):
-                code = doctor_mod.cmd_doctor(CliOptions(health_check=True))
+                code = doctor_mod.cmd_doctor(
+                    CliOptions(health_check=True, wordlist=wordlist),
+                )
             self.assertEqual(code, int(ExitCode.LINT_FAILED))
             self.assertIn("path-export", err.getvalue())
 
@@ -374,7 +379,6 @@ class TestDoctor(unittest.TestCase):
                 return target == wordlist or target.endswith("wordlist.txt")
 
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
                 patch.object(report_mod, "is_macos", return_value=True),
                 patch.object(health_actions_mod, "is_macos", return_value=True),
                 patch("spell_sync.health.report.is_path_readable", side_effect=readable),
@@ -391,9 +395,15 @@ class TestDoctor(unittest.TestCase):
                     ),
                 ),
                 patch.object(report_mod, "inspect_git_hooks", return_value=None),
+            ):
+                report = doctor_mod.build_doctor_report(run)
+            with (
+                patch.object(doctor_mod._SERVICE, "load_doctor_report", return_value=report),
                 redirect_stderr(err),
             ):
-                code = doctor_mod.cmd_doctor(CliOptions(health_check=True))
+                code = doctor_mod.cmd_doctor(
+                    CliOptions(health_check=True, wordlist=wordlist),
+                )
             self.assertEqual(code, int(ExitCode.OK))
             self.assertIn("macos-fda", err.getvalue())
 
@@ -403,7 +413,6 @@ class TestDoctor(unittest.TestCase):
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
                 patch.object(
                     report_mod,
                     "inspect_cli",
@@ -417,7 +426,11 @@ class TestDoctor(unittest.TestCase):
                 ),
                 patch.object(report_mod, "inspect_git_hooks", return_value=None),
             ):
-                code = doctor_mod.cmd_doctor(CliOptions(health_check=True))
+                report = doctor_mod.build_doctor_report(run)
+            with patch.object(doctor_mod._SERVICE, "load_doctor_report", return_value=report):
+                code = doctor_mod.cmd_doctor(
+                    CliOptions(health_check=True, wordlist=wordlist),
+                )
             self.assertEqual(code, int(ExitCode.OK))
 
     def test_doctor_check_exits_on_errors(self):
@@ -427,7 +440,6 @@ class TestDoctor(unittest.TestCase):
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             err = io.StringIO()
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
                 patch.object(run, "check_wordlist", return_value=ExitCode.WORDLIST_UNREADABLE),
                 patch.object(
                     report_mod,
@@ -441,9 +453,15 @@ class TestDoctor(unittest.TestCase):
                     ),
                 ),
                 patch.object(report_mod, "inspect_git_hooks", return_value=None),
+            ):
+                report = doctor_mod.build_doctor_report(run)
+            with (
+                patch.object(doctor_mod._SERVICE, "load_doctor_report", return_value=report),
                 redirect_stderr(err),
             ):
-                code = doctor_mod.cmd_doctor(CliOptions(health_check=True))
+                code = doctor_mod.cmd_doctor(
+                    CliOptions(health_check=True, wordlist=wordlist),
+                )
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
             self.assertIn("wordlist unreadable", err.getvalue())
 
@@ -665,11 +683,9 @@ class TestDoctor(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
             opts = CliOptions(wordlist=wordlist)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
             buf = io.StringIO()
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
-                patch.object(doctor_mod, "build_doctor_report", return_value=report),
+                patch.object(doctor_mod._SERVICE, "load_doctor_report", return_value=report),
                 redirect_stdout(buf),
             ):
                 code = doctor_mod.cmd_doctor(opts)

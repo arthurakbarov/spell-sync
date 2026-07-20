@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from ..application.requests import SetupRequest, resolve_project_wordlist
 from ..io import wordlist_unreadable
 from ..project import ProjectContext
 from ..push_journal import JournalLoadStatus, load_journal_result
@@ -49,8 +48,11 @@ def _blocking_journal_status(journal_status: JournalLoadStatus) -> bool:
     )
 
 
-def inspect_project_setup(request: SetupRequest) -> ProjectSetupState:
-    wordlist = resolve_project_wordlist(request.project)
+def inspect_project_setup(
+    wordlist: Path,
+    *,
+    allow_project_creation: bool = True,
+) -> ProjectSetupState:
     project = ProjectContext.build(wordlist)
     project_dir = project.project_dir
     config_path = project_dir / "spell-sync.toml"
@@ -172,7 +174,7 @@ def inspect_project_setup(request: SetupRequest) -> ProjectSetupState:
         )
 
     if not wordlist_exists and not config_exists:
-        can_wizard = request.allow_new_project_wizard
+        can_wizard = allow_project_creation
         return ProjectSetupState(
             status=ProjectSetupStatus.MISSING_PROJECT,
             effective_wordlist=wordlist,

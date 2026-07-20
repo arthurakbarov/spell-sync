@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .. import command_helpers
+from ..application.project_resolution import effective_push_strict, resolve_project_wordlist
 from ..application.requests import (
     DoctorRequest,
     PrepareTargetSettingsUpdateRequest,
@@ -15,8 +16,6 @@ from ..application.requests import (
     SetupRequest,
     StatusRequest,
     TargetSettingsRequest,
-    effective_push_strict,
-    resolve_project_wordlist,
 )
 from ..diagnostics.history_builder import HistoryBuildContext, build_history_record
 from ..diagnostics.history_store import OperationHistoryStore
@@ -33,6 +32,7 @@ from ..diagnostics.types import (
 )
 from ..exit_codes import ExitCode
 from ..health.report import build_doctor_report
+from ..health.types import DoctorReport
 from ..operation_lock import read_active_operation_lock
 from ..project_setup.discovery import SetupTargetDiscovery, discover_setup_targets
 from ..project_setup.draft import SetupDraft
@@ -44,8 +44,8 @@ from ..project_setup.target_settings import (
     TargetSettingsExecution,
     TargetSettingsSnapshot,
     execute_target_settings_update,
-    load_target_settings,
-    prepare_target_settings_update_request,
+    load_target_settings_snapshot,
+    prepare_target_settings_update,
 )
 from ..push_abort import PushAbort
 from ..push_journal import (
@@ -58,12 +58,13 @@ from ..push_journal import (
     safe_discard_journal_file,
 )
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
-from ..sync_models import PushResult
-from ..sync_run import SyncRun
+from ..sync_models import DictionaryDiff, PushResult
+from ..sync_run import SyncRun, sync_run_for
 from ..validated_runtime import build_validated_runtime
 from .builders import (
     build_dashboard_state,
     build_doctor_snapshot,
+    build_pull_add_from_preview,
     build_pull_operation_report,
     build_pull_preview,
     build_push_operation_report,
@@ -79,6 +80,8 @@ from .operation_explanations import build_push_target_updates
 from .reports import (
     DashboardState,
     DoctorSnapshot,
+    DoctorTargetsSnapshot,
+    DoctorTargetView,
     OperationOutcome,
     OperationReport,
     PullExecution,
@@ -197,7 +200,7 @@ class SpellSyncService:
         return replace(report, warnings=warnings)
 
     def load_status(self, request: StatusRequest) -> StatusSnapshot:
-        run = command_helpers.sync_run_for(request.project)
+        run = sync_run_for(resolve_project_wordlist(request.project))
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return StatusSnapshot(
@@ -218,7 +221,7 @@ class SpellSyncService:
         )
 
     def load_status_detail(self, request: StatusRequest) -> StatusDetailSnapshot:
-        run = command_helpers.sync_run_for(request.project)
+        run = sync_run_for(resolve_project_wordlist(request.project))
         return build_status_detail_snapshot(run)
 
     def load_dashboard(self, request: StatusRequest) -> DashboardState:
@@ -241,18 +244,18 @@ class SpellSyncService:
 
     def load_push_preview(self, request: PushRequest) -> PushPreview:
         strict = effective_push_strict(request)
-        run = command_helpers.sync_run_for(request.project, strict_push=strict)
+        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
         wordlist_error = run.check_wordlist()
         if wordlist_error is not None:
             return build_push_preview(None, wordlist_error=wordlist_error)
-        prepared = self.prepare_push(run)
+        prepared = self._prepare_push_for_run(run)
         if isinstance(prepared, ExitCode):
             return build_push_preview(None, prepare_error=prepared)
         return build_push_preview(prepared)
 
     def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
         try:
-            run = command_helpers.sync_run_for(request.project)
+            run = sync_run_for(resolve_project_wordlist(request.project))
             report = build_doctor_report(run)
             return build_doctor_snapshot(report)
         except Exception:
@@ -262,8 +265,104 @@ class SpellSyncService:
                 load_error="Doctor report could not be loaded.",
             )
 
+    def load_doctor_report(self, request: DoctorRequest) -> DoctorReport:
+        run = sync_run_for(resolve_project_wordlist(request.project))
+        return build_doctor_report(run)
+
+    def load_doctor_targets(self, request: DoctorRequest) -> DoctorTargetsSnapshot:
+        from ..dictionaries import DictionaryFormat
+        from ..read_outcome import dictionary_read_result
+
+        run = sync_run_for(resolve_project_wordlist(request.project))
+        targets: list[DoctorTargetView] = []
+        for dictionary in run.dictionaries:
+            status = dictionary_read_result(dictionary).status
+            fmt = (
+                dictionary.format.value
+                if isinstance(dictionary.format, DictionaryFormat)
+                else str(dictionary.format)
+            )
+            targets.append(
+                DoctorTargetView(
+                    name=dictionary.name,
+                    path=dictionary.path,
+                    format=fmt,
+                    read_status=status.value,
+                )
+            )
+        return DoctorTargetsSnapshot(
+            wordlist_path=str(Path(run.wordlist_str)),
+            targets=tuple(targets),
+        )
+
+    def load_push_removals(self, request: PushRequest) -> tuple[DictionaryDiff, ...]:
+        strict = effective_push_strict(request)
+        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
+        return tuple(diff for diff in run.status_diffs(verbose=True) if diff.to_remove > 0)
+
+    def load_push_plan(
+        self,
+        request: PushRequest,
+        *,
+        verbose: bool = False,
+    ) -> tuple[PushPreview, tuple[DictionaryDiff, ...], PushResult | ExitCode]:
+        strict = effective_push_strict(request)
+        run = sync_run_for(resolve_project_wordlist(request.project), strict_push=strict)
+        preview = self.load_push_preview(request)
+        diffs = tuple(run.status_diffs(verbose=verbose))
+        if not preview.is_executable or preview.prepared is None:
+            error = preview.prepare_error or preview.wordlist_error or ExitCode.PUSH_ABORT
+            return preview, diffs, error
+        skip_names = command_helpers.push_skip_running_app_dicts(run)
+        result = run.plan_push(skip_names=skip_names)
+        return preview, diffs, result
+
+    def execute_push_dry_run(self, request: PushRequest, preview: PushPreview) -> PushExecution:
+        prepared = preview.prepared
+        if prepared is None or not preview.is_executable:
+            return PushExecution(
+                prepared=prepared,
+                result=ExitCode.PUSH_ABORT,
+                outcome=OperationOutcome.FAILED,
+                message="Push preview is not executable.",
+                plan_identifier=preview.plan_identifier,
+                push_preview=preview,
+            )
+        strict = effective_push_strict(request)
+        with command_helpers.mutating_command_scope_for(
+            resolve_project_wordlist(request.project),
+            "push",
+            strict_push=strict,
+        ) as scope:
+            if isinstance(scope, int):
+                return PushExecution(
+                    prepared=prepared,
+                    result=ExitCode(scope),
+                    outcome=OperationOutcome.FAILED,
+                    message="Push could not acquire a safe execution context.",
+                    plan_identifier=preview.plan_identifier,
+                    push_preview=preview,
+                )
+            run = SyncRun(context=scope.context)
+            result = self._execute_push_for_run(run, prepared, dry_run=True)
+            execution = self.push_execution_from_result(prepared, result)
+            return PushExecution(
+                prepared=execution.prepared,
+                result=execution.result,
+                outcome=execution.outcome,
+                message=execution.message,
+                warnings=execution.warnings,
+                target_updates=execution.target_updates,
+                recovery_required=execution.recovery_required,
+                plan_identifier=preview.plan_identifier,
+                push_preview=preview,
+            )
+
     def prepare_pull(self, request: PullRequest) -> PullPreview:
-        run = command_helpers.sync_run_for(request.project)
+        wordlist = resolve_project_wordlist(request.project)
+        run = sync_run_for(wordlist)
+        if request.add_from is not None:
+            return build_pull_add_from_preview(run, request.add_from)
         return build_pull_preview(run)
 
     def execute_pull(
@@ -293,7 +392,10 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PULL, "validating", "Validating pull preview"),
         )
-        with command_helpers.mutating_command_scope_for(request.project, "pull") as scope:
+        with command_helpers.mutating_command_scope_for(
+            resolve_project_wordlist(request.project),
+            "pull",
+        ) as scope:
             if isinstance(scope, int):
                 _emit(
                     event_sink,
@@ -409,7 +511,7 @@ class SpellSyncService:
                 warnings=preview.warnings,
             )
 
-    def prepare_push(
+    def _prepare_push_for_run(
         self,
         run: SyncRun,
         *,
@@ -437,7 +539,7 @@ class SpellSyncService:
             )
         return prepared
 
-    def execute_push(
+    def _execute_push_for_run(
         self,
         run: SyncRun,
         prepared: PreparedPush,
@@ -493,7 +595,7 @@ class SpellSyncService:
         )
         return result
 
-    def run_push(
+    def _run_push_for_run(
         self,
         run: SyncRun,
         prepared: PreparedPush,
@@ -501,7 +603,7 @@ class SpellSyncService:
         dry_run: bool,
         event_sink: EventSink | None = None,
     ) -> PushExecution:
-        result = self.execute_push(
+        result = self._execute_push_for_run(
             run,
             prepared,
             dry_run=dry_run,
@@ -603,7 +705,7 @@ class SpellSyncService:
         )
         strict = effective_push_strict(request)
         with command_helpers.mutating_command_scope_for(
-            request.project,
+            resolve_project_wordlist(request.project),
             "push",
             strict_push=strict,
         ) as scope:
@@ -843,6 +945,7 @@ class SpellSyncService:
         preview: RecoveryPreview,
         *,
         confirmed_transaction_id: str,
+        dry_run: bool = False,
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         if confirmed_transaction_id != preview.preview_fingerprint:
@@ -865,7 +968,7 @@ class SpellSyncService:
             OperationEvent(OperationKind.RECOVER, "validating_journal", "Validating journal"),
         )
         with command_helpers.mutating_command_scope_for(
-            request.project,
+            resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -949,8 +1052,27 @@ class SpellSyncService:
                     ),
                 )
 
-            result = recover_from_journal(journal, dry_run=False)
+            result = recover_from_journal(journal, dry_run=dry_run)
             incomplete = bool(result.failed or result.conflicts)
+            if dry_run:
+                outcome = (
+                    RecoveryOutcome.CONFLICTED
+                    if result.conflicts
+                    else RecoveryOutcome.RECOVERED
+                    if not incomplete
+                    else RecoveryOutcome.RECOVERY_INCOMPLETE
+                )
+                return RecoveryExecution(
+                    preview=preview,
+                    result=result,
+                    outcome=outcome,
+                    message="Recovery dry-run completed.",
+                    warnings=preview.warnings,
+                    restored=result.restored,
+                    skipped=result.skipped,
+                    conflicts=result.conflicts,
+                    failed=result.failed,
+                )
             if incomplete:
                 outcome = (
                     RecoveryOutcome.CONFLICTED
@@ -1069,7 +1191,7 @@ class SpellSyncService:
                 message="Cleanup is not available for this preview.",
             )
         with command_helpers.mutating_command_scope_for(
-            request.project,
+            resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -1136,7 +1258,7 @@ class SpellSyncService:
                 message="Discard is not available for this preview.",
             )
         with command_helpers.mutating_command_scope_for(
-            request.project,
+            resolve_project_wordlist(request.project),
             "recover",
             allow_unfinished_journal=True,
         ) as scope:
@@ -1175,7 +1297,10 @@ class SpellSyncService:
             )
 
     def inspect_project_setup(self, request: SetupRequest) -> ProjectSetupState:
-        return inspect_project_setup(request)
+        return inspect_project_setup(
+            resolve_project_wordlist(request.project),
+            allow_project_creation=request.allow_project_creation,
+        )
 
     def discover_setup_targets(self, draft: SetupDraft) -> SetupTargetDiscovery:
         return discover_setup_targets(selected_targets=draft.selected_targets)
@@ -1220,13 +1345,25 @@ class SpellSyncService:
         return self._finalize_report(report, source=execution, duration_ms=duration_ms)
 
     def load_target_settings(self, request: TargetSettingsRequest) -> TargetSettingsSnapshot:
-        return load_target_settings(request)
+        return load_target_settings_snapshot(
+            wordlist=resolve_project_wordlist(request.project),
+        )
 
     def prepare_target_settings_update(
         self,
         request: PrepareTargetSettingsUpdateRequest,
     ) -> PreparedTargetSettingsUpdate:
-        return prepare_target_settings_update_request(request)
+        wordlist = resolve_project_wordlist(request.project)
+        validated = build_validated_runtime(wordlist)
+        pending_recovery = validated.journal_result.status not in (
+            JournalLoadStatus.ABSENT,
+            JournalLoadStatus.VALID_COMPLETED,
+        )
+        return prepare_target_settings_update(
+            wordlist=wordlist,
+            selected_target_ids=request.selected_target_ids,
+            pending_recovery=pending_recovery,
+        )
 
     def execute_target_settings_update(
         self,

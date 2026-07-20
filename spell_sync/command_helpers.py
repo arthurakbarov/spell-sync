@@ -5,9 +5,12 @@ from __future__ import annotations
 import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Iterator
 
-from .application.requests import ProjectRef, resolve_project_wordlist
+from .application.project_resolution import resolve_project_wordlist
+from .application.reports import PushPreview
+from .application.requests import ProjectRef
 from .cli_options import CliOptions
 from .config import CONFIRM_YES, push_max_removals_without_confirm
 from .exit_codes import ExitCode
@@ -101,7 +104,7 @@ def operation_lock_scope(opts: CliOptions, command: str) -> Iterator[int | None]
     from .cli_request_adapter import project_ref
 
     with operation_lock_scope_for(
-        project_ref(opts),
+        wordlist_path_for(project_ref(opts)),
         command,
         json_output=opts.json_output,
     ) as lock_exit:
@@ -187,7 +190,7 @@ def mutating_command_scope(
     from .cli_request_adapter import project_ref
 
     with mutating_command_scope_for(
-        project_ref(opts),
+        wordlist_path_for(project_ref(opts)),
         command,
         allow_unfinished_journal=allow_unfinished_journal,
         strict_push=strict_push,
@@ -306,7 +309,7 @@ def wordlist_file_for(opts: CliOptions):
 
 @contextmanager
 def mutating_command_scope_for(
-    project: ProjectRef,
+    wordlist: Path,
     command: str,
     *,
     allow_unfinished_journal: bool = False,
@@ -314,8 +317,11 @@ def mutating_command_scope_for(
     json_output: bool = False,
 ) -> Iterator[ValidatedRuntime | int]:
     """Acquire lock, then load config and journal once for mutating commands."""
-    wordlist = wordlist_path_for(project)
-    with operation_lock_scope_for(project, command, json_output=json_output) as lock_exit:
+    existing = active_validated_runtime()
+    if existing is not None:
+        yield existing
+        return
+    with operation_lock_scope_for(wordlist, command, json_output=json_output) as lock_exit:
         if lock_exit is not None:
             yield lock_exit
             return
@@ -348,12 +354,11 @@ def mutating_command_scope_for(
 
 @contextmanager
 def operation_lock_scope_for(
-    project: ProjectRef,
+    wordlist: Path,
     command: str,
     *,
     json_output: bool = False,
 ) -> Iterator[int | None]:
-    wordlist = wordlist_path_for(project)
     try:
         with acquire_operation_lock(wordlist, command):
             yield None
@@ -471,6 +476,35 @@ def guard_exit_code(
             print("Cancelled.")
         return int(cancelled)
     return None
+
+
+def confirm_push_removals_for_preview(
+    preview: PushPreview,
+    opts: CliOptions,
+) -> bool | None:
+    prepared = preview.prepared
+    peak = prepared.max_removals() if prepared is not None else 0
+    limit = push_max_removals_without_confirm()
+    if peak <= limit or opts.yes or opts.dry_run:
+        return True
+    log.warn(
+        f"push would remove up to {peak} words from a dictionary "
+        f"(limit {limit} without confirmation)"
+    )
+    log.detail("Review `status --verbose`, or pass `--yes` to proceed.")
+    interactive = sys.stdin.isatty() and not opts.json_output
+    if not interactive:
+        log.abort(
+            "push aborted — too many removals without confirmation. "
+            "Pass `--yes` to proceed in non-interactive mode."
+        )
+        return False
+    try:
+        answer = input("Continue push? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nCancelled.")
+        return None
+    return answer in CONFIRM_YES
 
 
 def confirm_push_removals(

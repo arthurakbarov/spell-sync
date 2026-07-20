@@ -11,6 +11,8 @@ import unittest
 from contextlib import ExitStack, redirect_stdout
 from unittest.mock import patch
 
+from service_test_utils import patch_isolated_push
+
 import spell_sync.app_process_check as guard
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
@@ -104,12 +106,12 @@ class TestRunningAppGuard(unittest.TestCase):
             )
             with ExitStack() as stack:
                 self._enter_chrome_running(stack)
-                stack.enter_context(patch.object(commands, "sync_run_for", return_value=run))
+                stack.enter_context(patch_isolated_push(run))
                 stdin = stack.enter_context(patch.object(commands.sys, "stdin"))
                 stdin.isatty.return_value = True
                 buf = io.StringIO()
                 with redirect_stdout(buf):
-                    code = commands.cmd_push(CliOptions(yes=True))
+                    code = commands.cmd_push(CliOptions(wordlist=wordlist, yes=True))
             self.assertEqual(code, int(ExitCode.PARTIAL_PUSH))
             self.assertEqual(read_text_words(chrome_path, quiet=True), {"stale"})
             self.assertEqual(read_text_words(other_path, quiet=True), {"alpha"})

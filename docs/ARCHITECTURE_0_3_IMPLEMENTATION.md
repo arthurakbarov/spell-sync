@@ -113,7 +113,53 @@ blocking, and privacy rules.
 
 ## Current phase
 
-Phase 2 complete (typed application requests). Phase 3 (explicit runtime) not started.
+Phase 2B complete (typed application boundary). Phase 3 (explicit runtime) not started.
+
+## Phase 2B: complete application boundary
+
+### CLI bypass inventory (resolved)
+
+| Command | Before | After |
+|---------|--------|-------|
+| status | service | service |
+| pull | CLI `SyncRun` | `prepare_pull` / `execute_pull` |
+| push | CLI `SyncRun` + `prepare_push(run)` | `load_push_preview` / `execute_push_preview` |
+| recover | journal internals in CLI | `inspect_recovery` + typed execution |
+| doctor | CLI `sync_run_for` | `load_doctor_report` / `load_doctor_targets` |
+| plan | CLI `sync_run_for` | `load_push_plan` / `execute_push_dry_run` |
+| init | service (draft in CLI) | service (unchanged draft assembly) |
+| config-check | CLI settings utility | CLI utility (documented exception) |
+| lint | CLI lint core | CLI utility (documented exception) |
+| support-report | typed request | service/report boundary |
+| ui | adapter | adapter |
+| version | presentation | presentation |
+
+### Dead requests and mappers (resolved)
+
+Removed unused `ConfigCheckRequest`, `LintRequest`, `config_check_request()`, `lint_request()`.
+Removed unused `OperationSource`.
+
+### Reverse dependency inventory (resolved)
+
+Core/project modules no longer import `spell_sync.application`. Resolution lives in
+`application/project_resolution.py`.
+
+### Required final service entrypoints
+
+Public: `prepare_pull`, `execute_pull`, `load_push_preview`, `execute_push_preview`,
+`execute_push_dry_run`, `inspect_recovery`, `execute_recovery*`, `load_doctor_report`,
+`load_doctor_targets`, `load_push_plan`, `load_push_removals`.
+
+Private: `_prepare_push_for_run`, `_execute_push_for_run`, `_run_push_for_run`.
+
+Push strict resolution: `effective_push_strict()` in `project_resolution.py` (implicit
+settings until Phase 3).
+
+### Compatibility contracts
+
+- CLI preflight (`mutating_command_scope`) preserved for JSON lock/config/journal exits
+- Service reuses active validated context when CLI scope is open
+- JSON schemas and exit codes unchanged
 
 ## Phase 2: typed request migration
 
@@ -138,8 +184,9 @@ See `docs/decisions/0001-typed-application-requests.md`.
 
 `ProjectRef`, `StatusRequest`, `DoctorRequest`, `PullRequest`, `PushRequest`,
 `RecoveryRequest`, `SetupRequest`, `TargetSettingsRequest`,
-`PrepareTargetSettingsUpdateRequest`, `SupportReportRequest`, `ConfigCheckRequest`,
-`LintRequest`, `OperationSource` (reserved for diagnostics; not wired yet).
+`PrepareTargetSettingsUpdateRequest`, `SupportReportRequest`.
+
+`config-check` and `lint` remain CLI-level utilities (no request types).
 
 ### Migration order
 
@@ -169,11 +216,12 @@ Summary:
 - Phase 0: baseline audit, this document
 - Phase 1 (spell-sync-dev): removed review-bundle, export-source handoff tooling
 - Phase 2: typed application requests + CLI adapter
+- Phase 2B: pure request DTOs, service-only CLI mutations, dependency direction
 
 ## Last validation
 
 ```text
-Phase 2: pytest 1559 passed; scripts/ci.sh green; wheel smoke OK (2026-07-20)
+Phase 2B: pytest 1559+ passed; scripts/ci.sh green; 100% line coverage (2026-07-20)
 ```
 
 ## Remaining work

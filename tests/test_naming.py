@@ -143,7 +143,9 @@ class TestJsonNaming(unittest.TestCase):
                     Dictionary("a", dict_path, DictionaryFormat.TEXT),
                 ],
             )
-            with patch.object(commands, "sync_run_for", return_value=run):
+            from service_test_utils import patch_commands_service, status_snapshot_from_run
+
+            with patch_commands_service(load_status=status_snapshot_from_run(run)):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_status(CliOptions(json_output=True))

@@ -13,6 +13,12 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from service_test_utils import (
+    patch_recover_service,
+    recoverable_preview,
+    recovery_execution,
+)
+
 import spell_sync.commands as commands
 import spell_sync.doctor as doctor_mod
 import spell_sync.recover_cmd as recover_mod
@@ -131,9 +137,11 @@ class TestPushJournalLifecycle(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch(
-                "spell_sync.recover_cmd.recover_from_journal",
-                return_value=RecoverResult((), (), ()),
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(RecoverResult((), (), ()), preview=preview)
+            with patch_recover_service(
+                inspect_recovery=preview,
+                execute_recovery=execution,
             ):
                 code = recover_mod.cmd_recover(
                     CliOptions(wordlist=str(wordlist), yes=True),
@@ -175,8 +183,12 @@ class TestRecoverCommand(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
+            preview = recoverable_preview(str(wordlist))
             buf = io.StringIO()
-            with redirect_stdout(buf):
+            with (
+                patch_recover_service(inspect_recovery=preview),
+                redirect_stdout(buf),
+            ):
                 code = recover_mod.cmd_recover(
                     CliOptions(wordlist=str(wordlist), json_output=True),
                 )
@@ -468,8 +480,16 @@ class TestRecoverCommandCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            with _locked_patch(wordlist):
-                code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist)))
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(ExitCode.PUSH_ABORT, preview=preview)
+            with (
+                _locked_patch(wordlist),
+                patch_recover_service(
+                    inspect_recovery=preview,
+                    execute_recovery=execution,
+                ),
+            ):
+                code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist), yes=True))
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
 
     def test_recover_no_journal_json(self):
@@ -490,9 +510,14 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch(
-                "spell_sync.recover_cmd.recover_from_journal",
-                return_value=RecoverResult((), (), ("wordlist",)),
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(
+                RecoverResult((), (), ("wordlist",)),
+                preview=preview,
+            )
+            with patch_recover_service(
+                inspect_recovery=preview,
+                execute_recovery=execution,
             ):
                 code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist), yes=True))
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
@@ -502,9 +527,14 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch(
-                "spell_sync.recover_cmd.recover_from_journal",
-                return_value=RecoverResult(("wordlist",), (), ()),
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(
+                RecoverResult(("wordlist",), (), ()),
+                preview=preview,
+            )
+            with patch_recover_service(
+                inspect_recovery=preview,
+                execute_recovery=execution,
             ):
                 code = recover_mod.cmd_recover(
                     CliOptions(wordlist=str(wordlist), dry_run=True),
@@ -516,9 +546,14 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch(
-                "spell_sync.recover_cmd.recover_from_journal",
-                return_value=RecoverResult((), ("wordlist",), ()),
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(
+                RecoverResult((), ("wordlist",), ()),
+                preview=preview,
+            )
+            with patch_recover_service(
+                inspect_recovery=preview,
+                execute_recovery=execution,
             ):
                 code = recover_mod.cmd_recover(
                     CliOptions(wordlist=str(wordlist), dry_run=True),
@@ -530,9 +565,14 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch(
-                "spell_sync.recover_cmd.recover_from_journal",
-                return_value=RecoverResult(("wordlist",), (), ()),
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(
+                RecoverResult(("wordlist",), (), ()),
+                preview=preview,
+            )
+            with patch_recover_service(
+                inspect_recovery=preview,
+                execute_recovery=execution,
             ):
                 code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist), yes=True))
             self.assertEqual(code, int(ExitCode.OK))
@@ -542,12 +582,14 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
+            preview = recoverable_preview(str(wordlist))
+            execution = recovery_execution(RecoverResult((), (), ()), preview=preview)
             with (
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="y"),
-                patch(
-                    "spell_sync.recover_cmd.recover_from_journal",
-                    return_value=RecoverResult((), (), ()),
+                patch_recover_service(
+                    inspect_recovery=preview,
+                    execute_recovery=execution,
                 ),
             ):
                 code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist)))
@@ -558,9 +600,11 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
+            preview = recoverable_preview(str(wordlist))
             with (
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="n"),
+                patch_recover_service(inspect_recovery=preview),
             ):
                 code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist)))
             self.assertEqual(code, int(ExitCode.CANCELLED))
@@ -570,9 +614,11 @@ class TestRecoverCommandCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
+            preview = recoverable_preview(str(wordlist))
             with (
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=EOFError),
+                patch_recover_service(inspect_recovery=preview),
             ):
                 code = recover_mod.cmd_recover(CliOptions(wordlist=str(wordlist)))
             self.assertEqual(code, int(ExitCode.CANCELLED))

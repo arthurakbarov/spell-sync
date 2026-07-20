@@ -12,6 +12,18 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import MagicMock, patch
 
+from service_test_utils import (
+    doctor_targets_from_run,
+    executable_push_preview,
+    patch_commands_service,
+    patch_doctor_service,
+    patch_plan_service,
+    pull_execution,
+    pull_preview_executable,
+    push_execution,
+    status_snapshot_from_run,
+)
+
 import spell_sync.commands as commands
 import spell_sync.doctor as doctor_mod
 import spell_sync.plan_cmd as plan_mod
@@ -57,7 +69,7 @@ class TestJsonContract(unittest.TestCase):
             )
             buf = io.StringIO()
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(load_status=status_snapshot_from_run(run)),
                 redirect_stdout(buf),
             ):
                 code = commands.cmd_status(CliOptions(json_output=True, wordlist=wordlist))
@@ -87,7 +99,11 @@ class TestJsonContract(unittest.TestCase):
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             buf = io.StringIO()
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
+                patch.object(
+                    doctor_mod._SERVICE,
+                    "load_doctor_report",
+                    return_value=doctor_mod.build_doctor_report(run),
+                ),
                 patch.object(
                     report_mod,
                     "inspect_cli",
@@ -121,7 +137,7 @@ class TestJsonContract(unittest.TestCase):
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             buf = io.StringIO()
             with (
-                patch.object(doctor_mod, "sync_run_for", return_value=run),
+                patch_doctor_service(load_doctor_targets=doctor_targets_from_run(run)),
                 redirect_stdout(buf),
             ):
                 code = doctor_mod.cmd_doctor(
@@ -150,11 +166,10 @@ class TestJsonContract(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
-            buf = io.StringIO()
+            preview = executable_push_preview()
             with (
-                patch.object(plan_mod, "sync_run_for", return_value=run),
-                redirect_stdout(buf),
+                patch_plan_service(load_push_preview=preview),
+                redirect_stdout(buf := io.StringIO()),
             ):
                 code = plan_mod.cmd_plan(
                     CliOptions(json_output=True, plan_removals=True, wordlist=wordlist),
@@ -171,13 +186,10 @@ class TestJsonContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", os.path.join(d, "a.txt"), DictionaryFormat.TEXT)],
-            )
+            preview = executable_push_preview()
             buf = io.StringIO()
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(load_push_preview=preview),
                 patch.object(commands, "warn_missing_optional_apps"),
                 patch.object(commands, "_running_apps_check_for_push", return_value=False),
                 redirect_stdout(buf),
@@ -194,12 +206,19 @@ class TestJsonContract(unittest.TestCase):
             self.assertEqual(payload["reason"], "running_apps_check")
 
     def test_push_json_does_not_prompt_in_tty(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        run.push_from_wordlist = lambda **_: ExitCode.OK  # type: ignore[method-assign, assignment]
+        preview = executable_push_preview()
+        execution = push_execution(ExitCode.OK, preview=preview)
         buf = io.StringIO()
         with (
-            patch.object(commands, "sync_run_for", return_value=run),
+            patch_commands_service(
+                load_push_preview=preview,
+                execute_push_preview=execution,
+                build_push_report=MagicMock(),
+            ),
             patch.object(commands, "warn_missing_optional_apps"),
+            patch.object(commands, "_running_apps_check_for_push", return_value=True),
+            patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+            patch.object(commands, "review_removals_for_preview", return_value=True),
             patch.object(commands.sys, "stdin") as stdin,
             patch("builtins.input", side_effect=AssertionError("must not prompt")),
             redirect_stdout(buf),
@@ -246,10 +265,15 @@ class TestJsonContractExtended(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             with open(wordlist, "w", encoding="utf-8") as handle:
                 handle.write("alpha\n")
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
+            preview = pull_preview_executable(wordlist, 1, 1)
+            execution = pull_execution(1, 1, preview=preview)
             buf = io.StringIO()
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(
+                    prepare_pull=preview,
+                    execute_pull=execution,
+                    build_pull_report=MagicMock(),
+                ),
                 redirect_stdout(buf),
             ):
                 code = commands.cmd_pull(CliOptions(json_output=True, wordlist=wordlist))

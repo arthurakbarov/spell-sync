@@ -10,9 +10,14 @@ import shutil
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from conftest import DEFAULT_OPTS
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    push_execution,
+)
 
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
@@ -107,19 +112,19 @@ class TestPushStrict(unittest.TestCase):
     def test_cmd_push_strict_via_cli(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-                strict_push=True,
-            )
+            preview = executable_push_preview()
+            execution = push_execution(ExitCode.PUSH_ABORT, preview=preview)
             with (
                 patch.object(commands, "_running_apps_check_for_push", return_value=True),
-                patch.object(commands, "sync_run_for", return_value=run),
-                patch.object(run, "push_from_wordlist", return_value=ExitCode.PUSH_ABORT),
+                patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_preview=execution,
+                    build_push_report=MagicMock(),
+                ),
             ):
-                code = commands.cmd_push(CliOptions(strict=True))
+                code = commands.cmd_push(CliOptions(strict=True, wordlist=wordlist, yes=True))
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
 
     def test_finish_push_partial_summary_line(self):
@@ -312,16 +317,12 @@ class TestRemovalWarning(unittest.TestCase):
     def test_cmd_push_cancelled_on_removal_reject(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
+            preview = executable_push_preview()
             with (
                 patch.object(commands, "_running_apps_check_for_push", return_value=True),
-                patch.object(commands, "confirm_push_removals", return_value=False),
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch.object(commands, "confirm_push_removals_for_preview", return_value=False),
+                patch_commands_service(load_push_preview=preview),
                 patch.object(commands.sys, "stdin") as stdin,
             ):
                 stdin.isatty.return_value = True
@@ -329,20 +330,18 @@ class TestRemovalWarning(unittest.TestCase):
             self.assertEqual(code, int(ExitCode.CANCELLED))
 
     def test_before_push_checks_chains_browser_and_removals(self):
-        with tempfile.TemporaryDirectory() as d:
-            wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
-            write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
-            with (
-                patch.object(commands, "_running_apps_check_for_push", return_value=True),
-                patch.object(commands, "confirm_push_removals", return_value=True) as removals,
-            ):
-                self.assertTrue(commands._before_push_checks(run, DEFAULT_OPTS))
-                removals.assert_called_once()
+        preview = executable_push_preview()
+        with (
+            patch.object(commands, "_running_apps_check_for_push", return_value=True),
+            patch.object(
+                commands,
+                "confirm_push_removals_for_preview",
+                return_value=True,
+            ) as removals,
+        ):
+            self.assertTrue(commands._running_apps_check_for_push(DEFAULT_OPTS))
+            self.assertTrue(commands.confirm_push_removals_for_preview(preview, DEFAULT_OPTS))
+            removals.assert_called_once()
 
 
 class TestLintCaseDedupe(unittest.TestCase):

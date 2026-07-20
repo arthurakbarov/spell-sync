@@ -139,7 +139,7 @@ def test_support_report_corrupt_target_reason(
     )
     corrupt = _target("chrome", status="corrupt", available=False, readable=False)
     with patch(
-        "spell_sync.application.support_report.load_target_settings",
+        "spell_sync.application.support_report.load_target_settings_snapshot",
         return_value=MagicMock(targets=(corrupt,)),
     ):
         report = build_support_report(
@@ -264,7 +264,7 @@ def test_support_report_unreadable_and_pending(
     )
     unreadable = _target("firefox", status="unreadable", available=False, readable=False)
     with patch(
-        "spell_sync.application.support_report.load_target_settings",
+        "spell_sync.application.support_report.load_target_settings_snapshot",
         return_value=MagicMock(targets=(unreadable,)),
     ):
         report = build_support_report(
@@ -281,7 +281,7 @@ def test_support_report_unreadable_and_pending(
             ),
         ),
         patch(
-            "spell_sync.application.support_report.load_target_settings",
+            "spell_sync.application.support_report.load_target_settings_snapshot",
             return_value=MagicMock(targets=()),
         ),
     ):

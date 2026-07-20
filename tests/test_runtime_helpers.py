@@ -10,12 +10,16 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from service_test_utils import patch_doctor_service, patch_plan_service
+
 import spell_sync.doctor as doctor_mod
 import spell_sync.health.types as health_types_mod
 import spell_sync.plan_cmd as plan_mod
 import spell_sync.removal_review as removal_mod
+from spell_sync.application.reports import PushPreview
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
+from spell_sync.exit_codes import ExitCode
 from spell_sync.health.types import DoctorAction
 from spell_sync.io import write_text_words
 from spell_sync.runtime import (
@@ -69,14 +73,9 @@ class TestRuntimeHelpers(unittest.TestCase):
             dict_path = os.path.join(d, "dict.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
             Path(dict_path).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            code = plan_mod.cmd_plan(
+                CliOptions(wordlist=wordlist, plan_removals=True),
             )
-            with patch.object(plan_mod, "sync_run_for", return_value=run):
-                code = plan_mod.cmd_plan(
-                    CliOptions(wordlist=wordlist, plan_removals=True),
-                )
             self.assertEqual(code, 0)
 
     def test_discover_pip_script_darwin_library_python(self):
@@ -250,25 +249,28 @@ class TestPlanRemovalsHuman(unittest.TestCase):
             Path(dict_path).write_text("gone\n", encoding="utf-8")
             wordlist = os.path.join(d, "wordlist.txt")
             Path(wordlist).write_text("stay\n", encoding="utf-8")
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
+            code = plan_mod.cmd_plan(
+                CliOptions(wordlist=wordlist, plan_removals=True),
             )
-            with patch.object(plan_mod, "sync_run_for", return_value=run):
-                code = plan_mod.cmd_plan(
-                    CliOptions(wordlist=wordlist, plan_removals=True),
-                )
             self.assertEqual(code, 0)
 
     def test_plan_removals_wordlist_error(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        run.check_wordlist = lambda: (
-            __import__(  # type: ignore[method-assign, assignment]
-                "spell_sync.exit_codes",
-                fromlist=["ExitCode"],
-            ).ExitCode.WORDLIST_UNREADABLE
+        preview = PushPreview(
+            prepared=None,
+            targets=(),
+            additions=0,
+            removals=0,
+            warnings=(),
+            created_at="2026-01-01T00:00:00+00:00",
+            plan_identifier="blocked",
+            targets_to_update=0,
+            unchanged=0,
+            skipped=(),
+            corrupt=(),
+            blocked=(),
+            wordlist_error=ExitCode.WORDLIST_UNREADABLE,
         )
-        with patch.object(plan_mod, "sync_run_for", return_value=run):
+        with patch_plan_service(load_push_preview=preview):
             code = plan_mod.cmd_plan(CliOptions(plan_removals=True))
         self.assertEqual(code, 6)
 
@@ -323,10 +325,8 @@ class TestDoctorActionFormatting(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(wordlist=wordlist, dictionaries=[])
-            with patch.object(doctor_mod, "sync_run_for", return_value=run):
-                with patch.object(doctor_mod, "build_doctor_report", return_value=report):
-                    code = doctor_mod.cmd_doctor(CliOptions(wordlist=wordlist))
+            with patch_doctor_service(load_doctor_report=report):
+                code = doctor_mod.cmd_doctor(CliOptions(wordlist=wordlist))
             self.assertEqual(code, 0)
 
 

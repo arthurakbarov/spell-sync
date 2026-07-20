@@ -18,9 +18,13 @@ directly. `SpellSyncService` accepts typed requests only.
 ## Consequences
 
 - Application and TUI no longer import `CliOptions`
+- `application/requests.py` contains frozen DTOs only; resolution in `project_resolution.py`
+- Core/project modules do not import application DTOs
+- CLI mutation commands route through `SpellSyncService` (preflight scope preserves JSON exits)
 - Presentation flags stay in CLI command handlers
 - Confirmation tokens remain separate execution arguments
-- Runtime settings (`ContextVar`) unchanged in 0.2.1
+- `config-check` and `lint` remain CLI utilities without request types
+- Runtime settings (`ContextVar`) unchanged in 0.2.1; explicit runtime deferred to Phase 3
 
 ## Rejected alternatives
 

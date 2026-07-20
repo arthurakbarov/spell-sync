@@ -219,7 +219,7 @@ class TuiController:
     def _setup_request(self) -> SetupRequest:
         return SetupRequest(
             project=self._project_ref(),
-            allow_new_project_wizard=self._project.wordlist is None,
+            allow_project_creation=self._project.wordlist is None,
         )
 
     def _target_settings_request(self) -> TargetSettingsRequest:

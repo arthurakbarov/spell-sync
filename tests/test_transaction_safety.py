@@ -609,8 +609,17 @@ class TestCoverage101(unittest.TestCase):
             )
 
     def test_recover_rollback_incomplete_json_reason(self):
+        from dataclasses import replace
+
+        from service_test_utils import (
+            patch_recover_service,
+            recoverable_preview,
+            recovery_execution,
+        )
+
         from spell_sync.push_journal import (
             JOURNAL_STATE_ROLLBACK_INCOMPLETE,
+            RecoverResult,
         )
         from tests.journal_test_utils import write_test_journal
 
@@ -621,8 +630,22 @@ class TestCoverage101(unittest.TestCase):
                 wordlist,
                 state=JOURNAL_STATE_ROLLBACK_INCOMPLETE,
             )
+            preview = replace(
+                recoverable_preview(str(wordlist)),
+                transaction_state=JOURNAL_STATE_ROLLBACK_INCOMPLETE,
+            )
+            execution = recovery_execution(
+                RecoverResult(("wordlist",), (), ()),
+                preview=preview,
+            )
             buf = __import__("io").StringIO()
-            with __import__("contextlib").redirect_stdout(buf):
+            with (
+                patch_recover_service(
+                    inspect_recovery=preview,
+                    execute_recovery=execution,
+                ),
+                __import__("contextlib").redirect_stdout(buf),
+            ):
                 code = recover_mod.cmd_recover(
                     CliOptions(wordlist=str(wordlist), yes=True, json_output=True),
                 )

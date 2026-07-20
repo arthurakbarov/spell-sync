@@ -10,7 +10,12 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from conftest import DEFAULT_OPTS
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    patch_isolated_push,
+    status_snapshot_from_run,
+)
 
 import spell_sync.commands as commands
 from spell_sync.cli_options import CliOptions
@@ -303,12 +308,9 @@ class TestPushChromeGuard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", os.path.join(d, "a.txt"), DictionaryFormat.TEXT)],
-            )
+            preview = executable_push_preview()
             with (
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_commands_service(load_push_preview=preview),
                 patch.object(commands, "warn_missing_optional_apps"),
                 patch.object(commands, "_running_apps_check_for_push", return_value=False),
             ):
@@ -324,25 +326,21 @@ class TestPushChromeGuard(unittest.TestCase):
             wordlist = os.path.join(d, "wordlist.txt")
             dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
+            write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
             run = SyncRun(
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with (
-                patch.object(
-                    commands,
-                    "_running_apps_check_for_push",
-                    return_value=True,
-                ),
-                patch.object(commands, "sync_run_for", return_value=run),
-            ):
+            with patch_isolated_push(run):
                 with redirect_stdout(io.StringIO()):
-                    self.assertEqual(commands.cmd_push(DEFAULT_OPTS), 0)
+                    self.assertEqual(
+                        commands.cmd_push(CliOptions(wordlist=wordlist, yes=True)),
+                        0,
+                    )
                 self.assertEqual(read_text_words(dict_path, quiet=True), {"alpha"})
 
     def test_cmd_push_yes_skips_chrome_prompt(self):
         import spell_sync.app_process_check as guard
-        from spell_sync.cli_options import CliOptions
 
         with (
             patch.object(guard, "chrome_dictionaries_enabled", return_value=True),
@@ -353,20 +351,19 @@ class TestPushChromeGuard(unittest.TestCase):
                 wordlist = os.path.join(d, "wordlist.txt")
                 dict_path = os.path.join(d, "a.txt")
                 write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
+                write_text_words(dict_path, ["stale"], "utf-8", False, quiet=True)
                 run = SyncRun(
                     wordlist=wordlist,
                     dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
                 )
-                with (
-                    patch.object(commands, "sync_run_for", return_value=run),
-                    patch.object(commands.sys, "stdin") as stdin,
-                ):
-                    stdin.isatty.return_value = True
-                    with redirect_stdout(io.StringIO()):
-                        self.assertEqual(
-                            commands.cmd_push(CliOptions(yes=True)),
-                            0,
-                        )
+                with patch_isolated_push(run):
+                    with patch.object(commands.sys, "stdin") as stdin:
+                        stdin.isatty.return_value = True
+                        with redirect_stdout(io.StringIO()):
+                            self.assertEqual(
+                                commands.cmd_push(CliOptions(wordlist=wordlist, yes=True)),
+                                0,
+                            )
 
 
 class TestChromeGuard(unittest.TestCase):
@@ -380,10 +377,11 @@ class TestChromeGuard(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            snapshot = status_snapshot_from_run(run)
+            with patch_commands_service(load_status=snapshot):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
-                    commands.cmd_status(DEFAULT_OPTS)
+                    commands.cmd_status(CliOptions(wordlist=wordlist))
                 self.assertIn("wordlist is empty", buf.getvalue())
 
     def test_cmd_push_empty_wordlist_aborts(self):
@@ -392,21 +390,16 @@ class TestChromeGuard(unittest.TestCase):
             dict_path = os.path.join(d, "a.txt")
             open(wordlist, "w", encoding="utf-8").close()
             write_text_words(dict_path, ["beta"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
             with (
                 patch.object(
                     commands,
                     "_running_apps_check_for_push",
                     return_value=True,
                 ),
-                patch.object(commands, "sync_run_for", return_value=run),
             ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
-                    code = commands.cmd_push(DEFAULT_OPTS)
+                    code = commands.cmd_push(CliOptions(wordlist=wordlist))
                 self.assertEqual(code, int(ExitCode.PUSH_ABORT))
                 self.assertEqual(read_text_words(dict_path, quiet=True), {"beta"})
                 self.assertIn("wordlist is empty", buf.getvalue())
@@ -422,17 +415,12 @@ class TestChromeGuard(unittest.TestCase):
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             with (
-                patch.object(
-                    commands,
-                    "_running_apps_check_for_push",
-                    return_value=True,
-                ),
-                patch.object(commands, "sync_run_for", return_value=run),
+                patch_isolated_push(run),
                 patch("spell_sync.push_prepared.write_rendered", return_value=False),
             ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
-                    code = commands.cmd_push(DEFAULT_OPTS)
+                    code = commands.cmd_push(CliOptions(wordlist=wordlist, yes=True))
                 out = buf.getvalue()
                 self.assertEqual(code, int(ExitCode.PUSH_ABORT))
                 self.assertIn("not written", out)

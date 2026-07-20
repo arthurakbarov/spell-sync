@@ -11,12 +11,18 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from conftest import DEFAULT_OPTS
+from service_test_utils import (
+    executable_push_preview,
+    patch_commands_service,
+    push_execution,
+    status_snapshot_from_run,
+)
 
 import spell_sync.commands as commands
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
-from spell_sync.io import write_text_words
+from spell_sync.io import read_text_words, write_text_words
 from spell_sync.sync_run import PushResult, SyncRun
 
 
@@ -48,7 +54,7 @@ class TestCommands(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
-            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            with patch_commands_service(load_status=status_snapshot_from_run(run)):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     self.assertEqual(commands.cmd_status(DEFAULT_OPTS), 0)
@@ -68,7 +74,8 @@ class TestCommands(unittest.TestCase):
                 wordlist=wordlist,
                 dictionaries=self._dictionaries(path_a, path_b),
             )
-            with patch("spell_sync.command_helpers.sync_run_for", return_value=run):
+            snapshot = status_snapshot_from_run(run, include_word_diffs=True)
+            with patch_commands_service(load_status=snapshot):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     code = commands.cmd_status(CliOptions(verbose=True))
@@ -99,8 +106,8 @@ class TestWordlistUnreadable(unittest.TestCase):
             open(wordlist, "w").close()
             run = SyncRun(wordlist=wordlist, dictionaries=[])
             with (
-                patch("spell_sync.command_helpers.sync_run_for", return_value=run),
                 patch("spell_sync.push_setup.wordlist_unreadable", return_value=True),
+                patch_commands_service(load_status=status_snapshot_from_run(run)),
             ):
                 code = commands.cmd_status(DEFAULT_OPTS)
             self.assertEqual(code, int(ExitCode.WORDLIST_UNREADABLE))
@@ -110,17 +117,18 @@ class TestPartialPushExit(unittest.TestCase):
     def test_run_partial_push_exit_via_command(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = os.path.join(d, "wordlist.txt")
-            dict_path = os.path.join(d, "a.txt")
             write_text_words(wordlist, ["alpha"], "utf-8", False, quiet=True)
-            run = SyncRun(
-                wordlist=wordlist,
-                dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
-            )
             result = PushResult(1, ("a",), ("blocked",))
+            preview = executable_push_preview()
+            execution = push_execution(result, preview=preview)
             with (
                 patch.object(commands, "_running_apps_check_for_push", return_value=True),
-                patch.object(commands, "sync_run_for", return_value=run),
-                patch.object(run, "push_from_wordlist", return_value=result),
+                patch.object(commands, "confirm_push_removals_for_preview", return_value=True),
+                patch_commands_service(
+                    load_push_preview=preview,
+                    execute_push_preview=execution,
+                    build_push_report=MagicMock(),
+                ),
             ):
                 code = commands.cmd_push(DEFAULT_OPTS)
             self.assertEqual(code, int(ExitCode.PARTIAL_PUSH))
@@ -128,36 +136,28 @@ class TestPartialPushExit(unittest.TestCase):
 
 class TestPushReviewRemovals(unittest.TestCase):
     def test_push_review_removals_interrupted(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        prepared = MagicMock()
-        prepared.max_removals.return_value = 0
+        preview = executable_push_preview()
         with (
             patch.object(commands, "_running_apps_check_for_push", return_value=True),
-            patch.object(commands, "sync_run_for", return_value=run),
-            patch.object(run, "prepare_push_operation", return_value=prepared),
-            patch.object(commands, "review_removals_interactive", return_value=None),
+            patch.object(commands, "review_removals_for_preview", return_value=None),
+            patch_commands_service(load_push_preview=preview),
         ):
             code = commands.cmd_push(CliOptions(review_removals=True))
         self.assertEqual(code, int(ExitCode.SYNC_INTERRUPTED))
 
     def test_before_push_checks_review_removals_false(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
-        with (
-            patch.object(commands, "_running_apps_check_for_push", return_value=True),
-            patch.object(commands, "review_removals_interactive", return_value=False),
-        ):
-            result = commands._before_push_checks(run, CliOptions(review_removals=True))
+        preview = executable_push_preview()
+        with patch.object(commands, "review_removals_for_preview", return_value=False):
+            result = commands.review_removals_for_preview(preview, interactive=False)
         self.assertFalse(result)
 
     def test_before_push_checks_running_apps_rejected(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
         with patch.object(commands, "_running_apps_check_for_push", return_value=False):
-            self.assertFalse(commands._before_push_checks(run, DEFAULT_OPTS))
+            self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS))
 
     def test_before_push_checks_running_apps_interrupted(self):
-        run = SyncRun(wordlist="/tmp/x", dictionaries=[])
         with patch.object(commands, "_running_apps_check_for_push", return_value=None):
-            self.assertIsNone(commands._before_push_checks(run, DEFAULT_OPTS))
+            self.assertIsNone(commands._running_apps_check_for_push(DEFAULT_OPTS))
 
 
 class TestPullAddFrom(unittest.TestCase):
@@ -180,12 +180,9 @@ class TestPullAddFrom(unittest.TestCase):
             Path(wordlist).write_text("one\n", encoding="utf-8")
             external = os.path.join(d, "from.txt")
             Path(external).write_text("two\n", encoding="utf-8")
-            with patch.object(commands, "sync_run_for") as factory:
-                run = SyncRun(wordlist=wordlist, dictionaries=[])
-                factory.return_value = run
-                code = commands.cmd_pull(CliOptions(add_from=external, wordlist=wordlist))
+            code = commands.cmd_pull(CliOptions(add_from=external, wordlist=wordlist))
             self.assertEqual(code, int(ExitCode.OK))
-            words = run.load_wordlist()
+            words = read_text_words(wordlist, quiet=True)
             self.assertIn("one", words)
             self.assertIn("two", words)
 

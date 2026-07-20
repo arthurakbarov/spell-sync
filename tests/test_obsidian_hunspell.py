@@ -13,12 +13,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from conftest import DEFAULT_OPTS
+from service_test_utils import patch_isolated_push
 
 import spell_sync.app_process_check as obsidian_guard
 import spell_sync.commands as commands
 import spell_sync.dictionaries as dict_mod
 import spell_sync.io as io_mod
 import spell_sync.paths as paths_mod
+from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.io import read_text_words, write_text_words
 from spell_sync.sync_run import SyncRun
@@ -461,12 +463,14 @@ class TestPullPushIntegration(unittest.TestCase):
             before, after = run.pull_into_wordlist()
             self.assertEqual((before, after), (0, 1))
             write_text_words(str(wordlist), ["alpha", "local"], "utf-8", False, quiet=True)
-            with (
-                patch.object(commands, "_running_apps_check_for_push", return_value=True),
-                patch.object(commands, "sync_run_for", return_value=run),
-            ):
+            with patch_isolated_push(run):
                 with redirect_stdout(io.StringIO()):
-                    self.assertEqual(commands.cmd_push(DEFAULT_OPTS), 0)
+                    self.assertEqual(
+                        commands.cmd_push(
+                            CliOptions(wordlist=str(wordlist), yes=True),
+                        ),
+                        0,
+                    )
             self.assertEqual(io_mod.read_hunspell_words(dic, quiet=True), {"alpha", "local"})
 
 

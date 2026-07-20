@@ -136,6 +136,20 @@ class DoctorSnapshot:
 
 
 @dataclass(frozen=True)
+class DoctorTargetView:
+    name: str
+    path: str
+    format: str
+    read_status: str
+
+
+@dataclass(frozen=True)
+class DoctorTargetsSnapshot:
+    wordlist_path: str
+    targets: tuple[DoctorTargetView, ...]
+
+
+@dataclass(frozen=True)
 class PushPreviewSnapshot:
     """Deprecated alias kept for transitional imports."""
 

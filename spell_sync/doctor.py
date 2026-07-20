@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
+from .application import SpellSyncService
 from .cli_options import CliOptions
-from .cli_request_adapter import project_ref
-from .command_helpers import quiet_json_output, sync_run_for
-from .dictionaries import DictionaryFormat
+from .cli_request_adapter import doctor_request
+from .command_helpers import quiet_json_output
 from .dictionary_hints import warn_missing_optional_apps
 from .exit_codes import ExitCode
 from .health import (
@@ -23,7 +22,6 @@ from .health import (
 from .health.serialize import doctor_command_payload, doctor_report_exit_code
 from .json_output import base_payload, emit_json
 from .log import log
-from .read_outcome import dictionary_read_result
 
 __all__ = [
     "CliStatus",
@@ -36,53 +34,49 @@ __all__ = [
     "warn_missing_optional_apps",
 ]
 
-
-def _target_payload(dictionary) -> dict[str, object]:
-    status = dictionary_read_result(dictionary).status
-    return {
-        "name": dictionary.name,
-        "path": dictionary.path,
-        "format": dictionary.format.value
-        if isinstance(dictionary.format, DictionaryFormat)
-        else str(dictionary.format),
-        "read_status": status.value,
-    }
-
-
-def _cmd_doctor_targets(opts: CliOptions, run) -> int:
-    targets = [_target_payload(dictionary) for dictionary in run.dictionaries]
-    if opts.json_output:
-        emit_json(
-            {
-                **base_payload("doctor", exit=int(ExitCode.OK)),
-                "targets": True,
-                "wordlist": str(Path(run.wordlist_str)),
-                "count": len(targets),
-                "targets_list": targets,
-            }
-        )
-        return int(ExitCode.OK)
-
-    log.section("doctor: discovered dictionary paths")
-    if not targets:
-        log.detail("no dictionary targets discovered for this platform")
-        return int(ExitCode.OK)
-
-    for item in targets:
-        log.info(f"{item['name']}: {item['path']} ({item['format']}, {item['read_status']})")
-    log.done(f"targets: {len(targets)} dictionary path(s)")
-    return int(ExitCode.OK)
+_SERVICE = SpellSyncService(enable_file_logging=False)
 
 
 def cmd_doctor(opts: CliOptions) -> int:
     with quiet_json_output(opts):
-        run = sync_run_for(project_ref(opts))
-        if opts.show_targets:
-            return _cmd_doctor_targets(opts, run)
+        request = doctor_request(opts)
+        if request.list_targets:
+            snapshot = _SERVICE.load_doctor_targets(request)
+            targets = [
+                {
+                    "name": item.name,
+                    "path": item.path,
+                    "format": item.format,
+                    "read_status": item.read_status,
+                }
+                for item in snapshot.targets
+            ]
+            if opts.json_output:
+                emit_json(
+                    {
+                        **base_payload("doctor", exit=int(ExitCode.OK)),
+                        "targets": True,
+                        "wordlist": snapshot.wordlist_path,
+                        "count": len(targets),
+                        "targets_list": targets,
+                    }
+                )
+                return int(ExitCode.OK)
 
-        report = build_doctor_report(run)
+            log.section("doctor: discovered dictionary paths")
+            if not targets:
+                log.detail("no dictionary targets discovered for this platform")
+                return int(ExitCode.OK)
+            for item in targets:
+                log.info(
+                    f"{item['name']}: {item['path']} ({item['format']}, {item['read_status']})"
+                )
+            log.done(f"targets: {len(targets)} dictionary path(s)")
+            return int(ExitCode.OK)
 
-        if opts.health_check:
+        report = _SERVICE.load_doctor_report(request)
+
+        if request.health_check:
             if opts.json_output:
                 exit_code = doctor_report_exit_code(report, health_check=True)
                 payload = doctor_command_payload(report, health_check=True)
