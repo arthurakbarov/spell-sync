@@ -42,12 +42,14 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 4. Identify affected architecture boundaries (CLI, application, core, TUI).
 5. Read implementation code and existing tests for the changed scope.
 6. Make the smallest coherent change for the **current phase only**.
-7. Run focused tests for the changed scope.
-8. Run architecture guards (`tests/test_application_requests.py`, phase-specific tests).
-9. Run full `scripts/ci.sh`.
+7. Run focused tests via `select-and-run-tests` / `scripts/run_focused_tests.py`.
+8. Run architecture guards when application boundaries change.
+9. Run full `scripts/ci.sh` **once** on the final stable tree.
 10. On failure: read `CI_LOG` and `CI_SUMMARY`; identify the primary error via stable IDs.
 11. Update every affected document, test, and contract in the same task.
 12. Produce an evidence-based report (see **Final report contract** below).
+
+Staged validation levels and deduplication rules: `docs/TESTING_STRATEGY.md`.
 
 ## Current-phase lifecycle
 
@@ -104,12 +106,13 @@ Do not ask the owner to diagnose failures or read raw logs.
 ## CI artifacts
 
 - Entry point: `scripts/ci.sh` (non-interactive).
-- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 2).
+- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 3).
 - Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed run pairs).
 - Final stdout block prints `CI_RESULT`, `CI_EXIT`, optional `CI_FAILED_ID`, `CI_SUMMARY`, `CI_LOG`.
 
-Schema v2 fields include `schemaVersion`, `runId`, `historyLogPath`, `historySummaryPath`, and
-`failedCheckId` when a check fails.
+Schema v3 adds `mode`, `finalEvidence`, and `treeDigest`. Only `mode=full` with
+`finalEvidence=true` and matching tree digest counts as final CI evidence. Diagnostic runs
+(`--only`, `--from`, `--resume-failed`) do not.
 
 Installed-wheel smoke runs outside the repository checkout so the local tree cannot shadow the
 installed package.
@@ -150,6 +153,10 @@ Every completed phase or corrective task returns:
 
 ## 6. Focused validation
 | Command | Result |
+
+## Test selection
+- changed scope, clusters, skipped duplicate commands, reused run keys
+- full CI runs attempted (expected: 1) and reason for any additional run
 
 ## 7. Full CI
 - CI_RESULT, CI_EXIT, CI_FAILED_ID, CI_SUMMARY, CI_LOG

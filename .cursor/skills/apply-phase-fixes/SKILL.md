@@ -23,31 +23,23 @@ Working tree should be clean before starting.
 
 ## Workflow
 
-1. Reproduce each listed defect.
+1. Reproduce each listed defect (Level 0 exact test).
 2. Add a regression test per defect.
 3. Apply the minimal fix.
 4. Do not refactor unrelated code.
 5. Do not start the next phase.
 6. Update docs/ADR only when factual contracts change.
-7. Run focused validation for touched scope.
-8. Run `scripts/ci.sh`.
+7. After all defects in a cluster are fixed, run `select-and-run-tests` once for the
+   combined affected clusters — not after every single defect.
+8. Run `scripts/ci.sh` **once** after all defects are fixed.
 9. Create a corrective local commit.
 10. Leave current phase at `awaiting-approval`.
 11. Return a defect-by-defect report and stop.
 
-## Per-defect report
-
-For each defect include:
-
-- reproduction steps
-- root cause
-- fix summary
-- regression test path
-- validation result (command + exit code)
-
 ## Validation
 
-Follow `spell-sync-ci` for CI diagnosis. Use stable test/check IDs in the report.
+Use `select-and-run-tests` during the fix loop. Use `spell-sync-ci` only for final full CI
+diagnosis. Do not run full CI after each individual defect.
 
 ## Finalize workspace snapshot
 

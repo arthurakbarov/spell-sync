@@ -62,6 +62,7 @@ REQUIRED_RULES = (
     "project-safety.mdc",
     "architecture-boundaries.mdc",
     "tests-fixtures.mdc",
+    "test-efficiency.mdc",
 )
 
 REQUIRED_SKILLS = (
@@ -71,6 +72,7 @@ REQUIRED_SKILLS = (
     "architecture-refactor",
     "spell-sync-ci",
     "mutation-safety-audit",
+    "select-and-run-tests",
 )
 
 BANNED_WORKFLOW_TERMS = [
@@ -88,6 +90,24 @@ MODIFYING_SKILLS = (
     "architecture-refactor",
     "release-candidate",
     "spell-sync-ci",
+)
+
+FOCUSED_TEST_SKILL = "select-and-run-tests"
+TESTING_STRATEGY_DOC = "docs/TESTING_STRATEGY.md"
+TEST_IMPACT_REGISTRY = "tests/test-impact.toml"
+TEST_PLAN_SCRIPT = "scripts/test_plan.py"
+FOCUSED_RUNNER_SCRIPT = "scripts/run_focused_tests.py"
+
+BASELINE_FULL_CI_PATTERN = re.compile(
+    r"run `scripts/ci\.sh` when baseline|"
+    r"run `scripts/ci\.sh` before starting|"
+    r"baseline CI fails\)|"
+    r"must run `scripts/ci\.sh` before",
+    re.I,
+)
+FOCUSED_SKILL_FORBIDDEN_CI = re.compile(
+    r"(?<!\bnot )(?<!\bwithout )scripts/ci\.sh",
+    re.I,
 )
 
 SNAPSHOT_FINALIZATION_MARKER = "Finalize workspace snapshot"
@@ -257,13 +277,64 @@ def check_snapshot_tooling_absent_from_public_package(root: Path) -> list[str]:
         for path in base.rglob("*"):
             if path.is_file() and "create-code-snapshot" in path.name:
                 errors.append(
-                    f"snapshot script must not live in public package tree: {path.relative_to(root)}"
+                    "snapshot script must not live in public package tree: "
+                    f"{path.relative_to(root)}"
+                )
+    return errors
+
+
+def check_test_efficiency_contract(root: Path) -> list[str]:
+    errors: list[str] = []
+    strategy = root / TESTING_STRATEGY_DOC
+    if not strategy.is_file():
+        errors.append(
+            f"[TEST-EFFICIENCY-001] missing {TESTING_STRATEGY_DOC}; add docs/TESTING_STRATEGY.md"
+        )
+    registry = root / TEST_IMPACT_REGISTRY
+    if not registry.is_file():
+        errors.append(
+            f"[TEST-EFFICIENCY-002] missing {TEST_IMPACT_REGISTRY}; add tests/test-impact.toml"
+        )
+    for rel in (TEST_PLAN_SCRIPT, FOCUSED_RUNNER_SCRIPT):
+        if not (root / rel).is_file():
+            errors.append(f"[TEST-EFFICIENCY-003] missing {rel}")
+    return errors
+
+
+def check_modifying_skill_validation(root: Path) -> list[str]:
+    errors: list[str] = []
+    skills = root / ".cursor" / "skills"
+    focused = skills / FOCUSED_TEST_SKILL / "SKILL.md"
+    if focused.is_file():
+        focused_text = focused.read_text(encoding="utf-8")
+        if FOCUSED_SKILL_FORBIDDEN_CI.search(focused_text):
+            errors.append(
+                f"[TEST-EFFICIENCY-004] .cursor/skills/{FOCUSED_TEST_SKILL}/SKILL.md "
+                "must not invoke full CI"
+            )
+    for skill_name in MODIFYING_SKILLS:
+        skill_file = skills / skill_name / "SKILL.md"
+        if not skill_file.is_file():
+            continue
+        text = skill_file.read_text(encoding="utf-8")
+        if BASELINE_FULL_CI_PATTERN.search(text):
+            errors.append(
+                f"[TEST-EFFICIENCY-005] .cursor/skills/{skill_name}/SKILL.md "
+                "requires baseline full CI for every clean task; use CI evidence reuse"
+            )
+        if skill_name in {"execute-current-phase", "apply-phase-fixes", "architecture-refactor"}:
+            if "select-and-run-tests" not in text:
+                errors.append(
+                    f"[TEST-EFFICIENCY-006] .cursor/skills/{skill_name}/SKILL.md "
+                    "must reference select-and-run-tests staged validation"
                 )
     return errors
 
 
 def validate_agent_config(root: Path) -> list[str]:
     errors: list[str] = []
+    errors.extend(check_test_efficiency_contract(root))
+    errors.extend(check_modifying_skill_validation(root))
     cursor = root / ".cursor"
     rules = cursor / "rules"
     skills = cursor / "skills"

@@ -30,11 +30,14 @@ Read:
 
 ## Step 2 — verify baseline
 
-- `git status --short` must be clean before starting
+- `git status --short` must be clean before starting a **new phase implementation**
 - run `python3 scripts/check-agent-config.py`
 - run `python3 scripts/check-docs-contract.py`
-- run `scripts/ci.sh` when baseline is uncertain
-- stop with a prerequisite report if tree is dirty or baseline CI fails
+- reuse existing full CI evidence when the tree is clean and `.artifacts/ci/ci-summary.json`
+  shows `mode=full`, `result=success`, and matching `treeDigest` for current `HEAD`
+- run baseline full CI only when evidence is missing, failed, stale, or the owner explicitly
+  requests it; otherwise use lightweight validators and phase-specific focused tests via
+  skill `select-and-run-tests`
 
 ## Step 3 — start phase
 
@@ -69,12 +72,12 @@ Before edits, record:
 
 ## Step 6 — validate incrementally
 
-After logical chunks:
+After logical chunks use skill `select-and-run-tests` (Levels 0–2). Do not run full CI
+during the edit loop.
 
-- focused pytest for changed scope
-- architecture tests (`tests/test_application_requests.py`, phase-specific guards)
-- `python3 -m ruff check spell_sync tests scripts`
-- `python3 -m mypy spell_sync` when types changed
+- focused pytest via `python3 scripts/run_focused_tests.py`
+- architecture tests when application boundaries change
+- changed-file Ruff only: `python3 -m ruff check <changed-python-files>`
 - `git diff --check`
 
 ## Step 7 — update repository knowledge
@@ -88,9 +91,14 @@ Update in the same task when facts change:
 
 ## Step 8 — full validation
 
+Run full CI **once** on the final stable tree:
+
 ```bash
 scripts/ci.sh
 ```
+
+On failure, rerun only the failed gate (`scripts/ci.sh --only <CHECK_ID>`) while fixing,
+then run one new full CI after files change. Do not repeat full CI without changes.
 
 Read `CI_RESULT`, `CI_EXIT`, `CI_SUMMARY`, `CI_LOG`, and `CI_FAILED_ID` on failure.
 Fix phase-related failures and rerun. Do not ask the owner to read raw logs.

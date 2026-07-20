@@ -18,6 +18,7 @@ description: >-
 
 - For read-only UI or documentation-only changes
 - To automatically rewrite code before identifying a concrete defect
+- To rerun safety suites already recorded as successful for the current tree
 
 ## Pre-read
 
@@ -53,23 +54,26 @@ spell_sync/project_setup/target_settings.py
 
 ## Regression tests
 
-Run relevant suites:
+Required safety suites (via `select-and-run-tests` when not already green):
 
 ```bash
-python3.11 -m pytest tests/test_pull_safety.py tests/test_transaction_safety.py -q
-python3.11 -m pytest tests/test_tui_mutation_safety.py tests/test_tui_recovery_safety.py -q
-python3.11 -m pytest tests/test_target_settings.py tests/test_project_setup.py -q
+python3 scripts/run_focused_tests.py --cluster pull
+python3 scripts/run_focused_tests.py --cluster push
+python3 scripts/run_focused_tests.py --cluster transaction
+python3 scripts/run_focused_tests.py --cluster recovery
 ```
+
+Skip reruns when ledger shows `TEST_RUN_REASON=already-passed-for-current-state`.
 
 ## Stop conditions
 
 - All checklist items verified or explicitly N/A with justification
-- Safety regression tests green
+- Safety regression tests green or reused from ledger
 - Report any invariant gap before proceeding
 
 ## Final report
 
 - Files changed in mutation path
 - Checklist pass/fail per item
-- Test results
+- Test results or reused ledger keys
 - Identified gaps and recommended fixes (do not apply fixes unless asked)

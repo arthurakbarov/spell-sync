@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -24,11 +25,105 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
-SUMMARY_SCHEMA = 2
+SUMMARY_SCHEMA = 3
 MIN_PYTHON = (3, 11)
 INTERNAL_CHECK_ID = "ci.internal"
 
 RunStep = Callable[..., tuple[int, str]]
+
+
+def _ci_tree_digest(root: Path) -> str:
+    head = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "status",
+            "--porcelain=v2",
+            "--untracked-files=all",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    payload = f"{head.stdout.strip()}\n{status.stdout}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
+    return [
+        ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
+        ("docs.contract", [py, "scripts/check-docs-contract.py"]),
+        ("agent.config", [py, "scripts/check-agent-config.py"]),
+        ("targets.capabilities", [py, "scripts/check-target-capabilities.py", "--check"]),
+        ("ruff.check", [py, "-m", "ruff", "check", "spell_sync", "tests", "scripts"]),
+        (
+            "ruff.format",
+            [py, "-m", "ruff", "format", "--check", "spell_sync", "tests", "scripts"],
+        ),
+        ("mypy", [py, "-m", "mypy", "spell_sync"]),
+        (
+            "tests.pytest",
+            [
+                py,
+                "-m",
+                "pytest",
+                "tests/",
+                "-q",
+                "--cov=spell_sync",
+                "--cov-branch",
+                "--cov-report=term-missing:skip-covered",
+                "--cov-report=json",
+                "--cov-fail-under=98",
+            ],
+        ),
+    ]
+
+
+def _check_ids(steps: list[tuple[str, list[str]]]) -> list[str]:
+    return [step_id for step_id, _ in steps]
+
+
+def _select_steps(
+    steps: list[tuple[str, list[str]]],
+    *,
+    only: str | None,
+    start_from: str | None,
+    resume_failed: list[str] | None,
+) -> list[tuple[str, list[str]]]:
+    ids = _check_ids(steps)
+    if resume_failed:
+        selected = [item for item in steps if item[0] in resume_failed]
+        if not selected:
+            raise ValueError(f"resume-failed ids not found: {resume_failed}")
+        return selected
+    if only:
+        selected = [item for item in steps if item[0] == only]
+        if not selected:
+            raise ValueError(f"unknown check id: {only}")
+        return selected
+    if start_from:
+        if start_from not in ids:
+            raise ValueError(f"unknown check id: {start_from}")
+        index = ids.index(start_from)
+        return steps[index:]
+    return steps
+
+
+def _ci_mode(*, only: str | None, start_from: str | None, resume_failed: bool) -> str:
+    if resume_failed:
+        return "resume"
+    if only:
+        return "only"
+    if start_from:
+        return "from"
+    return "full"
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +358,9 @@ class CiRunner:
         self._used = False
         self._artifacts_ready = False
         self._wheel_smoke_root: Path | None = None
+        self._mode = "full"
+        self._final_evidence = True
+        self._tree_digest = ""
 
     def _bind_run_artifacts(self) -> RunArtifacts:
         run_id = _unique_run_id(self.artifacts, self.now())
@@ -346,6 +444,9 @@ class CiRunner:
             "exitCode": exit_code,
             "startedAt": self.started_at,
             "completedAt": completed,
+            "mode": self._mode,
+            "finalEvidence": self._final_evidence,
+            "treeDigest": self._tree_digest,
             "checks": self.checks,
             "logPath": str(self._log_path),
             "historyLogPath": str(self._history_log_path),
@@ -493,10 +594,24 @@ print(importlib.metadata.version("spell-sync"))
         )
         return 0, "\n".join(parts), summary
 
-    def run(self, *, bootstrap: bool = True) -> int:
+    def run(
+        self,
+        *,
+        bootstrap: bool = True,
+        only: str | None = None,
+        start_from: str | None = None,
+        resume_failed: list[str] | None = None,
+    ) -> int:
         if self._used:
             raise RuntimeError("CiRunner instances are single-use")
         self._used = True
+        self._mode = _ci_mode(
+            only=only,
+            start_from=start_from,
+            resume_failed=resume_failed is not None,
+        )
+        self._final_evidence = self._mode == "full"
+        self._tree_digest = _ci_tree_digest(self.root)
 
         try:
             self.started_at = self.now().isoformat()
@@ -551,45 +666,42 @@ print(importlib.metadata.version("spell-sync"))
                 if install_editable_rc != 0:
                     return self._finish(install_editable_rc)
 
-            steps: list[tuple[str, list[str]]] = [
-                ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
-                ("docs.contract", [py, "scripts/check-docs-contract.py"]),
-                ("agent.config", [py, "scripts/check-agent-config.py"]),
-                ("targets.capabilities", [py, "scripts/check-target-capabilities.py", "--check"]),
-                ("ruff.check", [py, "-m", "ruff", "check", "spell_sync", "tests", "scripts"]),
-                (
-                    "ruff.format",
-                    [py, "-m", "ruff", "format", "--check", "spell_sync", "tests", "scripts"],
-                ),
-                ("mypy", [py, "-m", "mypy", "spell_sync"]),
-                (
-                    "tests.pytest",
-                    [
-                        py,
-                        "-m",
-                        "pytest",
-                        "tests/",
-                        "-q",
-                        "--cov=spell_sync",
-                        "--cov-branch",
-                        "--cov-report=term-missing:skip-covered",
-                        "--cov-report=json",
-                        "--cov-fail-under=98",
-                    ],
-                ),
-            ]
+            steps = _build_check_steps(py)
+            try:
+                selected = _select_steps(
+                    steps,
+                    only=only,
+                    start_from=start_from,
+                    resume_failed=resume_failed,
+                )
+            except ValueError as exc:
+                self.record(INTERNAL_CHECK_ID, 1, str(exc))
+                return self._finish(1)
 
-            for step_id, argv in steps:
+            run_post_pytest = self._mode == "full" or start_from == "tests.pytest"
+            if resume_failed:
+                run_post_pytest = run_post_pytest or any(
+                    item in {"tests.pytest", "coverage.policy"} for item in resume_failed
+                )
+
+            for step_id, argv in selected:
                 rc, out = self.run_step(argv, cwd=self.root)
                 summary = self._fail_summary(step_id, out) if rc != 0 else ""
                 self.record(step_id, rc, out, summary)
                 if rc != 0:
                     return self._finish(rc)
 
-            cov_rc, cov_out = _coverage_gate(py, root=self.root, run_step=self.run_step)
-            self.record("coverage.policy", cov_rc, cov_out)
-            if cov_rc != 0:
-                return self._finish(cov_rc)
+            if not run_post_pytest:
+                return self._finish(0)
+
+            if only is None and (self._mode == "full" or start_from == "tests.pytest"):
+                cov_rc, cov_out = _coverage_gate(py, root=self.root, run_step=self.run_step)
+                self.record("coverage.policy", cov_rc, cov_out)
+                if cov_rc != 0:
+                    return self._finish(cov_rc)
+
+            if self._mode != "full" and only not in {None, "tests.pytest"}:
+                return self._finish(0)
 
             shutil.rmtree(self.root / "build", ignore_errors=True)
             shutil.rmtree(self.root / "dist", ignore_errors=True)
@@ -680,6 +792,25 @@ print(importlib.metadata.version("spell-sync"))
             self._cleanup()
 
 
+def _load_resume_failed_ids(summary_path: Path, root: Path) -> tuple[list[str], str]:
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("resume summary must be a JSON object")
+    summary_digest = payload.get("treeDigest")
+    if not isinstance(summary_digest, str) or not summary_digest:
+        raise ValueError("resume summary missing treeDigest")
+    current_digest = _ci_tree_digest(root)
+    if summary_digest != current_digest:
+        raise ValueError("resume summary treeDigest does not match current tree")
+    checks = payload.get("checks")
+    if not isinstance(checks, list):
+        raise ValueError("resume summary missing checks")
+    failed = [str(item["id"]) for item in checks if item.get("status") == "failed"]
+    if not failed:
+        raise ValueError("resume summary has no failed checks")
+    return failed, current_digest
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run spell-sync CI checks with machine-readable summary output.",
@@ -689,6 +820,27 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip dependency installation (environment already prepared).",
     )
+    parser.add_argument(
+        "--list-checks",
+        action="store_true",
+        help="Print stable check ids and exit.",
+    )
+    parser.add_argument(
+        "--only",
+        metavar="CHECK_ID",
+        help="Run a single diagnostic check (not final CI evidence).",
+    )
+    parser.add_argument(
+        "--from",
+        dest="start_from",
+        metavar="CHECK_ID",
+        help="Run from CHECK_ID through remaining checks (diagnostic).",
+    )
+    parser.add_argument(
+        "--resume-failed",
+        metavar="SUMMARY_PATH",
+        help="Rerun failed checks from a prior summary for the same tree digest.",
+    )
     return parser
 
 
@@ -696,8 +848,43 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     python_bin = os.environ.get("PYTHON_BIN") or sys.executable
+    if args.list_checks:
+        ids = _check_ids(_build_check_steps(python_bin))
+        ids.extend(
+            [
+                "coverage.policy",
+                "packaging.build",
+                "packaging.twine",
+                "packaging.wheel-smoke",
+                "smoke.init",
+                "smoke.lint",
+                "smoke.tui",
+            ]
+        )
+        for check_id in ids:
+            print(check_id)
+        return 0
+    resume_failed: list[str] | None = None
+    if args.resume_failed:
+        summary_path = Path(args.resume_failed)
+        if not summary_path.is_file():
+            print(f"resume summary not found: {summary_path}", file=sys.stderr)
+            return 1
+        try:
+            resume_failed, _digest = _load_resume_failed_ids(summary_path, ROOT)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+    if args.only and args.start_from:
+        print("cannot combine --only and --from", file=sys.stderr)
+        return 1
     runner = CiRunner(python_bin=python_bin)
-    return runner.run(bootstrap=not args.no_bootstrap)
+    return runner.run(
+        bootstrap=not args.no_bootstrap,
+        only=args.only,
+        start_from=args.start_from,
+        resume_failed=resume_failed,
+    )
 
 
 if __name__ == "__main__":

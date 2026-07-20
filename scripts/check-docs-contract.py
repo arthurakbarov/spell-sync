@@ -48,8 +48,10 @@ KNOWN_STATUSES = frozenset(
 AGENT_WORKFLOW_DOCS = (
     "AGENTS.md",
     "docs/AGENT_DEVELOPMENT.md",
+    "docs/TESTING_STRATEGY.md",
     ".cursor/skills/spell-sync-ci/SKILL.md",
 )
+TESTING_STRATEGY_DOC = Path("docs/TESTING_STRATEGY.md")
 PINNED_PYTHON = re.compile(r"python3\.\d+")
 DEVELOPMENT_VERSION = Path("docs/DEVELOPMENT.md")
 HISTORICAL_DOC_PATHS = frozenset(
@@ -438,6 +440,37 @@ def _check_stale_version_claims(root: Path, version: str) -> list[ContractViolat
                 )
     return violations
 
+    return violations
+
+
+def _check_testing_strategy_doc(root: Path) -> list[ContractViolation]:
+    violations: list[ContractViolation] = []
+    path = root / TESTING_STRATEGY_DOC
+    if not path.is_file():
+        violations.append(
+            ContractViolation(
+                "TEST-001",
+                path,
+                None,
+                f"missing {TESTING_STRATEGY_DOC}",
+                "add docs/TESTING_STRATEGY.md with Levels 0–3 validation guidance",
+            )
+        )
+        return violations
+    text = path.read_text(encoding="utf-8")
+    for required in ("Level 0", "Level 1", "Level 2", "Level 3", "test-impact.toml"):
+        if required not in text:
+            violations.append(
+                ContractViolation(
+                    "TEST-002",
+                    path,
+                    None,
+                    f"TESTING_STRATEGY.md missing section reference: {required}",
+                    f"document {required} in the testing strategy",
+                )
+            )
+    return violations
+
 
 def check_repository(root: Path) -> list[ContractViolation]:
     violations: list[ContractViolation] = []
@@ -533,6 +566,7 @@ def check_repository(root: Path) -> list[ContractViolation]:
     violations.extend(_check_current_phase_section(root))
     violations.extend(_check_stale_version_claims(root, version))
     violations.extend(_check_agent_workflow_docs(root))
+    violations.extend(_check_testing_strategy_doc(root))
     return violations
 
 

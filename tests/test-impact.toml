@@ -1,0 +1,225 @@
+[meta]
+sharedFixtures = [
+  "tests/conftest.py",
+  "tests/runtime_helpers.py",
+  "tests/service_test_utils.py",
+]
+docsOnlyPrefixes = [
+  "docs/",
+  "README",
+  "CHANGELOG",
+  "LICENSE",
+]
+agentPaths = [
+  ".cursor/",
+  "AGENTS.md",
+  "docs/AGENT_DEVELOPMENT.md",
+]
+ciScriptPaths = [
+  "scripts/ci.sh",
+  "scripts/ci_runner.py",
+  "scripts/check-agent-config.py",
+  "scripts/check-docs-contract.py",
+  "scripts/test_plan.py",
+  "scripts/run_focused_tests.py",
+  "scripts/test_selection/",
+]
+pyprojectPath = "pyproject.toml"
+
+[fallback]
+tests = [
+  "tests/test_core.py",
+  "tests/test_installed_workflow.py",
+]
+
+[clusters.runtime]
+production = [
+  "spell_sync/runtime_settings.py",
+  "spell_sync/resolved_runtime.py",
+  "spell_sync/sync_context.py",
+  "spell_sync/validated_runtime.py",
+  "spell_sync/application/runtime_resolver.py",
+  "spell_sync/application/mutation_scope.py",
+  "spell_sync/mutation_guards.py",
+]
+tests = [
+  "tests/test_runtime_architecture.py",
+  "tests/test_explicit_runtime.py",
+  "tests/test_runtime_helpers.py",
+  "tests/test_application_service.py",
+]
+validators = []
+
+[clusters.configuration]
+production = [
+  "spell_sync/config.py",
+  "spell_sync/settings.py",
+  "spell_sync/project_setup/*.py",
+  "spell_sync/config_check_cmd.py",
+]
+tests = [
+  "tests/test_settings.py",
+  "tests/test_project_setup.py",
+  "tests/test_target_settings.py",
+  "tests/test_application_requests.py",
+]
+validators = []
+
+[clusters.pull]
+production = [
+  "spell_sync/sync_run.py",
+  "spell_sync/pull*.py",
+  "spell_sync/io.py",
+]
+tests = [
+  "tests/test_pull_safety.py",
+  "tests/test_pull_flow.py",
+]
+validators = []
+
+[clusters.push]
+production = [
+  "spell_sync/push_*.py",
+  "spell_sync/push_setup.py",
+  "spell_sync/application/service.py",
+  "spell_sync/io.py",
+  "spell_sync/app_process_check.py",
+]
+tests = [
+  "tests/test_push_transaction.py",
+  "tests/test_transaction_safety.py",
+  "tests/test_push_safety_coverage.py",
+  "tests/test_push_safety_edges.py",
+  "tests/test_app_process_check.py",
+]
+validators = []
+
+[clusters.transaction]
+production = [
+  "spell_sync/push_transaction.py",
+  "spell_sync/push_journal.py",
+  "spell_sync/operation_lock.py",
+  "spell_sync/push_prepared.py",
+]
+tests = [
+  "tests/test_push_transaction.py",
+  "tests/test_transaction_safety.py",
+  "tests/test_push_journal.py",
+  "tests/test_operation_lock.py",
+]
+validators = []
+
+[clusters.recovery]
+production = [
+  "spell_sync/recover*.py",
+  "spell_sync/recovery*.py",
+  "spell_sync/push_journal.py",
+]
+tests = [
+  "tests/test_recovery_discard_safety.py",
+  "tests/test_recovery_facade_coverage.py",
+  "tests/test_tui_recovery_safety.py",
+  "tests/test_recovery_flow.py",
+]
+validators = []
+
+[clusters.tui]
+production = [
+  "spell_sync/tui/",
+  "spell_sync/application/service.py",
+]
+tests = [
+  "tests/tui/test_architecture.py",
+  "tests/test_tui_mutation_safety.py",
+  "tests/test_tui_recovery_safety.py",
+  "tests/test_gui_smoke.py",
+]
+validators = []
+
+[clusters.cli-json]
+production = [
+  "spell_sync/cli.py",
+  "spell_sync/commands.py",
+  "spell_sync/cli_request_adapter.py",
+  "spell_sync/json_output.py",
+  "spell_sync/application/requests.py",
+]
+tests = [
+  "tests/test_cli.py",
+  "tests/test_commands.py",
+  "tests/test_json_contract.py",
+  "tests/test_json_output.py",
+  "tests/test_application_requests.py",
+]
+validators = []
+
+[clusters.packaging]
+production = [
+  "pyproject.toml",
+  "spell_sync/__init__.py",
+  "spell_sync/version.py",
+]
+tests = [
+  "tests/test_installed_workflow.py",
+  "tests/test_ci_contract.py",
+]
+validators = [
+  "scripts/check-target-capabilities.py --check",
+]
+static_targets = [
+  "spell_sync",
+]
+
+[clusters.agent-workflow]
+production = [
+  ".cursor/",
+  "AGENTS.md",
+  "docs/AGENT_DEVELOPMENT.md",
+  "scripts/check-agent-config.py",
+  "scripts/check-docs-contract.py",
+  "scripts/ci_runner.py",
+  "scripts/test_plan.py",
+  "scripts/run_focused_tests.py",
+  "scripts/test_selection/",
+  "tests/test-impact.toml",
+]
+tests = [
+  "tests/test_agent_config_validator.py",
+  "tests/test_docs_contract.py",
+  "tests/test_ci_contract.py",
+  "tests/test_test_planner.py",
+  "tests/test_focused_test_runner.py",
+  "tests/test_test_efficiency_contract.py",
+]
+validators = [
+  "scripts/check-agent-config.py",
+  "scripts/check-docs-contract.py",
+]
+
+[clusters.documentation]
+production = [
+  "docs/",
+  "README.md",
+  "CONTRIBUTING.md",
+]
+tests = []
+validators = [
+  "scripts/check-docs-style.sh",
+  "scripts/check-docs-contract.py",
+]
+
+[clusters.test-selection]
+production = [
+  "scripts/test_plan.py",
+  "scripts/run_focused_tests.py",
+  "scripts/test_selection/",
+  "tests/test-impact.toml",
+]
+tests = [
+  "tests/test_test_planner.py",
+  "tests/test_focused_test_runner.py",
+  "tests/test_test_efficiency_contract.py",
+]
+validators = [
+  "scripts/check-agent-config.py",
+]

@@ -56,10 +56,9 @@ No-args on a TTY launches the TUI when a project is ready. See `spell_sync/cli.p
 ## Critical commands
 
 ```bash
-python3 -m ruff check spell_sync tests scripts
-python3 -m ruff format --check spell_sync tests scripts
-python3 -m mypy spell_sync
 python3 -m pytest <focused tests> -q
+python3 scripts/test_plan.py
+python3 scripts/run_focused_tests.py
 scripts/ci.sh
 python3 scripts/check-agent-config.py
 python3 scripts/check-docs-contract.py

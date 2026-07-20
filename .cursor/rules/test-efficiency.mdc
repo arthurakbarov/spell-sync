@@ -1,0 +1,35 @@
+---
+description: Require minimal non-duplicated validation during development and one final full CI run.
+alwaysApply: true
+---
+
+# Test efficiency
+
+## During development
+
+1. Start from the smallest failing test (Level 0).
+2. Do not run an entire module when one test function suffices.
+3. After local pass, run affected module tests once (Level 1).
+4. After module pass, run the relevant risk cluster once (Level 2).
+5. Do not run another cluster without dependency or risk reason.
+6. Do not run full CI in the middle of a normal edit loop.
+7. Do not repeat an identical successful command on an unchanged tree.
+8. Before running tests, use `scripts/test_plan.py` or document the exact manual reason.
+9. Do not use `pytest --lf` as final evidence.
+10. Do not use `pytest -x` as final cluster evidence.
+11. `--lf`, `--ff`, `-x` are diagnostic only; follow with the normal selected suite.
+12. Do not run packaging or wheel smoke in focused loops unless package boundaries changed.
+13. Run full `scripts/ci.sh` exactly once on the final stable tree.
+14. On final CI failure, rerun only the failed check while fixing; then one new full CI.
+15. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
+
+## Tools
+
+- Plan: `python3 scripts/test_plan.py`
+- Run: `python3 scripts/run_focused_tests.py`
+- Strategy: `docs/TESTING_STRATEGY.md`
+- Registry: `tests/test-impact.toml`
+
+## Reporting
+
+Show skipped duplicate commands and reused run keys in the final report.

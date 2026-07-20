@@ -21,22 +21,25 @@ description: Perform an architecture migration while preserving safety contracts
 2. **Safety inventory** — list Pull/Push/Recovery/lock/journal invariants at risk.
 3. **Migration order** — follow the tracker; finish one layer before the next.
 4. **Single path** — remove or migrate callers; no permanent compatibility wrappers.
-5. **No hidden globals** — prefer explicit parameters, resolver objects, or frozen context passed through facades.
-6. **Architecture tests** — extend `tests/test_application_requests.py` and phase-specific guards.
-7. **Focused safety tests** — run mutation safety tests when behavior touches writes.
+5. **No hidden globals** — prefer explicit parameters, resolver objects, or frozen context.
+6. **Architecture tests** — extend phase-specific guards.
+7. **Combined focused validation** — build one deduplicated cluster plan with
+   `python3 scripts/test_plan.py --explain` and run via `select-and-run-tests` once.
+   Do not rerun overlapping clusters sequentially.
 8. **ADR** — add or update `docs/decisions/` when a decision is accepted.
-9. **Full CI** — `scripts/ci.sh` must pass.
-10. **Package smoke** — required when CLI/package runtime or import paths change.
+9. **Full CI once** — `scripts/ci.sh` on final stable tree only.
+10. **Package smoke** — covered by final CI when package boundaries change.
 
 ## Stop conditions
 
-- Stop when phase completion criteria in the tracker are met and CI is green
-- Stop and report if a change would break CLI JSON, exit codes, or Pull/Push semantics without explicit phase scope
+- Stop when phase completion criteria are met and final CI is green
+- Stop and report if a change would break CLI JSON, exit codes, or Pull/Push semantics
 
 ## Related skills
 
+- `select-and-run-tests` — staged validation during migration
 - `mutation-safety-audit` — mandatory for mutation-path changes
-- `spell-sync-ci` — validation and failure diagnosis
+- `spell-sync-ci` — final CI and diagnostic reruns
 
 ## Finalize workspace snapshot
 

@@ -1,0 +1,125 @@
+"""Load and match the test impact registry."""
+
+from __future__ import annotations
+
+import fnmatch
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+
+SAFETY_CRITICAL_CLUSTERS = frozenset({"pull", "push", "transaction", "recovery"})
+CONSERVATIVE_FALLBACK_CLUSTER = "packaging"
+ALL_PYTEST_CLUSTERS = frozenset(
+    {
+        "runtime",
+        "configuration",
+        "pull",
+        "push",
+        "transaction",
+        "recovery",
+        "tui",
+        "cli-json",
+        "packaging",
+        "agent-workflow",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ClusterSpec:
+    name: str
+    production: tuple[str, ...]
+    tests: tuple[str, ...]
+    validators: tuple[str, ...] = ()
+    static_targets: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Registry:
+    clusters: dict[str, ClusterSpec]
+    shared_fixtures: tuple[str, ...]
+    docs_only_prefixes: tuple[str, ...]
+    agent_paths: tuple[str, ...]
+    ci_script_paths: tuple[str, ...]
+    pyproject_path: str
+    conservative_tests: tuple[str, ...]
+
+
+def _as_tuple(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(str(item) for item in value)
+
+
+def load_registry(path: Path) -> Registry:
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    clusters: dict[str, ClusterSpec] = {}
+    for name, section in data.get("clusters", {}).items():
+        if not isinstance(section, dict):
+            continue
+        clusters[name] = ClusterSpec(
+            name=name,
+            production=_as_tuple(section.get("production")),
+            tests=_as_tuple(section.get("tests")),
+            validators=_as_tuple(section.get("validators")),
+            static_targets=_as_tuple(section.get("static_targets")),
+        )
+    meta = data.get("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+    fallback = data.get("fallback", {})
+    if not isinstance(fallback, dict):
+        fallback = {}
+    return Registry(
+        clusters=clusters,
+        shared_fixtures=_as_tuple(meta.get("sharedFixtures")),
+        docs_only_prefixes=_as_tuple(meta.get("docsOnlyPrefixes")),
+        agent_paths=_as_tuple(meta.get("agentPaths")),
+        ci_script_paths=_as_tuple(meta.get("ciScriptPaths")),
+        pyproject_path=str(meta.get("pyprojectPath", "pyproject.toml")),
+        conservative_tests=_as_tuple(fallback.get("tests")),
+    )
+
+
+def path_matches(path: str, patterns: tuple[str, ...]) -> bool:
+    normalized = path.replace("\\", "/")
+    for pattern in patterns:
+        if fnmatch.fnmatch(normalized, pattern):
+            return True
+        if normalized == pattern:
+            return True
+        if pattern.endswith("/") and normalized.startswith(pattern):
+            return True
+    return False
+
+
+def is_docs_only(path: str, registry: Registry) -> bool:
+    normalized = path.replace("\\", "/")
+    return any(normalized.startswith(prefix) for prefix in registry.docs_only_prefixes)
+
+
+def clusters_for_file(path: str, registry: Registry) -> set[str]:
+    normalized = path.replace("\\", "/")
+    matched: set[str] = set()
+    if normalized in registry.shared_fixtures or normalized == "tests/conftest.py":
+        return set(ALL_PYTEST_CLUSTERS)
+    if normalized.startswith("tests/") and normalized.endswith(".py"):
+        matched.add("_test_file")
+        return matched
+    if any(normalized.startswith(prefix) for prefix in registry.agent_paths):
+        matched.add("agent-workflow")
+    if any(normalized == item or normalized.startswith(item) for item in registry.ci_script_paths):
+        matched.add("agent-workflow")
+    if normalized == registry.pyproject_path:
+        matched.add("packaging")
+        matched.add("agent-workflow")
+    for cluster in registry.clusters.values():
+        if path_matches(normalized, cluster.production):
+            matched.add(cluster.name)
+    if normalized.startswith("spell_sync/") and not matched:
+        matched.add(CONSERVATIVE_FALLBACK_CLUSTER)
+    return matched
+
+
+def dedupe_sorted(items: set[str] | list[str]) -> list[str]:
+    return sorted(set(items))

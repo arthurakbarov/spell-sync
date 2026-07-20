@@ -247,13 +247,16 @@ class TestCiContract(unittest.TestCase):
             "exitCode",
             "startedAt",
             "completedAt",
+            "mode",
+            "finalEvidence",
+            "treeDigest",
             "checks",
             "logPath",
             "historyLogPath",
             "historySummaryPath",
         ):
             self.assertIn(key, summary, msg=f"[CI-CONTRACT-005] missing {key}")
-        self.assertEqual(summary["schemaVersion"], 2)
+        self.assertEqual(summary["schemaVersion"], 3)
 
     def test_success_final_output(self) -> None:
         buf = io.StringIO()
