@@ -113,23 +113,72 @@ blocking, and privacy rules.
 
 ## Current phase
 
-Phase 0 complete (inventory). Phase 1 complete (private). Phase 2 not started.
+Phase 2 complete (typed application requests). Phase 3 (explicit runtime) not started.
+
+## Phase 2: typed request migration
+
+See `docs/decisions/0001-typed-application-requests.md`.
+
+### CliOptions field classification
+
+| Field | Category |
+|-------|----------|
+| `wordlist` | Project selection |
+| `add_from` | Operation semantics (Pull) |
+| `strict` | Operation semantics (Push CLI override → `strict_override`) |
+| `fix`, `strict` (lint) | Operation semantics (Lint) |
+| `verbose` | Presentation (status diff detail via `include_word_diffs` mapping) |
+| `dry_run`, `yes` | CLI transport / confirmation flow |
+| `json_output` | Presentation only |
+| `review_removals`, `plan_removals`, `health_check`, `show_targets` | CLI transport (command routing) |
+| `discard_corrupt_journal` | CLI transport (recover flags) |
+| `support_report_format`, `support_report_output` | Presentation only (export boundary) |
+
+### Target request types
+
+`ProjectRef`, `StatusRequest`, `DoctorRequest`, `PullRequest`, `PushRequest`,
+`RecoveryRequest`, `SetupRequest`, `TargetSettingsRequest`,
+`PrepareTargetSettingsUpdateRequest`, `SupportReportRequest`, `ConfigCheckRequest`,
+`LintRequest`, `OperationSource` (reserved for diagnostics; not wired yet).
+
+### Migration order
+
+1. Add `application/requests.py`
+2. Add `cli_request_adapter.py` with shared `project_ref()`
+3. Migrate `SpellSyncService` to typed requests (single contract)
+4. Migrate CLI commands (adapter → service → renderer)
+5. Migrate TUI controller (direct request builders)
+6. Remove `CliOptions` from application/TUI; add architecture guards
+
+### Compatibility contracts
+
+- CLI command names, arguments, defaults, exit codes unchanged
+- JSON schemas and field ordering unchanged
+- TUI navigation and copy unchanged
+- Confirmation IDs remain separate execution arguments
+- `CliOptions` retained as CLI parser DTO only
+
+Summary:
+
+- `CliOptions` is CLI parser DTO only; application layer uses `application/requests.py`
+- `cli_request_adapter.py` is the sole production mapper from CLI DTO to requests
+- TUI builds requests directly; presentation flags remain in CLI
 
 ## Completed phases
 
 - Phase 0: baseline audit, this document
 - Phase 1 (spell-sync-dev): removed review-bundle, export-source handoff tooling
+- Phase 2: typed application requests + CLI adapter
 
 ## Last validation
 
 ```text
-spell-sync-dev: sh -n scripts/health.sh — pass
-spell-sync: baseline CI green at c9b46bc (pre-0.3 work)
+Phase 2: pytest 1559 passed; scripts/ci.sh green; wheel smoke OK (2026-07-20)
 ```
 
 ## Remaining work
 
-Phases 2–10 on public spell-sync repository (see migration order).
+Phases 3–10 on public spell-sync repository (see migration order).
 
 ## Deferred work
 

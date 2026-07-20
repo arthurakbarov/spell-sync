@@ -8,8 +8,11 @@ alwaysApply: false
 
 ## Layering
 
+- CLI parser builds `CliOptions`; `cli_request_adapter.py` maps to immutable application requests
+- TUI builds application requests directly from `ProjectRef` / controller context
 - CLI and TUI call `SpellSyncService` (`spell_sync/application/service.py`) — not core writers directly
-- Application layer orchestrates; it must not import Textual
+- Application layer orchestrates; it must not import `CliOptions`, `argparse`, `cli_request_adapter`, or Textual
+- `spell_sync/application/requests.py` holds UI-neutral frozen request dataclasses
 - Core owns mutation semantics: `sync_run`, `push_prepared`, `push_transaction`, `pull`, `project_setup`
 - TUI must not import dictionary writers, journal internals, snapshot writers, or config writers
 

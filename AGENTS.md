@@ -7,14 +7,22 @@ dictionaries are never inspected or modified.
 ## Architecture map
 
 ```text
-CLI / TUI
+CLI parser (CliOptions) / TUI controller
     ↓
-application facade (spell_sync/application/)
+CLI adapter / direct request builders
+    ↓
+immutable application requests (application/requests.py)
+    ↓
+SpellSyncService (application/service.py)
     ↓
 core planning and execution (sync_run, push_prepared, push_transaction, pull)
     ↓
 filesystem adapters (dictionaries, io, paths)
 ```
+
+CLI/TUI adapters create immutable application requests. The application layer does not
+depend on `CliOptions`. Runtime settings are still implicit in 0.2.1 (ContextVar); explicit
+runtime is Phase 3.
 
 Canonical references:
 

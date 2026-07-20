@@ -47,7 +47,19 @@ Targets with subset filtering today: Windows custom spelling files (`win-ru` →
 ## Command flow
 
 ```text
-CLI parsing
+CLI parser (CliOptions)
+    ↓
+cli_request_adapter
+    ↓
+immutable application request
+    ↓
+SpellSyncService
+
+TUI controller
+    ↓
+immutable application request
+    ↓
+SpellSyncService
     ↓
 ValidatedRuntime (config + journal, under lock)
     ↓
@@ -59,14 +71,20 @@ Safety checks + confirmation
     ↓
 Transactional execution (journal + snapshots)
     ↓
-Structured result → human or JSON
+Structured result → human or JSON (CLI/TUI presentation)
 ```
+
+Runtime settings remain implicit via ContextVar in 0.2.1; explicit runtime is a later phase.
 
 ## Core modules
 
 | Module | Role |
 |--------|------|
 | `cli.py` | Argparse, command dispatch |
+| `cli_options.py` | CLI parser DTO only |
+| `cli_request_adapter.py` | Map `CliOptions` → application requests |
+| `application/requests.py` | Immutable UI-neutral request dataclasses |
+| `application/service.py` | Facade for CLI and TUI |
 | `commands.py` | `pull`, `push`, `status`, `init`, `lint` |
 | `sync_context.py` | `RuntimeContext` — wordlist, config, dictionaries |
 | `validated_runtime.py` | Single config/journal load under lock |
