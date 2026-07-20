@@ -6,14 +6,14 @@ Prepare architectural release 0.3.0: typed application requests, explicit runtim
 context, thin facade with focused services, structured technical events, current
 documentation, and architecture validation guards.
 
-Remove maintainer-private handoff workflow (completed in spell-sync-dev).
+Remove obsolete private maintainer export workflow (completed in spell-sync-dev).
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
 | spell-sync | `c9b46bc` docs: add platform validation readiness report | yes |
-| spell-sync-dev | `3dcf017` chore: remove review handoff tooling | yes |
+| spell-sync-dev | `3dcf017` chore: remove obsolete private export tooling | yes |
 | spell-words | `c7ffed5` chore: add data repository agent guide | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
@@ -101,7 +101,7 @@ blocking, and privacy rules.
 
 ## Migration order
 
-1. ~~Remove review handoff tooling (spell-sync-dev)~~ done
+1. ~~Remove obsolete private maintainer export tooling (spell-sync-dev)~~ done
 2. Typed application requests + CLI adapter
 3. Explicit runtime settings + RuntimeResolver; remove ContextVars
 4. Split application services + presenters; thin facade
@@ -113,9 +113,17 @@ blocking, and privacy rules.
 
 ## Current phase
 
-Phase 2B complete (typed application boundary). Phase 2C complete (deterministic agent
-workflow, machine-readable CI, documentation contracts). Phase 3 (explicit runtime) is not
-started.
+Phase 2D complete: hardened deterministic CI and documentation contracts.
+
+[architecture-status:start]
+current: phase-2d
+phase-1: complete
+phase-2: complete
+phase-2b: complete
+phase-2c: complete
+phase-2d: complete
+phase-3: not-started
+[architecture-status:end]
 
 ## Phase 2B: complete application boundary
 
@@ -216,7 +224,7 @@ Summary:
 ## Completed phases
 
 - Phase 0: baseline audit, this document
-- Phase 1 (spell-sync-dev): removed review-bundle, export-source handoff tooling
+- Phase 1 (spell-sync-dev): removed obsolete private export and review-bundle tooling
 - Phase 2: typed application requests + CLI adapter
 - Phase 2B: pure request DTOs, service-only CLI mutations, dependency direction
 

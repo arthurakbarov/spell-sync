@@ -3,10 +3,9 @@
 set -e
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-if command -v python3.11 >/dev/null 2>&1; then
-  exec python3.11 "$root/scripts/ci_runner.py" "$@"
-elif command -v python3.12 >/dev/null 2>&1; then
-  exec python3.12 "$root/scripts/ci_runner.py" "$@"
-else
-  exec python3 "$root/scripts/ci_runner.py" "$@"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "CI requires PYTHON_BIN interpreter (default: python3); not found: $PYTHON_BIN" >&2
+  exit 1
 fi
+exec "$PYTHON_BIN" "$root/scripts/ci_runner.py" "$@"

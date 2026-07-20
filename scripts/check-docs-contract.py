@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,15 +33,16 @@ EXCLUDE_PATH_PARTS = (
 HISTORICAL_MARKERS = (
     "Removed unused",
     "removed unused",
-    "Phase 3 (explicit runtime) not started",
-    "Phase 3 is **not** started",
     "Historical context",
     "historical context",
     "resolved",
 )
 
-IMPLEMENTATION_TRACKER = ROOT / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md"
+IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md"
 CURRENT_PHASE_HEADING = "## Current phase"
+ARCHITECTURE_STATUS_START = "[architecture-status:start]"
+ARCHITECTURE_STATUS_END = "[architecture-status:end]"
+KNOWN_STATUSES = frozenset({"complete", "in-progress", "not-started", "planned"})
 HISTORICAL_DOC_PATHS = frozenset(
     {
         "docs/UX_0_2_IMPLEMENTATION.md",
@@ -50,17 +52,26 @@ HISTORICAL_DOC_PATHS = frozenset(
 )
 
 
-def _project_version() -> str:
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+@dataclass(frozen=True, slots=True)
+class ContractViolation:
+    check_id: str
+    path: Path | None
+    line_no: int | None
+    detail: str
+    remediation: str
+
+
+def _project_version(root: Path) -> str:
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     version = data.get("project", {}).get("version")
     if not isinstance(version, str):
         raise RuntimeError("pyproject.toml missing project.version")
     return version
 
 
-def _tracked_markdown() -> list[Path]:
+def _tracked_markdown(root: Path) -> list[Path]:
     out = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "-z", "*.md"],
+        ["git", "-C", str(root), "ls-files", "-z", "*.md"],
         check=True,
         capture_output=True,
     )
@@ -71,12 +82,12 @@ def _tracked_markdown() -> list[Path]:
         rel = raw.decode("utf-8")
         if rel.startswith(".cursor/"):
             continue
-        paths.append(ROOT / rel)
+        paths.append(root / rel)
     return paths
 
 
-def _agents_cli_commands() -> set[str]:
-    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+def _agents_cli_commands(root: Path) -> set[str]:
+    agents = (root / "AGENTS.md").read_text(encoding="utf-8")
     fence = re.search(
         r"```text agent-config-cli-commands\s*\n(.*?)```",
         agents,
@@ -99,79 +110,165 @@ def _line_has_historical_context(lines: list[str], line_no: int) -> bool:
     return any(marker in window for marker in HISTORICAL_MARKERS)
 
 
-def _fail(
-    check: str,
-    path: Path | None,
-    *,
-    line_no: int | None = None,
-    detail: str,
-    remediation: str,
-) -> None:
-    loc = str(path.relative_to(ROOT)) if path else "-"
-    line_part = f"\n  line: {line_no}" if line_no is not None else ""
-    print(
-        f"[{CHECK_ID}-{check}]\n"
-        f"  path: {loc}{line_part}\n"
-        f"  contract: documentation contract violation\n"
-        f"  actual: {detail}\n"
-        f"  remediation: {remediation}",
-        file=sys.stderr,
-    )
-
-
-def _check_current_phase_section() -> int:
-    errors = 0
-    if not IMPLEMENTATION_TRACKER.is_file():
-        _fail(
-            "PHASE-001",
-            IMPLEMENTATION_TRACKER,
-            detail="implementation tracker missing",
-            remediation="restore docs/ARCHITECTURE_0_3_IMPLEMENTATION.md",
-        )
-        return 1
-    text = IMPLEMENTATION_TRACKER.read_text(encoding="utf-8")
-    headings = [
-        idx
-        for idx, line in enumerate(text.splitlines(), start=1)
-        if line.strip() == CURRENT_PHASE_HEADING
+def _current_phase_body(text: str) -> tuple[int | None, str]:
+    lines = text.splitlines()
+    heading_indexes = [
+        idx for idx, line in enumerate(lines) if line.strip() == CURRENT_PHASE_HEADING
     ]
-    if len(headings) != 1:
-        _fail(
-            "PHASE-002",
-            IMPLEMENTATION_TRACKER,
-            detail=f"expected exactly one {CURRENT_PHASE_HEADING}, found {len(headings)}",
-            remediation="keep a single current phase section in the implementation tracker",
-        )
-        errors += 1
-        return errors
-    start = text.index(CURRENT_PHASE_HEADING)
-    body = text[start : start + 600]
-    if re.search(r"Phase\s*3\s+(?:is\s+)?complete", body, re.I):
-        _fail(
-            "PHASE-003",
-            IMPLEMENTATION_TRACKER,
-            detail="implementation tracker claims Phase 3 complete",
-            remediation="Phase 3 remains future work until explicit runtime lands",
-        )
-        errors += 1
-    body_normalized = body.lower().replace("\n", " ")
-    if "Phase 3" in body and "not started" not in body_normalized:
-        _fail(
-            "PHASE-004",
-            IMPLEMENTATION_TRACKER,
-            detail="Phase 3 status must explicitly say not started",
-            remediation="document Phase 3 as not started until migration begins",
-        )
-        errors += 1
-    return errors
+    if len(heading_indexes) != 1:
+        return None, ""
+    start = heading_indexes[0] + 1
+    body_lines: list[str] = []
+    for line in lines[start:]:
+        if line.startswith("## ") and line.strip() != CURRENT_PHASE_HEADING:
+            break
+        if line.strip() == ARCHITECTURE_STATUS_START:
+            break
+        body_lines.append(line)
+    return heading_indexes[0] + 1, "\n".join(body_lines).strip()
 
 
-def _check_stale_version_claims(version: str) -> int:
-    errors = 0
+def _parse_architecture_status(text: str) -> tuple[dict[str, str] | None, str | None]:
+    start_count = text.count(ARCHITECTURE_STATUS_START)
+    end_count = text.count(ARCHITECTURE_STATUS_END)
+    if start_count == 0 and end_count == 0:
+        return None, None
+    if start_count != 1 or end_count != 1:
+        return None, "architecture status markers must appear exactly once"
+    start = text.index(ARCHITECTURE_STATUS_START) + len(ARCHITECTURE_STATUS_START)
+    end = text.index(ARCHITECTURE_STATUS_END)
+    block = text[start:end].strip()
+    statuses: dict[str, str] = {}
+    for line_no, raw in enumerate(block.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            return None, f"invalid architecture status line {line_no}: {line!r}"
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or not value:
+            return None, f"invalid architecture status line {line_no}: {line!r}"
+        if key in statuses:
+            return None, f"duplicate architecture status key: {key}"
+        statuses[key] = value
+    return statuses, None
+
+
+def _check_current_phase_section(root: Path) -> list[ContractViolation]:
+    tracker = root / IMPLEMENTATION_TRACKER
+    violations: list[ContractViolation] = []
+    if not tracker.is_file():
+        return [
+            ContractViolation(
+                "PHASE-001",
+                tracker,
+                None,
+                "implementation tracker missing",
+                "restore docs/ARCHITECTURE_0_3_IMPLEMENTATION.md",
+            )
+        ]
+    text = tracker.read_text(encoding="utf-8")
+    heading_line, body = _current_phase_body(text)
+    heading_count = sum(1 for line in text.splitlines() if line.strip() == CURRENT_PHASE_HEADING)
+    if heading_count != 1:
+        violations.append(
+            ContractViolation(
+                "PHASE-002",
+                tracker,
+                None,
+                f"expected exactly one {CURRENT_PHASE_HEADING}, found {heading_count}",
+                "keep a single current phase section in the implementation tracker",
+            )
+        )
+        return violations
+    if not body:
+        violations.append(
+            ContractViolation(
+                "PHASE-003",
+                tracker,
+                heading_line,
+                "current phase section body is empty",
+                "document the active phase status in the current phase section",
+            )
+        )
+
+    statuses, parse_error = _parse_architecture_status(text)
+    if parse_error:
+        violations.append(
+            ContractViolation(
+                "PHASE-004",
+                tracker,
+                None,
+                parse_error,
+                "fix architecture-status marker block formatting",
+            )
+        )
+        return violations
+    if statuses is None:
+        return violations
+
+    current = statuses.get("current")
+    if not current:
+        violations.append(
+            ContractViolation(
+                "PHASE-005",
+                tracker,
+                None,
+                "architecture status missing current phase",
+                "add current: <phase-id> to architecture-status block",
+            )
+        )
+    phase_keys = [key for key in statuses if key != "current"]
+    if current and current not in phase_keys:
+        violations.append(
+            ContractViolation(
+                "PHASE-006",
+                tracker,
+                None,
+                f"current references unknown phase id: {current}",
+                "add a matching phase entry in architecture-status block",
+            )
+        )
+
+    in_progress = [
+        key for key, value in statuses.items() if key != "current" and value == "in-progress"
+    ]
+    if len(in_progress) > 1:
+        violations.append(
+            ContractViolation(
+                "PHASE-007",
+                tracker,
+                None,
+                f"multiple in-progress phases: {in_progress}",
+                "mark at most one phase as in-progress",
+            )
+        )
+
+    for key, value in statuses.items():
+        if key == "current":
+            continue
+        if value not in KNOWN_STATUSES:
+            violations.append(
+                ContractViolation(
+                    "PHASE-008",
+                    tracker,
+                    None,
+                    f"unknown status for {key}: {value}",
+                    f"use one of {sorted(KNOWN_STATUSES)}",
+                )
+            )
+
+    return violations
+
+
+def _check_stale_version_claims(root: Path, version: str) -> list[ContractViolation]:
+    violations: list[ContractViolation] = []
     stale = re.compile(r"\b0\.2\.0\b")
-    for path in _tracked_markdown():
-        rel = str(path.relative_to(ROOT))
-        if rel in HISTORICAL_DOC_PATHS or rel == "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md":
+    for path in _tracked_markdown(root):
+        rel = str(path.relative_to(root))
+        if rel in HISTORICAL_DOC_PATHS or rel == IMPLEMENTATION_TRACKER:
             continue
         if any(part in rel for part in EXCLUDE_PATH_PARTS):
             continue
@@ -180,59 +277,76 @@ def _check_stale_version_claims(version: str) -> int:
             if stale.search(line) and _line_has_historical_context(lines, line_no - 1):
                 continue
             if stale.search(line):
-                _fail(
-                    "VERSION-001",
-                    path,
-                    line_no=line_no,
-                    detail=line.strip(),
-                    remediation=f"update version references to {version}",
+                violations.append(
+                    ContractViolation(
+                        "VERSION-001",
+                        path,
+                        line_no,
+                        line.strip(),
+                        f"update version references to {version}",
+                    )
                 )
-                errors += 1
-    return errors
+    return violations
 
 
-def main() -> int:
-    errors = 0
-    version = _project_version()
-    cli_commands = _agents_cli_commands()
+def check_repository(root: Path) -> list[ContractViolation]:
+    violations: list[ContractViolation] = []
+    version = _project_version(root)
+    try:
+        cli_commands = _agents_cli_commands(root)
+    except RuntimeError as exc:
+        violations.append(
+            ContractViolation(
+                "CLI-002",
+                root / "AGENTS.md",
+                None,
+                str(exc),
+                "restore AGENTS.md agent-config-cli-commands fence",
+            )
+        )
+        cli_commands = set()
+
     code_commands: set[str] = set()
-    cli_file = ROOT / "spell_sync" / "cli.py"
-    tree = ast.parse(cli_file.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "COMMANDS"
-        ):
-            if isinstance(node.value, ast.Dict):
+    cli_file = root / "spell_sync" / "cli.py"
+    if cli_file.is_file():
+        tree = ast.parse(cli_file.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == "COMMANDS"
+                and isinstance(node.value, ast.Dict)
+            ):
                 code_commands = {
                     key.value
                     for key in node.value.keys
                     if isinstance(key, ast.Constant) and isinstance(key.value, str)
                 }
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if (
-                    isinstance(target, ast.Name)
-                    and target.id == "COMMANDS"
-                    and isinstance(node.value, ast.Dict)
-                ):
-                    code_commands = {
-                        key.value
-                        for key in node.value.keys
-                        if isinstance(key, ast.Constant) and isinstance(key.value, str)
-                    }
-    if cli_commands != code_commands:
-        _fail(
-            "CLI-001",
-            ROOT / "AGENTS.md",
-            detail=f"fence={sorted(cli_commands)} code={sorted(code_commands)}",
-            remediation="sync AGENTS.md agent-config-cli-commands with spell_sync/cli.py COMMANDS",
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "COMMANDS"
+                        and isinstance(node.value, ast.Dict)
+                    ):
+                        code_commands = {
+                            key.value
+                            for key in node.value.keys
+                            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+                        }
+    if cli_commands and code_commands and cli_commands != code_commands:
+        violations.append(
+            ContractViolation(
+                "CLI-001",
+                root / "AGENTS.md",
+                None,
+                f"fence={sorted(cli_commands)} code={sorted(code_commands)}",
+                "sync AGENTS.md agent-config-cli-commands with spell_sync/cli.py COMMANDS",
+            )
         )
-        errors += 1
 
-    for path in _tracked_markdown():
-        rel = str(path.relative_to(ROOT))
+    for path in _tracked_markdown(root):
+        rel = str(path.relative_to(root))
         if rel in HISTORICAL_DOC_PATHS:
             continue
         if any(part in rel for part in EXCLUDE_PATH_PARTS):
@@ -244,33 +358,57 @@ def main() -> int:
                     continue
                 if _line_has_historical_context(lines, line_no - 1):
                     continue
-                _fail(
-                    "API-001",
-                    path,
-                    line_no=line_no,
-                    detail=label,
-                    remediation=f"use the current API or mark the section historical ({label})",
+                violations.append(
+                    ContractViolation(
+                        "API-001",
+                        path,
+                        line_no,
+                        label,
+                        f"use the current API or mark the section historical ({label})",
+                    )
                 )
-                errors += 1
 
-    agent_dev = ROOT / "docs" / "AGENT_DEVELOPMENT.md"
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if not agent_dev.is_file():
-        _fail(
-            "AGENT-001",
-            agent_dev,
-            detail="missing docs/AGENT_DEVELOPMENT.md",
-            remediation="add the agent development contract",
+        violations.append(
+            ContractViolation(
+                "AGENT-001",
+                agent_dev,
+                None,
+                "missing docs/AGENT_DEVELOPMENT.md",
+                "add the agent development contract",
+            )
         )
-        errors += 1
 
-    errors += _check_current_phase_section()
-    errors += _check_stale_version_claims(version)
+    violations.extend(_check_current_phase_section(root))
+    violations.extend(_check_stale_version_claims(root, version))
+    return violations
 
-    if errors:
-        print(f"[{CHECK_ID}] failed checks: {errors}", file=sys.stderr)
+
+def format_violation(root: Path, violation: ContractViolation) -> str:
+    loc = str(violation.path.relative_to(root)) if violation.path else "-"
+    line_part = f"\n  line: {violation.line_no}" if violation.line_no is not None else ""
+    return (
+        f"[{CHECK_ID}-{violation.check_id}]\n"
+        f"  path: {loc}{line_part}\n"
+        f"  contract: documentation contract violation\n"
+        f"  actual: {violation.detail}\n"
+        f"  remediation: {violation.remediation}"
+    )
+
+
+def main() -> int:
+    violations = check_repository(ROOT)
+    if violations:
+        for violation in violations:
+            print(format_violation(ROOT, violation), file=sys.stderr)
+        print(f"[{CHECK_ID}] failed checks: {len(violations)}", file=sys.stderr)
         return 1
+    version = _project_version(ROOT)
+    markdown_count = len(_tracked_markdown(ROOT))
     print(
-        f"[{CHECK_ID}] documentation contract OK ({len(_tracked_markdown())} markdown files, version {version})"
+        f"[{CHECK_ID}] documentation contract OK "
+        f"({markdown_count} markdown files, version {version})"
     )
     return 0
 

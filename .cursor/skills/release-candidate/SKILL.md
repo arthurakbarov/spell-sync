@@ -26,7 +26,7 @@ description: >-
 - [ ] Wheel/sdist contents verified (`installed-wheel-smoke` skill)
 - [ ] Source ZIP via `git archive` (not parent workspace zip)
 - [ ] Privacy scan (`privacy-export` skill)
-- [ ] SHA-256 hashes recorded for handoff artifacts
+- [ ] SHA-256 hashes recorded for release artifacts
 - [ ] `docs/MANUAL_TESTING.md` scenarios current
 - [ ] `python3.11 scripts/check-target-capabilities.py --check` green
 - [ ] No false `manual_validation: pass` claims in `docs/target-validation.json`

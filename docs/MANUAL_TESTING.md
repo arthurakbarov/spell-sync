@@ -23,7 +23,7 @@ account so application state does not mix with daily use.
 
 ## Installation
 
-From the repository checkout (handoff artifacts live in `dist/`):
+From the repository checkout (release artifacts live in `dist/`):
 
 ```bash
 uv tool install ./dist/spell_sync-0.2.0-py3-none-any.whl

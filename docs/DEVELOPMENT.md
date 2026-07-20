@@ -47,11 +47,12 @@ directories; it does not create files in the repository root.
 
 Agent-oriented workflow details live in `docs/AGENT_DEVELOPMENT.md` (not duplicated here).
 
-Individual steps:
+Static checks: Ruff covers the production package, tests, and Python scripts under
+`scripts/`. Mypy covers the production package only (`spell_sync/`).
 
 ```bash
-python3 -m ruff check spell_sync tests
-python3 -m ruff format --check spell_sync tests
+python3 -m ruff check spell_sync tests scripts
+python3 -m ruff format --check spell_sync tests scripts
 python3 -m mypy spell_sync
 python3 -m pytest tests -q --cov=spell_sync --cov-branch --cov-fail-under=98
 python3 scripts/check-docs-contract.py

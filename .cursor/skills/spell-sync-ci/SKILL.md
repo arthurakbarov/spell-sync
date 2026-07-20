@@ -47,7 +47,8 @@ scripts/ci.sh
 ```
 
 Read `CI_LOG` and `CI_SUMMARY` from the printed paths. On failure, use `CI_FAILED_ID` as the
-primary gate identifier. Do not ask the owner to diagnose failures.
+primary gate identifier. Summary schema version 2 includes `runId`, `historyLogPath`, and
+`historySummaryPath`. Do not ask the owner to diagnose failures.
 
 ## What ci.sh enforces
 
@@ -61,7 +62,7 @@ Via `scripts/ci_runner.py`:
 | `docs.contract` | Documentation contracts |
 | `agent.config` | Cursor agent configuration |
 | `targets.capabilities` | Target registry |
-| `ruff.check` / `ruff.format` | Lint and format |
+| `ruff.check` / `ruff.format` | Lint and format (`spell_sync`, `tests`, `scripts`) |
 | `mypy` | Types on `spell_sync/` |
 | `tests.pytest` | Full pytest suite |
 | `coverage.policy` | 100% lines, ≥96% branches on `spell_sync/` |

@@ -1,7 +1,7 @@
 ---
 name: privacy-export
 description: >-
-  Scan artifacts and repository content before handoff or publication. Use before
+  Scan artifacts and repository content before publication or release candidate review. Use before
   creating ZIP archives, sharing wheels, or any push the owner requests. Never
   archive a parent workspace.
 ---
@@ -23,14 +23,14 @@ description: >-
 
 - [ ] Operate only from public repository root
 - [ ] Source via `git archive` — never whole-workspace zip
-- [ ] No `.git` in handoff artifacts unless intentionally requested
+- [ ] No `.git` in distribution artifacts unless intentionally requested
 - [ ] No personal wordlist or personal `spell-sync.toml` at repository root
 - [ ] No personal lint whitelist. The tracked bundled runtime whitelist is allowed and must remain packaged.
 - [ ] No absolute personal paths, credentials, tokens, or private emails
 - [ ] No logs, operation history, pending journal data, or transaction snapshots in tracked files or artifacts
 - [ ] No exported support or review session reports in tracked files
 - [ ] No build caches (`.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `dist/`, `build/`)
-- [ ] Inspect ZIP/wheel/sdist file list before handoff
+- [ ] Inspect ZIP/wheel/sdist file list before publication
 - [ ] Calculate SHA-256 for each artifact
 
 ## Allowed public resources
@@ -75,7 +75,7 @@ git grep -iE 'private maintainer workspace|private wordlist|nested spell-words' 
   -- AGENTS.md .cursor docs README.md || true
 ```
 
-Each hit must be fixed or justified before handoff.
+Each hit must be fixed or justified before publication.
 
 ### Artifact contents
 

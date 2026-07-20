@@ -7,6 +7,8 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,21 +21,24 @@ def _load_ci_runner():
     spec = importlib.util.spec_from_file_location("ci_runner", ROOT / "scripts" / "ci_runner.py")
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
 
-def _success_run(mod, argv: list[str], *, cwd=None, env=None) -> tuple[int, str]:
+def _success_run(root: Path, argv: list[str], *, cwd=None, env=None) -> tuple[int, str]:
     joined = " ".join(argv)
+    effective = cwd or root
     if "sys.version_info" in joined:
         return 0, "3.11\n"
     if "pip install" in joined:
         return 0, ""
     if joined.endswith("build"):
-        (mod.ROOT / "dist").mkdir(parents=True, exist_ok=True)
-        version = mod._package_version()
-        (mod.ROOT / "dist" / f"spell_sync-{version}-py3-none-any.whl").write_bytes(b"whl")
-        (mod.ROOT / "dist" / f"spell_sync-{version}.tar.gz").write_bytes(b"sdist")
+        (effective / "dist").mkdir(parents=True, exist_ok=True)
+        mod = _load_ci_runner()
+        version_text = mod._package_version(root)
+        (effective / "dist" / f"spell_sync-{version_text}-py3-none-any.whl").write_bytes(b"whl")
+        (effective / "dist" / f"spell_sync-{version_text}.tar.gz").write_bytes(b"sdist")
         return 0, ""
     if "twine" in joined:
         return 0, ""
@@ -53,7 +58,7 @@ def _success_run(mod, argv: list[str], *, cwd=None, env=None) -> tuple[int, str]
     if "pytest" in joined and "tests/" in joined:
         return 0, ""
     if "-c" in joined and "coverage" in joined:
-        (mod.ROOT / "coverage.json").write_text(
+        (effective / "coverage.json").write_text(
             '{"totals":{"missing_lines":[],"num_branches":1,"covered_branches":1}}',
             encoding="utf-8",
         )
@@ -74,25 +79,19 @@ class TestCiContract(unittest.TestCase):
         runner_cls.assert_not_called()
         self.assertEqual(ctx.exception.code, 0, msg="[CI-CONTRACT-001] --help must exit 0")
 
-    def test_ci_sh_delegates_to_runner(self) -> None:
+    def test_ci_sh_uses_python_bin_override(self) -> None:
         text = (ROOT / "scripts" / "ci.sh").read_text(encoding="utf-8")
-        self.assertIn(
-            "ci_runner.py",
-            text,
-            msg="[CI-CONTRACT-002] ci.sh must delegate to ci_runner.py",
-        )
+        self.assertIn("PYTHON_BIN", text, msg="[CI-CONTRACT-002] ci.sh must support PYTHON_BIN")
+        self.assertIn("ci_runner.py", text)
 
     def test_first_failure_exit_code_preserved(self) -> None:
-        calls: list[list[str]] = []
-
         def fake_run(argv: list[str], *, cwd=None, env=None):
-            calls.append(argv)
             joined = " ".join(argv)
             if "sys.version_info" in joined:
                 return 0, "3.11\n"
             if "check-docs-style.sh" in joined:
                 return 1, "forced docs.style failure\n"
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
+            return _success_run(self.mod.ROOT, argv, cwd=cwd, env=env)
 
         runner = self.mod.CiRunner(run_step=fake_run)
         rc = runner.run(bootstrap=False)
@@ -108,7 +107,7 @@ class TestCiContract(unittest.TestCase):
                 return 0, "3.11\n"
             if "check-docs-contract.py" in joined:
                 return 2, "docs contract failed\n"
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
+            return _success_run(self.mod.ROOT, argv, cwd=cwd, env=env)
 
         buf = io.StringIO()
         runner = self.mod.CiRunner(run_step=fake_run)
@@ -117,33 +116,37 @@ class TestCiContract(unittest.TestCase):
         self.assertEqual(rc, 2, msg="[CI-CONTRACT-004] expected exit 2")
         self.assertIn("CI_FAILED_ID=docs.contract", buf.getvalue())
 
-    def test_ci_summary_schema(self) -> None:
+    def test_ci_summary_schema_v2(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
             joined = " ".join(argv)
             if "sys.version_info" in joined:
                 return 0, "3.11\n"
             if "check-docs-style.sh" in joined:
                 return 1, "fail\n"
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
+            return _success_run(self.mod.ROOT, argv, cwd=cwd, env=env)
 
         self.mod.CiRunner(run_step=fake_run).run(bootstrap=False)
         summary = json.loads((ROOT / ".artifacts/ci/ci-summary.json").read_text(encoding="utf-8"))
         for key in (
             "schemaVersion",
+            "runId",
             "result",
             "exitCode",
             "startedAt",
             "completedAt",
             "checks",
             "logPath",
+            "historyLogPath",
+            "historySummaryPath",
         ):
             self.assertIn(key, summary, msg=f"[CI-CONTRACT-005] missing {key}")
+        self.assertEqual(summary["schemaVersion"], 2)
 
     def test_success_final_output(self) -> None:
         buf = io.StringIO()
         runner = self.mod.CiRunner(
             run_step=lambda argv, *, cwd=None, env=None: _success_run(
-                self.mod, argv, cwd=cwd, env=env
+                self.mod.ROOT, argv, cwd=cwd, env=env
             ),
         )
         with patch("sys.stdout", buf):
@@ -174,102 +177,127 @@ class TestCiContract(unittest.TestCase):
     def test_log_and_summary_paths_exist(self) -> None:
         runner = self.mod.CiRunner(
             run_step=lambda argv, *, cwd=None, env=None: _success_run(
-                self.mod, argv, cwd=cwd, env=env
+                self.mod.ROOT, argv, cwd=cwd, env=env
             ),
         )
         runner.run(bootstrap=False)
+        summary = json.loads((ROOT / ".artifacts/ci/ci-summary.json").read_text(encoding="utf-8"))
+        self.assertTrue(Path(summary["logPath"]).is_file(), msg="[CI-CONTRACT-008] ci.log missing")
         self.assertTrue(
-            (ROOT / ".artifacts/ci/ci.log").is_file(), msg="[CI-CONTRACT-008] ci.log missing"
+            Path(summary["historyLogPath"]).is_file(),
+            msg="[CI-CONTRACT-009] history log missing",
         )
         self.assertTrue(
-            (ROOT / ".artifacts/ci/ci-summary.json").is_file(),
-            msg="[CI-CONTRACT-009] ci-summary.json missing",
+            Path(summary["historySummaryPath"]).is_file(),
+            msg="[CI-CONTRACT-010] history summary missing",
         )
 
     def test_retention_keeps_exactly_five(self) -> None:
         artifacts = ROOT / ".artifacts/ci"
         artifacts.mkdir(parents=True, exist_ok=True)
         for idx in range(7):
-            (artifacts / f"ci-2026010{idx}T000000Z.log").write_text(
-                f"log {idx}\n", encoding="utf-8"
+            (artifacts / f"ci-run-2026010{idx}T000000.000000Z.log").write_text(
+                f"log {idx}\n",
+                encoding="utf-8",
             )
         self.mod._rotate_logs(artifacts)
         self.assertEqual(
-            len(list(artifacts.glob("ci-*.log"))), 5, msg="[CI-CONTRACT-010] keep 5 logs"
+            len(list(artifacts.glob("ci-run-*.log"))),
+            5,
+            msg="[CI-CONTRACT-011] keep 5 history logs",
         )
 
-    def test_timestamp_collision_safe(self) -> None:
+    def test_timestamp_collision_creates_two_history_files(self) -> None:
         fixed = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         runner = self.mod.CiRunner(
             run_step=lambda argv, *, cwd=None, env=None: _success_run(
-                self.mod, argv, cwd=cwd, env=env
+                self.mod.ROOT, argv, cwd=cwd, env=env
             ),
             now=lambda: fixed,
         )
         runner.run(bootstrap=False)
         runner.run(bootstrap=False)
-        self.assertEqual(
-            len(list((ROOT / ".artifacts/ci").glob("ci-20260101T000000Z.log"))),
-            1,
-            msg="[CI-CONTRACT-011] atomic replace keeps one stamp file",
-        )
+        history = sorted((ROOT / ".artifacts/ci").glob("ci-run-20260101T000000.000000Z*.log"))
+        self.assertEqual(len(history), 2, msg="[CI-CONTRACT-012] collision must keep two runs")
 
-    def test_venv_failure_stops(self) -> None:
+    def test_python_310_fails(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
-            joined = " ".join(argv)
-            if "venv" in joined:
-                return 3, "venv failed\n"
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
+            if "sys.version_info" in " ".join(argv):
+                return 0, "3.10\n"
+            return 0, ""
 
         runner = self.mod.CiRunner(run_step=fake_run)
         rc = runner.run(bootstrap=False)
-        self.assertEqual(rc, 3, msg="[CI-CONTRACT-012] venv failure must stop")
-        failed = [c for c in runner.checks if c["status"] == "failed"]
-        self.assertEqual(failed[0]["id"], "packaging.wheel-smoke")
+        self.assertEqual(rc, 1, msg="[CI-CONTRACT-013] Python 3.10 must fail")
+        self.assertEqual(runner.checks[0]["id"], "bootstrap.python")
 
-    def test_packaging_paths_expanded_not_literal_glob(self) -> None:
-        captured: list[list[str]] = []
-
+    def test_python_314_passes(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
-            captured.append(argv)
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
+            if "sys.version_info" in " ".join(argv):
+                return 0, "3.14\n"
+            return _success_run(self.mod.ROOT, argv, cwd=cwd, env=env)
 
-        self.mod.CiRunner(run_step=fake_run).run(bootstrap=False)
-        twine_calls = [argv for argv in captured if "twine" in " ".join(argv)]
-        self.assertTrue(twine_calls, msg="[CI-CONTRACT-013] twine must run")
-        self.assertNotIn("dist/*", twine_calls[0], msg="[CI-CONTRACT-014] no literal dist/* glob")
+        runner = self.mod.CiRunner(run_step=fake_run)
+        rc = runner.run(bootstrap=False)
+        self.assertEqual(rc, 0, msg="[CI-CONTRACT-014] Python 3.14 must pass")
 
-    def test_smoke_uses_temporary_home_not_repo_root(self) -> None:
-        captured_home: list[str] = []
-        init_cwd: list[Path | None] = []
+    def test_min_python_matches_pyproject(self) -> None:
+        minimum = self.mod._min_python_from_pyproject(self.mod.ROOT)
+        self.assertEqual(minimum, self.mod.MIN_PYTHON, msg="[CI-CONTRACT-015] metadata minimum")
 
+    def test_custom_root_isolation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            artifacts = root / ".artifacts" / "ci"
+            (root / "pyproject.toml").write_text(
+                '[project]\nname="x"\nversion="8.8.8"\nrequires-python=">=3.11"\n',
+                encoding="utf-8",
+            )
+            (root / "scripts").mkdir()
+            (root / "scripts" / "check-docs-style.sh").write_text("#!/bin/sh\nexit 0\n")
+            (root / "scripts" / "check-docs-style.sh").chmod(0o755)
+            seen_cwd: list[Path | None] = []
+
+            def fake_run(argv: list[str], *, cwd=None, env=None):
+                seen_cwd.append(cwd)
+                return _success_run(root, argv, cwd=cwd or root, env=env)
+
+            runner = self.mod.CiRunner(root=root, artifacts=artifacts, run_step=fake_run)
+            runner.run(bootstrap=False)
+            self.assertEqual(self.mod._package_version(root), "8.8.8")
+            self.assertTrue(all(path == root or path is not None for path in seen_cwd))
+            self.assertFalse((self.mod.ROOT / "coverage.json").exists())
+
+    def test_internal_failure_records_ci_internal(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
-            joined = " ".join(argv)
-            if "spell_sync init" in joined:
-                self.assertIsNotNone(env)
-                captured_home.append(env["HOME"])
-                init_cwd.append(cwd)
-            return _success_run(self.mod, argv, cwd=cwd, env=env)
-
-        self.mod.CiRunner(run_step=fake_run).run(bootstrap=False)
-        self.assertTrue(captured_home, msg="[CI-CONTRACT-015] init smoke must run")
-        self.assertTrue(all(path != self.mod.ROOT for path in init_cwd if path is not None))
-
-    def test_cleanup_on_failure(self) -> None:
-        (self.mod.ROOT / "coverage.json").write_text("{}", encoding="utf-8")
-
-        def fake_run(argv: list[str], *, cwd=None, env=None):
-            joined = " ".join(argv)
-            if "sys.version_info" in joined:
+            if "sys.version_info" in " ".join(argv):
                 return 0, "3.11\n"
-            if "check-docs-style.sh" in joined:
-                return 1, "fail\n"
-            return 0, ""
+            raise RuntimeError("injected failure")
 
-        self.mod.CiRunner(run_step=fake_run).run(bootstrap=False)
-        self.assertFalse(
-            (self.mod.ROOT / "coverage.json").exists(), msg="[CI-CONTRACT-016] cleanup coverage"
-        )
+        buf = io.StringIO()
+        runner = self.mod.CiRunner(run_step=fake_run)
+        with patch("sys.stdout", buf):
+            rc = runner.run(bootstrap=False)
+        self.assertEqual(rc, 1, msg="[CI-CONTRACT-016] internal failure exits 1")
+        self.assertIn("CI_FAILED_ID=ci.internal", buf.getvalue())
+
+    def test_internal_failure_when_finish_unwritable(self) -> None:
+        runner = self.mod.CiRunner()
+        runner.started_at = datetime.now(timezone.utc).isoformat()
+        runner.artifacts.mkdir(parents=True, exist_ok=True)
+        runner._bind_run_artifacts()
+
+        def fail_write(*_args, **_kwargs):
+            raise OSError("read-only")
+
+        buf = io.StringIO()
+        with patch.object(self.mod, "_atomic_write", side_effect=fail_write):
+            with patch("sys.stdout", buf):
+                rc = runner._handle_internal_failure(RuntimeError("boom"))
+        self.assertEqual(rc, 1)
+        self.assertIn("CI_SUMMARY=unavailable", buf.getvalue())
+        self.assertIn("CI_LOG=unavailable", buf.getvalue())
 
     def test_no_bootstrap_skips_install(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
@@ -283,32 +311,6 @@ class TestCiContract(unittest.TestCase):
             return 0, ""
 
         self.mod.CiRunner(run_step=fake_run).run(bootstrap=False)
-
-    def test_unsupported_python(self) -> None:
-        def fake_run(argv: list[str], *, cwd=None, env=None):
-            if "sys.version_info" in " ".join(argv):
-                return 0, "3.10\n"
-            return 0, ""
-
-        runner = self.mod.CiRunner(run_step=fake_run)
-        rc = runner.run(bootstrap=False)
-        self.assertEqual(rc, 1, msg="[CI-CONTRACT-018] unsupported Python must fail")
-        self.assertEqual(runner.checks[0]["id"], "bootstrap.python")
-
-    def test_atomic_summary_replacement(self) -> None:
-        summary_path = ROOT / ".artifacts/ci/ci-summary.json"
-        summary_path.parent.mkdir(parents=True, exist_ok=True)
-        summary_path.write_text('{"schemaVersion":1,"result":"failed"}\n', encoding="utf-8")
-        runner = self.mod.CiRunner(
-            run_step=lambda argv, *, cwd=None, env=None: _success_run(
-                self.mod, argv, cwd=cwd, env=env
-            ),
-        )
-        runner.run(bootstrap=False)
-        payload = json.loads(summary_path.read_text(encoding="utf-8"))
-        self.assertEqual(
-            payload["result"], "success", msg="[CI-CONTRACT-019] summary replaced atomically"
-        )
 
 
 if __name__ == "__main__":

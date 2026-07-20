@@ -12,7 +12,7 @@ alwaysApply: false
 - Wheel must not contain: tests, caches, logs, history, wordlist, config, journal, snapshots
 - Verify version consistency in `pyproject.toml`, `spell-sync version`, wheel METADATA, sdist PKG-INFO
 
-## Source handoff
+## Source export
 
 - Use `git archive` from the public repository root
 - Never zip or archive a parent workspace containing private repos or personal data

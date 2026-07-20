@@ -195,7 +195,7 @@ def test_cli_support_report_output(
             SupportReportRequest(project=ProjectRef(wordlist=wordlist)),
         ),
     )
-    output = tmp_path / "handoff.json"
+    output = tmp_path / "support-report.json"
     code = cmd_support_report(
         CliOptions(
             wordlist=opts.wordlist,
