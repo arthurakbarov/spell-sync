@@ -114,6 +114,18 @@ class TestApplicationServiceArchitecture(unittest.TestCase):
         self.assertIn("build_history_record", source)
         self.assertIn("history_store.append", source)
 
+    def test_facade_finalize_report_delegates_to_diagnostics(self) -> None:
+        service = SpellSyncService(enable_file_logging=False)
+        report = MagicMock()
+        with patch.object(
+            DiagnosticsService,
+            "finalize_report",
+            return_value=report,
+        ) as mocked:
+            result = service._finalize_report(report, duration_ms=5)
+        self.assertIs(result, report)
+        mocked.assert_called_once_with(report, source=None, duration_ms=5)
+
 
 if __name__ == "__main__":
     unittest.main()
