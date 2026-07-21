@@ -158,3 +158,13 @@ def test_format_log_line_for_display_omits_target_suffix_when_missing() -> None:
     formatted = format_log_line_for_display(line)
     assert "target=" not in formatted
     assert "push.plan_verified" in formatted
+
+
+def test_parse_technical_log_line_returns_none_when_json_is_not_object(monkeypatch) -> None:
+    import spell_sync.diagnostics.technical_event_log as technical_event_log
+
+    def fake_loads(_line: str) -> list[int]:
+        return [1, 2]
+
+    monkeypatch.setattr(technical_event_log.json, "loads", fake_loads)
+    assert technical_event_log.parse_technical_log_line('{"eventId":"push.completed"}') is None
