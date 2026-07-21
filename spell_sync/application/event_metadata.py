@@ -7,9 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 _CORRELATION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
-_TARGET_ID_PATTERN = re.compile(
-    r"^(?:[a-z][a-z0-9_-]{0,63}|[a-z]+:[a-zA-Z0-9._-]{1,64})$"
-)
+_TARGET_ID_PATTERN = re.compile(r"^(?:[a-z][a-z0-9_-]{0,63}|[a-z]+:[a-zA-Z0-9._-]{1,64})$")
 _PRIVACY_DENY_SUBSTRINGS = (
     "/home/",
     "/users/",

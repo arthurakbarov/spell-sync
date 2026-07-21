@@ -250,3 +250,66 @@ def test_terminal_metadata_serializes_typed_reason_and_outcome() -> None:
     payload = technical_event_to_dict(event)
     assert payload["reasonCode"] == "rollback_incomplete"
     assert payload["outcome"] == "failed"
+
+
+def test_event_helpers_parse_none_and_unknown_push_reason() -> None:
+    from spell_sync.application.event_helpers import (
+        parse_correlation,
+        parse_target,
+        push_abort_reason_to_event_reason,
+    )
+
+    assert parse_correlation(None) is None
+    assert parse_target(None) is None
+    assert push_abort_reason_to_event_reason(None) is None
+    assert push_abort_reason_to_event_reason("unknown") is None
+
+
+def test_correlation_rejects_whitespace_even_when_pattern_matches() -> None:
+    with pytest.raises(ValueError):
+        CorrelationId.parse("plan\t123")
+
+
+def test_validate_structured_log_message_rejects_invalid_payload() -> None:
+    from spell_sync.diagnostics.technical_event_log import validate_structured_log_message
+
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        validate_structured_log_message("plain text")
+    with pytest.raises(ValueError, match="not valid JSON"):
+        validate_structured_log_message("{bad-json}")
+    with pytest.raises(ValueError, match="unexpected structured log keys"):
+        validate_structured_log_message('{"schemaVersion":1,"extra":true}')
+    with pytest.raises(ValueError, match="unsupported schemaVersion"):
+        validate_structured_log_message('{"schemaVersion":99,"eventId":"push.completed"}')
+
+
+def test_validate_parsed_dict_rejects_invalid_counts() -> None:
+    from spell_sync.diagnostics.technical_event_log import _validate_parsed_dict
+
+    base = {
+        "schemaVersion": 1,
+        "timestamp": "2026-07-21T12:00:00Z",
+        "eventId": "push.completed",
+        "operation": "push",
+        "category": "lifecycle",
+        "severity": "success",
+        "completed": -1,
+    }
+    with pytest.raises(ValueError, match="invalid completed"):
+        _validate_parsed_dict(base)
+    base["completed"] = 2
+    base["total"] = 1
+    with pytest.raises(ValueError, match="completed exceeds total"):
+        _validate_parsed_dict(base)
+
+
+def test_enum_value_rejects_non_string_raw() -> None:
+    from spell_sync.diagnostics.technical_event_log import _enum_value
+
+    with pytest.raises(ValueError, match="invalid eventId type"):
+        _enum_value(EventId, 1, "eventId")
+
+
+def test_event_emitter_skips_presentation_when_sink_is_none() -> None:
+    emitter = EventEmitter(presentation_sink=None, technical_sink=lambda _event: None)
+    emitter.emit(_sample_event())
