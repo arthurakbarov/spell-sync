@@ -119,8 +119,13 @@ class TestSpellSyncService(unittest.TestCase):
         with patch(
             "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
         ):
-            service._prepare_push_for_run(run, event_sink=events.append)
-            service._execute_push_for_run(run, prepared, dry_run=False, event_sink=events.append)
+            service._sync._prepare_push_for_run(run, event_sink=events.append)
+            service._sync._execute_push_for_run(
+                run,
+                prepared,
+                dry_run=False,
+                event_sink=events.append,
+            )
 
         stages = [event.stage for event in events]
         self.assertEqual(
@@ -137,7 +142,7 @@ class TestSpellSyncService(unittest.TestCase):
         with patch(
             "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
         ):
-            result = service._execute_push_for_run(run, prepared, dry_run=False)
+            result = service._sync._execute_push_for_run(run, prepared, dry_run=False)
 
         run.prepare_push_operation.assert_not_called()
         run.push_from_wordlist.assert_called_once_with(prepared=prepared)
@@ -152,7 +157,7 @@ class TestSpellSyncService(unittest.TestCase):
             "spell_sync.application._operation_deps.plan_fingerprint_conflict",
             return_value="cursor",
         ):
-            result = service._execute_push_for_run(run, prepared, dry_run=False)
+            result = service._sync._execute_push_for_run(run, prepared, dry_run=False)
 
         run.push_from_wordlist.assert_not_called()
         self.assertEqual(result, ExitCode.PUSH_ABORT)
@@ -401,26 +406,6 @@ class TestSpellSyncService(unittest.TestCase):
             snapshot = service.load_doctor(_doctor())
         self.assertEqual(snapshot.load_error, "Doctor report could not be loaded.")
 
-    def test_run_push_for_run_wraps_execute_push_result(self):
-        service = SpellSyncService()
-        prepared = MagicMock(spec=PreparedPush)
-        run = MagicMock()
-        push_result = PushResult(word_count=1, written=("demo",))
-
-        with patch.object(
-            service._sync, "_execute_push_for_run", return_value=push_result
-        ) as execute_push:
-            execution = service._run_push_for_run(
-                run,
-                prepared,
-                dry_run=False,
-                event_sink=[],
-            )
-
-        execute_push.assert_called_once()
-        self.assertIs(execution.prepared, prepared)
-        self.assertIs(execution.result, push_result)
-
     def test_prepare_pull_delegates_to_builder(self):
         from spell_sync.application.reports import PullPreview
 
@@ -653,7 +638,7 @@ class TestServiceFacadePaths(unittest.TestCase):
         with patch.object(
             service._sync, "_execute_push_for_run", return_value=PushResult(1, ("a",), ())
         ):
-            execution = service._run_push_for_run(run, prepared, dry_run=True)
+            execution = service._sync._run_push_for_run(run, prepared, dry_run=True)
         self.assertEqual(execution.result.word_count, 1)
 
     def test_prepare_pull_add_from_paths(self):

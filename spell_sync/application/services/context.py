@@ -9,7 +9,7 @@ from ...diagnostics.paths import AppStatePaths
 from ..runtime_resolver import RuntimeResolver
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ApplicationContext:
     runtime: RuntimeResolver
     history_store: OperationHistoryStore

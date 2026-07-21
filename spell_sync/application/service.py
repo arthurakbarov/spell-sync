@@ -22,22 +22,6 @@ from ..project_setup.target_settings import (
 )
 from ..push_prepared import PreparedPush
 from ..sync_models import DictionaryDiff, PushResult
-from ..sync_run import SyncRun
-from ._operation_deps import (  # noqa: F401 — legacy test patch surface
-    build_doctor_report,
-    build_doctor_snapshot,
-    build_pull_preview,
-    build_status_detail_snapshot,
-    cleanup_after_successful_recovery,
-    discard_completed_journal,
-    execute_prepared_push,
-    file_content_hash,
-    load_journal_result,
-    plan_fingerprint_conflict,
-    read_active_operation_lock,
-    recover_from_journal,
-    safe_discard_journal_file,
-)
 from .events import EventSink, OperationKind
 from .reports import (
     DashboardState,
@@ -375,54 +359,3 @@ class SpellSyncService:
         duration_ms: int = 0,
     ) -> OperationReport:
         return self._diagnostics.build_recovery_report(execution, duration_ms=duration_ms)
-
-    def _finalize_report(
-        self,
-        report: OperationReport,
-        *,
-        source: object | None = None,
-        duration_ms: int = 0,
-    ) -> OperationReport:
-        return self._diagnostics.finalize_report(
-            report,
-            source=source,
-            duration_ms=duration_ms,
-        )
-
-    def _prepare_push_for_run(
-        self,
-        run: SyncRun,
-        *,
-        event_sink: EventSink | None = None,
-    ) -> PreparedPush | ExitCode:
-        return self._sync._prepare_push_for_run(run, event_sink=event_sink)
-
-    def _execute_push_for_run(
-        self,
-        run: SyncRun,
-        prepared: PreparedPush,
-        *,
-        dry_run: bool,
-        event_sink: EventSink | None = None,
-    ) -> PushResult | ExitCode:
-        return self._sync._execute_push_for_run(
-            run,
-            prepared,
-            dry_run=dry_run,
-            event_sink=event_sink,
-        )
-
-    def _run_push_for_run(
-        self,
-        run: SyncRun,
-        prepared: PreparedPush,
-        *,
-        dry_run: bool,
-        event_sink: EventSink | None = None,
-    ) -> PushExecution:
-        return self._sync._run_push_for_run(
-            run,
-            prepared,
-            dry_run=dry_run,
-            event_sink=event_sink,
-        )

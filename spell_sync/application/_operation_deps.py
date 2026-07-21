@@ -1,9 +1,4 @@
-"""Shared operation dependencies for application services.
-
-Single import surface for symbols tests patch under the legacy
-``spell_sync.application.service`` path. Focused services import from here so
-``unittest.mock.patch`` targets stay stable across the Phase 4 decomposition.
-"""
+"""Shared low-level operation dependencies used by focused application services."""
 
 from __future__ import annotations
 

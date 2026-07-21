@@ -437,25 +437,6 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         )
         self.assertEqual(service.build_pull_report(pull_exec).operation, "pull")
 
-    def test_run_push_for_run_outcome_branches(self):
-        service = SpellSyncService()
-        prepared = MagicMock(spec=PreparedPush)
-        run = MagicMock()
-        with patch.object(
-            service._sync,
-            "_execute_push_for_run",
-            return_value=ExitCode.PUSH_ABORT,
-        ):
-            failed = service._run_push_for_run(run, prepared, dry_run=False)
-        self.assertEqual(failed.outcome, OperationOutcome.FAILED)
-        with patch.object(
-            service._sync,
-            "_execute_push_for_run",
-            return_value=PushResult(word_count=1, written=("a",), skipped=("b",)),
-        ):
-            warned = service._run_push_for_run(run, prepared, dry_run=False)
-        self.assertEqual(warned.outcome, OperationOutcome.COMPLETED_WITH_WARNINGS)
-
 
 if __name__ == "__main__":
     unittest.main()

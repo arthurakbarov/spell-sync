@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from spell_sync.application.builders import build_pull_preview, build_push_preview
+from spell_sync.application.builders import build_pull_preview
 from spell_sync.application.reports import OperationOutcome
 from spell_sync.application.requests import ProjectRef, PullRequest, PushRequest
 from spell_sync.application.service import SpellSyncService
@@ -37,10 +37,11 @@ class TestTuiMutationSafety(unittest.TestCase):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
             _wordlist, _dictionary, run, request = self._project(tmp)
-            prepared = service._prepare_push_for_run(run)
-            self.assertNotIsInstance(prepared, ExitCode)
-            preview = build_push_preview(prepared)
             push_request = PushRequest(project=request.project)
+            with _patch_run_discover(run):
+                preview = service.load_push_preview(push_request)
+            self.assertIsNotNone(preview.prepared)
+            prepared = preview.prepared
             with _patch_run_discover(run):
                 result = service.execute_push_preview(
                     push_request,
@@ -54,9 +55,10 @@ class TestTuiMutationSafety(unittest.TestCase):
         service = SpellSyncService()
         with tempfile.TemporaryDirectory() as tmp:
             _wordlist, dictionary, run, request = self._project(tmp)
-            prepared = service._prepare_push_for_run(run)
-            self.assertNotIsInstance(prepared, ExitCode)
-            preview = build_push_preview(prepared)
+            push_request = PushRequest(project=request.project)
+            with _patch_run_discover(run):
+                preview = service.load_push_preview(push_request)
+            self.assertIsNotNone(preview.prepared)
             self.assertEqual(preview.removals, 1)
             extra = [f"extra{i}" for i in range(60)]
             dictionary.write_text(
