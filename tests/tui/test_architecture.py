@@ -80,6 +80,7 @@ class TestTuiArchitecture(unittest.TestCase):
     def test_push_preview_carries_prepared_push(self):
         prepared = PreparedPush(
             ctx=MagicMock(),
+            runtime_identity=MagicMock(),
             plan=MagicMock(),
             targets=(),
             dictionaries=(),

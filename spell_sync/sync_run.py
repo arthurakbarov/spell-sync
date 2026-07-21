@@ -297,6 +297,7 @@ class SyncRun:
 
         result = execute_prepared_push(
             prepared,
+            execution_context=self._ctx,
             dry_run=dry_run,
             running_app_skip_reasons_fn=lambda names: running_app_skip_reasons(
                 names,

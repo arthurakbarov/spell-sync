@@ -23,7 +23,7 @@ def mutation_scope_for(
     command: str,
     *,
     allow_unfinished_journal: bool = False,
-    strict_push: bool = False,
+    strict_push_override: bool | None = None,
     json_output: bool = False,
 ) -> Iterator[MutationScopeResult]:
     """Acquire lock, then load config and journal once for mutating commands."""
@@ -31,7 +31,10 @@ def mutation_scope_for(
         if lock_exit is not None:
             yield lock_exit
             return
-        resolved = _build_resolved_runtime(wordlist, strict_push=strict_push)
+        resolved = _build_resolved_runtime(
+            wordlist,
+            strict_push_override=strict_push_override,
+        )
         config_exit = invalid_config_exit_from_scope(
             command,
             resolved.config_result,

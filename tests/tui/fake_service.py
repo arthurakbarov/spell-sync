@@ -551,8 +551,10 @@ def _fake_prepared() -> PreparedPush:
     plan = MagicMock()
     ctx = MagicMock()
     ctx.wordlist_str = "/tmp/wordlist.txt"
+    identity = MagicMock()
     return PreparedPush(
         ctx=ctx,
+        runtime_identity=identity,
         plan=plan,
         targets=(target,),
         dictionaries=(),

@@ -174,7 +174,7 @@ def mutating_command_scope(
     command: str,
     *,
     allow_unfinished_journal: bool = False,
-    strict_push: bool = False,
+    strict_push_override: bool | None = None,
 ) -> Iterator[ResolvedRuntime | int]:
     from .cli_request_adapter import project_ref
 
@@ -182,7 +182,7 @@ def mutating_command_scope(
         wordlist_path_for(project_ref(opts)),
         command,
         allow_unfinished_journal=allow_unfinished_journal,
-        strict_push=strict_push,
+        strict_push_override=strict_push_override,
         json_output=opts.json_output,
     ) as scope:
         yield scope
@@ -305,7 +305,7 @@ def mutating_command_scope_for(
     command: str,
     *,
     allow_unfinished_journal: bool = False,
-    strict_push: bool = False,
+    strict_push_override: bool | None = None,
     json_output: bool = False,
 ) -> Iterator[ResolvedRuntime | int]:
     """Acquire lock, then load config and journal once for mutating commands."""
@@ -313,7 +313,7 @@ def mutating_command_scope_for(
         wordlist,
         command,
         allow_unfinished_journal=allow_unfinished_journal,
-        strict_push=strict_push,
+        strict_push_override=strict_push_override,
         json_output=json_output,
     ) as scope:
         yield scope

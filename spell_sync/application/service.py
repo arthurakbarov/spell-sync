@@ -59,6 +59,7 @@ from ..push_journal import (
     safe_discard_journal_file,
 )
 from ..push_prepared import PreparedPush, execute_prepared_push, plan_fingerprint_conflict
+from ..runtime_identity import RUNTIME_CHANGED_AFTER_PREVIEW, RuntimeIdentity
 from ..settings import config_blocks_mutating
 from ..sync_models import DictionaryDiff, PushResult
 from ..sync_run import SyncRun
@@ -116,6 +117,19 @@ def _running_app_skip_reasons_for(settings):
         return running_app_skip_reasons(dictionary_names, settings=settings)
 
     return _fn
+
+
+_RUNTIME_CHANGED_MESSAGE = (
+    "Project configuration or targets changed after the preview was created. "
+    "Request a new preview before executing."
+)
+
+
+def _runtime_identity_matches(
+    preview_identity: RuntimeIdentity,
+    execution_identity: RuntimeIdentity,
+) -> bool:
+    return preview_identity == execution_identity
 
 
 class SpellSyncService:
@@ -364,11 +378,11 @@ class SpellSyncService:
                 plan_identifier=preview.plan_identifier,
                 push_preview=preview,
             )
-        strict = self._effective_push_strict(request)
+        strict_override = request.strict_override
         with self._runtime.mutation_scope(
             request.project,
             "push",
-            strict_push=strict,
+            strict_push_override=strict_override,
             json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
@@ -377,6 +391,15 @@ class SpellSyncService:
                     result=ExitCode(scope),
                     outcome=OperationOutcome.FAILED,
                     message="Push could not acquire a safe execution context.",
+                    plan_identifier=preview.plan_identifier,
+                    push_preview=preview,
+                )
+            if not _runtime_identity_matches(prepared.runtime_identity, scope.identity):
+                return PushExecution(
+                    prepared=prepared,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=OperationOutcome.STOPPED_SAFELY,
+                    message=_RUNTIME_CHANGED_MESSAGE,
                     plan_identifier=preview.plan_identifier,
                     push_preview=preview,
                 )
@@ -460,6 +483,25 @@ class SpellSyncService:
                 ),
             )
             run = SyncRun(context=scope.context)
+            if preview.runtime_identity is not None and not _runtime_identity_matches(
+                preview.runtime_identity, scope.identity
+            ):
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.PULL,
+                        "verifying_plan",
+                        RUNTIME_CHANGED_AFTER_PREVIEW,
+                        level=EventLevel.ERROR,
+                    ),
+                )
+                return PullExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=OperationOutcome.STOPPED_SAFELY,
+                    message=_RUNTIME_CHANGED_MESSAGE,
+                    warnings=preview.warnings,
+                )
             if Path(preview.wordlist_path).resolve() != Path(run.wordlist_str).resolve():
                 _emit(
                     event_sink,
@@ -740,11 +782,11 @@ class SpellSyncService:
             event_sink,
             OperationEvent(OperationKind.PUSH, "validating", "Validating configuration"),
         )
-        strict = self._effective_push_strict(request)
+        strict_override = request.strict_override
         with self._runtime.mutation_scope(
             request.project,
             "push",
-            strict_push=strict,
+            strict_push_override=strict_override,
             json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
@@ -775,6 +817,26 @@ class SpellSyncService:
                     level=EventLevel.SUCCESS,
                 ),
             )
+
+            if not _runtime_identity_matches(prepared.runtime_identity, scope.identity):
+                _emit(
+                    event_sink,
+                    OperationEvent(
+                        OperationKind.PUSH,
+                        "verifying_plan",
+                        RUNTIME_CHANGED_AFTER_PREVIEW,
+                        level=EventLevel.ERROR,
+                    ),
+                )
+                return PushExecution(
+                    prepared=prepared,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=OperationOutcome.STOPPED_SAFELY,
+                    message=_RUNTIME_CHANGED_MESSAGE,
+                    target_updates=updates,
+                    plan_identifier=preview.plan_identifier,
+                    push_preview=preview,
+                )
 
             conflict = plan_fingerprint_conflict(prepared)
             if conflict is not None:
@@ -845,8 +907,9 @@ class SpellSyncService:
 
             result = execute_prepared_push(
                 prepared,
+                execution_context=scope.context,
                 dry_run=False,
-                running_app_skip_reasons_fn=_running_app_skip_reasons_for(prepared.ctx.settings),
+                running_app_skip_reasons_fn=_running_app_skip_reasons_for(scope.context.settings),
             )
             return self._finalize_push_preview_result(
                 prepared,

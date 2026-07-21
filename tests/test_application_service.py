@@ -53,7 +53,15 @@ def _pull_scope(wordlist: str = "/tmp/w.txt"):
     ctx.wordlist_file = Path(wordlist)
     validated = MagicMock()
     validated.context = ctx
+    validated.identity = MagicMock()
     return validated
+
+
+def _push_scope(runtime_identity):
+    scope = MagicMock()
+    scope.identity = runtime_identity
+    scope.context = MagicMock(settings=MagicMock())
+    return scope
 
 
 def _status(wordlist: str | None = None, *, include_word_diffs: bool = False) -> StatusRequest:
@@ -468,6 +476,7 @@ class TestSpellSyncService(unittest.TestCase):
         prepared.targets = ()
         prepared.wordlist_needs_write = False
         prepared.ctx = MagicMock(wordlist_str="/tmp/w.txt")
+        prepared.runtime_identity = MagicMock()
         preview = PushPreview(
             prepared=prepared,
             targets=(),
@@ -482,7 +491,7 @@ class TestSpellSyncService(unittest.TestCase):
             corrupt=(),
             blocked=(),
         )
-        with _patch_mutation_scope(MagicMock()):
+        with _patch_mutation_scope(_push_scope(prepared.runtime_identity)):
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
                 return_value="chrome",
@@ -495,7 +504,7 @@ class TestSpellSyncService(unittest.TestCase):
         self.assertEqual(conflict.outcome, OperationOutcome.STOPPED_SAFELY)
         self.assertEqual(conflict.conflict_target, "chrome")
 
-        with _patch_mutation_scope(MagicMock()):
+        with _patch_mutation_scope(_push_scope(prepared.runtime_identity)):
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
                 return_value=None,
@@ -702,9 +711,13 @@ class TestServiceFacadePaths(unittest.TestCase):
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
             service = SpellSyncService(enable_file_logging=False)
-            with patch.object(RuntimeResolver, "sync_run", return_value=run):
-                preview = service.load_push_preview(_push(wordlist))
-                execution = service.execute_push_dry_run(_push(wordlist), preview)
+            with patch(
+                "spell_sync.application._runtime_factory.discover_dictionaries",
+                return_value=run.context.dictionaries,
+            ):
+                with patch.object(RuntimeResolver, "sync_run", return_value=run):
+                    preview = service.load_push_preview(_push(wordlist))
+                    execution = service.execute_push_dry_run(_push(wordlist), preview)
             self.assertIsInstance(execution.result, PushResult)
 
     def test_pull_and_push_execution_from_result_paths(self):

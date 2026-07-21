@@ -7,6 +7,7 @@ from enum import Enum
 
 from ..exit_codes import ExitCode
 from ..push_prepared import PreparedPush
+from ..runtime_identity import RuntimeIdentity
 from ..sync_models import DictionaryDiff, PushResult
 
 
@@ -200,6 +201,7 @@ class PullPreview:
     merged_words: tuple[str, ...]
     addition_words: frozenset[str] = frozenset()
     wordlist_fingerprint: str | None = None
+    runtime_identity: RuntimeIdentity | None = None
     prepare_error: ExitCode | None = None
     wordlist_error: ExitCode | None = None
 

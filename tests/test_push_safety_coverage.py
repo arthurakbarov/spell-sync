@@ -270,6 +270,7 @@ class TestPushPreparedCoverage(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -297,6 +298,7 @@ class TestPushPreparedCoverage(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -419,6 +421,7 @@ class TestPushPreparedWordlistPath(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -444,6 +447,7 @@ class TestPushPreparedWordlistPath(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -651,6 +655,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             write_text_words(str(dict_path), ["changed"], "utf-8", False, quiet=True)
             result = execute_prepared_push(
                 prepared,
+                execution_context=prepared.ctx,
                 dry_run=False,
                 running_app_skip_reasons_fn=lambda _names: {},
             )
@@ -685,6 +690,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             )
             result = execute_prepared_push(
                 prepared,
+                execution_context=prepared.ctx,
                 dry_run=False,
                 running_app_skip_reasons_fn=lambda _names: {},
             )
@@ -714,6 +720,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -767,6 +774,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             ):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -787,6 +795,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             with patch("spell_sync.push_prepared.write_rendered", return_value=True):
                 result = execute_prepared_push(
                     prepared,
+                    execution_context=prepared.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )

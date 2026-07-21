@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +23,8 @@ from ..push_journal import (
 )
 from ..push_prepared import PreparedPush
 from ..read_outcome import ReadStatus, dictionary_read_result
-from ..settings import ConfigStatus
+from ..runtime_identity import build_runtime_identity
+from ..settings import ConfigStatus, load_config_result
 from ..sync_models import PushResult
 from ..sync_run import SyncRun
 from ..validated_runtime import ValidatedRuntime
@@ -697,6 +699,9 @@ def build_pull_preview(run: SyncRun) -> PullPreview:
     after = len(merged)
     digest = file_content_hash(Path(wordlist_path))
     plan_id = (digest or f"{before}-{after}")[:8]
+    config_result = load_config_result(wordlist=Path(wordlist_path))
+    identity_context = replace(run.context, settings=config_result.runtime_settings())
+    runtime_identity = build_runtime_identity(identity_context, config_result=config_result)
     return PullPreview(
         wordlist_path=wordlist_path,
         additions=after - before,
@@ -711,6 +716,7 @@ def build_pull_preview(run: SyncRun) -> PullPreview:
         merged_words=tuple(merged),
         addition_words=frozenset(addition_words),
         wordlist_fingerprint=digest,
+        runtime_identity=runtime_identity,
     )
 
 
@@ -776,6 +782,9 @@ def build_pull_add_from_preview(run: SyncRun, source: Path) -> PullPreview:
     digest = file_content_hash(Path(wordlist_path))
     plan_id = (digest or f"{before}-{after}")[:8]
     source_label = str(source_path)
+    config_result = load_config_result(wordlist=Path(wordlist_path))
+    identity_context = replace(run.context, settings=config_result.runtime_settings())
+    runtime_identity = build_runtime_identity(identity_context, config_result=config_result)
     return PullPreview(
         wordlist_path=wordlist_path,
         additions=after - before,
@@ -796,6 +805,7 @@ def build_pull_add_from_preview(run: SyncRun, source: Path) -> PullPreview:
         merged_words=tuple(merged),
         addition_words=frozenset(addition_words),
         wordlist_fingerprint=digest,
+        runtime_identity=runtime_identity,
     )
 
 

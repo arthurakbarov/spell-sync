@@ -24,6 +24,7 @@ from .push_setup import (
     wordlist_needs_rewrite,
 )
 from .push_transaction import PushTransaction
+from .runtime_identity import RuntimeIdentity, build_runtime_identity
 from .runtime_settings import RuntimeSettings
 from .sync_context import RuntimeContext
 from .sync_models import PushResult
@@ -38,6 +39,7 @@ class PreparedTarget:
 @dataclass(frozen=True)
 class PreparedPush:
     ctx: RuntimeContext
+    runtime_identity: RuntimeIdentity
     plan: PushPlan
     targets: tuple[PreparedTarget, ...]
     dictionaries: tuple
@@ -77,8 +79,13 @@ def prepare_push(
     plan = setup.plan
     needs_write = wordlist_needs_rewrite(ctx, words)
     wl_rendered = render_wordlist(words) if needs_write else None
+    from .settings import load_config_result
+
+    config_result = load_config_result(wordlist=ctx.wordlist)
+    runtime_identity = build_runtime_identity(ctx, config_result=config_result)
     return PreparedPush(
         ctx=ctx,
+        runtime_identity=runtime_identity,
         plan=plan,
         targets=_render_plan(plan),
         dictionaries=tuple(setup.dictionaries),
@@ -111,10 +118,11 @@ def write_rendered(path: Path, rendered: RenderedWrite, *, settings: RuntimeSett
 def execute_prepared_push(
     prepared: PreparedPush,
     *,
+    execution_context: RuntimeContext,
     dry_run: bool,
     running_app_skip_reasons_fn,
 ) -> PushResult | ExitCode | PushAbort:
-    ctx = prepared.ctx
+    ctx = execution_context
     conflict = plan_fingerprint_conflict(prepared)
     if conflict is not None:
         log.abort(f"push aborted — {conflict} changed after plan (fingerprint conflict).")
@@ -243,7 +251,7 @@ def execute_prepared_push(
                 )
 
         written = tuple(name for name, ok in outcomes if ok)
-        mkspell_after_neovim_writes(written, settings=prepared.ctx.settings)
+        mkspell_after_neovim_writes(written, settings=ctx.settings)
         try:
             journal_session.complete()
         except OSError:

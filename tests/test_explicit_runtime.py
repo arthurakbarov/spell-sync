@@ -13,6 +13,7 @@ from spell_sync.application.requests import ProjectRef, PushRequest
 from spell_sync.application.runtime_resolver import RuntimeResolver
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime
+from spell_sync.runtime_identity import build_runtime_identity
 from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
@@ -82,6 +83,7 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             context,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         resolver = RuntimeResolver(bound=validated)
         project = ProjectRef(wordlist=Path("/tmp/other.txt"))
@@ -108,6 +110,7 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             context,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         resolver = RuntimeResolver(bound=validated)
         run = resolver.sync_run(ProjectRef(wordlist=Path("/tmp/wordlist.txt")), strict_push=True)
@@ -128,11 +131,13 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             context,
             ConfigLoadResult(ConfigStatus.VALID, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         fresh = ResolvedRuntime(
             context,
             ConfigLoadResult(ConfigStatus.VALID, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         resolver = RuntimeResolver(bound=validated)
         with patch("spell_sync.application.mutation_scope.operation_lock_scope_for") as lock_scope:
@@ -185,6 +190,7 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             context,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         run = sync_run_for(validated, strict_push=True)
         self.assertTrue(run.strict_push)
@@ -253,6 +259,7 @@ class TestExplicitRuntimeCoverage(unittest.TestCase):
             context,
             ConfigLoadResult(ConfigStatus.VALID, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(context),
         )
         run = make_sync_run(wordlist=Path("/tmp/wordlist.txt"))
         service = type(

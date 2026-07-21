@@ -23,6 +23,13 @@ from tests.journal_test_utils import write_test_journal
 from tests.runtime_helpers import make_sync_run
 
 
+def _patch_run_discover(run: SyncRun):
+    return patch(
+        "spell_sync.application._runtime_factory.discover_dictionaries",
+        return_value=run.context.dictionaries,
+    )
+
+
 class TestPullSafety(unittest.TestCase):
     def _project(self, tmp: str) -> tuple[Path, Path, SyncRun, PullRequest, CliOptions]:
         root = Path(tmp)
@@ -138,16 +145,17 @@ class TestPullSafety(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
-            with patch.object(
-                SyncRun,
-                "execute_prepared_pull",
-                return_value=(preview.before_count, preview.after_count),
-            ) as execute:
-                execution = service.execute_pull(
-                    request,
-                    preview,
-                    confirmed_plan_id=preview.plan_identifier,
-                )
+            with _patch_run_discover(run):
+                with patch.object(
+                    SyncRun,
+                    "execute_prepared_pull",
+                    return_value=(preview.before_count, preview.after_count),
+                ) as execute:
+                    execution = service.execute_pull(
+                        request,
+                        preview,
+                        confirmed_plan_id=preview.plan_identifier,
+                    )
             execute.assert_called_once()
             self.assertEqual(execution.outcome, OperationOutcome.COMPLETED)
 
@@ -156,16 +164,17 @@ class TestPullSafety(unittest.TestCase):
             wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
             expected = (preview.before_count, preview.after_count)
-            with patch.object(
-                SyncRun,
-                "execute_prepared_pull",
-                return_value=expected,
-            ) as execute:
-                service_result = SpellSyncService().execute_pull(
-                    request,
-                    preview,
-                    confirmed_plan_id=preview.plan_identifier,
-                )
+            with _patch_run_discover(run):
+                with patch.object(
+                    SyncRun,
+                    "execute_prepared_pull",
+                    return_value=expected,
+                ) as execute:
+                    service_result = SpellSyncService().execute_pull(
+                        request,
+                        preview,
+                        confirmed_plan_id=preview.plan_identifier,
+                    )
             execute.assert_called_once()
             self.assertEqual(service_result.outcome, OperationOutcome.COMPLETED)
 
@@ -186,12 +195,13 @@ class TestPullSafety(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, _dictionary, run, request, opts = self._project(tmp)
             preview = build_pull_preview(run)
-            SpellSyncService().execute_pull(
-                request,
-                preview,
-                confirmed_plan_id=preview.plan_identifier,
-                event_sink=events.append,
-            )
+            with _patch_run_discover(run):
+                SpellSyncService().execute_pull(
+                    request,
+                    preview,
+                    confirmed_plan_id=preview.plan_identifier,
+                    event_sink=events.append,
+                )
         stages = [event.stage for event in events]
         self.assertIn("validating", stages)
         self.assertIn("acquiring_lock", stages)

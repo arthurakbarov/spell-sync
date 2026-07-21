@@ -18,6 +18,7 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.dictionary_registry import DictionarySource, discover_from_sources
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
 from spell_sync.resolved_runtime import ResolvedRuntime
+from spell_sync.runtime_identity import build_runtime_identity
 from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
@@ -132,6 +133,7 @@ class TestRuntimeContext(unittest.TestCase):
             ctx,
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
+            build_runtime_identity(ctx),
         )
         source = inspect.getsource(sync_run_for)
         self.assertNotIn("build_resolved_runtime", source)

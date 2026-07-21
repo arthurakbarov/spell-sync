@@ -45,7 +45,7 @@ class RuntimeResolver:
         wordlist = resolve_project_wordlist(project)
         return _build_resolved_runtime(
             wordlist,
-            strict_push=strict_push,
+            strict_push_override=strict_push,
             validate_journal_wordlist=validate_journal_wordlist,
         )
 
@@ -73,7 +73,7 @@ class RuntimeResolver:
         command: str,
         *,
         allow_unfinished_journal: bool = False,
-        strict_push: bool = False,
+        strict_push_override: bool | None = None,
         json_output: bool = False,
     ) -> Iterator[ResolvedRuntime | int]:
         wordlist = resolve_project_wordlist(project)
@@ -81,7 +81,7 @@ class RuntimeResolver:
             wordlist,
             command,
             allow_unfinished_journal=allow_unfinished_journal,
-            strict_push=strict_push,
+            strict_push_override=strict_push_override,
             json_output=json_output,
         ) as scope:
             yield scope
