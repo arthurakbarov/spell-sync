@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
+    changed_source_paths,
     content_tree_digest,
     git_branch,
     git_detached,
@@ -664,6 +665,23 @@ print(importlib.metadata.version("spell-sync"))
                 self.record("bootstrap.python", 1, detail)
                 return self._finish(1)
             self.record("bootstrap.python", 0, f"python {pyver} via {py}")
+
+            dirty_paths = changed_source_paths(self.root)
+            if dirty_paths and self._mode == "full":
+                preview = ", ".join(dirty_paths[:8])
+                if len(dirty_paths) > 8:
+                    preview += f" (+{len(dirty_paths) - 8} more)"
+                self.record(
+                    "bootstrap.clean-tree",
+                    1,
+                    f"dirty source tree: {preview}",
+                )
+                self._final_evidence = False
+                return self._finish(1)
+            if dirty_paths:
+                self._final_evidence = False
+            elif self._mode == "full":
+                self.record("bootstrap.clean-tree", 0, "working tree clean")
 
             if bootstrap:
                 install_rc, install_out = self.run_step(

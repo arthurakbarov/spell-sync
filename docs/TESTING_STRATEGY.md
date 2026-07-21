@@ -36,7 +36,9 @@ reproduce.
 
 ### Level 1 — changed-module validation
 
-After Level 0 passes, run tests mapped to touched production modules once.
+After Level 0 passes, run `moduleTests` mapped to touched production modules once. Level 1
+is intentionally smaller than Level 2: direct module regressions and minimal integration
+only.
 
 ```bash
 python3 scripts/test_plan.py --explain
@@ -45,8 +47,11 @@ python3 scripts/run_focused_tests.py
 
 ### Level 2 — risk-cluster validation
 
-When Level 1 is green, run the deduplicated cluster plan once. Clusters are defined in
-`tests/test-impact.toml`:
+When Level 1 is green, run the deduplicated `clusterTests` plan once. Level 2 must be a
+strict superset of Level 1 for each cluster (except documented tiny clusters). Level 1
+does not replace mandatory Level 2 before final CI.
+
+Clusters are defined in `tests/test-impact.toml`:
 
 | Cluster | Typical scope |
 |---------|---------------|
@@ -68,13 +73,15 @@ python3 scripts/run_focused_tests.py --cluster runtime
 
 ### Level 3 — final repository CI
 
+Full mode requires a clean committed working tree (`bootstrap.clean-tree`). Uncommitted
+source changes fail before expensive checks. Diagnostic partial runs (`--only`, `--from`,
+`--resume-failed`) may run on a dirty tree but set `finalEvidence=false`.
+
+Final evidence requires committed clean HEAD verified by `python3 scripts/check-ci-evidence.py`.
+
 ```bash
 scripts/ci.sh
 ```
-
-Run once when implementation, focused tests, and static corrections are complete and a
-green result is expected. Diagnostic partial runs (`--only`, `--from`) do not count as
-final evidence.
 
 ## Time budget guidance
 

@@ -28,6 +28,8 @@ EXCLUDE_EXACT = frozenset(
     }
 )
 
+GIT_SUBPROCESS_TIMEOUT_SECONDS = 30.0
+
 
 def normalize_rel(path: str) -> str:
     return path.replace("\\", "/")
@@ -51,6 +53,7 @@ def _run_git(root: Path, *args: str) -> bytes:
         ["git", "-C", str(root), *args],
         check=False,
         capture_output=True,
+        timeout=GIT_SUBPROCESS_TIMEOUT_SECONDS,
     )
     if result.returncode != 0:
         return b""
@@ -76,30 +79,63 @@ def git_detached(root: Path) -> bool:
     return not _run_git(root, "symbolic-ref", "--quiet", "HEAD").strip()
 
 
-def _status_paths(root: Path) -> list[str]:
-    output = _run_git(root, "status", "--porcelain=v2", "--untracked-files=all").decode(
-        "utf-8",
-        errors="replace",
-    )
+def _decode_git_paths(raw: bytes) -> list[str]:
+    if not raw:
+        return []
+    return [part.decode("utf-8", errors="surrogateescape") for part in raw.split(b"\0") if part]
+
+
+def _paths_from_name_status(raw: bytes) -> list[str]:
     paths: list[str] = []
-    for line in output.splitlines():
-        if not line.strip():
+    index = 0
+    parts = _decode_git_paths(raw)
+    while index < len(parts):
+        status = parts[index]
+        index += 1
+        if not status:
             continue
-        parts = line.split("\t", 1)
-        if len(parts) != 2:
+        if status.startswith("R") or status.startswith("C"):
+            if index >= len(parts):
+                break
+            old_path = parts[index]
+            index += 1
+            if index >= len(parts):
+                paths.append(old_path)
+                break
+            new_path = parts[index]
+            index += 1
+            paths.extend((old_path, new_path))
             continue
-        paths.append(parts[1].strip())
+        if index >= len(parts):
+            break
+        paths.append(parts[index])
+        index += 1
     return paths
+
+
+def _collect_git_paths(root: Path, *args: str) -> list[str]:
+    return _decode_git_paths(_run_git(root, *args))
+
+
+def changed_source_paths(root: Path) -> tuple[str, ...]:
+    """Return tracked/untracked source paths changed relative to HEAD."""
+    paths: set[str] = set()
+    paths.update(_collect_git_paths(root, "diff", "--name-only", "-z", "--cached", "HEAD"))
+    paths.update(_collect_git_paths(root, "diff", "--name-only", "-z"))
+    paths.update(_collect_git_paths(root, "ls-files", "-o", "--exclude-standard", "-z"))
+    paths.update(_collect_git_paths(root, "ls-files", "-u", "-z"))
+    paths.update(_paths_from_name_status(_run_git(root, "diff", "--name-status", "-z", "--cached")))
+    paths.update(_paths_from_name_status(_run_git(root, "diff", "--name-status", "-z")))
+    paths.update(
+        _paths_from_name_status(_run_git(root, "diff", "--name-status", "-z", "--diff-filter=M"))
+    )
+    normalized = {normalize_rel(path) for path in paths if path}
+    return tuple(sorted(path for path in normalized if not is_digest_excluded(path)))
 
 
 def is_working_tree_clean(root: Path) -> bool:
     """True when no tracked or untracked source changes remain outside digest exclusions."""
-    for rel in _status_paths(root):
-        normalized = normalize_rel(rel)
-        if is_digest_excluded(normalized):
-            continue
-        return False
-    return True
+    return not changed_source_paths(root)
 
 
 def _hash_path_entry(hasher: hashlib._Hash, rel: str, path: Path) -> None:

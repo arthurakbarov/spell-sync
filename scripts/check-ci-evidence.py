@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
+    changed_source_paths,
     content_tree_digest,
     git_branch,
     git_detached,
@@ -84,6 +85,13 @@ def verify_ci_evidence(
 ) -> tuple[int, dict[str, object]]:
     head = git_head(root)
     digest = content_tree_digest(root)
+    if changed_source_paths(root):
+        return _reject(
+            "ci-evidence.dirty-tree",
+            head=head,
+            digest=digest,
+            format_json=format_json,
+        )
     if not summary_path.is_file():
         return _reject(
             "ci-evidence.missing",

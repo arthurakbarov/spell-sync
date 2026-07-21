@@ -13,6 +13,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.test_selection.digest import compute_run_key, tree_digest  # noqa: E402
+from scripts.test_selection.tree_state import (  # noqa: E402
+    changed_source_paths,
+    is_working_tree_clean,
+)
 
 
 def _run_git(cwd: Path, *args: str) -> None:
@@ -156,3 +160,40 @@ def test_ci_resume_rejects_same_path_different_contents(tmp_path: Path) -> None:
     summary_digest = digest_a
     current_digest = digest_b
     assert summary_digest != current_digest
+
+
+def test_changed_source_paths_detects_modified_and_untracked(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    assert is_working_tree_clean(repo)
+    assert changed_source_paths(repo) == ()
+    (repo / "tracked.txt").write_text("dirty\n", encoding="utf-8")
+    (repo / "new.txt").write_text("x\n", encoding="utf-8")
+    changed = changed_source_paths(repo)
+    assert "tracked.txt" in changed
+    assert "new.txt" in changed
+    assert not is_working_tree_clean(repo)
+
+
+def test_changed_source_paths_ignores_artifact_directories(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    artifacts = repo / ".artifacts" / "ci"
+    artifacts.mkdir(parents=True)
+    (artifacts / "ci.log").write_text("log\n", encoding="utf-8")
+    (repo / "build").mkdir()
+    (repo / "build" / "wheel").write_text("x\n", encoding="utf-8")
+    assert changed_source_paths(repo) == ()
+    assert is_working_tree_clean(repo)
+
+
+def test_changed_source_paths_detects_staged_delete_and_rename(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    (repo / "old.txt").write_text("x\n", encoding="utf-8")
+    _run_git(repo, "add", "old.txt")
+    _run_git(repo, "commit", "-m", "add old")
+    (repo / "tracked.txt").unlink()
+    _run_git(repo, "add", "tracked.txt")
+    _run_git(repo, "mv", "old.txt", "renamed.txt")
+    changed = changed_source_paths(repo)
+    assert "tracked.txt" in changed
+    assert "old.txt" in changed or "renamed.txt" in changed
+    assert not is_working_tree_clean(repo)

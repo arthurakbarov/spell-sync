@@ -73,13 +73,33 @@ def _write_success_summary(
 
 
 def test_stale_head_rejected(evidence_mod, tmp_path: Path) -> None:
+    import subprocess
+
     from scripts.test_selection.tree_state import content_tree_digest
 
-    digest = content_tree_digest(ROOT)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-b", "main"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Test"],
+        check=True,
+        capture_output=True,
+    )
+    (repo / "tracked.txt").write_text("clean\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-m", "init"], check=True, capture_output=True
+    )
+    digest = content_tree_digest(repo)
     summary = tmp_path / "ci" / "ci-summary-stale-head-test.json"
     _write_success_summary(summary, head="0" * 40, digest=digest)
     code, payload = evidence_mod.verify_ci_evidence(
-        ROOT,
+        repo,
         summary,
         format_json=True,
     )
@@ -102,3 +122,36 @@ def test_first_success_history_counts(tmp_path: Path) -> None:
     assert counts.full_ci_attempts == 1
     assert counts.full_ci_failures == 0
     assert counts.full_ci_successes == 1
+
+
+def test_forged_success_summary_rejected_on_dirty_tree(evidence_mod, tmp_path: Path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-b", "main"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Test"],
+        check=True,
+        capture_output=True,
+    )
+    (repo / "tracked.txt").write_text("clean\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-m", "init"], check=True, capture_output=True
+    )
+    head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    from scripts.test_selection.tree_state import content_tree_digest
+
+    digest = content_tree_digest(repo)
+    summary = tmp_path / "ci-summary.json"
+    _write_success_summary(summary, head=head, digest=digest)
+    (repo / "dirty.txt").write_text("new\n", encoding="utf-8")
+    code, payload = evidence_mod.verify_ci_evidence(repo, summary, format_json=True)
+    assert code == 1
+    assert payload.get("failedId") == "ci-evidence.dirty-tree"
