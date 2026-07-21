@@ -141,8 +141,7 @@ class DiagnosticsService:
         return self.finalize_report(report, source=execution, duration_ms=duration_ms)
 
     def build_support_report(self, request: SupportReportRequest):
-        from ..sync_run import SyncRun
-        from .support_report import build_support_report as _build_support_report
+        from ..support_report import build_support_report as _build_support_report
 
         resolved = self._ctx.runtime.resolve_read(request.project)
         run = SyncRun(context=resolved.context)
