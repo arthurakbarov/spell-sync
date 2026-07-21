@@ -40,8 +40,8 @@ Public version: `0.2.1` (`pyproject.toml`).
 
 Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
 
-Phase 5 final CI evidence: `734f380`, run `20260721T201808.293806Z`,
-treeDigest `978d6b9d40b4f10767e3a68e67a67a6a9a5af2ff1d1fc3493c9a871a98578e5c`,
+Phase 5 final CI evidence: `56617d3`, run `20260721T202212.532326Z`,
+treeDigest `4cc6b99689d38a155c8b7a786786aa6a2a965ab1dc62c79d8aa85a456fa4c501`,
 `finalEvidence=true`, `treeStable=true`.
 
 ## Current dependency graph
