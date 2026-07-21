@@ -14,7 +14,7 @@ from ...project_setup.target_settings import (
 from ...push_journal import JournalLoadStatus
 from ..events import EventSink
 from ..requests import PrepareTargetSettingsUpdateRequest, TargetSettingsRequest
-from ._shared import emit_technical
+from ._shared import make_operation_emitter
 from .context import ApplicationContext
 
 
@@ -50,12 +50,9 @@ class TargetSettingsService:
         confirmed_update_id: str,
         event_sink: EventSink | None = None,
     ) -> TargetSettingsExecution:
+        emitter = make_operation_emitter(event_sink)
         return execute_target_settings_update(
             prepared,
             confirmed_update_id=confirmed_update_id,
-            event_sink=(
-                (lambda event: emit_technical(event_sink, event))
-                if event_sink is not None
-                else None
-            ),
+            event_sink=emitter.emit,
         )

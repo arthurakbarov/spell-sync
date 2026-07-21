@@ -12,7 +12,7 @@ from ...project_setup.prepare import PreparedProjectSetup, prepare_project_setup
 from ...project_setup.state import ProjectSetupState, inspect_project_setup, validate_setup_wordlist
 from ..events import EventSink
 from ..requests import SetupRequest
-from ._shared import emit_technical
+from ._shared import make_operation_emitter
 from .context import ApplicationContext
 
 
@@ -39,14 +39,11 @@ class SetupService:
         confirmed_setup_id: str,
         event_sink: EventSink | None = None,
     ) -> ProjectSetupExecution:
+        emitter = make_operation_emitter(event_sink)
         return execute_project_setup(
             prepared,
             confirmed_setup_id=confirmed_setup_id,
-            event_sink=(
-                (lambda event: emit_technical(event_sink, event))
-                if event_sink is not None
-                else None
-            ),
+            event_sink=emitter.emit,
         )
 
     def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:

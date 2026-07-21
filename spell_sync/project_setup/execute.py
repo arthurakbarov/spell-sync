@@ -8,8 +8,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from ..io import atomic_write
+from ..operation_lock import OperationLocked, acquire_operation_lock
+from ..push_journal import file_content_hash
+from ..settings import ConfigStatus, load_config_result
+from .prepare import PreparedProjectSetup, SetupFileAction
 
 if TYPE_CHECKING:
+    from ..application.event_metadata import EventReason
     from ..application.events import (
         EventCategory,
         EventId,
@@ -17,10 +22,8 @@ if TYPE_CHECKING:
         EventSeverity,
         TechnicalEvent,
     )
-from ..operation_lock import OperationLocked, acquire_operation_lock
-from ..push_journal import file_content_hash
-from ..settings import ConfigStatus, load_config_result
-from .prepare import PreparedProjectSetup, SetupFileAction
+
+EventSink = Callable[["TechnicalEvent"], None]
 
 
 class ProjectSetupOutcome(str, Enum):
@@ -39,9 +42,6 @@ class ProjectSetupExecution:
     warnings: tuple[str, ...] = ()
 
 
-EventSink = Callable[["TechnicalEvent"], None]
-
-
 def _fingerprint_matches(path: Path, fingerprint: str | None) -> bool:
     if fingerprint is None:
         return not path.is_file()
@@ -53,34 +53,58 @@ def _emit_setup_event(
     event_sink: EventSink | None,
     *,
     setup_id: str,
-    event_id: EventId,
-    severity: EventSeverity | None = None,
-    phase: EventPhase | None = None,
-    category: EventCategory | None = None,
+    event_id: "EventId",
+    severity: "EventSeverity | None" = None,
+    phase: "EventPhase | None" = None,
+    category: "EventCategory | None" = None,
+    reason: "EventReason | None" = None,
+    terminal: bool = False,
+    outcome: ProjectSetupOutcome | None = None,
 ) -> None:
-    from ..application.events import (
-        EventCategory as EventCategoryEnum,
-    )
-    from ..application.events import (
-        EventSeverity as EventSeverityEnum,
-    )
-    from ..application.events import (
-        OperationKind,
-        TechnicalEvent,
-    )
+    from ..application.event_helpers import build_technical_event, setup_outcome_to_terminal
+    from ..application.events import EventCategory, EventPhase, EventSeverity, OperationKind
 
     if event_sink is None:
         return
+    terminal_phase = EventPhase.COMPLETED if terminal else phase
+    terminal_outcome = (
+        setup_outcome_to_terminal(outcome) if terminal and outcome is not None else None
+    )
     event_sink(
-        TechnicalEvent(
+        build_technical_event(
             event_id=event_id,
             operation=OperationKind.SETUP,
-            category=category or EventCategoryEnum.LIFECYCLE,
-            severity=severity or EventSeverityEnum.INFO,
-            phase=phase,
+            category=category or EventCategory.LIFECYCLE,
+            severity=severity or EventSeverity.INFO,
+            phase=terminal_phase,
             correlation_id=setup_id,
+            reason=reason,
+            outcome=terminal_outcome,
         )
     )
+
+
+def _return_with_terminal(
+    event_sink: EventSink | None,
+    *,
+    setup_id: str,
+    execution: ProjectSetupExecution,
+    event_id: "EventId",
+    reason: "EventReason",
+    severity: "EventSeverity | None" = None,
+) -> ProjectSetupExecution:
+    from ..application.events import EventSeverity
+
+    _emit_setup_event(
+        event_sink,
+        setup_id=setup_id,
+        event_id=event_id,
+        severity=severity or EventSeverity.ERROR,
+        reason=reason,
+        terminal=True,
+        outcome=execution.outcome,
+    )
+    return execution
 
 
 def execute_project_setup(
@@ -89,6 +113,7 @@ def execute_project_setup(
     confirmed_setup_id: str,
     event_sink: EventSink | None = None,
 ) -> ProjectSetupExecution:
+    from ..application.event_metadata import EventReason
     from ..application.events import EventCategory, EventId, EventPhase, EventSeverity
 
     setup_id = prepared.setup_id
@@ -110,38 +135,72 @@ def execute_project_setup(
         )
 
     if confirmed_setup_id != prepared.setup_id:
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=ProjectSetupOutcome.FAILED,
-            message="Setup confirmation does not match the current preview.",
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=ProjectSetupOutcome.FAILED,
+                message="Setup confirmation does not match the current preview.",
+            ),
+            event_id=EventId.SETUP_FAILED,
+            reason=EventReason.CONFIRMATION_MISMATCH,
         )
     if not prepared.can_execute:
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-            message="Setup preview has conflicts and cannot execute.",
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                message="Setup preview has conflicts and cannot execute.",
+            ),
+            event_id=EventId.SETUP_STOPPED_SAFELY,
+            reason=EventReason.PREVIEW_NOT_EXECUTABLE,
+            severity=EventSeverity.WARNING,
         )
 
     emit(EventId.SETUP_VALIDATING, phase=EventPhase.PREPARING)
     for item in prepared.files:
         if item.action is SetupFileAction.CONFLICT:
-            return ProjectSetupExecution(
-                prepared=prepared,
-                outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                message=f"Conflict detected: {item.relative_name}",
+            return _return_with_terminal(
+                event_sink,
+                setup_id=setup_id,
+                execution=ProjectSetupExecution(
+                    prepared=prepared,
+                    outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                    message=f"Conflict detected: {item.relative_name}",
+                ),
+                event_id=EventId.SETUP_STOPPED_SAFELY,
+                reason=EventReason.CONFLICT_DETECTED,
+                severity=EventSeverity.WARNING,
             )
         if item.action is SetupFileAction.KEEP and item.fingerprint is not None:
             if not _fingerprint_matches(item.path, item.fingerprint):
-                return ProjectSetupExecution(
-                    prepared=prepared,
-                    outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                    message=f"{item.relative_name} changed after preview.",
+                return _return_with_terminal(
+                    event_sink,
+                    setup_id=setup_id,
+                    execution=ProjectSetupExecution(
+                        prepared=prepared,
+                        outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                        message=f"{item.relative_name} changed after preview.",
+                    ),
+                    event_id=EventId.SETUP_STOPPED_SAFELY,
+                    reason=EventReason.FILE_CHANGED_AFTER_PREVIEW,
+                    severity=EventSeverity.WARNING,
                 )
         if item.action is SetupFileAction.CREATE and item.path.exists():
-            return ProjectSetupExecution(
-                prepared=prepared,
-                outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                message=f"{item.relative_name} appeared after preview.",
+            return _return_with_terminal(
+                event_sink,
+                setup_id=setup_id,
+                execution=ProjectSetupExecution(
+                    prepared=prepared,
+                    outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                    message=f"{item.relative_name} appeared after preview.",
+                ),
+                event_id=EventId.SETUP_STOPPED_SAFELY,
+                reason=EventReason.FILE_APPEARED_AFTER_PREVIEW,
+                severity=EventSeverity.WARNING,
             )
 
     created: list[Path] = []
@@ -188,42 +247,71 @@ def execute_project_setup(
             if config_result.status not in (ConfigStatus.VALID, ConfigStatus.UNKNOWN_KEY):
                 raise RuntimeError("Created configuration failed validation.")
     except OperationLocked:
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=ProjectSetupOutcome.FAILED,
-            message="Another spell-sync process holds the project lock.",
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=ProjectSetupOutcome.FAILED,
+                message="Another spell-sync process holds the project lock.",
+            ),
+            event_id=EventId.SETUP_FAILED,
+            reason=EventReason.LOCK_UNAVAILABLE,
         )
     except FileExistsError as exc:
         _rollback_created(created)
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-            message=str(exc),
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                message=str(exc),
+            ),
+            event_id=EventId.SETUP_STOPPED_SAFELY,
+            reason=EventReason.FILE_EXISTS,
+            severity=EventSeverity.WARNING,
         )
     except OSError as exc:
         incomplete = _rollback_created(created)
         outcome = ProjectSetupOutcome.SETUP_INCOMPLETE if incomplete else ProjectSetupOutcome.FAILED
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=outcome,
-            message=str(exc),
-            created_files=tuple(path.name for path in created),
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=outcome,
+                message=str(exc),
+                created_files=tuple(path.name for path in created),
+            ),
+            event_id=EventId.SETUP_INCOMPLETE if incomplete else EventId.SETUP_FAILED,
+            reason=EventReason.IO_ERROR,
         )
     except RuntimeError as exc:
         incomplete = _rollback_created(created)
         outcome = ProjectSetupOutcome.SETUP_INCOMPLETE if incomplete else ProjectSetupOutcome.FAILED
-        return ProjectSetupExecution(
-            prepared=prepared,
-            outcome=outcome,
-            message=str(exc),
-            created_files=tuple(path.name for path in created),
+        return _return_with_terminal(
+            event_sink,
+            setup_id=setup_id,
+            execution=ProjectSetupExecution(
+                prepared=prepared,
+                outcome=outcome,
+                message=str(exc),
+                created_files=tuple(path.name for path in created),
+            ),
+            event_id=EventId.SETUP_INCOMPLETE if incomplete else EventId.SETUP_FAILED,
+            reason=EventReason.CONFIG_VALIDATION_FAILED,
         )
 
-    emit(
-        EventId.SETUP_COMPLETED,
+    _emit_setup_event(
+        event_sink,
+        setup_id=setup_id,
+        event_id=EventId.SETUP_COMPLETED,
         severity=EventSeverity.SUCCESS,
         phase=EventPhase.COMPLETED,
         category=EventCategory.LIFECYCLE,
+        terminal=True,
+        outcome=ProjectSetupOutcome.COMPLETED,
     )
     message = (
         "Project created. The existing canonical wordlist was kept unchanged."

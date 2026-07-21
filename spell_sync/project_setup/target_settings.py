@@ -8,9 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from ..io import atomic_write
-
 if TYPE_CHECKING:
+    from ..application.event_metadata import EventReason
     from ..application.events import (
         EventCategory,
         EventId,
@@ -18,6 +17,8 @@ if TYPE_CHECKING:
         EventSeverity,
         TechnicalEvent,
     )
+
+from ..io import atomic_write
 from ..operation_lock import OperationLocked, acquire_operation_lock
 from ..push_journal import file_content_hash
 from ..settings import ConfigStatus, config_blocks_mutating, load_config_result
@@ -77,6 +78,63 @@ class TargetSettingsExecution:
 
 
 EventSink = Callable[["TechnicalEvent"], None]
+
+
+def _emit_targets_event(
+    event_sink: EventSink | None,
+    *,
+    update_id: str,
+    event_id: "EventId",
+    severity: "EventSeverity | None" = None,
+    phase: "EventPhase | None" = None,
+    category: "EventCategory | None" = None,
+    reason: "EventReason | None" = None,
+    terminal: bool = False,
+    outcome: TargetSettingsOutcome | None = None,
+) -> None:
+    from ..application.event_helpers import (
+        build_technical_event,
+        target_settings_outcome_to_terminal,
+    )
+    from ..application.events import EventCategory, EventPhase, EventSeverity, OperationKind
+
+    if event_sink is None:
+        return
+    event_sink(
+        build_technical_event(
+            event_id=event_id,
+            operation=OperationKind.TARGETS,
+            category=category or EventCategory.LIFECYCLE,
+            severity=severity or EventSeverity.INFO,
+            phase=EventPhase.COMPLETED if terminal else phase,
+            correlation_id=update_id,
+            reason=reason,
+            outcome=target_settings_outcome_to_terminal(outcome) if terminal and outcome else None,
+        )
+    )
+
+
+def _return_with_terminal(
+    event_sink: EventSink | None,
+    *,
+    update_id: str,
+    execution: TargetSettingsExecution,
+    event_id: "EventId",
+    reason: "EventReason",
+    severity: "EventSeverity | None" = None,
+) -> TargetSettingsExecution:
+    from ..application.events import EventSeverity
+
+    _emit_targets_event(
+        event_sink,
+        update_id=update_id,
+        event_id=event_id,
+        severity=severity or EventSeverity.ERROR,
+        reason=reason,
+        terminal=True,
+        outcome=execution.outcome,
+    )
+    return execution
 
 
 def _project_config_path(wordlist: Path) -> Path:
@@ -288,14 +346,8 @@ def execute_target_settings_update(
     confirmed_update_id: str,
     event_sink: EventSink | None = None,
 ) -> TargetSettingsExecution:
-    from ..application.events import (
-        EventCategory,
-        EventId,
-        EventPhase,
-        EventSeverity,
-        OperationKind,
-        TechnicalEvent,
-    )
+    from ..application.event_metadata import EventReason
+    from ..application.events import EventCategory, EventId, EventPhase, EventSeverity
 
     update_id = prepared.update_id
 
@@ -306,39 +358,55 @@ def execute_target_settings_update(
         phase: EventPhase | None = None,
         category: EventCategory = EventCategory.LIFECYCLE,
     ) -> None:
-        if event_sink is None:
-            return
-        event_sink(
-            TechnicalEvent(
-                event_id=event_id,
-                operation=OperationKind.TARGETS,
-                category=category,
-                severity=severity,
-                phase=phase,
-                correlation_id=update_id,
-            )
+        _emit_targets_event(
+            event_sink,
+            update_id=update_id,
+            event_id=event_id,
+            severity=severity,
+            phase=phase,
+            category=category,
         )
 
     if confirmed_update_id != prepared.update_id:
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.FAILED,
-            message="Configuration confirmation does not match the current preview.",
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.FAILED,
+                message="Configuration confirmation does not match the current preview.",
+            ),
+            event_id=EventId.TARGETS_FAILED,
+            reason=EventReason.CONFIRMATION_MISMATCH,
         )
     if not prepared.can_execute:
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.STOPPED_SAFELY,
-            message="Configuration preview cannot execute.",
-            warnings=prepared.warnings,
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.STOPPED_SAFELY,
+                message="Configuration preview cannot execute.",
+                warnings=prepared.warnings,
+            ),
+            event_id=EventId.TARGETS_STOPPED_SAFELY,
+            reason=EventReason.PREVIEW_NOT_EXECUTABLE,
+            severity=EventSeverity.WARNING,
         )
 
     if not _fingerprint_matches(prepared.config_path, prepared.config_fingerprint_before):
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.STOPPED_SAFELY,
-            message=_STALE_CONFIG_MESSAGE,
-            warnings=prepared.warnings,
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.STOPPED_SAFELY,
+                message=_STALE_CONFIG_MESSAGE,
+                warnings=prepared.warnings,
+            ),
+            event_id=EventId.TARGETS_STOPPED_SAFELY,
+            reason=EventReason.STALE_CONFIG,
+            severity=EventSeverity.WARNING,
         )
 
     try:
@@ -346,11 +414,18 @@ def execute_target_settings_update(
         with acquire_operation_lock(prepared.wordlist_path, "targets"):
             emit(EventId.TARGETS_CONFLICTS_CHECKED, phase=EventPhase.EXECUTING)
             if not _fingerprint_matches(prepared.config_path, prepared.config_fingerprint_before):
-                return TargetSettingsExecution(
-                    prepared=prepared,
-                    outcome=TargetSettingsOutcome.STOPPED_SAFELY,
-                    message=_STALE_CONFIG_MESSAGE,
-                    warnings=prepared.warnings,
+                return _return_with_terminal(
+                    event_sink,
+                    update_id=update_id,
+                    execution=TargetSettingsExecution(
+                        prepared=prepared,
+                        outcome=TargetSettingsOutcome.STOPPED_SAFELY,
+                        message=_STALE_CONFIG_MESSAGE,
+                        warnings=prepared.warnings,
+                    ),
+                    event_id=EventId.TARGETS_STOPPED_SAFELY,
+                    reason=EventReason.STALE_CONFIG,
+                    severity=EventSeverity.WARNING,
                 )
             emit(
                 EventId.TARGETS_WRITE_STARTED,
@@ -372,31 +447,53 @@ def execute_target_settings_update(
             if loaded != expected:
                 raise RuntimeError("Updated configuration does not match the preview.")
     except OperationLocked:
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.FAILED,
-            message="Another spell-sync process holds the project lock.",
-            warnings=prepared.warnings,
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.FAILED,
+                message="Another spell-sync process holds the project lock.",
+                warnings=prepared.warnings,
+            ),
+            event_id=EventId.TARGETS_FAILED,
+            reason=EventReason.LOCK_UNAVAILABLE,
         )
     except OSError as exc:
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.FAILED,
-            message=str(exc),
-            warnings=prepared.warnings,
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.FAILED,
+                message=str(exc),
+                warnings=prepared.warnings,
+            ),
+            event_id=EventId.TARGETS_FAILED,
+            reason=EventReason.WRITE_FAILED,
         )
     except RuntimeError as exc:
-        return TargetSettingsExecution(
-            prepared=prepared,
-            outcome=TargetSettingsOutcome.FAILED,
-            message=str(exc),
-            warnings=prepared.warnings,
+        return _return_with_terminal(
+            event_sink,
+            update_id=update_id,
+            execution=TargetSettingsExecution(
+                prepared=prepared,
+                outcome=TargetSettingsOutcome.FAILED,
+                message=str(exc),
+                warnings=prepared.warnings,
+            ),
+            event_id=EventId.TARGETS_FAILED,
+            reason=EventReason.VERIFICATION_MISMATCH,
         )
 
-    emit(
-        EventId.TARGETS_COMPLETED,
+    _emit_targets_event(
+        event_sink,
+        update_id=update_id,
+        event_id=EventId.TARGETS_COMPLETED,
         severity=EventSeverity.SUCCESS,
         phase=EventPhase.COMPLETED,
+        terminal=True,
+        outcome=TargetSettingsOutcome.COMPLETED,
     )
     enabled_names = ", ".join(
         target_display_name(target_id) for target_id in sorted(prepared.enabled_target_ids)
