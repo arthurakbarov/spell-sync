@@ -480,8 +480,14 @@ class CiRunner:
                 self._history_summary_path,
                 json.dumps(payload, indent=2) + "\n",
             )
-            history = summarize_ci_history(self.artifacts)
-            history_dict = history.to_json_dict()
+        _cleanup_orphan_artifacts(
+            self.artifacts,
+            current_run_id=self.run_id,
+            log_lines=self.log_lines,
+        )
+        _rotate_completed_pairs(self.artifacts)
+        if self._mode == "full":
+            history_dict = summarize_ci_history(self.artifacts).to_json_dict()
             payload["historyAtCompletion"] = history_dict
             payload["fullCiAttempts"] = history_dict["fullCiAttempts"]
             payload["fullCiFailures"] = history_dict["fullCiFailures"]
@@ -490,12 +496,6 @@ class CiRunner:
         _atomic_write(self._summary_path, summary_text)
         if self._mode == "full":
             _atomic_write(self._history_summary_path, summary_text)
-        _cleanup_orphan_artifacts(
-            self.artifacts,
-            current_run_id=self.run_id,
-            log_lines=self.log_lines,
-        )
-        _rotate_completed_pairs(self.artifacts)
         self._print_failure_block(
             exit_code,
             summary_path=str(self._summary_path),
