@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented — awaiting phase approval
+Accepted (owner-approved Phase 4)
 
 ## Context
 

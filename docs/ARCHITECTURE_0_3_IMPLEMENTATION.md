@@ -10,12 +10,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 4: focused application services and thin facade — **awaiting approval**. Phase 3
-(explicit runtime, runtime identity safety, commit-bound final CI evidence) is
-**complete** and owner-approved.
+Phase 5: structured technical events and diagnostics — **not started**. Phase 4
+(focused application services and thin facade) is **complete** and owner-approved.
 
 [architecture-status:start]
-current: phase-4
+current: phase-5
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -23,7 +22,7 @@ phase-2c: complete
 phase-2d: complete
 phase-2e: complete
 phase-3: complete
-phase-4: awaiting-approval
+phase-4: complete
 phase-5: not-started
 [architecture-status:end]
 
@@ -31,13 +30,13 @@ phase-5: not-started
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `1ba73ba` test: cover runtime identity subset policy and pull fingerprint guard | yes |
-| spell-sync-dev | `334ab73` test: make snapshot suite fast and timeout-safe | yes |
+| spell-sync | `0a69064` test: cover operation screen unmount mutation cleanup | yes |
+| spell-sync-dev | `7bb8ecf` test: cover snapshot git timeout | yes |
 | spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
 
-Phase 3 final CI evidence: `1ba73ba`, run `20260721T040009.370414Z`, `finalEvidence=true`.
+Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -206,7 +205,7 @@ and commit-bound final CI evidence.
 
 ## Phase 4 — Focused application services and thin facade
 
-**Status:** awaiting approval
+**Status:** complete
 
 ### Preflight maintenance (complete)
 
@@ -311,7 +310,7 @@ full final CI
 installed-wheel smoke
 ```
 
-### Completion criteria
+### Completion criteria (met)
 
 - Facade substantially thinner; responsibilities have a single owner.
 - No CLI/TUI bypasses.
@@ -319,11 +318,25 @@ installed-wheel smoke
 - Architecture guards forbid reverse dependencies.
 - Legacy parallel helpers removed.
 - Docs, ADR, and project map current.
-- Final CI on final committed clean HEAD.
-- Phase status `awaiting-approval`.
-- Phase 5 not started.
+- Final CI on committed clean HEAD.
+- Owner approval recorded; tracker status `complete`.
+
+### Owner acceptance (recorded)
+
+- focused application services created under `spell_sync/application/services/`;
+- `SpellSyncService` is a thin delegation facade;
+- `ApplicationContext` is frozen;
+- CLI and TUI use canonical application paths;
+- runtime resolution remains through `RuntimeResolver`;
+- mutation safety and `RuntimeIdentity` preserved;
+- private legacy facade orchestration removed;
+- final CI evidence bound to committed HEAD `0a69064`;
+- coverage correction commit `0a69064` accepted;
+- Phase 5 was not started before approval.
 
 ## Phase 5 — Structured technical events and diagnostics
+
+**Status:** not started
 
 ### Goal
 
