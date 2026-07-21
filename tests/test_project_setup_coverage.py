@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from spell_sync.application import SpellSyncService
-from spell_sync.application.events import OperationEvent, OperationKind
+from spell_sync.application.events import OperationKind, PresentedEvent
 from spell_sync.bundled_files import init_project_directory
 from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
@@ -60,9 +60,9 @@ class TestProjectSetupCoverage(unittest.TestCase):
             wordlist = Path(tmp) / "wordlist.txt"
             draft = SetupDraft(wordlist, (), create_wordlist=True)
             prepared = service.prepare_project_setup(draft)
-            events: list[OperationEvent] = []
+            events: list[PresentedEvent] = []
 
-            def sink(event: OperationEvent) -> None:
+            def sink(event: PresentedEvent) -> None:
                 events.append(event)
 
             service.execute_project_setup(

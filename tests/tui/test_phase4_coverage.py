@@ -9,7 +9,13 @@ from unittest.mock import patch
 from textual.widgets import Input
 from textual.worker import WorkerState
 
-from spell_sync.application.events import EventLevel, OperationEvent, OperationKind
+from spell_sync.application.events import (
+    EventId,
+    EventPhase,
+    EventSeverity,
+    OperationKind,
+    PresentedEvent,
+)
 from spell_sync.application.reports import (
     OperationOutcome,
     OperationReport,
@@ -86,20 +92,22 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             app.push_screen(screen)
             await pilot.pause()
             screen._apply_event(
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "rolling_back",
-                    "rolling",
-                    level=EventLevel.WARNING,
-                    target="chrome",
+                PresentedEvent(
+                    operation=OperationKind.PUSH,
+                    event_id=EventId.PUSH_ROLLBACK_STARTED,
+                    message="Rolling back push transaction",
+                    severity=EventSeverity.WARNING,
+                    phase=EventPhase.ROLLING_BACK,
+                    target_id="chrome",
                 )
             )
             screen._apply_event(
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "finalizing",
-                    "done",
-                    level=EventLevel.SUCCESS,
+                PresentedEvent(
+                    operation=OperationKind.PUSH,
+                    event_id=EventId.PUSH_FINALIZING,
+                    message="Finalizing transaction",
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.FINALIZING,
                     completed=1,
                     total=2,
                 )

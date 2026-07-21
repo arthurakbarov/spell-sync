@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from spell_sync.application import SpellSyncService
-from spell_sync.application.events import OperationEvent
+from spell_sync.application.events import EventId, PresentedEvent
 from spell_sync.application.reports import (
     DashboardSeverity,
     PullPreview,
@@ -114,7 +114,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.prepare_push_operation.return_value = prepared
         run.push_from_wordlist.return_value = PushResult(word_count=1, written=("demo",))
 
-        events: list[OperationEvent] = []
+        events: list[PresentedEvent] = []
 
         with patch(
             "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
@@ -127,10 +127,15 @@ class TestSpellSyncService(unittest.TestCase):
                 event_sink=events.append,
             )
 
-        stages = [event.stage for event in events]
+        event_ids = [event.event_id for event in events]
         self.assertEqual(
-            stages,
-            ["building_plan", "verifying_plan", "creating_snapshots", "completed"],
+            event_ids,
+            [
+                EventId.PUSH_BUILDING_PLAN,
+                EventId.PUSH_PLAN_VERIFIED,
+                EventId.PUSH_EXECUTION_STARTED,
+                EventId.PUSH_COMPLETED,
+            ],
         )
 
     def test_execute_push_for_run_uses_prepared_without_replan(self):

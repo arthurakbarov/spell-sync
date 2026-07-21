@@ -255,6 +255,29 @@ validators = [
   "scripts/check-docs-contract.py",
 ]
 
+[clusters.diagnostics-events]
+production = [
+  "spell_sync/application/events.py",
+  "spell_sync/application/event_presenter.py",
+  "spell_sync/application/services/_shared.py",
+  "spell_sync/diagnostics/technical_event_log.py",
+  "spell_sync/diagnostics/technical_logging.py",
+  "spell_sync/diagnostics/safe_log.py",
+]
+moduleTests = [
+  "tests/test_technical_logging.py",
+  "tests/test_diagnostic_redaction.py",
+]
+clusterTests = [
+  "tests/test_technical_logging.py",
+  "tests/test_diagnostic_redaction.py",
+  "tests/test_diagnostics_coverage.py",
+  "tests/test_support_report.py",
+  "tests/test_application_services.py",
+  "tests/tui/test_architecture.py",
+]
+validators = []
+
 [clusters.test-selection]
 production = [
   "scripts/test_plan.py",

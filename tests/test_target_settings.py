@@ -731,10 +731,10 @@ def test_service_target_settings_with_event_sink(
     service: SpellSyncService,
     mock_targets,
 ) -> None:
-    from spell_sync.application.events import OperationEvent
+    from spell_sync.application.events import PresentedEvent
 
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
-    events: list[OperationEvent] = []
+    events: list[PresentedEvent] = []
     with mock_targets(frozenset({"chrome"})):
         prepared = service.prepare_target_settings_update(
             PrepareTargetSettingsUpdateRequest(

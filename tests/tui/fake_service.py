@@ -12,7 +12,16 @@ from spell_sync.application.builders import (
     build_setup_operation_report,
     build_target_settings_operation_report,
 )
-from spell_sync.application.events import EventLevel, EventSink, OperationEvent, OperationKind
+from spell_sync.application.event_presenter import present_event
+from spell_sync.application.events import (
+    EventCategory,
+    EventId,
+    EventPhase,
+    EventSeverity,
+    EventSink,
+    OperationKind,
+    TechnicalEvent,
+)
 from spell_sync.application.reports import (
     DashboardIssue,
     DashboardSeverity,
@@ -59,6 +68,27 @@ from spell_sync.project_setup.target_settings import (
 )
 from spell_sync.push_prepared import PreparedPush
 from spell_sync.sync_models import DictionaryDiff, PushResult
+
+
+def _presented(
+    event_id: EventId,
+    operation: OperationKind,
+    *,
+    category: EventCategory = EventCategory.LIFECYCLE,
+    severity: EventSeverity = EventSeverity.INFO,
+    phase: EventPhase | None = None,
+    **kwargs: object,
+):
+    return present_event(
+        TechnicalEvent(
+            event_id=event_id,
+            operation=operation,
+            category=category,
+            severity=severity,
+            phase=phase,
+            **kwargs,
+        )
+    )
 
 
 @dataclass
@@ -131,26 +161,26 @@ class FakeTuiService:
             raise self.raise_on_execute
         if event_sink is not None:
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PULL_LOCK_ACQUIRED,
                     OperationKind.PULL,
-                    "acquiring_lock",
-                    "Operation lock acquired",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PULL_WRITE_STARTED,
                     OperationKind.PULL,
-                    "writing_wordlist",
-                    "Writing canonical wordlist",
+                    phase=EventPhase.EXECUTING,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PULL_COMPLETED,
                     OperationKind.PULL,
-                    "completed",
-                    "Pull completed",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
                 )
             )
         if self.pull_execution is not None:
@@ -177,36 +207,37 @@ class FakeTuiService:
             raise self.raise_on_execute
         if event_sink is not None:
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PUSH_LOCK_ACQUIRED,
                     OperationKind.PUSH,
-                    "acquiring_lock",
-                    "Operation lock acquired",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PUSH_PLAN_VERIFIED,
                     OperationKind.PUSH,
-                    "verifying_plan",
-                    "Prepared plan verified",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PUSH_SNAPSHOTS_STARTED,
                     OperationKind.PUSH,
-                    "creating_snapshots",
-                    "Creating recovery snapshots",
+                    category=EventCategory.TRANSACTION,
+                    phase=EventPhase.EXECUTING,
                     completed=0,
                     total=1,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.PUSH_COMPLETED,
                     OperationKind.PUSH,
-                    "completed",
-                    "Push completed",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
                 )
             )
         if self.push_execution is not None:
@@ -249,19 +280,19 @@ class FakeTuiService:
             raise self.raise_on_execute
         if event_sink is not None:
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.RECOVERY_VALIDATING,
                     OperationKind.RECOVER,
-                    "validating_journal",
-                    "Validating journal",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
                 )
             )
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.RECOVERY_COMPLETED,
                     OperationKind.RECOVER,
-                    "completed",
-                    "Recovery completed",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
                 )
             )
         if self.recovery_execution is not None:
@@ -399,11 +430,11 @@ class FakeTuiService:
             raise self.raise_on_execute
         if event_sink is not None:
             event_sink(
-                OperationEvent(
+                _presented(
+                    EventId.TARGETS_COMPLETED,
                     OperationKind.TARGETS,
-                    "completed",
-                    "Configuration updated",
-                    level=EventLevel.SUCCESS,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
                 )
             )
         if self.target_settings_execution is not None:

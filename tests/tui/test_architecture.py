@@ -135,12 +135,12 @@ class TestTuiArchitecture(unittest.TestCase):
         self.assertEqual(screen._preview.removals, 6)
         self.assertEqual(screen._preview.additions, 28)
 
-    def test_removal_words_not_in_operation_events(self):
-        from spell_sync.application.events import OperationEvent
+    def test_presented_events_have_no_word_payload_fields(self):
+        from spell_sync.application.events import PresentedEvent, TechnicalEvent
 
-        # Event schema has no word payload fields.
-        self.assertNotIn("words", OperationEvent.__annotations__)
-        self.assertNotIn("removal_words", OperationEvent.__annotations__)
+        for event_type in (PresentedEvent, TechnicalEvent):
+            self.assertNotIn("words", event_type.__annotations__)
+            self.assertNotIn("removal_words", event_type.__annotations__)
 
     def test_tui_setup_goes_through_service(self):
         service = fake_service()
