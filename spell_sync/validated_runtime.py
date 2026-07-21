@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-from .resolved_runtime import (
-    ProjectRuntimeMismatchError,
-    ResolvedRuntime,
-    build_resolved_runtime,
-)
+from .resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime
 
 ValidatedRuntime = ResolvedRuntime
-build_validated_runtime = build_resolved_runtime
 
 __all__ = [
     "ProjectRuntimeMismatchError",
     "ResolvedRuntime",
     "ValidatedRuntime",
-    "build_resolved_runtime",
-    "build_validated_runtime",
 ]

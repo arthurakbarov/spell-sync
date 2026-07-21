@@ -26,7 +26,7 @@ from .push_setup import (
     skipped_dictionary_names,
 )
 from .read_outcome import ReadStatus
-from .resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from .resolved_runtime import ResolvedRuntime
 from .sync_context import RuntimeContext, as_dictionary_list
 from .sync_models import DictionaryDiff, PushResult
 from .words import WordSet, clean_words, merge_case_duplicates, sort_words
@@ -308,17 +308,9 @@ class SyncRun:
         return result
 
 
-def sync_run_for(
-    wordlist: Path,
-    *,
-    strict_push: bool = False,
-    validated: ResolvedRuntime | None = None,
-) -> SyncRun:
-    """Build SyncRun from an effective wordlist path."""
-    if validated is not None:
-        ctx = validated.context
-        if strict_push != ctx.strict_push:
-            ctx = replace(ctx, strict_push=strict_push)
-        return SyncRun(context=ctx)
-    resolved = build_resolved_runtime(wordlist, strict_push=strict_push)
-    return SyncRun(context=resolved.context)
+def sync_run_for(resolved: ResolvedRuntime, *, strict_push: bool | None = None) -> SyncRun:
+    """Build SyncRun from an explicit resolved runtime."""
+    ctx = resolved.context
+    if strict_push is not None and strict_push != ctx.strict_push:
+        ctx = replace(ctx, strict_push=strict_push)
+    return SyncRun(context=ctx)

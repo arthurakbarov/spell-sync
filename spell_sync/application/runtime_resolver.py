@@ -16,7 +16,6 @@ __all__ = [
     "ProjectRuntimeMismatchError",
     "ResolvedRuntime",
     "RuntimeResolver",
-    "build_resolved_runtime",
 ]
 
 

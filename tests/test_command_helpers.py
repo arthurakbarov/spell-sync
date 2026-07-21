@@ -27,13 +27,13 @@ import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
 from spell_sync.application.reports import PullPreview
 from spell_sync.cli_options import CliOptions
-from spell_sync.command_helpers import finish_push, sync_run_for, wordlist_file_for
+from spell_sync.command_helpers import finish_push, wordlist_file_for
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
 from spell_sync.paths import resolve_wordlist_path
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus, PushJournal
-from spell_sync.settings import ConfigLoadResult, ConfigStatus
+from spell_sync.settings import ConfigDiagnostic, ConfigLoadResult, ConfigStatus
 from spell_sync.sync_run import PushResult
 from tests.runtime_helpers import make_sync_run
 
@@ -64,11 +64,15 @@ class TestResolveWordlistPath(unittest.TestCase):
             opts = CliOptions(wordlist=custom)
             self.assertEqual(wordlist_file_for(opts), Path(custom))
 
-    def test_sync_run_for_uses_explicit_wordlist(self):
+    def test_sync_run_for_uses_resolved_runtime(self):
         with tempfile.TemporaryDirectory() as d:
             custom = os.path.join(d, "words.txt")
             Path(custom).write_text("a\n", encoding="utf-8")
-            run = sync_run_for(Path(custom))
+            from spell_sync.resolved_runtime import build_resolved_runtime
+            from spell_sync.sync_run import sync_run_for
+
+            resolved = build_resolved_runtime(Path(custom))
+            run = sync_run_for(resolved)
             self.assertEqual(str(run.wordlist_file), custom)
 
     def test_finish_push_json_partial(self):
@@ -128,6 +132,36 @@ class TestCommandHelpers(unittest.TestCase):
         self.assertIsNone(
             command_helpers.invalid_config_exit_from_result(CliOptions(), "push", valid)
         )
+
+    def test_invalid_config_exit_from_result_json(self):
+        invalid = ConfigLoadResult(
+            ConfigStatus.SYNTAX_ERROR,
+            None,
+            (ConfigDiagnostic("spell-sync.toml", "bad", ConfigStatus.SYNTAX_ERROR),),
+        )
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = command_helpers.invalid_config_exit_from_result(
+                CliOptions(json_output=True),
+                "push",
+                invalid,
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["reason"], "invalid_config")
+
+    def test_invalid_config_exit_from_result_text(self):
+        invalid = ConfigLoadResult(
+            ConfigStatus.SYNTAX_ERROR,
+            None,
+            (ConfigDiagnostic("spell-sync.toml", "bad", ConfigStatus.SYNTAX_ERROR),),
+        )
+        code = command_helpers.invalid_config_exit_from_result(
+            CliOptions(json_output=False),
+            "push",
+            invalid,
+        )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
 
     def test_unfinished_journal_exit_from_result_cli_paths(self):
         opts_json = CliOptions(json_output=True)

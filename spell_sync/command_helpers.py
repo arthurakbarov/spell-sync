@@ -30,10 +30,10 @@ from .push_journal import (
     JournalLoadStatus,
     journal_payload,
 )
-from .resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from .resolved_runtime import ResolvedRuntime
 from .runtime_settings import RuntimeSettings
 from .settings import config_blocks_mutating
-from .sync_run import DictionaryDiff, PushResult, SyncRun, sync_run_for  # noqa: F401
+from .sync_run import DictionaryDiff, PushResult, SyncRun  # noqa: F401
 
 
 def invalid_config_exit_from_result(
@@ -63,15 +63,6 @@ def invalid_config_exit_from_result(
             f"({result.status.value}). Fix config before mutating commands."
         )
     return int(ExitCode.PUSH_ABORT)
-
-
-def invalid_config_exit(opts: CliOptions, command: str) -> int | None:
-    """Pre-lock config check; prefer service mutation scope for mutating commands."""
-    from .cli_request_adapter import project_ref
-
-    wordlist = wordlist_path_for(project_ref(opts))
-    validated = build_resolved_runtime(wordlist)
-    return invalid_config_exit_from_result(opts, command, validated.config_result)
 
 
 def run_from_scope(scope: ResolvedRuntime | int) -> SyncRun | int:

@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from spell_sync.cli_options import CliOptions
-from spell_sync.command_helpers import invalid_config_exit, run_from_scope
+from spell_sync.command_helpers import run_from_scope
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import write_text_words
@@ -30,6 +30,7 @@ from spell_sync.journal_schema import (
     parse_wordlist_state,
     validate_journal_provenance,
 )
+from spell_sync.mutation_guards import invalid_config_exit_from_scope
 from spell_sync.push_abort import PushAbort, handle_failed_push_rollback, rollback_result_failed
 from spell_sync.push_journal import JournalTarget, PushJournalSession, journal_path_for_wordlist
 from spell_sync.push_prepared import (
@@ -48,9 +49,9 @@ from spell_sync.push_render import (
 )
 from spell_sync.push_transaction import PushTransaction, RollbackResult, txn_snapshot_root
 from spell_sync.recover_cmd import cmd_recover
+from spell_sync.resolved_runtime import build_resolved_runtime
 from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.sync_run import PushResult, SyncRun
-from spell_sync.validated_runtime import build_validated_runtime
 from tests.journal_test_utils import write_test_journal
 from tests.runtime_helpers import make_sync_run
 
@@ -304,15 +305,20 @@ class TestPushPreparedCoverage(unittest.TestCase):
 
 class TestCommandHelpersCoverage(unittest.TestCase):
     def test_invalid_config_exit_and_run_from_scope(self):
+
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
             (wordlist.parent / "spell-sync.toml").write_text("[bad\n", encoding="utf-8")
-            code = invalid_config_exit(CliOptions(wordlist=str(wordlist)), "push")
+            resolved = build_resolved_runtime(wordlist)
+            code = invalid_config_exit_from_scope(
+                "push",
+                resolved.config_result,
+                json_output=False,
+            )
             self.assertEqual(code, int(ExitCode.PUSH_ABORT))
         self.assertEqual(run_from_scope(5), 5)
-        validated = build_validated_runtime(wordlist)
-        self.assertIsInstance(run_from_scope(validated), SyncRun)
+        self.assertIsInstance(run_from_scope(resolved), SyncRun)
 
 
 class TestRecoverCmdCoverage(unittest.TestCase):

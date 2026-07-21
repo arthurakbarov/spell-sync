@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -185,8 +186,48 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
         )
-        run = sync_run_for(Path("/tmp/wordlist.txt"), strict_push=True, validated=validated)
+        run = sync_run_for(validated, strict_push=True)
         self.assertTrue(run.strict_push)
+
+    def test_project_a_b_a_isolation(self) -> None:
+        with tempfile.TemporaryDirectory() as da, tempfile.TemporaryDirectory() as db:
+            wordlist_a = Path(da) / "wordlist.txt"
+            wordlist_b = Path(db) / "wordlist.txt"
+            wordlist_a.write_text("alpha\n", encoding="utf-8")
+            wordlist_b.write_text("beta\n", encoding="utf-8")
+            (Path(da) / "spell-sync.toml").write_text(
+                "[dictionaries]\nchrome = true\n",
+                encoding="utf-8",
+            )
+            (Path(db) / "spell-sync.toml").write_text(
+                "[dictionaries]\nchrome = false\n",
+                encoding="utf-8",
+            )
+            resolver = RuntimeResolver()
+            project_a = ProjectRef(wordlist=wordlist_a)
+            project_b = ProjectRef(wordlist=wordlist_b)
+            resolved_a1 = resolver.resolve_read(project_a)
+            resolved_b = resolver.resolve_read(project_b)
+            resolved_a2 = resolver.resolve_read(project_a)
+            self.assertTrue(resolved_a1.context.settings.dictionaries.chrome)
+            self.assertFalse(resolved_b.context.settings.dictionaries.chrome)
+            self.assertTrue(resolved_a2.context.settings.dictionaries.chrome)
+            self.assertIsNot(resolved_a1, resolved_b)
+            self.assertIsNot(resolved_a1.context, resolved_b.context)
+
+    def test_external_config_edit_visible_on_next_resolve(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            config = Path(d) / "spell-sync.toml"
+            config.write_text("[dictionaries]\nchrome = true\n", encoding="utf-8")
+            resolver = RuntimeResolver()
+            project = ProjectRef(wordlist=wordlist)
+            first = resolver.resolve_read(project)
+            config.write_text("[dictionaries]\nchrome = false\n", encoding="utf-8")
+            second = resolver.resolve_read(project)
+            self.assertTrue(first.context.settings.dictionaries.chrome)
+            self.assertFalse(second.context.settings.dictionaries.chrome)
 
 
 class TestExplicitRuntimeCoverage(unittest.TestCase):

@@ -180,8 +180,8 @@ through `RuntimeResolver`, passed into the application facade.
 | pull | CLI `SyncRun` | `prepare_pull` / `execute_pull` |
 | push | CLI `SyncRun` + `prepare_push(run)` | `load_push_preview` / `execute_push_preview` |
 | recover | journal internals in CLI | `inspect_recovery` + typed execution |
-| doctor | CLI `sync_run_for` | `load_doctor_report` / `load_doctor_targets` |
-| plan | CLI `sync_run_for` | `load_push_plan` / `execute_push_dry_run` |
+| doctor | `RuntimeResolver.sync_run` | `load_doctor_report` / `load_doctor_targets` |
+| plan | `RuntimeResolver.sync_run` | `load_push_plan` / `execute_push_dry_run` |
 | init | service (draft in CLI) | service (unchanged draft assembly) |
 | config-check | CLI settings utility | CLI utility (documented exception) |
 | lint | CLI lint core | CLI utility (documented exception) |

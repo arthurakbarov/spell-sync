@@ -112,29 +112,15 @@ class TestRuntimeContext(unittest.TestCase):
             self.assertEqual(run.wordlist_file, wordlist)
             self.assertEqual(run.dictionaries[0].name, "a")
 
-    def test_sync_run_for_uses_cli_wordlist(self):
-        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
-            wordlist = f.name
-        try:
-            with patch.object(
-                settings_mod,
-                "config_paths",
-                return_value=[Path("/nonexistent/spell-sync.toml")],
-            ):
-                run = sync_run_for(Path(wordlist))
-            self.assertEqual(str(run.wordlist_file), wordlist)
-        finally:
-            Path(wordlist).unlink(missing_ok=True)
-
-    def test_build_resolved_runtime_is_explicit(self):
+    def test_sync_run_for_requires_resolved_runtime(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
-            wordlist.write_text("alpha\n", encoding="utf-8")
+            wordlist.write_text("a\n", encoding="utf-8")
             resolved = build_resolved_runtime(wordlist)
-            self.assertIsInstance(resolved, ResolvedRuntime)
-            self.assertEqual(resolved.context.wordlist, wordlist)
+            run = sync_run_for(resolved)
+            self.assertEqual(run.wordlist_file, wordlist)
 
-    def test_sync_run_for_with_validated_does_not_load_config(self):
+    def test_sync_run_for_with_resolved_does_not_load_config(self):
         ctx = RuntimeContext.build(
             Path("/tmp/wordlist.txt"),
             [],
@@ -145,9 +131,9 @@ class TestRuntimeContext(unittest.TestCase):
             ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
             JournalLoadResult(JournalLoadStatus.ABSENT, None),
         )
-        with patch("spell_sync.sync_run.build_resolved_runtime") as build:
-            run = sync_run_for(Path("/tmp/wordlist.txt"), validated=validated)
-            build.assert_not_called()
+        source = inspect.getsource(sync_run_for)
+        self.assertNotIn("build_resolved_runtime", source)
+        run = sync_run_for(validated)
         self.assertIs(run.context, ctx)
 
     def test_cli_command_modules_do_not_construct_runtime_resolver(self):
@@ -161,6 +147,14 @@ class TestRuntimeContext(unittest.TestCase):
                     if isinstance(func, ast.Call) and isinstance(func.func, ast.Name):
                         if func.func.id == "RuntimeResolver":
                             self.fail(f"{path.name} must not construct RuntimeResolver()")
+
+    def test_build_resolved_runtime_is_explicit(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            resolved = build_resolved_runtime(wordlist)
+            self.assertIsInstance(resolved, ResolvedRuntime)
+            self.assertEqual(resolved.context.wordlist, wordlist)
 
     def test_mutation_scope_module_always_acquires_lock(self):
         from spell_sync.application import mutation_scope as mutation_scope_mod

@@ -16,13 +16,16 @@ hard to trace and test.
 - Remove production `ContextVar` usage for settings and validated runtime.
 - Introduce `RuntimeResolver` in the application layer with optional `bound` reuse.
 - Pass explicit settings dicts into dictionary discovery and config flag helpers.
-- Pass optional `validated` / `bound` parameters through `runtime_context_for`,
-  `sync_run_for`, and `mutating_command_scope_for`.
 - Resolve push strict mode from explicit runtime config when available.
+- Core receives a prepared `RuntimeContext` / `ResolvedRuntime`; low-level factories stay private to resolution paths.
+- `sync_run_for(resolved, …)` requires an explicit `ResolvedRuntime` — no config-loading fallback.
+- Mutating commands acquire a fresh resolved runtime under the operation lock via `mutation_scope_for`.
 
 ## Consequences
 
 - Application facade owns runtime resolution; core modules no longer bind implicit scopes.
 - CLI JSON, exit codes, and Pull/Push semantics remain unchanged.
-- Module-level settings cache remains for performance; explicit config bypasses reload paths.
+- No module-level config cache and no `ContextVar` runtime scope; each resolve reads current config.
+- Fresh mutation resolution happens under the project operation lock.
+- Typed `RuntimeSettings` and `RuntimeResolver` form the application boundary.
 - Service decomposition and structured technical events remain deferred to later phases.

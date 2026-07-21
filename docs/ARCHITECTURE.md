@@ -74,7 +74,9 @@ Transactional execution (journal + snapshots)
 Structured result → human or JSON (CLI/TUI presentation)
 ```
 
-Runtime settings remain implicit via ContextVar in 0.2.1; explicit runtime is a later phase.
+Runtime settings are resolved explicitly via `RuntimeResolver` (Phase 3). There is no
+production `ContextVar` scope and no module-level config cache; mutating commands resolve
+fresh runtime under the operation lock.
 
 ## Core modules
 
