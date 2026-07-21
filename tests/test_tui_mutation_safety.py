@@ -15,6 +15,7 @@ from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words
 from spell_sync.sync_run import SyncRun
 from tests.runtime_helpers import make_sync_run
+from tests.test_pull_safety import _patch_run_discover
 
 
 class TestTuiMutationSafety(unittest.TestCase):
@@ -40,11 +41,12 @@ class TestTuiMutationSafety(unittest.TestCase):
             self.assertNotIsInstance(prepared, ExitCode)
             preview = build_push_preview(prepared)
             push_request = PushRequest(project=request.project)
-            result = service.execute_push_preview(
-                push_request,
-                preview,
-                confirmed_plan_id=preview.plan_identifier,
-            )
+            with _patch_run_discover(run):
+                result = service.execute_push_preview(
+                    push_request,
+                    preview,
+                    confirmed_plan_id=preview.plan_identifier,
+                )
             self.assertIs(result.prepared, preview.prepared)
             self.assertIs(result.prepared, prepared)
 
@@ -61,11 +63,12 @@ class TestTuiMutationSafety(unittest.TestCase):
                 "alpha\nbeta\ngamma\n" + "\n".join(extra) + "\n",
                 encoding="utf-8",
             )
-            execution = service.execute_push_preview(
-                PushRequest(project=request.project),
-                preview,
-                confirmed_plan_id=preview.plan_identifier,
-            )
+            with _patch_run_discover(run):
+                execution = service.execute_push_preview(
+                    PushRequest(project=request.project),
+                    preview,
+                    confirmed_plan_id=preview.plan_identifier,
+                )
             self.assertEqual(execution.outcome, OperationOutcome.STOPPED_SAFELY)
             self.assertIsNotNone(execution.conflict_target)
             words = read_text_words(dictionary)
@@ -80,11 +83,12 @@ class TestTuiMutationSafety(unittest.TestCase):
             preview = build_pull_preview(run)
             self.assertEqual(preview.additions, 1)
             self.assertIn("delta", preview.addition_words)
-            execution = service.execute_pull(
-                request,
-                preview,
-                confirmed_plan_id=preview.plan_identifier,
-            )
+            with _patch_run_discover(run):
+                execution = service.execute_pull(
+                    request,
+                    preview,
+                    confirmed_plan_id=preview.plan_identifier,
+                )
             self.assertEqual(execution.outcome, OperationOutcome.COMPLETED)
             words = read_text_words(wordlist)
             self.assertIn("delta", words)

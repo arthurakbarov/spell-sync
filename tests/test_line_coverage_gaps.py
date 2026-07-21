@@ -272,6 +272,7 @@ class TestLineCoverageGaps(unittest.TestCase):
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
+                identity=MagicMock(),
             )
             preview = build_recovery_preview(validated)
             self.assertEqual(preview.status, RecoveryStatus.RECOVERY_IN_PROGRESS)
@@ -313,6 +314,7 @@ class TestLineCoverageGaps(unittest.TestCase):
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
+                identity=MagicMock(),
             )
             mixed = build_recovery_preview(validated)
             self.assertEqual(mixed.status, RecoveryStatus.CONFLICTED)
@@ -347,6 +349,7 @@ class TestLineCoverageGaps(unittest.TestCase):
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
+                identity=MagicMock(),
             )
             failed = build_recovery_preview(validated)
             self.assertGreater(failed.failure_count, 0)

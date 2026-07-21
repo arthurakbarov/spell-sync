@@ -274,6 +274,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         prepared.targets = ()
         prepared.wordlist_needs_write = True
         prepared.ctx = MagicMock(wordlist_str="/tmp/w.txt")
+        prepared.runtime_identity = MagicMock()
         target = MagicMock()
         target.planned.dictionary.name = "chrome"
         prepared.targets = (target,)
@@ -311,10 +312,13 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         self.assertEqual(locked.outcome, OperationOutcome.FAILED)
 
         abort = PushAbort(ExitCode.PUSH_ABORT, "write_failed", "boom")
+        scope_runtime = MagicMock()
+        scope_runtime.identity = prepared.runtime_identity
+        scope_runtime.context = MagicMock(settings=MagicMock())
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
@@ -343,7 +347,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
@@ -363,7 +367,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",
@@ -393,7 +397,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as scope:
-            scope.return_value.__enter__.return_value = MagicMock()
+            scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application.service.plan_fingerprint_conflict",

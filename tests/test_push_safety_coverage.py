@@ -665,6 +665,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
                 assert not isinstance(prepared2, ExitCode)
                 result2 = execute_prepared_push(
                     prepared2,
+                    execution_context=prepared2.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )
@@ -741,6 +742,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             ):
                 result2 = execute_prepared_push(
                     prepared2,
+                    execution_context=prepared2.ctx,
                     dry_run=False,
                     running_app_skip_reasons_fn=lambda _names: {},
                 )

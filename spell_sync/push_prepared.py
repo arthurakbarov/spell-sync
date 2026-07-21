@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .exit_codes import ExitCode
@@ -82,7 +82,11 @@ def prepare_push(
     from .settings import load_config_result
 
     config_result = load_config_result(wordlist=ctx.wordlist)
-    runtime_identity = build_runtime_identity(ctx, config_result=config_result)
+    identity_context = replace(
+        ctx,
+        settings=config_result.runtime_settings(),
+    )
+    runtime_identity = build_runtime_identity(identity_context, config_result=config_result)
     return PreparedPush(
         ctx=ctx,
         runtime_identity=runtime_identity,

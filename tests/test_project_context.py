@@ -51,6 +51,9 @@ def test_project_context_uses_resolved_wordlist_parent(tmp_path: Path) -> None:
     assert context.config_paths[-1] == context.project_dir / "spell-sync.toml"
 
 
+from tests.runtime_helpers import make_resolved_runtime
+
+
 def test_runtime_resolver_bound_reuses_context(tmp_path: Path) -> None:
     wordlist = tmp_path / "wordlist.txt"
     context = RuntimeContext.build(
@@ -58,11 +61,7 @@ def test_runtime_resolver_bound_reuses_context(tmp_path: Path) -> None:
         [],
         settings=RuntimeSettings.defaults(),
     )
-    validated = ResolvedRuntime(
-        context,
-        ConfigLoadResult(ConfigStatus.ABSENT, {}, ()),
-        JournalLoadResult(JournalLoadStatus.ABSENT, None),
-    )
+    validated = make_resolved_runtime(wordlist, context=context)
     resolver = RuntimeResolver(bound=validated)
     resolved = resolver.resolve_read(ProjectRef(wordlist=wordlist))
     assert resolved.context is context

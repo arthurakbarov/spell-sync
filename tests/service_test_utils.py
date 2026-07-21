@@ -255,7 +255,13 @@ def patch_recover_service(**methods: object):
 def patch_isolated_sync_run(run: SyncRun) -> Iterator[None]:
     from spell_sync.application.runtime_resolver import RuntimeResolver
 
-    with patch.object(RuntimeResolver, "sync_run", return_value=run):
+    with (
+        patch.object(RuntimeResolver, "sync_run", return_value=run),
+        patch(
+            "spell_sync.application._runtime_factory.discover_dictionaries",
+            return_value=run.context.dictionaries,
+        ),
+    ):
         yield
 
 
@@ -270,6 +276,10 @@ def patch_isolated_push(
 
     with (
         patch_isolated_sync_run(run),
+        patch(
+            "spell_sync.application._runtime_factory.discover_dictionaries",
+            return_value=run.context.dictionaries,
+        ),
         patch.object(commands_mod, "_running_apps_check_for_push", return_value=running_apps),
         patch.object(
             commands_mod,

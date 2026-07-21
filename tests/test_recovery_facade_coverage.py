@@ -271,6 +271,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.ABSENT, None),
+                identity=MagicMock(),
             )
             preview = build_recovery_preview(absent)
             self.assertEqual(preview.status, RecoveryStatus.ABSENT)
