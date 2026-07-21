@@ -132,3 +132,28 @@ def test_event_emitter_is_fail_open_when_sink_raises() -> None:
     )
     emitter.emit(_sample_event())
     assert "technical" in seen
+
+
+def test_technical_event_to_dict_rejects_forbidden_payload_keys(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.technical_event_log._FORBIDDEN_PAYLOAD_KEYS",
+        frozenset({"severity"}),
+    )
+    try:
+        technical_event_to_dict(_sample_event())
+    except ValueError as exc:
+        assert "forbidden technical event field" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_parse_technical_log_line_returns_none_for_non_object_json() -> None:
+    assert parse_technical_log_line('"hello"') is None
+
+
+def test_format_log_line_for_display_omits_target_suffix_when_missing() -> None:
+    event = _sample_event(target_id=None)
+    line = serialize_technical_event(event)
+    formatted = format_log_line_for_display(line)
+    assert "target=" not in formatted
+    assert "push.plan_verified" in formatted

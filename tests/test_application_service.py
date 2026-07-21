@@ -153,6 +153,24 @@ class TestSpellSyncService(unittest.TestCase):
         run.push_from_wordlist.assert_called_once_with(prepared=prepared)
         self.assertIsInstance(result, PushResult)
 
+    def test_execute_push_for_run_emits_failed_when_push_returns_exit_code(self):
+        service = SpellSyncService()
+        prepared = MagicMock(spec=PreparedPush)
+        run = MagicMock()
+        run.push_from_wordlist.return_value = ExitCode.PUSH_ABORT
+        events: list[PresentedEvent] = []
+        with patch(
+            "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
+        ):
+            result = service._sync._execute_push_for_run(
+                run,
+                prepared,
+                dry_run=False,
+                event_sink=events.append,
+            )
+        self.assertEqual(result, ExitCode.PUSH_ABORT)
+        self.assertTrue(any(event.event_id is EventId.PUSH_FAILED for event in events))
+
     def test_fingerprint_conflict_returns_abort_without_execute(self):
         service = SpellSyncService()
         prepared = MagicMock(spec=PreparedPush)

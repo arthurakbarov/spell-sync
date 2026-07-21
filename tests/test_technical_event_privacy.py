@@ -127,3 +127,83 @@ def test_technical_events_do_not_leak_sentinels(
 
     for blob in (log_text, history_text, support_json, support_text):
         _assert_sentinels_absent(blob)
+
+
+def test_present_event_maps_target_and_reason_specific_messages() -> None:
+    from spell_sync.application.event_presenter import present_event
+    from spell_sync.application.events import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+        OperationKind,
+        TechnicalEvent,
+    )
+
+    base = dict(
+        operation=OperationKind.PUSH,
+        category=EventCategory.LIFECYCLE,
+        severity=EventSeverity.INFO,
+        phase=EventPhase.EXECUTING,
+        correlation_id="corr",
+    )
+    changed = present_event(
+        TechnicalEvent(event_id=EventId.PUSH_TARGET_CHANGED, target_id="cursor", **base)
+    )
+    assert changed.message == "cursor changed after preview"
+
+    started = present_event(
+        TechnicalEvent(event_id=EventId.PUSH_TARGET_STARTED, target_id="chrome", **base)
+    )
+    assert started.message == "Updating chrome"
+
+    restore = present_event(
+        TechnicalEvent(
+            event_id=EventId.RECOVERY_TARGET_RESTORE_STARTED,
+            operation=OperationKind.RECOVER,
+            category=EventCategory.RECOVERY,
+            severity=EventSeverity.INFO,
+            phase=EventPhase.EXECUTING,
+            correlation_id="corr",
+            target_id="vscode",
+        )
+    )
+    assert restore.message == "Recovering vscode"
+
+    remove = present_event(
+        TechnicalEvent(
+            event_id=EventId.RECOVERY_TARGET_REMOVE_STARTED,
+            operation=OperationKind.RECOVER,
+            category=EventCategory.RECOVERY,
+            severity=EventSeverity.INFO,
+            phase=EventPhase.EXECUTING,
+            correlation_id="corr",
+            target_id="created",
+        )
+    )
+    assert remove.message == "Recovering created"
+
+    wordlist = present_event(
+        TechnicalEvent(
+            event_id=EventId.RECOVERY_WORDLIST_RESTORE_STARTED,
+            operation=OperationKind.RECOVER,
+            category=EventCategory.RECOVERY,
+            severity=EventSeverity.INFO,
+            phase=EventPhase.EXECUTING,
+            correlation_id="corr",
+        )
+    )
+    assert wordlist.message == "Recovering wordlist"
+
+    reason = present_event(
+        TechnicalEvent(
+            event_id=EventId.PUSH_FAILED,
+            operation=OperationKind.PUSH,
+            category=EventCategory.TRANSACTION,
+            severity=EventSeverity.ERROR,
+            phase=EventPhase.EXECUTING,
+            correlation_id="corr",
+            reason_code="rollback_incomplete",
+        )
+    )
+    assert reason.message == "Push rollback did not complete cleanly"
