@@ -22,6 +22,30 @@ from ._shared import emit_technical, make_operation_emitter
 from .context import ApplicationContext
 
 
+def _emit_recovery_terminal(
+    emitter,
+    *,
+    correlation_id: str,
+    event_id: EventId,
+    reason: EventReason | None = None,
+    outcome: RecoveryOutcome | None = None,
+    severity: EventSeverity = EventSeverity.ERROR,
+) -> None:
+    emit_technical(
+        emitter,
+        build_technical_event(
+            event_id=event_id,
+            operation=OperationKind.RECOVER,
+            category=EventCategory.RECOVERY,
+            severity=severity,
+            phase=EventPhase.COMPLETED,
+            correlation_id=correlation_id,
+            reason=reason,
+            outcome=outcome,
+        ),
+    )
+
+
 class RecoveryService:
     def __init__(self, ctx: ApplicationContext) -> None:
         self._ctx = ctx
@@ -46,6 +70,13 @@ class RecoveryService:
         emitter = make_operation_emitter(event_sink)
 
         if confirmed_transaction_id != preview.preview_fingerprint:
+            _emit_recovery_terminal(
+                emitter,
+                correlation_id=correlation_id,
+                event_id=EventId.RECOVERY_FAILED,
+                reason=EventReason.CONFIRMATION_MISMATCH,
+                outcome=RecoveryOutcome.FAILED,
+            )
             return RecoveryExecution(
                 preview=preview,
                 result=ExitCode.PUSH_ABORT,
@@ -313,6 +344,13 @@ class RecoveryService:
         emitter = make_operation_emitter(event_sink)
 
         if confirmed_transaction_id != preview.preview_fingerprint:
+            _emit_recovery_terminal(
+                emitter,
+                correlation_id=correlation_id,
+                event_id=EventId.RECOVERY_FAILED,
+                reason=EventReason.CONFIRMATION_MISMATCH,
+                outcome=RecoveryOutcome.FAILED,
+            )
             return RecoveryExecution(
                 preview=preview,
                 result=ExitCode.PUSH_ABORT,
@@ -383,7 +421,17 @@ class RecoveryService:
         confirmed_transaction_id: str,
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
+        correlation_id = preview.preview_fingerprint
+        emitter = make_operation_emitter(event_sink)
+
         if confirmed_transaction_id != preview.preview_fingerprint:
+            _emit_recovery_terminal(
+                emitter,
+                correlation_id=correlation_id,
+                event_id=EventId.RECOVERY_FAILED,
+                reason=EventReason.CONFIRMATION_MISMATCH,
+                outcome=RecoveryOutcome.FAILED,
+            )
             return RecoveryExecution(
                 preview=preview,
                 result=ExitCode.PUSH_ABORT,
@@ -430,6 +478,13 @@ class RecoveryService:
                         message=discard_result.detail
                         or "Discard could not remove recovery metadata.",
                     )
+            _emit_recovery_terminal(
+                emitter,
+                correlation_id=correlation_id,
+                event_id=EventId.RECOVERY_DISCARDED,
+                severity=EventSeverity.SUCCESS,
+                outcome=RecoveryOutcome.DISCARDED,
+            )
             return RecoveryExecution(
                 preview=preview,
                 result=ExitCode.OK,

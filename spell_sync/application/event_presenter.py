@@ -52,6 +52,7 @@ _MESSAGES: dict[EventId, str] = {
     EventId.RECOVERY_FAILED: "Recovery incomplete",
     EventId.RECOVERY_CLEANUP_STARTED: "Cleaning recovery artifacts",
     EventId.RECOVERY_CLEANUP_COMPLETED: "Cleanup completed",
+    EventId.RECOVERY_DISCARDED: "Recovery metadata discarded",
     EventId.RECOVERY_COMPLETED: "Recovery completed",
     EventId.SETUP_VALIDATING: "Validating setup paths",
     EventId.SETUP_LOCK_ACQUIRED: "Acquiring project lock",

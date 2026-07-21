@@ -14,8 +14,8 @@ from ..settings import ConfigStatus, load_config_result
 from .prepare import PreparedProjectSetup, SetupFileAction
 
 if TYPE_CHECKING:
-    from ..application.event_metadata import EventReason
-    from ..application.events import (
+    from ..diagnostics.event_metadata import EventReason
+    from ..diagnostics.technical_event_model import (
         EventCategory,
         EventId,
         EventPhase,
@@ -61,8 +61,16 @@ def _emit_setup_event(
     terminal: bool = False,
     outcome: ProjectSetupOutcome | None = None,
 ) -> None:
-    from ..application.event_helpers import build_technical_event, setup_outcome_to_terminal
-    from ..application.events import EventCategory, EventPhase, EventSeverity, OperationKind
+    from ..diagnostics.technical_event_builder import (
+        build_technical_event,
+        setup_outcome_to_terminal,
+    )
+    from ..diagnostics.technical_event_model import (
+        EventCategory,
+        EventPhase,
+        EventSeverity,
+        OperationKind,
+    )
 
     if event_sink is None:
         return
@@ -93,7 +101,7 @@ def _return_with_terminal(
     reason: "EventReason",
     severity: "EventSeverity | None" = None,
 ) -> ProjectSetupExecution:
-    from ..application.events import EventSeverity
+    from ..diagnostics.technical_event_model import EventSeverity
 
     _emit_setup_event(
         event_sink,
@@ -113,8 +121,13 @@ def execute_project_setup(
     confirmed_setup_id: str,
     event_sink: EventSink | None = None,
 ) -> ProjectSetupExecution:
-    from ..application.event_metadata import EventReason
-    from ..application.events import EventCategory, EventId, EventPhase, EventSeverity
+    from ..diagnostics.event_metadata import EventReason
+    from ..diagnostics.technical_event_model import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+    )
 
     setup_id = prepared.setup_id
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..application.events import OperationKind
 from ..application.reports import OperationOutcome
 from .history_record import OperationHistoryRecord
+from .technical_event_model import OperationKind
 
 
 @dataclass(frozen=True)

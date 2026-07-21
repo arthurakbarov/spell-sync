@@ -9,13 +9,14 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from ..application.event_metadata import (
+from .event_metadata import (
     CorrelationId,
     EventReason,
     TargetId,
     TerminalOutcome,
 )
-from ..application.events import (
+from .safe_log import sanitize_log_message
+from .technical_event_model import (
     EventCategory,
     EventId,
     EventPhase,
@@ -23,7 +24,6 @@ from ..application.events import (
     OperationKind,
     TechnicalEvent,
 )
-from .safe_log import sanitize_log_message
 from .technical_logging import get_spell_sync_logger
 
 SCHEMA_VERSION = 1
@@ -216,8 +216,11 @@ def parse_technical_log_line(line: str) -> ParsedTechnicalLogEvent | None:
 
 
 def format_log_line_for_display(line: str) -> str:
-    parsed = parse_technical_log_line(line)
-    if parsed is None:
-        return sanitize_log_message(line)
-    suffix = f" target={parsed.target_id.value}" if parsed.target_id is not None else ""
-    return sanitize_log_message(f"{parsed.severity.value} {parsed.event_id.value}{suffix}")
+    stripped = line.strip()
+    if stripped.startswith("{"):
+        parsed = parse_technical_log_line(line)
+        if parsed is None:
+            return "[malformed structured log line]"
+        suffix = f" target={parsed.target_id.value}" if parsed.target_id is not None else ""
+        return sanitize_log_message(f"{parsed.severity.value} {parsed.event_id.value}{suffix}")
+    return sanitize_log_message(line)

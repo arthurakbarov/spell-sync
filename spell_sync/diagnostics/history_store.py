@@ -8,7 +8,6 @@ import sys
 from contextlib import contextmanager
 from typing import Iterator
 
-from ..application.events import OperationKind
 from ..application.reports import OperationOutcome
 from .history_record import OperationHistoryRecord
 from .path_guard import (
@@ -19,6 +18,7 @@ from .path_guard import (
     validate_file_path,
 )
 from .paths import AppStatePaths
+from .technical_event_model import OperationKind
 from .types import HistoryClearResult, HistoryReadResult, HistoryWriteResult
 
 MAX_HISTORY_RECORDS = 500

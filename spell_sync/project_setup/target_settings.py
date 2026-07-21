@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from ..application.event_metadata import EventReason
-    from ..application.events import (
+    from ..diagnostics.event_metadata import EventReason
+    from ..diagnostics.technical_event_model import (
         EventCategory,
         EventId,
         EventPhase,
@@ -92,11 +92,16 @@ def _emit_targets_event(
     terminal: bool = False,
     outcome: TargetSettingsOutcome | None = None,
 ) -> None:
-    from ..application.event_helpers import (
+    from ..diagnostics.technical_event_builder import (
         build_technical_event,
         target_settings_outcome_to_terminal,
     )
-    from ..application.events import EventCategory, EventPhase, EventSeverity, OperationKind
+    from ..diagnostics.technical_event_model import (
+        EventCategory,
+        EventPhase,
+        EventSeverity,
+        OperationKind,
+    )
 
     if event_sink is None:
         return
@@ -123,7 +128,7 @@ def _return_with_terminal(
     reason: "EventReason",
     severity: "EventSeverity | None" = None,
 ) -> TargetSettingsExecution:
-    from ..application.events import EventSeverity
+    from ..diagnostics.technical_event_model import EventSeverity
 
     _emit_targets_event(
         event_sink,
@@ -346,8 +351,13 @@ def execute_target_settings_update(
     confirmed_update_id: str,
     event_sink: EventSink | None = None,
 ) -> TargetSettingsExecution:
-    from ..application.event_metadata import EventReason
-    from ..application.events import EventCategory, EventId, EventPhase, EventSeverity
+    from ..diagnostics.event_metadata import EventReason
+    from ..diagnostics.technical_event_model import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+    )
 
     update_id = prepared.update_id
 
