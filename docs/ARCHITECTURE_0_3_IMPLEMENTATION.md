@@ -32,7 +32,7 @@ phase-5: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `56617d3` Phase 5 corrective fixes (structured JSONL + typed metadata) | yes |
+| spell-sync | Phase 5 corrective fixes (diagnostics layer + recovery terminals) | yes |
 | spell-sync-dev | `7bb8ecf` test: cover snapshot git timeout | yes |
 | spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
 
@@ -40,9 +40,8 @@ Public version: `0.2.1` (`pyproject.toml`).
 
 Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
 
-Phase 5 final CI evidence: `56617d3`, run `20260721T202212.532326Z`,
-treeDigest `4cc6b99689d38a155c8b7a786786aa6a2a965ab1dc62c79d8aa85a456fa4c501`,
-`finalEvidence=true`, `treeStable=true`.
+Phase 5 final CI evidence: pending — bind with `scripts/ci.sh` on committed clean HEAD
+(`phase-5: awaiting-approval`).
 
 ## Current dependency graph
 
@@ -361,17 +360,19 @@ boundaries.
 
 ### Delivered
 
-- `spell_sync/application/events.py` — `EventId`, `TechnicalEvent`, `EventEmitter`,
-  `operation_emitter`, typed enums (`OperationKind`, `EventCategory`, `EventSeverity`,
-  `EventPhase`); removed free-form `OperationEvent.stage`
+- `spell_sync/diagnostics/event_metadata.py` — typed `CorrelationId`, `TargetId`, `EventReason`,
+  `TerminalOutcome` (Chrome profile ids may include spaces)
+- `spell_sync/diagnostics/technical_event_model.py` — `EventId`, `TechnicalEvent`, typed enums
+- `spell_sync/diagnostics/technical_event_builder.py` — canonical event construction helpers
+- `spell_sync/application/events.py` — `EventEmitter`, `operation_emitter`, `PresentedEvent`
+  (re-exports typed model from diagnostics)
 - `spell_sync/application/event_presenter.py` — `present_event`, fixed message catalog,
   contextual overrides for `target_id` and `reason_code`
 - `spell_sync/diagnostics/technical_event_log.py` — JSON Lines serialization
   (`schemaVersion: 1`), privacy field allowlist, `write_technical_event`,
   `parse_technical_log_line`, `format_log_line_for_display` for backward-compatible tail reading
-- Focused services (`sync`, `recovery`, `setup`, `target_settings`) and
-  `project_setup/execute.py`, `project_setup/target_settings.py` emit typed events with
-  `correlation_id` from preview/plan identifiers
+- `project_setup/execute.py`, `project_setup/target_settings.py` emit typed events with
+  `correlation_id` from preview/plan identifiers (imports diagnostics only, not application)
 - `DiagnosticsService.finalize_report` emits `diagnostics.history_write_failed` on history
   append failure; `SpellSyncService` emits `diagnostics.logging_setup_failed` when file logging
   cannot start
@@ -379,7 +380,9 @@ boundaries.
   free-form stage strings)
 - `safe_log.format_safe_log_record` bypasses sanitization for structured JSON lines;
   legacy plain-text lines remain redacted
-- `read_technical_log_tail` displays structured events via presenter-friendly summaries
+- Recovery terminal events on confirmation mismatch and successful discard
+  (`EventId.RECOVERY_DISCARDED`)
+- Malformed JSON-like log lines redacted in display (no sentinel leakage)
 - ADR `docs/decisions/0004-structured-technical-events.md`
 - `docs/PROJECT_MAP.md` and `tests/test-impact.toml` diagnostics/events cluster updated
 
