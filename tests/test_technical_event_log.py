@@ -267,7 +267,7 @@ def test_event_helpers_parse_none_and_unknown_push_reason() -> None:
 
 def test_correlation_rejects_whitespace_even_when_pattern_matches() -> None:
     with pytest.raises(ValueError):
-        CorrelationId.parse("plan\t123")
+        CorrelationId.parse("plan 123")
 
 
 def test_validate_structured_log_message_rejects_invalid_payload() -> None:
@@ -310,6 +310,40 @@ def test_enum_value_rejects_non_string_raw() -> None:
         _enum_value(EventId, 1, "eventId")
 
 
+def test_enum_value_rejects_unknown_member() -> None:
+    from spell_sync.diagnostics.technical_event_log import _enum_value
+
+    with pytest.raises(ValueError, match="invalid eventId"):
+        _enum_value(EventId, "not.a.real.event", "eventId")
+
+
+def test_validate_parsed_dict_rejects_invalid_total() -> None:
+    from spell_sync.diagnostics.technical_event_log import _validate_parsed_dict
+
+    payload = {
+        "schemaVersion": 1,
+        "timestamp": "2026-07-21T12:00:00Z",
+        "eventId": "push.completed",
+        "operation": "push",
+        "category": "lifecycle",
+        "severity": "success",
+        "total": -1,
+    }
+    with pytest.raises(ValueError, match="invalid total"):
+        _validate_parsed_dict(payload)
+
+
 def test_event_emitter_skips_presentation_when_sink_is_none() -> None:
     emitter = EventEmitter(presentation_sink=None, technical_sink=lambda _event: None)
     emitter.emit(_sample_event())
+
+
+def test_event_emitter_skips_technical_when_sink_is_none() -> None:
+    seen: list[str] = []
+
+    def presentation(event) -> None:
+        seen.append(event.event_id.value)
+
+    emitter = EventEmitter(presentation_sink=presentation, technical_sink=None)
+    emitter.emit(_sample_event())
+    assert seen == ["push.plan_verified"]

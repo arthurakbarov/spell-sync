@@ -47,6 +47,27 @@ def test_object_repr_with_secret() -> None:
     assert "super-secret" not in safe_repr(SecretBox())
 
 
+def test_format_safe_log_record_preserves_structured_event_line() -> None:
+    import logging
+
+    from spell_sync.diagnostics.safe_log import format_safe_log_record
+
+    record = logging.LogRecord(
+        name="spell_sync",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='{"eventId":"push.completed"}',
+        args=(),
+        exc_info=None,
+    )
+    record.structured_event = True
+    assert (
+        format_safe_log_record(record, "ignored prefix")
+        == "ignored prefix"
+    )
+
+
 def test_format_safe_log_record_strips_traceback_message(tmp_path: Path) -> None:
     reset_logging_for_tests()
     paths = resolve_app_state_paths(state_root=tmp_path / "state")

@@ -65,8 +65,6 @@ def _validate_correlation(value: str) -> None:
     lowered = value.lower()
     if any(token in lowered for token in _PRIVACY_DENY_SUBSTRINGS):
         raise ValueError("invalid correlation id")
-    if any(ch.isspace() for ch in value):
-        raise ValueError("invalid correlation id")
 
 
 def _validate_target_id(value: str) -> None:
