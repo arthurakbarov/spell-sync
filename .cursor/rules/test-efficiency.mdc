@@ -19,18 +19,25 @@ alwaysApply: true
 10. Do not use `pytest -x` as final cluster evidence.
 11. `--lf`, `--ff`, `-x` are diagnostic only; follow with the normal selected suite.
 12. Do not run packaging or wheel smoke in focused loops unless package boundaries changed.
-13. Commit tracked changes; verify clean tree before final full CI.
-14. Run full `scripts/ci.sh` exactly once on the committed HEAD.
-15. Verify `python3 scripts/check-ci-evidence.py` before workspace snapshot.
-16. On final CI failure, rerun only the failed check while fixing; commit fix; clean tree; one new full CI.
-17. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
+13. Commit tracked changes; verify clean tree before final validation.
+14. Assess necessity: `python3 scripts/check-ci-necessity.py --explain`.
+15. Run full `scripts/ci.sh` when necessity is `full-required` (once on committed HEAD).
+16. When necessity is `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py`.
+17. Verify `python3 scripts/check-ci-evidence.py` before workspace snapshot.
+18. On final CI failure, rerun only the failed check while fixing; commit fix; clean tree; reassess necessity.
+19. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
+
+Full CI evidence is bound to CI-relevant inputs (`ciInputDigest`), not merely to Git HEAD.
+Exact Git HEAD matching remains required for release, publication, and signed artifact workflows.
 
 ## Tools
 
 - Plan: `python3 scripts/test_plan.py`
 - Run: `python3 scripts/run_focused_tests.py`
+- Necessity: `python3 scripts/check-ci-necessity.py`
+- Lightweight: `python3 scripts/run_lightweight_validation.py`
 - Strategy: `docs/TESTING_STRATEGY.md`
-- Registry: `tests/test-impact.toml`
+- Registry: `tests/test-impact.toml`, `ci/ci-impact.toml`
 
 ## Reporting
 

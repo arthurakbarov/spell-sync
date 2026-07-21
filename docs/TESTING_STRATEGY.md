@@ -77,7 +77,27 @@ Full mode requires a clean committed working tree (`bootstrap.clean-tree`). Unco
 source changes fail before expensive checks. Diagnostic partial runs (`--only`, `--from`,
 `--resume-failed`) may run on a dirty tree but set `finalEvidence=false`.
 
-Final evidence requires committed clean HEAD verified by `python3 scripts/check-ci-evidence.py`.
+Final evidence requires committed clean CI-relevant state verified by
+`python3 scripts/check-ci-evidence.py`.
+
+Full CI evidence is bound to **CI-relevant inputs** (`ciInputDigest`), not merely to the Git
+commit identifier. A later non-CI commit may reuse successful full CI evidence only when the
+CI input digest is unchanged and current lightweight validation succeeds.
+
+Exact Git HEAD matching remains required for release, publication, and signed artifact
+workflows (`python3 scripts/check-ci-evidence.py --release`).
+
+Before final validation, assess necessity:
+
+```bash
+python3 scripts/check-ci-necessity.py --explain
+```
+
+| Result | Action |
+|--------|--------|
+| `full-required` | `scripts/ci.sh` then `python3 scripts/check-ci-evidence.py` |
+| `lightweight-sufficient` | `python3 scripts/run_lightweight_validation.py` then `python3 scripts/check-ci-evidence.py` |
+| `no-action` | Do not rerun full CI |
 
 ```bash
 scripts/ci.sh

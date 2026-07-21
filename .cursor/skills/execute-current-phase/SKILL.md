@@ -33,11 +33,12 @@ Read:
 - `git status --short` must be clean before starting a **new phase implementation**
 - run `python3 scripts/check-agent-config.py`
 - run `python3 scripts/check-docs-contract.py`
-- reuse existing full CI evidence when the tree is clean and `python3 scripts/check-ci-evidence.py`
-  succeeds (matching `gitHead` and `treeDigest`)
-- run baseline full CI only when evidence is missing, failed, stale, or the owner explicitly
-  requests it; otherwise use lightweight validators and phase-specific focused tests via
-  skill `select-and-run-tests`
+- reuse existing full CI evidence when the tree is clean and
+  `python3 scripts/check-ci-evidence.py` succeeds (matching `ciInputDigest`; exact HEAD
+  optional for non-CI commits)
+- run baseline full CI only when necessity is `full-required`, evidence is missing or
+  failed, or the owner explicitly requests it; otherwise use lightweight validators and
+  phase-specific focused tests via skill `select-and-run-tests`
 
 ## Step 3 — start phase
 
@@ -102,17 +103,29 @@ Create one logical local commit (or a short sequence if clearly separated). Do n
 
 `git status --short` must be clean in every affected repository before final CI.
 
-## Step 11 — final full CI
+## Step 11 — final validation
 
-Run full CI **once** on the committed HEAD:
+Assess necessity on the committed HEAD:
+
+```bash
+python3 scripts/check-ci-necessity.py --explain
+```
+
+When `CI_NECESSITY_RESULT=full-required`, run full CI **once**:
 
 ```bash
 scripts/ci.sh
 ```
 
-On failure: diagnose failed check; fix files; focused failed-check validation; new corrective
-commit; clean tree; one new full CI on the new HEAD. Do not leave uncommitted fixes before
-final CI.
+When `CI_NECESSITY_RESULT=lightweight-sufficient`:
+
+```bash
+python3 scripts/run_lightweight_validation.py
+```
+
+On failure after full CI: diagnose failed check; fix files; focused failed-check validation;
+new corrective commit; clean tree; reassess necessity. Do not leave uncommitted fixes before
+final validation.
 
 Read `CI_RESULT`, `CI_EXIT`, `CI_SUMMARY`, `CI_LOG`, and `CI_FAILED_ID` on failure.
 

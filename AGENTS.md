@@ -130,4 +130,9 @@ Modifying tasks finalize per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot b
 | Installed wheel | `tests/test_installed_workflow.py` |
 | Architecture | `tests/tui/test_architecture.py` |
 
-Prefer focused tests first, then full `scripts/ci.sh`.
+Prefer focused tests first, then assess CI necessity (`python3 scripts/check-ci-necessity.py`).
+
+Full CI evidence is bound to CI-relevant inputs, not merely to the Git commit identifier.
+A later non-CI commit may reuse successful full CI evidence only when the CI input digest is
+unchanged and current lightweight validation succeeds. Exact Git HEAD matching remains required
+for release, publication, and signed artifact workflows.

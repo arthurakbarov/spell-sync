@@ -26,29 +26,49 @@ description: >-
 
 1. During development use skill `select-and-run-tests` (Levels 0–2).
 2. Commit all tracked changes; verify clean working tree.
-3. On committed HEAD run full CI **once**:
+3. Assess necessity:
+
+```bash
+python3 scripts/check-ci-necessity.py --explain
+```
+
+4. When `CI_NECESSITY_RESULT=full-required`, run full CI **once** on committed HEAD:
 
 ```bash
 scripts/ci.sh
 ```
 
-4. Verify final evidence:
+5. When `CI_NECESSITY_RESULT=lightweight-sufficient`:
+
+```bash
+python3 scripts/run_lightweight_validation.py
+```
+
+6. Verify final evidence:
 
 ```bash
 python3 scripts/check-ci-evidence.py
 ```
 
-5. On failure, fix and rerun only the failed check:
+Expect `CI_EVIDENCE_MATCH=exact-head` or `CI_EVIDENCE_MATCH=reused-non-ci-change`.
+
+7. On failure, fix and rerun only the failed check:
 
 ```bash
 scripts/ci.sh --only ruff.format
 ```
 
-6. After the fix changes files, commit, verify clean tree, then run one new full CI.
+8. After the fix changes CI-relevant files, commit, verify clean tree, reassess necessity, then run one new full CI when required.
 
 Diagnostic modes (`--only`, `--from`, `--resume-failed`) do **not** count as final CI
 evidence. Only `mode=full` with `finalEvidence=true` and `CI_EVIDENCE_RESULT=success`
 count.
+
+Release, publication, and signed artifact workflows require exact-head evidence:
+
+```bash
+python3 scripts/check-ci-evidence.py --release
+```
 
 ## What ci.sh enforces
 
@@ -56,6 +76,8 @@ Via `scripts/ci_runner.py`:
 
 | Check ID | Gate |
 |----------|------|
+| `ci-impact.registry` | CI impact classification registry |
+| `test-impact.registry` | Test impact registry |
 | `bootstrap.python` | Python 3.11+ |
 | `deps.install` / `deps.editable` | Tooling + editable install |
 | `docs.style` | Markdown style |

@@ -34,10 +34,12 @@ Working tree should be clean before starting.
 8. Run `python3 scripts/run_pre_final_checks.py` before commits.
 9. Set phase status to `awaiting-approval`; create corrective local commit(s). Do not push.
 10. Verify clean working trees (`git status --short`).
-11. Run `scripts/ci.sh` **once** on the committed HEAD (final evidence).
-12. Verify `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
-13. On CI failure after commit: fix; focused failed-check validation; new corrective commit;
-    clean tree; new full CI. Do not amend if a new commit preserves evidence more clearly.
+11. Assess necessity: `python3 scripts/check-ci-necessity.py --explain`.
+12. When `full-required`, run `scripts/ci.sh` **once** on the committed HEAD (final evidence).
+13. When `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py`.
+14. Verify `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
+15. On CI failure after commit: fix; focused failed-check validation; new corrective commit;
+    clean tree; reassess necessity. Do not amend if a new commit preserves evidence more clearly.
 14. Leave current phase at `awaiting-approval`.
 15. Return a defect-by-defect report and stop.
 

@@ -50,13 +50,15 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 12. Final task state: `git stash list` must be empty in the public spell-sync repository.
     Do not hide unfinished work in persistent Git stash between phases; preserve separate WIP
     on a named local branch with a normal commit instead.
-13. Run full `scripts/ci.sh` **once** on the committed HEAD (final evidence).
-14. Verify final evidence: `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
-15. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; new full CI.
-16. Update every affected document, test, and contract in the same task (before step 10).
-17. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
-18. Re-verify `git status --short` and `python3 scripts/check-ci-evidence.py` after snapshot.
-19. Produce an evidence-based report (see **Final report contract** below).
+13. Assess final validation need on the committed HEAD: `python3 scripts/check-ci-necessity.py --explain`.
+14. Run full `scripts/ci.sh` **once** when necessity is `full-required` (final evidence on committed HEAD).
+15. When necessity is `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py` on committed HEAD.
+16. Verify final evidence: `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
+17. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; reassess necessity.
+18. Update every affected document, test, and contract in the same task (before step 10).
+19. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
+20. Re-verify `git status --short` and `python3 scripts/check-ci-evidence.py` after snapshot.
+21. Produce an evidence-based report (see **Final report contract** below).
 
 After successful final CI and evidence verification, do not modify tracked repository files
 (ignored CI artifacts, owner snapshot outside repositories, and read-only inspection only).
@@ -118,15 +120,30 @@ Do not ask the owner to diagnose failures or read raw logs.
 ## CI artifacts
 
 - Entry point: `scripts/ci.sh` (non-interactive).
-- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 3).
+- Necessity planner: `python3 scripts/check-ci-necessity.py`.
+- Lightweight validation: `python3 scripts/run_lightweight_validation.py`.
+- Evidence verifier: `python3 scripts/check-ci-evidence.py` (`--release` requires exact HEAD).
+- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 4).
+- Lightweight receipt: `.artifacts/lightweight-validation/current.json`.
 - Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed run pairs).
 - Final stdout block prints `CI_RESULT`, `CI_EXIT`, optional `CI_FAILED_ID`, `CI_SUMMARY`, `CI_LOG`.
 
-Schema v3 adds `mode`, `finalEvidence`, `treeDigest`, `gitHead`, `gitBranch`, `gitDetached`,
-`treeDigestBefore`, `treeDigestAfter`, `treeStable`, and `historyAtCompletion`. Only
-`mode=full` with `finalEvidence=true`, matching `gitHead` and `treeDigest`, and
-`CI_EVIDENCE_RESULT=success` from `scripts/check-ci-evidence.py` counts as final CI
-evidence. Diagnostic runs (`--only`, `--from`, `--resume-failed`) do not.
+Schema version 4 adds `gitHeadAtRun`, `repositoryTreeDigest`, `ciInputDigest`, `ciInputDigestBefore`,
+`ciInputDigestAfter`, `ciInputStable`, `ciImpactSchemaVersion`, `evidenceScope`,
+`reusableAcrossNonCiCommits`, and `changeClassesAtRun` alongside schema v3 fields (`schemaVersion`,
+`runId`, `mode`, `finalEvidence`, `treeDigest`, `treeDigestBefore`, `treeDigestAfter`, `treeStable`,
+`gitHead`, `gitBranch`, `gitDetached`, `historyAtCompletion`, `historyLogPath`, `historySummaryPath`,
+`failedCheckId`, `checks`, `logPath`).
+
+Full CI evidence is bound to CI-relevant inputs (`ciInputDigest`), not merely to the Git commit
+identifier. A later non-CI commit may reuse successful full CI evidence only when the CI input digest
+is unchanged and current lightweight validation succeeds (`CI_EVIDENCE_MATCH=reused-non-ci-change`).
+Exact Git HEAD matching remains required for release, publication, and signed artifact workflows
+(`CI_EVIDENCE_MATCH=exact-head` with `python3 scripts/check-ci-evidence.py --release`).
+
+Only `mode=full` with `finalEvidence=true`, matching `ciInputDigest`, and
+`CI_EVIDENCE_RESULT=success` from `scripts/check-ci-evidence.py` counts as final CI evidence.
+Diagnostic runs (`--only`, `--from`, `--resume-failed`) do not.
 
 Installed-wheel smoke runs outside the repository checkout so the local tree cannot shadow the
 installed package.
