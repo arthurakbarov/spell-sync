@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from ...diagnostics.history_builder import HistoryBuildContext, build_history_record
-from ...diagnostics.technical_logging import get_spell_sync_logger, read_technical_log_tail
+from ...diagnostics.technical_logging import read_technical_log_tail
 from ...diagnostics.types import HistoryClearResult, OperationHistorySnapshot, TechnicalLogSnapshot
 from ...project_setup.execute import ProjectSetupExecution
 from ...project_setup.target_settings import TargetSettingsExecution
@@ -18,7 +18,14 @@ from ..builders import (
     build_setup_operation_report,
     build_target_settings_operation_report,
 )
-from ..events import OperationKind
+from ..events import (
+    EventCategory,
+    EventId,
+    EventSeverity,
+    OperationKind,
+    TechnicalEvent,
+    operation_emitter,
+)
 from ..reports import (
     OperationOutcome,
     OperationReport,
@@ -93,13 +100,16 @@ class DiagnosticsService:
         write_result = self._ctx.history_store.append(record)
         if write_result.ok:
             return report
-        get_spell_sync_logger().warning(
-            "history append failed",
-            extra={
-                "reason_code": "history_append_failed",
-                "record_id": record.record_id,
-                "operation": report.operation,
-            },
+        operation_emitter(None).emit(
+            TechnicalEvent(
+                event_id=EventId.DIAGNOSTICS_HISTORY_WRITE_FAILED,
+                operation=OperationKind(report.operation),
+                category=EventCategory.DIAGNOSTIC,
+                severity=EventSeverity.WARNING,
+                correlation_id=record.record_id,
+                reason_code="history_append_failed",
+                outcome=report.outcome.value,
+            )
         )
         warnings = report.warnings + (HISTORY_SAVE_WARNING,)
         return replace(report, warnings=warnings)
