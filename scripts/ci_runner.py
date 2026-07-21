@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -23,6 +22,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.test_selection.tree_state import content_tree_digest  # noqa: E402
+
 ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
 SUMMARY_SCHEMA = 3
@@ -33,31 +37,35 @@ RunStep = Callable[..., tuple[int, str]]
 
 
 def _ci_tree_digest(root: Path) -> str:
-    head = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    status = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "status",
-            "--porcelain=v2",
-            "--untracked-files=all",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    payload = f"{head.stdout.strip()}\n{status.stdout}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return content_tree_digest(root)
+
+
+def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
+    attempts = failures = successes = 0
+    if not artifacts.is_dir():
+        return {"fullCiAttempts": 0, "fullCiFailures": 0, "fullCiSuccesses": 0}
+    for path in sorted(artifacts.glob("ci-summary-*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("mode") != "full":
+            continue
+        attempts += 1
+        if payload.get("result") == "success" and payload.get("exitCode") == 0:
+            successes += 1
+        else:
+            failures += 1
+    return {
+        "fullCiAttempts": attempts,
+        "fullCiFailures": failures,
+        "fullCiSuccesses": successes,
+    }
 
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     return [
+        ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
         ("docs.contract", [py, "scripts/check-docs-contract.py"]),
         ("agent.config", [py, "scripts/check-agent-config.py"]),
@@ -360,7 +368,8 @@ class CiRunner:
         self._wheel_smoke_root: Path | None = None
         self._mode = "full"
         self._final_evidence = True
-        self._tree_digest = ""
+        self._tree_digest_before = ""
+        self._tree_digest_after = ""
 
     def _bind_run_artifacts(self) -> RunArtifacts:
         run_id = _unique_run_id(self.artifacts, self.now())
@@ -436,7 +445,29 @@ class CiRunner:
     def finish(self, exit_code: int) -> int:
         failed = sum(1 for c in self.checks if c["status"] == "failed")
         failed_id = next((str(c["id"]) for c in self.checks if c["status"] == "failed"), "")
+        self._tree_digest_after = _ci_tree_digest(self.root)
+        tree_stable = self._tree_digest_before == self._tree_digest_after
+        if self._mode == "full" and not tree_stable and exit_code == 0:
+            exit_code = 1
+            failed = max(failed, 1)
+            failed_id = "ci.tree-changed"
+            self._final_evidence = False
+            self.checks.append(
+                {
+                    "id": "ci.tree-changed",
+                    "status": "failed",
+                    "exitCode": 1,
+                    "summary": "source/test/config tree changed during CI",
+                }
+            )
         completed = self.now().isoformat()
+        history = _full_ci_history_counts(self.artifacts)
+        if self._mode == "full":
+            history = {
+                "fullCiAttempts": history["fullCiAttempts"] + 1,
+                "fullCiFailures": history["fullCiFailures"] + (0 if exit_code == 0 else 1),
+                "fullCiSuccesses": history["fullCiSuccesses"] + (1 if exit_code == 0 else 0),
+            }
         payload = {
             "schemaVersion": SUMMARY_SCHEMA,
             "runId": self.run_id,
@@ -446,7 +477,13 @@ class CiRunner:
             "completedAt": completed,
             "mode": self._mode,
             "finalEvidence": self._final_evidence,
-            "treeDigest": self._tree_digest,
+            "treeDigest": self._tree_digest_after,
+            "treeDigestBefore": self._tree_digest_before,
+            "treeDigestAfter": self._tree_digest_after,
+            "treeStable": tree_stable,
+            "fullCiAttempts": history["fullCiAttempts"],
+            "fullCiFailures": history["fullCiFailures"],
+            "fullCiSuccesses": history["fullCiSuccesses"],
             "checks": self.checks,
             "logPath": str(self._log_path),
             "historyLogPath": str(self._history_log_path),
@@ -611,7 +648,7 @@ print(importlib.metadata.version("spell-sync"))
             resume_failed=resume_failed is not None,
         )
         self._final_evidence = self._mode == "full"
-        self._tree_digest = _ci_tree_digest(self.root)
+        self._tree_digest_before = _ci_tree_digest(self.root)
 
         try:
             self.started_at = self.now().isoformat()
