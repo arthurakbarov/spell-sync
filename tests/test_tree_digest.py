@@ -64,6 +64,16 @@ def test_staged_content_a_to_b_changes_digest(tmp_path: Path) -> None:
     assert digest_a != digest_b
 
 
+def test_untracked_newline_filename_content_a_to_b_changes_digest(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    newline_path = repo / "bad\nname.txt"
+    newline_path.write_text("A\n", encoding="utf-8")
+    digest_a = tree_digest(repo)
+    newline_path.write_text("B\n", encoding="utf-8")
+    digest_b = tree_digest(repo)
+    assert digest_a != digest_b
+
+
 def test_untracked_content_a_to_b_changes_digest(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     untracked = repo / "new.txt"

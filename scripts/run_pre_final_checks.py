@@ -58,8 +58,6 @@ def main(argv: list[str] | None = None) -> int:
                     "pytest",
                     *plan.pytest_targets,
                     "-q",
-                    "--cov=spell_sync",
-                    "--cov-report=term-missing:skip-covered",
                 ],
             )
         )

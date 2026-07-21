@@ -54,6 +54,7 @@ clusterTests = [
   "tests/test_explicit_runtime.py",
   "tests/test_runtime_helpers.py",
   "tests/test_application_service.py",
+  "tests/test_application_services.py",
 ]
 validators = []
 
@@ -95,6 +96,8 @@ production = [
   "spell_sync/push_*.py",
   "spell_sync/push_setup.py",
   "spell_sync/application/service.py",
+  "spell_sync/application/services/*.py",
+  "spell_sync/application/_operation_deps.py",
   "spell_sync/io.py",
   "spell_sync/app_process_check.py",
   "spell_sync/runtime_identity.py",
@@ -152,6 +155,8 @@ validators = []
 production = [
   "spell_sync/tui/",
   "spell_sync/application/service.py",
+  "spell_sync/application/services/*.py",
+  "spell_sync/application/_operation_deps.py",
 ]
 moduleTests = [
   "tests/tui/test_review_workflow.py",

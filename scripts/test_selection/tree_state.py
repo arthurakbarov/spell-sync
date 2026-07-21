@@ -156,12 +156,17 @@ def _hash_path_entry(hasher: hashlib._Hash, rel: str, path: Path) -> None:
 
 
 def _untracked_paths(root: Path) -> list[str]:
-    output = _run_git(root, "ls-files", "-o", "--exclude-standard").decode(
-        "utf-8",
-        errors="replace",
-    )
-    paths = [line.strip() for line in output.splitlines() if line.strip()]
-    return sorted(path for path in paths if not is_digest_excluded(path))
+    output = _run_git(root, "ls-files", "-o", "--exclude-standard", "-z")
+    if not output:
+        return []
+    paths: list[str] = []
+    for entry in output.split(b"\0"):
+        if not entry:
+            continue
+        rel = entry.decode("utf-8", errors="replace")
+        if rel and not is_digest_excluded(rel):
+            paths.append(rel)
+    return sorted(paths)
 
 
 def content_tree_digest(root: Path) -> str:

@@ -248,11 +248,11 @@ class TestRemainingCoverage(unittest.TestCase):
         service = SpellSyncService()
         preview = sample_recovery_preview(status=RecoveryStatus.RECOVERABLE)
         with patch(
-            "spell_sync.application.service.recover_from_journal",
+            "spell_sync.application._operation_deps.recover_from_journal",
             return_value=RecoverResult(("wordlist",), (), ()),
         ):
             with patch(
-                "spell_sync.application.service.cleanup_after_successful_recovery",
+                "spell_sync.application._operation_deps.cleanup_after_successful_recovery",
                 return_value=DiscardArtifactsResult(False, False, "cleanup failed"),
             ):
                 with patch(
@@ -287,7 +287,7 @@ class TestRemainingCoverage(unittest.TestCase):
             )
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.safe_discard_journal_file",
+                "spell_sync.application._operation_deps.safe_discard_journal_file",
                 return_value=(False, "nope"),
             ):
                 execution = service.execute_recovery_discard(
@@ -470,7 +470,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 )
                 scope.return_value.__exit__.return_value = False
                 with patch(
-                    "spell_sync.application.service.discard_completed_journal",
+                    "spell_sync.application._operation_deps.discard_completed_journal",
                     return_value=DiscardArtifactsResult(False, False, "failed"),
                 ):
                     execution = service.execute_recovery_cleanup(

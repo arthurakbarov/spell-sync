@@ -10,7 +10,7 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 4: focused application services and thin facade — **not started**. Phase 3
+Phase 4: focused application services and thin facade — **awaiting approval**. Phase 3
 (explicit runtime, runtime identity safety, commit-bound final CI evidence) is
 **complete** and owner-approved.
 
@@ -23,7 +23,7 @@ phase-2c: complete
 phase-2d: complete
 phase-2e: complete
 phase-3: complete
-phase-4: not-started
+phase-4: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
@@ -99,22 +99,21 @@ compatibility alias only where legacy naming persists in tests or docs migration
 
 ## Service responsibility inventory
 
-### SpellSyncService (~1284 lines)
+### SpellSyncService (thin facade)
 
-Inspection: status, status_detail, dashboard, push_preview, doctor.
+Delegates to focused services under `spell_sync/application/services/`:
 
-Synchronization: prepare/execute pull, prepare/execute push, run_push, push execution
-helpers, reports.
+| Service | Responsibility |
+|---------|----------------|
+| `DiagnosticsService` | History, technical log, support report, report finalization |
+| `InspectionService` | Status, dashboard, doctor |
+| `SyncService` | Pull/Push preview and execution |
+| `RecoveryService` | Recovery preview and execution |
+| `SetupService` | Project setup / init |
+| `TargetSettingsService` | Target settings load and update |
 
-Recovery: inspect, execute, cleanup, discard.
-
-Setup: inspect, discover, prepare, execute, validate wordlist, reports.
-
-Target settings: load, prepare update, execute update, report.
-
-Diagnostics: history, technical log tail, support report delegation.
-
-Internal: `_finalize_report`, event emit helper.
+Facade wiring: `ApplicationContext` shares `RuntimeResolver`, history store, and state paths.
+See `docs/PROJECT_MAP.md` and ADR `docs/decisions/0003-focused-application-services.md`.
 
 ### builders.py (~1183 lines)
 
@@ -206,19 +205,22 @@ and commit-bound final CI evidence.
 
 ## Phase 4 — Focused application services and thin facade
 
-### Preflight maintenance
+### Preflight maintenance (complete)
 
-Two narrow fixes are **required before** service decomposition begins (documented here;
-not part of Phase 3 close-out):
+1. **NUL-safe untracked digest** — `_untracked_paths()` uses `git ls-files -z`; regression
+   test in `tests/test_tree_digest.py`.
+2. **Snapshot Git timeout** — spell-sync-dev `_git_command()` uses
+   `GIT_SUBPROCESS_TIMEOUT_SECONDS`.
 
-1. **NUL-safe untracked digest** — In `scripts/test_selection/tree_state.py`, `_untracked_paths()`
-   must use `git ls-files -o --exclude-standard -z` with NUL parsing. Add regression test:
-   untracked filename contains newline; content changes A → B; tree digest changes. Do not
-   use line-based Git path parsing.
+## Phase 4 — Focused application services and thin facade (awaiting approval)
 
-2. **Snapshot Git timeout** — In spell-sync-dev `scripts/create-code-snapshot.py`, production
-   `_git_command()` must use a controlled subprocess timeout and stable snapshot failure
-   (not timeout only in test helpers).
+### Delivered
+
+- `spell_sync/application/services/` package with six focused services + shared context
+- Thin `SpellSyncService` facade (delegation only)
+- ADR `docs/decisions/0003-focused-application-services.md`
+- `docs/PROJECT_MAP.md`
+- Architecture tests in `tests/test_application_services.py`
 
 ### Goal
 

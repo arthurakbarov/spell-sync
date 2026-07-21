@@ -137,7 +137,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.recover_from_journal",
+                "spell_sync.application._operation_deps.recover_from_journal",
                 return_value=conflict_result,
             ):
                 conflict = service.execute_recovery(
@@ -148,7 +148,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             self.assertEqual(conflict.outcome, RecoveryOutcome.CONFLICTED)
 
             with patch(
-                "spell_sync.application.service.recover_from_journal",
+                "spell_sync.application._operation_deps.recover_from_journal",
                 return_value=incomplete_result,
             ):
                 incomplete = service.execute_recovery(
@@ -176,10 +176,12 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.recover_from_journal",
+                "spell_sync.application._operation_deps.recover_from_journal",
                 return_value=result,
             ):
-                with patch("spell_sync.application.service.cleanup_after_successful_recovery"):
+                with patch(
+                    "spell_sync.application._operation_deps.cleanup_after_successful_recovery"
+                ):
                     events: list = []
                     execution = service.execute_recovery(
                         RecoveryRequest(project=ProjectRef()),
@@ -229,7 +231,9 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             ) as mutating:
                 mutating.return_value.__enter__.return_value = scope
                 mutating.return_value.__exit__.return_value = False
-                with patch("spell_sync.application.service.discard_completed_journal") as discard:
+                with patch(
+                    "spell_sync.application._operation_deps.discard_completed_journal"
+                ) as discard:
                     discard.return_value = DiscardArtifactsResult(True, True, None)
                     cleaned = service.execute_recovery_cleanup(
                         RecoveryRequest(project=ProjectRef(wordlist=wordlist)),
@@ -250,7 +254,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             mutating.return_value.__enter__.return_value = _recovery_scope(Path("/tmp/w.txt"))
             mutating.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.safe_discard_journal_file",
+                "spell_sync.application._operation_deps.safe_discard_journal_file",
                 return_value=(True, None),
             ) as discard:
                 discarded = service.execute_recovery_discard(

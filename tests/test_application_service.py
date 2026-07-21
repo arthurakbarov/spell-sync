@@ -116,7 +116,9 @@ class TestSpellSyncService(unittest.TestCase):
 
         events: list[OperationEvent] = []
 
-        with patch("spell_sync.application.service.plan_fingerprint_conflict", return_value=None):
+        with patch(
+            "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
+        ):
             service._prepare_push_for_run(run, event_sink=events.append)
             service._execute_push_for_run(run, prepared, dry_run=False, event_sink=events.append)
 
@@ -132,7 +134,9 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
         run.push_from_wordlist.return_value = PushResult(word_count=1, written=("demo",))
 
-        with patch("spell_sync.application.service.plan_fingerprint_conflict", return_value=None):
+        with patch(
+            "spell_sync.application._operation_deps.plan_fingerprint_conflict", return_value=None
+        ):
             result = service._execute_push_for_run(run, prepared, dry_run=False)
 
         run.prepare_push_operation.assert_not_called()
@@ -145,7 +149,7 @@ class TestSpellSyncService(unittest.TestCase):
         run = MagicMock()
 
         with patch(
-            "spell_sync.application.service.plan_fingerprint_conflict",
+            "spell_sync.application._operation_deps.plan_fingerprint_conflict",
             return_value="cursor",
         ):
             result = service._execute_push_for_run(run, prepared, dry_run=False)
@@ -241,10 +245,12 @@ class TestSpellSyncService(unittest.TestCase):
                 return_value=validated,
             ):
                 with patch(
-                    "spell_sync.application.service.read_active_operation_lock",
+                    "spell_sync.application._operation_deps.read_active_operation_lock",
                     return_value=None,
                 ):
-                    with patch.object(service, "load_status", return_value=snapshot) as load_status:
+                    with patch.object(
+                        service._inspection, "load_status", return_value=snapshot
+                    ) as load_status:
                         state = service.load_dashboard(_status("/tmp/w.txt"))
 
         load_status.assert_called_once()
@@ -292,12 +298,12 @@ class TestSpellSyncService(unittest.TestCase):
                 return_value=validated,
             ):
                 with patch(
-                    "spell_sync.application.service.read_active_operation_lock",
+                    "spell_sync.application._operation_deps.read_active_operation_lock",
                     return_value=None,
                 ):
-                    with patch.object(service, "load_status", return_value=snapshot):
+                    with patch.object(service._inspection, "load_status", return_value=snapshot):
                         with patch.object(
-                            service,
+                            service._diagnostics,
                             "load_operation_history",
                             return_value=OperationHistorySnapshot(records=(record,)),
                         ):
@@ -319,7 +325,7 @@ class TestSpellSyncService(unittest.TestCase):
         run.check_wordlist.return_value = None
 
         with patch.object(RuntimeResolver, "sync_run", return_value=run):
-            with patch.object(service, "_prepare_push_for_run", return_value=prepared):
+            with patch.object(service._sync, "_prepare_push_for_run", return_value=prepared):
                 preview = service.load_push_preview(_push())
 
         self.assertIs(preview.prepared, prepared)
@@ -344,7 +350,9 @@ class TestSpellSyncService(unittest.TestCase):
         run.check_wordlist.return_value = None
 
         with patch.object(RuntimeResolver, "sync_run", return_value=run):
-            with patch.object(service, "_prepare_push_for_run", return_value=ExitCode.PUSH_ABORT):
+            with patch.object(
+                service._sync, "_prepare_push_for_run", return_value=ExitCode.PUSH_ABORT
+            ):
                 preview = service.load_push_preview(_push())
 
         self.assertEqual(preview.prepare_error, ExitCode.PUSH_ABORT)
@@ -357,7 +365,7 @@ class TestSpellSyncService(unittest.TestCase):
 
         with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch(
-                "spell_sync.application.service.build_status_detail_snapshot",
+                "spell_sync.application._operation_deps.build_status_detail_snapshot",
                 return_value=detail,
             ) as builder:
                 result = service.load_status_detail(_status())
@@ -371,9 +379,11 @@ class TestSpellSyncService(unittest.TestCase):
         snapshot = MagicMock()
 
         with patch.object(RuntimeResolver, "sync_run", return_value=MagicMock()):
-            with patch("spell_sync.application.service.build_doctor_report", return_value=report):
+            with patch(
+                "spell_sync.application._operation_deps.build_doctor_report", return_value=report
+            ):
                 with patch(
-                    "spell_sync.application.service.build_doctor_snapshot",
+                    "spell_sync.application._operation_deps.build_doctor_snapshot",
                     return_value=snapshot,
                 ) as builder:
                     result = service.load_doctor(_doctor())
@@ -398,7 +408,7 @@ class TestSpellSyncService(unittest.TestCase):
         push_result = PushResult(word_count=1, written=("demo",))
 
         with patch.object(
-            service, "_execute_push_for_run", return_value=push_result
+            service._sync, "_execute_push_for_run", return_value=push_result
         ) as execute_push:
             execution = service._run_push_for_run(
                 run,
@@ -419,7 +429,7 @@ class TestSpellSyncService(unittest.TestCase):
         preview = MagicMock(spec=PullPreview)
         with patch.object(RuntimeResolver, "sync_run", return_value=run):
             with patch(
-                "spell_sync.application.service.build_pull_preview",
+                "spell_sync.application._operation_deps.build_pull_preview",
                 return_value=preview,
             ) as builder:
                 result = service.prepare_pull(_pull())
@@ -450,7 +460,7 @@ class TestSpellSyncService(unittest.TestCase):
         events: list = []
         with _patch_mutation_scope(_pull_scope()):
             with patch(
-                "spell_sync.application.service.file_content_hash",
+                "spell_sync.application._operation_deps.file_content_hash",
                 return_value="abc",
             ):
                 with patch.object(
@@ -493,7 +503,7 @@ class TestSpellSyncService(unittest.TestCase):
         )
         with _patch_mutation_scope(_push_scope(prepared.runtime_identity)):
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value="chrome",
             ):
                 conflict = service.execute_push_preview(
@@ -506,11 +516,11 @@ class TestSpellSyncService(unittest.TestCase):
 
         with _patch_mutation_scope(_push_scope(prepared.runtime_identity)):
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value=None,
             ):
                 with patch(
-                    "spell_sync.application.service.execute_prepared_push",
+                    "spell_sync.application._operation_deps.execute_prepared_push",
                     return_value=PushResult(word_count=1, written=("demo",)),
                 ):
                     ok = service.execute_push_preview(
@@ -640,7 +650,9 @@ class TestServiceFacadePaths(unittest.TestCase):
         self.assertEqual(locked.result, ExitCode.PUSH_ABORT)
 
         run = MagicMock()
-        with patch.object(service, "_execute_push_for_run", return_value=PushResult(1, ("a",), ())):
+        with patch.object(
+            service._sync, "_execute_push_for_run", return_value=PushResult(1, ("a",), ())
+        ):
             execution = service._run_push_for_run(run, prepared, dry_run=True)
         self.assertEqual(execution.result.word_count, 1)
 
@@ -695,7 +707,7 @@ class TestServiceFacadePaths(unittest.TestCase):
         )
         with (
             patch.object(RuntimeResolver, "sync_run", return_value=run),
-            patch.object(service, "load_push_preview", return_value=blocked),
+            patch.object(service._sync, "load_push_preview", return_value=blocked),
         ):
             preview, diffs, result = service.load_push_plan(_push("/tmp/w.txt"))
         self.assertEqual(result, ExitCode.PUSH_ABORT)

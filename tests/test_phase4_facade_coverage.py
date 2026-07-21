@@ -216,7 +216,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
                 return_value=ExitCode.PUSH_ABORT,
             ):
                 with patch(
-                    "spell_sync.application.service.file_content_hash",
+                    "spell_sync.application._operation_deps.file_content_hash",
                     return_value="changed",
                 ):
                     conflict = service.execute_pull(
@@ -230,7 +230,7 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             scope.return_value.__enter__.return_value = _pull_scope()
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.file_content_hash",
+                "spell_sync.application._operation_deps.file_content_hash",
                 return_value="abc",
             ):
                 with patch.object(
@@ -321,15 +321,15 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value=None,
             ):
                 with patch(
-                    "spell_sync.application.service.execute_prepared_push",
+                    "spell_sync.application._operation_deps.execute_prepared_push",
                     return_value=abort,
                 ):
                     with patch(
-                        "spell_sync.application.service.load_journal_result",
+                        "spell_sync.application._operation_deps.load_journal_result",
                     ) as journal:
                         journal.return_value.status = JournalLoadStatus.ABSENT
                         stopped = service.execute_push_preview(
@@ -350,11 +350,11 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value=None,
             ):
                 with patch(
-                    "spell_sync.application.service.execute_prepared_push",
+                    "spell_sync.application._operation_deps.execute_prepared_push",
                     return_value=recovery_abort,
                 ):
                     recovering = service.execute_push_preview(
@@ -370,15 +370,15 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value=None,
             ):
                 with patch(
-                    "spell_sync.application.service.execute_prepared_push",
+                    "spell_sync.application._operation_deps.execute_prepared_push",
                     return_value=ExitCode.PUSH_ABORT,
                 ):
                     with patch(
-                        "spell_sync.application.service.load_journal_result",
+                        "spell_sync.application._operation_deps.load_journal_result",
                     ) as journal:
                         journal.return_value.status = JournalLoadStatus.VALID_IN_PROGRESS
                         exit_recovery = service.execute_push_preview(
@@ -400,11 +400,11 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             scope.return_value.__enter__.return_value = scope_runtime
             scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.plan_fingerprint_conflict",
+                "spell_sync.application._operation_deps.plan_fingerprint_conflict",
                 return_value=None,
             ):
                 with patch(
-                    "spell_sync.application.service.execute_prepared_push",
+                    "spell_sync.application._operation_deps.execute_prepared_push",
                     return_value=skipped,
                 ):
                     warn = service.execute_push_preview(
@@ -442,14 +442,14 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
         prepared = MagicMock(spec=PreparedPush)
         run = MagicMock()
         with patch.object(
-            service,
+            service._sync,
             "_execute_push_for_run",
             return_value=ExitCode.PUSH_ABORT,
         ):
             failed = service._run_push_for_run(run, prepared, dry_run=False)
         self.assertEqual(failed.outcome, OperationOutcome.FAILED)
         with patch.object(
-            service,
+            service._sync,
             "_execute_push_for_run",
             return_value=PushResult(word_count=1, written=("a",), skipped=("b",)),
         ):

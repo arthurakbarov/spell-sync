@@ -1,0 +1,16 @@
+"""Shared application service dependencies."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from ...diagnostics.history_store import OperationHistoryStore
+from ...diagnostics.paths import AppStatePaths
+from ..runtime_resolver import RuntimeResolver
+
+
+@dataclass(slots=True)
+class ApplicationContext:
+    runtime: RuntimeResolver
+    history_store: OperationHistoryStore
+    state_paths: AppStatePaths

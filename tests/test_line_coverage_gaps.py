@@ -164,10 +164,12 @@ class TestLineCoverageGaps(unittest.TestCase):
             mutating.return_value.__enter__.return_value = scope
             mutating.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.service.recover_from_journal",
+                "spell_sync.application._operation_deps.recover_from_journal",
                 return_value=RecoverResult(restored=("wordlist",), skipped=(), failed=()),
             ):
-                with patch("spell_sync.application.service.cleanup_after_successful_recovery"):
+                with patch(
+                    "spell_sync.application._operation_deps.cleanup_after_successful_recovery"
+                ):
                     executed = service.execute_recovery(
                         RecoveryRequest(project=ProjectRef()),
                         preview,
@@ -244,7 +246,7 @@ class TestLineCoverageGaps(unittest.TestCase):
         ) as mutating:
             mutating.return_value.__enter__.return_value = MagicMock()
             mutating.return_value.__exit__.return_value = False
-            with patch("spell_sync.application.service.discard_completed_journal"):
+            with patch("spell_sync.application._operation_deps.discard_completed_journal"):
                 discarded = service.execute_recovery_discard(
                     RecoveryRequest(project=ProjectRef()),
                     discard_preview,
