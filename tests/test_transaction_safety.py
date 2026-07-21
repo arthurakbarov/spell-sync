@@ -565,14 +565,14 @@ class TestCoverage101(unittest.TestCase):
             self.assertEqual(dictionary_read_result(dictionary).status, ReadStatus.CORRUPT)
 
     def test_invalid_config_json_exit(self):
+        from spell_sync.application.runtime_resolver import RuntimeResolver
         from spell_sync.mutation_guards import invalid_config_exit_from_scope
-        from spell_sync.resolved_runtime import build_resolved_runtime
 
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             (wordlist.parent / "spell-sync.toml").write_text("[bad\n", encoding="utf-8")
-            resolved = build_resolved_runtime(wordlist)
+            resolved = RuntimeResolver().resolve_read(wordlist)
             buf = __import__("io").StringIO()
             with __import__("contextlib").redirect_stdout(buf):
                 code = invalid_config_exit_from_scope(

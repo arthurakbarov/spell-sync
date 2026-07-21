@@ -71,3 +71,7 @@ description: >-
 - Discovery paths
 - Pull/Push/subset semantics
 - Tests and docs updated
+
+## Finalize workspace snapshot
+
+Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

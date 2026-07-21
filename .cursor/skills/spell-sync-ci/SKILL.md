@@ -3,14 +3,14 @@ name: spell-sync-ci
 description: >-
   Run and fix spell-sync CI for a changed scope. Use when implementing features,
   fixing test failures, or verifying work before commit. Starts with
-  select-and-run-tests, then one final full scripts/ci.sh.
+  select-and-run-tests, then one final full scripts/ci.sh on committed HEAD.
 ---
 
 # spell-sync CI
 
 ## When to use
 
-- Before declaring a modifying task complete (final full CI once)
+- Before declaring a modifying task complete (final full CI once on committed HEAD)
 - When CI or coverage failures need diagnosis and fix
 - To rerun a **single failed gate** during fix loops
 
@@ -20,26 +20,35 @@ description: >-
 - To add meaningless tests solely to hit coverage lines
 - To run full CI on every tiny edit
 - To repeat full CI without file changes after a failure
+- Before local commits on a modifying task (final CI binds to committed HEAD)
 
 ## Workflow
 
 1. During development use skill `select-and-run-tests` (Levels 0–2).
-2. On final stable tree run full CI **once**:
+2. Commit all tracked changes; verify clean working tree.
+3. On committed HEAD run full CI **once**:
 
 ```bash
 scripts/ci.sh
 ```
 
-3. On failure, fix and rerun only the failed check:
+4. Verify final evidence:
+
+```bash
+python3 scripts/check-ci-evidence.py
+```
+
+5. On failure, fix and rerun only the failed check:
 
 ```bash
 scripts/ci.sh --only ruff.format
 ```
 
-4. After the fix changes files, run one new full CI — not before.
+6. After the fix changes files, commit, verify clean tree, then run one new full CI.
 
 Diagnostic modes (`--only`, `--from`, `--resume-failed`) do **not** count as final CI
-evidence. Only `mode=full` with `finalEvidence=true` in `CI_SUMMARY` counts.
+evidence. Only `mode=full` with `finalEvidence=true` and `CI_EVIDENCE_RESULT=success`
+count.
 
 ## What ci.sh enforces
 
@@ -77,22 +86,22 @@ List check ids: `scripts/ci.sh --list-checks`
 
 ## Stop conditions
 
-- Stop when final `scripts/ci.sh` exits **0** with `finalEvidence=true`
+- Stop when final `scripts/ci.sh` exits **0** with `finalEvidence=true` and
+  `python3 scripts/check-ci-evidence.py` reports `CI_EVIDENCE_RESULT=success`
 - Stop and report if a failure requires an architectural decision
 - Do not mask failures or weaken coverage gates
+- After successful final evidence, do not modify tracked repository files
 
 ## Final report
 
 - Focused commands from `select-and-run-tests` (including skipped duplicates)
-- Full CI runs attempted (expected: 1) and reason for any extra run
-- `CI_SUMMARY` and `CI_LOG` paths
+- Full CI runs attempted and reason for any extra run
+- `CI_SUMMARY`, `CI_LOG`, and `CI_EVIDENCE_*` paths/values
 - `CI_FAILED_ID` when CI failed
 
 ## Finalize workspace snapshot
 
-Before the final user report on modifying tasks:
-
-1. Remove stale non-canonical archives (script default cleanup).
-2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
-3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
-4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.
+Modifying tasks only — after `python3 scripts/check-ci-evidence.py` success: skill
+`create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; re-verify evidence;
+canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT:
+`docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

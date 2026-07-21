@@ -68,10 +68,11 @@ class TestResolveWordlistPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             custom = os.path.join(d, "words.txt")
             Path(custom).write_text("a\n", encoding="utf-8")
-            from spell_sync.resolved_runtime import build_resolved_runtime
+            from spell_sync.application.requests import ProjectRef
+            from spell_sync.application.runtime_resolver import RuntimeResolver
             from spell_sync.sync_run import sync_run_for
 
-            resolved = build_resolved_runtime(Path(custom))
+            resolved = RuntimeResolver().resolve_read(ProjectRef(wordlist=Path(custom)))
             run = sync_run_for(resolved)
             self.assertEqual(str(run.wordlist_file), custom)
 

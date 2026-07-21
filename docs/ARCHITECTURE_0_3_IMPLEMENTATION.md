@@ -8,6 +8,23 @@ documentation, and architecture validation guards.
 
 Remove obsolete private maintainer export workflow (completed in spell-sync-dev).
 
+## Current phase
+
+Phase 3: explicit runtime — content-addressed validation, test selection infrastructure,
+private runtime construction, and commit-bound final CI evidence.
+
+[architecture-status:start]
+current: phase-3
+phase-1: complete
+phase-2: complete
+phase-2b: complete
+phase-2c: complete
+phase-2d: complete
+phase-2e: complete
+phase-3: awaiting-approval
+phase-4: not-started
+[architecture-status:end]
+
 ## Verified baseline
 
 | Repository | HEAD | Clean |
@@ -109,23 +126,6 @@ blocking, and privacy rules.
 7. Documentation reorganization + ADRs
 8. Agent config refresh
 9. Version 0.3.0
-
-## Current phase
-
-Phase 3 implementation complete — awaiting owner approval.
-
-[architecture-status:start]
-current: phase-3
-phase-1: complete
-phase-2: complete
-phase-2b: complete
-phase-2c: complete
-phase-2d: complete
-phase-2e: complete
-phase-3: awaiting-approval
-phase-4: not-started
-phase-5: not-started
-[architecture-status:end]
 
 ## Phase 3 — Explicit runtime
 

@@ -10,11 +10,13 @@ alwaysApply: true
 3. Use applicable `.cursor/skills/**` (`execute-current-phase`, `spell-sync-ci`, etc.).
 4. Implement **only** the current architecture phase.
 5. Run focused pytest before full `scripts/ci.sh`.
+6. Commit tracked changes and verify clean trees before final full CI.
+7. Verify `python3 scripts/check-ci-evidence.py` after final CI; snapshot only after evidence success.
 6. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.
 7. Update tests, docs, contracts, and ADRs together with code changes.
 8. Do not claim pass without command evidence.
 9. Capture baseline Git state for all three workspace repositories at task start.
-10. Before the final user report on modifying tasks, always create `$HOME/code.zip` via skill `create-code-snapshot` (`--force`, then `--check`).
+10. On modifying tasks: finalize workspace snapshot per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot, then report.
 11. Do not advance to the next phase without owner approval (`advance-current-phase`).
 12. Do not push, tag, release, or publish without explicit owner request.
 

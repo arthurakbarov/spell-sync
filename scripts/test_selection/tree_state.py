@@ -72,6 +72,36 @@ def git_branch(root: Path) -> str:
     return f"detached:{head[:12]}"
 
 
+def git_detached(root: Path) -> bool:
+    return not _run_git(root, "symbolic-ref", "--quiet", "HEAD").strip()
+
+
+def _status_paths(root: Path) -> list[str]:
+    output = _run_git(root, "status", "--porcelain=v2", "--untracked-files=all").decode(
+        "utf-8",
+        errors="replace",
+    )
+    paths: list[str] = []
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        paths.append(parts[1].strip())
+    return paths
+
+
+def is_working_tree_clean(root: Path) -> bool:
+    """True when no tracked or untracked source changes remain outside digest exclusions."""
+    for rel in _status_paths(root):
+        normalized = normalize_rel(rel)
+        if is_digest_excluded(normalized):
+            continue
+        return False
+    return True
+
+
 def _hash_path_entry(hasher: hashlib._Hash, rel: str, path: Path) -> None:
     hasher.update(rel.encode("utf-8"))
     hasher.update(b"\0")

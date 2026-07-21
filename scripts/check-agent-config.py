@@ -90,6 +90,8 @@ MODIFYING_SKILLS = (
     "architecture-refactor",
     "release-candidate",
     "spell-sync-ci",
+    "add-target",
+    "tui-flow",
 )
 
 FOCUSED_TEST_SKILL = "select-and-run-tests"
@@ -121,6 +123,23 @@ TIMESTAMPED_ARCHIVE_PATTERN = re.compile(
 
 OWNER_SNAPSHOT_FORBIDDEN_IN_PUBLIC = re.compile(
     r"create-code-snapshot\.py|OWNER_WORKSPACE_SNAPSHOT",
+)
+
+FINAL_CI_LIFECYCLE_SKILLS = (
+    "execute-current-phase",
+    "apply-phase-fixes",
+    "architecture-refactor",
+    "spell-sync-ci",
+)
+
+CI_BEFORE_COMMIT_PATTERN = re.compile(
+    r"(?:run full CI|scripts/ci\.sh)[\s\S]{0,500}?\bcommit",
+    re.IGNORECASE,
+)
+
+STALE_CI_THEN_COMMIT = re.compile(
+    r"After green CI[\s\S]{0,200}?\bcommit",
+    re.IGNORECASE,
 )
 
 
@@ -366,10 +385,80 @@ def check_snapshot_finalization_skills(root: Path) -> list[str]:
     agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if agent_dev.is_file():
         text = agent_dev.read_text(encoding="utf-8")
-        if "Workspace archive (mandatory before report)" not in text:
+        if "## Workspace snapshot" not in text:
             errors.append(
-                "[SNAPSHOT-005] docs/AGENT_DEVELOPMENT.md missing mandatory "
-                "workspace archive section"
+                "[SNAPSHOT-005] docs/AGENT_DEVELOPMENT.md missing Workspace snapshot section"
+            )
+        if "no hash sidecar file" not in text and "no sidecar file" not in text:
+            errors.append(
+                "[SNAPSHOT-007] docs/AGENT_DEVELOPMENT.md must state SHA256 is "
+                "response-only (no sidecar file on disk)"
+            )
+    agents_md = root / "AGENTS.md"
+    if agents_md.is_file():
+        text = agents_md.read_text(encoding="utf-8")
+        if "docs/AGENT_DEVELOPMENT.md` § Workspace snapshot" not in text:
+            errors.append(
+                "[SNAPSHOT-006] AGENTS.md must reference "
+                "docs/AGENT_DEVELOPMENT.md § Workspace snapshot"
+            )
+    return errors
+
+
+def check_final_ci_lifecycle(root: Path) -> list[str]:
+    errors: list[str] = []
+    evidence_script = root / "scripts" / "check-ci-evidence.py"
+    if not evidence_script.is_file():
+        errors.append(
+            "[CI-LIFECYCLE-001] missing scripts/check-ci-evidence.py final evidence verifier"
+        )
+    plan_steps = root / "scripts" / "test_selection" / "plan_steps.py"
+    if not plan_steps.is_file():
+        errors.append(
+            "[CI-LIFECYCLE-002] missing scripts/test_selection/plan_steps.py run-key contract"
+        )
+    resolved_runtime = root / "spell_sync" / "resolved_runtime.py"
+    if resolved_runtime.is_file():
+        text = resolved_runtime.read_text(encoding="utf-8")
+        if re.search(r"^def build_resolved_runtime\b", text, re.MULTILINE):
+            errors.append(
+                "[CI-LIFECYCLE-003] spell_sync/resolved_runtime.py must not export "
+                "build_resolved_runtime; use private _build_resolved_runtime"
+            )
+    skills = root / ".cursor" / "skills"
+    for skill_name in FINAL_CI_LIFECYCLE_SKILLS:
+        skill_file = skills / skill_name / "SKILL.md"
+        if not skill_file.is_file():
+            continue
+        text = skill_file.read_text(encoding="utf-8")
+        rel = skill_file.relative_to(root)
+        if "check-ci-evidence.py" not in text:
+            errors.append(
+                f"[CI-LIFECYCLE-004] {rel}: modifying lifecycle skill must reference "
+                "python3 scripts/check-ci-evidence.py"
+            )
+        if STALE_CI_THEN_COMMIT.search(text):
+            errors.append(
+                f"[CI-LIFECYCLE-005] {rel}: full CI must not precede commit "
+                "(remove 'After green CI' then commit ordering)"
+            )
+        if CI_BEFORE_COMMIT_PATTERN.search(text) and "committed HEAD" not in text:
+            errors.append(
+                f"[CI-LIFECYCLE-006] {rel}: run full CI only on committed HEAD "
+                "after clean verification"
+            )
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
+    if agent_dev.is_file():
+        text = agent_dev.read_text(encoding="utf-8")
+        if "check-ci-evidence.py" not in text:
+            errors.append(
+                "[CI-LIFECYCLE-007] docs/AGENT_DEVELOPMENT.md must document "
+                "scripts/check-ci-evidence.py"
+            )
+        if "committed HEAD" not in text and "committed head" not in text.lower():
+            errors.append(
+                "[CI-LIFECYCLE-008] docs/AGENT_DEVELOPMENT.md must require final CI on "
+                "committed HEAD"
             )
     return errors
 
@@ -379,6 +468,7 @@ def validate_agent_config(root: Path) -> list[str]:
     errors.extend(check_test_efficiency_contract(root))
     errors.extend(check_modifying_skill_validation(root))
     errors.extend(check_snapshot_finalization_skills(root))
+    errors.extend(check_final_ci_lifecycle(root))
     cursor = root / ".cursor"
     rules = cursor / "rules"
     skills = cursor / "skills"

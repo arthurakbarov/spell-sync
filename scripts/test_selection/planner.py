@@ -88,6 +88,16 @@ def _collect_static_targets(clusters: set[str], registry: Registry) -> list[str]
     return dedupe_sorted(static)
 
 
+def _static_targets_for_changed_files(changed_files: list[str]) -> list[str]:
+    static: list[str] = []
+    for path in changed_files:
+        if path == "pyproject.toml":
+            static.append("spell_sync")
+        elif path.startswith("spell_sync/") and path.endswith(".py"):
+            static.append(path)
+    return dedupe_sorted(static)
+
+
 def _pytest_command(targets: list[str], python: str = "python3") -> tuple[str, ...]:
     if not targets:
         return ()
@@ -185,6 +195,8 @@ def build_plan(
         pytest_targets.extend(_collect_tests(clusters, registry, level=level))
         validators.extend(_collect_validators(clusters, registry))
         static_targets.extend(_collect_static_targets(clusters, registry))
+
+    static_targets.extend(_static_targets_for_changed_files(changed_files))
 
     pytest_targets = dedupe_sorted(pytest_targets)
     validators = dedupe_sorted(validators)

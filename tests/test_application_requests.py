@@ -231,7 +231,7 @@ class TestApplicationRequests(unittest.TestCase):
                 self.assertEqual(lock_exit, int(ExitCode.PUSH_ABORT))
 
         with patch(
-            "spell_sync.application.mutation_scope.build_resolved_runtime",
+            "spell_sync.application.mutation_scope._build_resolved_runtime",
         ) as build:
             build.return_value = MagicMock(
                 config_result=invalid,

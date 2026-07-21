@@ -6,12 +6,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from ..application._runtime_factory import _build_resolved_runtime
 from ..mutation_guards import (
     invalid_config_exit_from_scope,
     operation_lock_scope_for,
     unfinished_journal_exit_from_result_for,
 )
-from ..resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from ..resolved_runtime import ResolvedRuntime
 
 MutationScopeResult = ResolvedRuntime | int
 
@@ -30,7 +31,7 @@ def mutation_scope_for(
         if lock_exit is not None:
             yield lock_exit
             return
-        resolved = build_resolved_runtime(wordlist, strict_push=strict_push)
+        resolved = _build_resolved_runtime(wordlist, strict_push=strict_push)
         config_exit = invalid_config_exit_from_scope(
             command,
             resolved.config_result,

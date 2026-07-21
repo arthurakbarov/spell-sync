@@ -85,7 +85,7 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
         )
         resolver = RuntimeResolver(bound=validated)
         project = ProjectRef(wordlist=Path("/tmp/other.txt"))
-        with patch("spell_sync.resolved_runtime.build_resolved_runtime") as build:
+        with patch("spell_sync.application._runtime_factory._build_resolved_runtime") as build:
             with self.assertRaises(ProjectRuntimeMismatchError):
                 resolver.resolve_read(project)
             build.assert_not_called()
@@ -139,7 +139,7 @@ class TestExplicitRuntimeGuards(unittest.TestCase):
             lock_scope.return_value.__enter__.return_value = None
             lock_scope.return_value.__exit__.return_value = False
             with patch(
-                "spell_sync.application.mutation_scope.build_resolved_runtime",
+                "spell_sync.application.mutation_scope._build_resolved_runtime",
                 return_value=fresh,
             ) as build:
                 with resolver.mutation_scope(

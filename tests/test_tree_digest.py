@@ -130,11 +130,19 @@ def test_ignored_artifact_changes_do_not_change_digest(tmp_path: Path) -> None:
 
 
 def test_focused_run_key_matches_tree_digest_semantics(tmp_path: Path) -> None:
+    from scripts.test_selection.plan_steps import PlannedStep
+
     repo = _init_repo(tmp_path)
-    command = ["python3", "-m", "pytest", "tests/test_core.py", "-q"]
-    key_a = compute_run_key(root=repo, command=command, targets=["tests/test_core.py"], clusters=[])
+    steps = (
+        PlannedStep(
+            kind="pytest",
+            argv=("python3", "-m", "pytest", "tests/test_core.py", "-q"),
+        ),
+    )
+    metadata = ("schema=2", "level=2", "clusters=", "required=")
+    key_a = compute_run_key(root=repo, steps=steps, metadata=metadata)
     (repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
-    key_b = compute_run_key(root=repo, command=command, targets=["tests/test_core.py"], clusters=[])
+    key_b = compute_run_key(root=repo, steps=steps, metadata=metadata)
     assert key_a != key_b
 
 

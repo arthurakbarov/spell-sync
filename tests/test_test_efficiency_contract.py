@@ -91,14 +91,16 @@ def test_unrelated_docs_edit_does_not_invalidate_runtime_key() -> None:
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     from scripts.test_selection.digest import compute_run_key
+    from scripts.test_selection.plan_steps import PlannedStep
 
-    key = compute_run_key(
-        root=ROOT,
-        command=["python3", "-m", "pytest", "tests/test_runtime_architecture.py", "-q"],
-        targets=["tests/test_runtime_architecture.py"],
-        clusters=["runtime"],
-        tree_paths=["spell_sync/application/runtime_resolver.py"],
+    steps = (
+        PlannedStep(
+            kind="pytest",
+            argv=("python3", "-m", "pytest", "tests/test_runtime_architecture.py", "-q"),
+        ),
     )
+    metadata = ("schema=2", "level=2", "clusters=runtime", "required=")
+    key = compute_run_key(root=ROOT, steps=steps, metadata=metadata)
     assert len(key) == 64
 
 

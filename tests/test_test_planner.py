@@ -114,6 +114,40 @@ def test_ci_runner_selects_agent_and_ci_tests(planner_mod, registry) -> None:
     assert "tests/test_ci_contract.py" in plan.pytest_targets
 
 
+def test_pyproject_static_targets_include_spell_sync(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(ROOT, ["pyproject.toml"], registry=registry)
+    assert "spell_sync" in plan.static_targets
+
+
+def test_changed_python_file_static_target_is_file_path(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/runtime_settings.py"],
+        registry=registry,
+    )
+    assert "spell_sync/runtime_settings.py" in plan.static_targets
+
+
+def test_unknown_static_targets_key_rejected(registry_mod, tmp_path: Path) -> None:
+    bad = tmp_path / "test-impact.toml"
+    bad.write_text(
+        """
+[meta]
+sharedFixtures = []
+
+[fallback]
+tests = []
+
+[clusters.packaging]
+production = ["pyproject.toml"]
+static_targets = ["spell_sync"]
+""".strip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="TEST-IMPACT-SCHEMA-002"):
+        registry_mod.load_registry(bad)
+
+
 def test_changed_test_file_selects_itself(planner_mod, registry) -> None:
     plan = planner_mod.build_plan(
         ROOT,

@@ -32,37 +32,63 @@ def ledger_mod():
 
 
 @pytest.fixture()
+def steps_mod():
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    return _load_module("plan_steps", ROOT / "scripts" / "test_selection" / "plan_steps.py")
+
+
+@pytest.fixture()
 def runner_mod():
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     return _load_module("run_focused_tests", ROOT / "scripts" / "run_focused_tests.py")
 
 
-def test_exact_successful_run_skipped(ledger_mod, tmp_path: Path) -> None:
+def _sample_steps(steps_mod, *, target: str = "tests/test_core.py") -> tuple:
+    PlannedStep = steps_mod.PlannedStep
+    return (
+        PlannedStep(
+            kind="pytest",
+            argv=(sys.executable, "-m", "pytest", target, "-q"),
+        ),
+    )
+
+
+def _sample_metadata(*, cluster: str = "packaging") -> tuple[str, ...]:
+    return (
+        "schema=2",
+        "level=2",
+        f"clusters={cluster}",
+        "required=",
+    )
+
+
+def test_exact_successful_run_skipped(ledger_mod, steps_mod, tmp_path: Path) -> None:
     ledger = ledger_mod.TestRunLedger(tmp_path)
-    command = [sys.executable, "-m", "pytest", "tests/test_core.py", "-q"]
-    targets = ["tests/test_core.py"]
-    clusters = ["packaging"]
-    run_key = ledger.compute_key(command=command, targets=targets, clusters=clusters)
+    steps = _sample_steps(steps_mod)
+    metadata = _sample_metadata()
+    run_key = ledger.compute_key(steps=steps, metadata=metadata)
     now = datetime.now(timezone.utc)
     ledger.record_success(
         run_key=run_key,
-        command=command,
-        targets=targets,
-        clusters=clusters,
+        steps=steps,
+        metadata=metadata,
         started_at=now,
         completed_at=now,
         duration_seconds=1.0,
         validation_level=2,
         final_focused_evidence=True,
-        steps=[],
+        step_results=[
+            ledger_mod.StepResult(
+                kind=steps[0].kind,
+                command=list(steps[0].argv),
+                exit_code=0,
+                duration_seconds=1.0,
+            )
+        ],
     )
-    found = ledger.find_success(
-        run_key=run_key,
-        command=command,
-        targets=targets,
-        clusters=clusters,
-    )
+    found = ledger.find_success(run_key=run_key, steps=steps, metadata=metadata)
     assert found is not None
     assert found.result == "success"
 
@@ -76,17 +102,13 @@ def test_failed_run_not_reused(ledger_mod, tmp_path: Path) -> None:
             "abc": {
                 "schemaVersion": 2,
                 "runKey": "abc",
-                "command": ["python3", "-m", "pytest", "tests/test_core.py", "-q"],
+                "metadata": ["schema=2"],
                 "result": "failed",
                 "exitCode": 1,
                 "startedAt": "2026-01-01T00:00:00+00:00",
                 "completedAt": "2026-01-01T00:00:01+00:00",
                 "durationSeconds": 1.0,
                 "treeDigest": "deadbeef",
-                "targets": ["tests/test_core.py"],
-                "clusters": [],
-                "validationLevel": 2,
-                "finalFocusedEvidence": True,
                 "steps": [],
             }
         },
@@ -96,9 +118,8 @@ def test_failed_run_not_reused(ledger_mod, tmp_path: Path) -> None:
     ledger = ledger_mod.TestRunLedger(tmp_path)
     found = ledger.find_success(
         run_key="abc",
-        command=["python3", "-m", "pytest", "tests/test_core.py", "-q"],
-        targets=["tests/test_core.py"],
-        clusters=[],
+        steps=(),
+        metadata=("schema=2",),
     )
     assert found is None
 
@@ -111,67 +132,32 @@ def test_corrupt_ledger_ignored_safely(ledger_mod, tmp_path: Path) -> None:
     assert ledger.iter_records() == []
 
 
-def test_command_argv_included_in_run_key(ledger_mod, tmp_path: Path) -> None:
+def test_same_pytest_different_static_targets_changes_run_key(
+    ledger_mod, steps_mod, tmp_path: Path
+) -> None:
     ledger = ledger_mod.TestRunLedger(tmp_path)
+    PlannedStep = steps_mod.PlannedStep
+    pytest_step = PlannedStep(
+        kind="pytest",
+        argv=(sys.executable, "-m", "pytest", "tests/test_core.py", "-q"),
+    )
     key_a = ledger.compute_key(
-        command=["python3", "-m", "pytest", "tests/a.py", "-q"],
-        targets=["tests/a.py"],
-        clusters=[],
+        steps=(
+            pytest_step,
+            PlannedStep(
+                kind="ruff-check", argv=(sys.executable, "-m", "ruff", "check", "spell_sync")
+            ),
+        ),
+        metadata=_sample_metadata(),
     )
     key_b = ledger.compute_key(
-        command=["python3", "-m", "pytest", "tests/b.py", "-q"],
-        targets=["tests/b.py"],
-        clusters=[],
+        steps=(
+            pytest_step,
+            PlannedStep(kind="ruff-check", argv=(sys.executable, "-m", "ruff", "check", "scripts")),
+        ),
+        metadata=_sample_metadata(),
     )
     assert key_a != key_b
-
-
-def test_cluster_a_then_b_then_a_reuses_a(ledger_mod, tmp_path: Path) -> None:
-    ledger = ledger_mod.TestRunLedger(tmp_path)
-    command_a = [sys.executable, "-m", "pytest", "tests/test_pull_safety.py", "-q"]
-    command_b = [sys.executable, "-m", "pytest", "tests/test_transaction_safety.py", "-q"]
-    key_a = ledger.compute_key(
-        command=command_a,
-        targets=["tests/test_pull_safety.py"],
-        clusters=["pull"],
-    )
-    key_b = ledger.compute_key(
-        command=command_b,
-        targets=["tests/test_transaction_safety.py"],
-        clusters=["transaction"],
-    )
-    now = datetime.now(timezone.utc)
-    ledger.record_success(
-        run_key=key_a,
-        command=command_a,
-        targets=["tests/test_pull_safety.py"],
-        clusters=["pull"],
-        started_at=now,
-        completed_at=now,
-        duration_seconds=1.0,
-        validation_level=2,
-        final_focused_evidence=True,
-        steps=[],
-    )
-    ledger.record_success(
-        run_key=key_b,
-        command=command_b,
-        targets=["tests/test_transaction_safety.py"],
-        clusters=["transaction"],
-        started_at=now,
-        completed_at=now,
-        duration_seconds=2.0,
-        validation_level=2,
-        final_focused_evidence=True,
-        steps=[],
-    )
-    found_a = ledger.find_success(
-        run_key=key_a,
-        command=command_a,
-        targets=["tests/test_pull_safety.py"],
-        clusters=["pull"],
-    )
-    assert found_a is not None
 
 
 def test_force_reruns(runner_mod) -> None:

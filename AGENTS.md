@@ -112,7 +112,11 @@ topology, remotes, and publication workflows live only in the private maintainer
 
 - Do not start the next architecture phase without owner approval
 - Do not mark a phase `complete` from implementation work — use `awaiting-approval`, then `advance-current-phase`
-- Do not create archive, handoff, or upload workflows for external review
+- Do not create **external review** archive, handoff, or upload workflows (see **Workspace snapshot**)
+
+## Workspace snapshot
+
+Modifying tasks finalize per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot before the final report.
 
 ## Testing focus
 

@@ -52,3 +52,7 @@ python3.11 -m pytest tests/tui/test_architecture.py -q
 - Read-only vs mutation classification
 - Tests added/updated
 - Manual verification: keyboard, mouse, narrow terminal
+
+## Finalize workspace snapshot
+
+Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

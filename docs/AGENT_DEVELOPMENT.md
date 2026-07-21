@@ -44,10 +44,19 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 6. Make the smallest coherent change for the **current phase only**.
 7. Run focused tests via `select-and-run-tests` / `scripts/run_focused_tests.py`.
 8. Run architecture guards when application boundaries change.
-9. Run full `scripts/ci.sh` **once** on the final stable tree.
-10. On failure: read `CI_LOG` and `CI_SUMMARY`; identify the primary error via stable IDs.
-11. Update every affected document, test, and contract in the same task.
-12. Produce an evidence-based report (see **Final report contract** below).
+9. Run pre-final checks (`scripts/run_pre_final_checks.py`) before commits.
+10. Set phase status to `awaiting-approval` when implementation is complete; commit all tracked changes locally.
+11. Verify clean working trees (`git status --short`) in every affected repository.
+12. Run full `scripts/ci.sh` **once** on the committed HEAD (final evidence).
+13. Verify final evidence: `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
+14. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; new full CI.
+15. Update every affected document, test, and contract in the same task (before step 10).
+16. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
+17. Re-verify `git status --short` and `python3 scripts/check-ci-evidence.py` after snapshot.
+18. Produce an evidence-based report (see **Final report contract** below).
+
+After successful final CI and evidence verification, do not modify tracked repository files
+(ignored CI artifacts, owner snapshot outside repositories, and read-only inspection only).
 
 Staged validation levels and deduplication rules: `docs/TESTING_STRATEGY.md`.
 
@@ -110,9 +119,11 @@ Do not ask the owner to diagnose failures or read raw logs.
 - Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed run pairs).
 - Final stdout block prints `CI_RESULT`, `CI_EXIT`, optional `CI_FAILED_ID`, `CI_SUMMARY`, `CI_LOG`.
 
-Schema v3 adds `mode`, `finalEvidence`, and `treeDigest`. Only `mode=full` with
-`finalEvidence=true` and matching tree digest counts as final CI evidence. Diagnostic runs
-(`--only`, `--from`, `--resume-failed`) do not.
+Schema v3 adds `mode`, `finalEvidence`, `treeDigest`, `gitHead`, `gitBranch`, `gitDetached`,
+`treeDigestBefore`, `treeDigestAfter`, `treeStable`, and `historyAtCompletion`. Only
+`mode=full` with `finalEvidence=true`, matching `gitHead` and `treeDigest`, and
+`CI_EVIDENCE_RESULT=success` from `scripts/check-ci-evidence.py` counts as final CI
+evidence. Diagnostic runs (`--only`, `--from`, `--resume-failed`) do not.
 
 Installed-wheel smoke runs outside the repository checkout so the local tree cannot shadow the
 installed package.
@@ -180,7 +191,8 @@ Every completed phase or corrective task returns:
 - next phase not started; no push/tag/release; no unrelated product changes
 ```
 
-When the task changed workspace state in any repository, section **14. Workspace snapshot** must include:
+When the task changed workspace state in any repository, section **14. Workspace snapshot** (see
+**Workspace snapshot** below) must include:
 
 ```markdown
 ## 14. Workspace snapshot
@@ -188,8 +200,8 @@ When the task changed workspace state in any repository, section **14. Workspace
 - result: success
 - created: true
 - verified: true
-- path: `$HOME/code.zip`
-- SHA-256: `...`
+- path: `$HOME/code.zip` (only file persisted on disk)
+- SHA-256: `...` (from `SNAPSHOT_SHA256`; response only)
 - size: `... bytes`
 - archive file count: `...`
 - stale archives removed: `...`
@@ -211,27 +223,34 @@ When the task was read-only:
 - existing path: `$HOME/code.zip`
 ```
 
-## Workspace archive (mandatory before report)
+## Workspace snapshot
 
-Every **modifying task** must finalize the owner-controlled workspace snapshot in `$HOME`
-**before** the final user report:
+Every **modifying task** — workspace state changed in spell-sync, spell-sync-dev, or spell-words —
+must finalize the owner workspace snapshot **before** the final user report.
 
-1. Remove stale non-canonical archives (script default cleanup).
-2. Create fresh `$HOME/code.zip` with `--force` after commits and validation.
-3. Verify with `--check`.
-4. End the report with `CODE_ARCHIVE` and `SHA256`.
+| Persist on disk | Response only (never write to disk) |
+|-----------------|-------------------------------------|
+| `$HOME/code.zip` | SHA256 in report §14, report footer, and `SNAPSHOT_SHA256` stdout |
 
-Skill: `create-code-snapshot` in the private maintainer repository (`spell-sync-dev`).
-Canonical paths only: `$HOME/code.zip` and `$HOME/code.zip.sha256`. No timestamped alternates.
+Procedure — skill `create-code-snapshot` in spell-sync-dev:
 
-Modifying-task reports end with:
+1. After commits, clean trees, final full CI, and `python3 scripts/check-ci-evidence.py` success: `--force`, then `--check`.
+2. Re-run `git status --short` and `python3 scripts/check-ci-evidence.py`; both must stay green.
+3. Canonical path: `$HOME/code.zip` only. No timestamped alternates; no hash sidecar file
+   (`code.zip.sha256`) on disk.
+4. Read-only tasks: skip recreation; report §14 with `result: skipped`.
+
+Report footer:
 
 ```text
 CODE_ARCHIVE
 <absolute path to $HOME/code.zip>
 
 SHA256
-<digest>
+<digest from SNAPSHOT_SHA256>
 ```
+
+Maintainer script details: private `docs/OWNER_WORKSPACE_SNAPSHOT.md` in spell-sync-dev (not
+shipped in the public package).
 
 Do not include huge raw logs. Include failed check ID and a short relevant excerpt only when unresolved.

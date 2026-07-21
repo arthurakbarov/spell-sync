@@ -58,8 +58,65 @@ def _as_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
+META_KEYS = frozenset(
+    {
+        "sharedFixtures",
+        "docsOnlyPrefixes",
+        "agentPaths",
+        "ciScriptPaths",
+        "pyprojectPath",
+    }
+)
+FALLBACK_KEYS = frozenset({"tests"})
+CLUSTER_KEYS = frozenset(
+    {
+        "production",
+        "moduleTests",
+        "clusterTests",
+        "tests",
+        "validators",
+        "staticTargets",
+        "allowNoMatch",
+    }
+)
+
+
+def registry_schema_errors(data: dict[str, object]) -> list[str]:
+    errors: list[str] = []
+    meta = data.get("meta")
+    if isinstance(meta, dict):
+        for key in meta:
+            if key not in META_KEYS:
+                errors.append(
+                    f"[TEST-IMPACT-SCHEMA-002] meta key: {key} remediation: remove or rename"
+                )
+    fallback = data.get("fallback")
+    if isinstance(fallback, dict):
+        for key in fallback:
+            if key not in FALLBACK_KEYS:
+                errors.append(
+                    f"[TEST-IMPACT-SCHEMA-002] fallback key: {key} remediation: remove or rename"
+                )
+    clusters = data.get("clusters")
+    if isinstance(clusters, dict):
+        for cluster_name, section in clusters.items():
+            if not isinstance(section, dict):
+                continue
+            for key in section:
+                if key not in CLUSTER_KEYS:
+                    remediation = "use staticTargets" if key == "static_targets" else "remove key"
+                    errors.append(
+                        f"[TEST-IMPACT-SCHEMA-002] cluster: {cluster_name} key: {key} "
+                        f"remediation: {remediation}"
+                    )
+    return errors
+
+
 def load_registry(path: Path) -> Registry:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
+    schema_errors = registry_schema_errors(data)
+    if schema_errors:
+        raise ValueError("\n".join(schema_errors))
     clusters: dict[str, ClusterSpec] = {}
     for name, section in data.get("clusters", {}).items():
         if not isinstance(section, dict):

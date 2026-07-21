@@ -33,8 +33,8 @@ Read:
 - `git status --short` must be clean before starting a **new phase implementation**
 - run `python3 scripts/check-agent-config.py`
 - run `python3 scripts/check-docs-contract.py`
-- reuse existing full CI evidence when the tree is clean and `.artifacts/ci/ci-summary.json`
-  shows `mode=full`, `result=success`, and matching `treeDigest` for current `HEAD`
+- reuse existing full CI evidence when the tree is clean and `python3 scripts/check-ci-evidence.py`
+  succeeds (matching `gitHead` and `treeDigest`)
 - run baseline full CI only when evidence is missing, failed, stale, or the owner explicitly
   requests it; otherwise use lightweight validators and phase-specific focused tests via
   skill `select-and-run-tests`
@@ -89,44 +89,48 @@ Update in the same task when facts change:
 - agent rules/skills only when workflow or boundaries change
 - tests and documentation contracts
 
-## Step 8 — full validation
+## Step 8 — pre-final checks
 
-Run full CI **once** on the final stable tree:
+Run `python3 scripts/run_pre_final_checks.py` on the final uncommitted tree before commits.
+
+## Step 9 — awaiting approval and commits
+
+Set current phase status to `awaiting-approval` in the architecture status block.
+Create one logical local commit (or a short sequence if clearly separated). Do not push.
+
+## Step 10 — clean verification
+
+`git status --short` must be clean in every affected repository before final CI.
+
+## Step 11 — final full CI
+
+Run full CI **once** on the committed HEAD:
 
 ```bash
 scripts/ci.sh
 ```
 
-On failure, rerun only the failed gate (`scripts/ci.sh --only <CHECK_ID>`) while fixing,
-then run one new full CI after files change. Do not repeat full CI without changes.
+On failure: diagnose failed check; fix files; focused failed-check validation; new corrective
+commit; clean tree; one new full CI on the new HEAD. Do not leave uncommitted fixes before
+final CI.
 
 Read `CI_RESULT`, `CI_EXIT`, `CI_SUMMARY`, `CI_LOG`, and `CI_FAILED_ID` on failure.
-Fix phase-related failures and rerun. Do not ask the owner to read raw logs.
 
-## Step 9 — commit
+## Step 12 — verify final evidence
 
-After green CI:
+```bash
+python3 scripts/check-ci-evidence.py
+```
 
-- review diff and scope
-- create one logical local commit (or a short sequence if clearly separated)
-- do not push
+Require `CI_EVIDENCE_RESULT=success`. After success, do not modify tracked repository files.
 
-## Step 10 — awaiting approval
-
-Set current phase status to `awaiting-approval` in the architecture status block.
-Keep `current` on this phase. Do not set `complete` or advance `current`.
-
-If the status update requires a docs-only follow-up, commit it locally and rerun lightweight validators.
-
-## Step 11 — report and stop
+## Step 13 — report and stop
 
 Return the final report contract from `docs/AGENT_DEVELOPMENT.md`. Stop. Do not start the next phase.
 
 ## Finalize workspace snapshot
 
-Before the final user report on modifying tasks:
-
-1. Remove stale non-canonical archives (script default cleanup).
-2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
-3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
-4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.
+Modifying tasks only — after step 12 evidence verification: skill `create-code-snapshot` in
+spell-sync-dev with `--force`, then `--check`; re-run `python3 scripts/check-ci-evidence.py`
+and `git status --short`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` /
+`SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

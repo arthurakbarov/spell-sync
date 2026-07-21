@@ -6,7 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import Iterator
 
-from ..resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime, build_resolved_runtime
+from ..application._runtime_factory import _build_resolved_runtime
+from ..resolved_runtime import ProjectRuntimeMismatchError, ResolvedRuntime
 from ..sync_run import SyncRun
 from .mutation_scope import mutation_scope_for
 from .project_resolution import resolve_project_wordlist
@@ -42,7 +43,7 @@ class RuntimeResolver:
                 return replace(self.bound, context=ctx)
             return self.bound
         wordlist = resolve_project_wordlist(project)
-        return build_resolved_runtime(
+        return _build_resolved_runtime(
             wordlist,
             strict_push=strict_push,
             validate_journal_wordlist=validate_journal_wordlist,

@@ -31,10 +31,15 @@ Working tree should be clean before starting.
 6. Update docs/ADR only when factual contracts change.
 7. After all defects in a cluster are fixed, run `select-and-run-tests` once for the
    combined affected clusters — not after every single defect.
-8. Run `scripts/ci.sh` **once** after all defects are fixed.
-9. Create a corrective local commit.
-10. Leave current phase at `awaiting-approval`.
-11. Return a defect-by-defect report and stop.
+8. Run `python3 scripts/run_pre_final_checks.py` before commits.
+9. Set phase status to `awaiting-approval`; create corrective local commit(s). Do not push.
+10. Verify clean working trees (`git status --short`).
+11. Run `scripts/ci.sh` **once** on the committed HEAD (final evidence).
+12. Verify `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
+13. On CI failure after commit: fix; focused failed-check validation; new corrective commit;
+    clean tree; new full CI. Do not amend if a new commit preserves evidence more clearly.
+14. Leave current phase at `awaiting-approval`.
+15. Return a defect-by-defect report and stop.
 
 ## Validation
 
@@ -43,9 +48,7 @@ diagnosis. Do not run full CI after each individual defect.
 
 ## Finalize workspace snapshot
 
-Before the final user report on modifying tasks:
-
-1. Remove stale non-canonical archives (script default cleanup).
-2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
-3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
-4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.
+Modifying tasks only — after successful `python3 scripts/check-ci-evidence.py`: skill
+`create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; re-verify evidence
+and clean trees; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
+SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

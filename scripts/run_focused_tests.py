@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import subprocess
 import sys
 import time
@@ -18,7 +17,12 @@ if str(ROOT) not in sys.path:
 from scripts.test_plan import format_text  # noqa: E402
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.ledger import StepResult, TestRunLedger  # noqa: E402
-from scripts.test_selection.planner import TestPlan, build_plan  # noqa: E402
+from scripts.test_selection.plan_steps import (  # noqa: E402
+    PlannedStep,
+    build_planned_steps,
+    plan_metadata_signature,
+)
+from scripts.test_selection.planner import build_plan  # noqa: E402
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -42,75 +46,21 @@ def run_command(command: list[str], *, cwd: Path) -> tuple[int, float]:
     return proc.returncode, duration
 
 
-def _split_validator(spec: str) -> list[str]:
-    if spec.endswith(".sh"):
-        return ["bash", spec]
-    return shlex.split(spec)
-
-
-def _execute_plan(plan: TestPlan, *, cwd: Path) -> tuple[int, list[StepResult]]:
-    steps: list[StepResult] = []
-    for validator in plan.validators:
-        command = _split_validator(validator)
-        if command[0].endswith(".py") and not Path(command[0]).is_absolute():
-            command = [sys.executable, *command]
-        exit_code, duration = run_command(command, cwd=cwd)
-        steps.append(
+def _execute_steps(steps: tuple[PlannedStep, ...], *, cwd: Path) -> tuple[int, list[StepResult]]:
+    results: list[StepResult] = []
+    for step in steps:
+        exit_code, duration = run_command(list(step.argv), cwd=cwd)
+        results.append(
             StepResult(
-                kind="validator",
-                command=command,
+                kind=step.kind,
+                command=list(step.argv),
                 exit_code=exit_code,
                 duration_seconds=duration,
             )
         )
         if exit_code != 0:
-            return exit_code, steps
-
-    for target in plan.static_targets:
-        for kind, args in (
-            ("ruff", [sys.executable, "-m", "ruff", "check", target]),
-            ("ruff", [sys.executable, "-m", "ruff", "format", "--check", target]),
-        ):
-            exit_code, duration = run_command(args, cwd=cwd)
-            steps.append(
-                StepResult(
-                    kind=kind,
-                    command=args,
-                    exit_code=exit_code,
-                    duration_seconds=duration,
-                )
-            )
-            if exit_code != 0:
-                return exit_code, steps
-
-    if plan.pytest_targets:
-        command = list(plan.command)
-        exit_code, duration = run_command(command, cwd=cwd)
-        steps.append(
-            StepResult(
-                kind="pytest",
-                command=command,
-                exit_code=exit_code,
-                duration_seconds=duration,
-            )
-        )
-        if exit_code != 0:
-            return exit_code, steps
-
-    return 0, steps
-
-
-def _plan_signature(plan: TestPlan) -> tuple[list[str], list[str], list[str]]:
-    command_parts: list[str] = []
-    if plan.command:
-        command_parts.extend(plan.command)
-    for validator in plan.validators:
-        command_parts.extend(_split_validator(validator))
-    return (
-        command_parts,
-        list(plan.pytest_targets),
-        list(plan.clusters),
-    )
+            return exit_code, results
+    return 0, results
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -131,22 +81,28 @@ def main(argv: list[str] | None = None) -> int:
     if args.explain:
         sys.stdout.write(format_text(plan, explain=True))
 
-    command_parts, targets, clusters = _plan_signature(plan)
-    if not command_parts and not plan.validators:
+    steps = build_planned_steps(
+        plan,
+        root=ROOT,
+        python=args.python,
+        changed_files=tuple(changed),
+    )
+    metadata = plan_metadata_signature(
+        plan=plan,
+        steps=steps,
+        cluster_override=args.cluster,
+        target_override=args.target,
+    )
+    if not steps and not plan.validators:
         print("TEST_RUN_RESULT=skipped")
         print("TEST_RUN_REASON=no-focused-targets")
         return 0
 
     ledger = TestRunLedger(ROOT)
-    run_key = ledger.compute_key(command=command_parts, targets=targets, clusters=clusters)
+    run_key = ledger.compute_key(steps=steps, metadata=metadata)
 
     if not args.force:
-        existing = ledger.find_success(
-            run_key=run_key,
-            command=command_parts,
-            targets=targets,
-            clusters=clusters,
-        )
+        existing = ledger.find_success(run_key=run_key, steps=steps, metadata=metadata)
         if existing is not None:
             print("TEST_RUN_RESULT=skipped")
             print("TEST_RUN_REASON=already-passed-for-current-state")
@@ -155,12 +111,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     started_at = datetime.now(timezone.utc)
-    exit_code, steps = _execute_plan(plan, cwd=ROOT)
+    exit_code, step_results = _execute_steps(steps, cwd=ROOT)
     completed_at = datetime.now(timezone.utc)
-    duration = sum(step.duration_seconds for step in steps)
+    duration = sum(step.duration_seconds for step in step_results)
 
-    pytest_ran = any(step.kind == "pytest" for step in steps)
-    validator_count = sum(1 for step in steps if step.kind == "validator")
+    pytest_ran = any(step.kind == "pytest" for step in step_results)
+    validator_count = sum(1 for step in step_results if step.kind == "validator")
 
     print(f"TEST_RUN_RESULT={'success' if exit_code == 0 else 'failed'}")
     print(f"TEST_RUN_EXIT={exit_code}")
@@ -174,15 +130,14 @@ def main(argv: list[str] | None = None) -> int:
     if exit_code == 0:
         ledger.record_success(
             run_key=run_key,
-            command=command_parts,
-            targets=targets,
-            clusters=clusters,
+            steps=steps,
+            metadata=metadata,
             started_at=started_at,
             completed_at=completed_at,
             duration_seconds=duration,
             validation_level=plan.validation_level,
             final_focused_evidence=plan.final_focused_evidence,
-            steps=steps,
+            step_results=step_results,
         )
     return exit_code
 

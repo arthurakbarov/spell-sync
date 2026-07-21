@@ -6,6 +6,7 @@ import hashlib
 import sys
 from pathlib import Path
 
+from scripts.test_selection.plan_steps import PlannedStep
 from scripts.test_selection.tree_state import content_tree_digest, git_head
 
 __all__ = [
@@ -42,19 +43,16 @@ def python_version_digest() -> str:
 def compute_run_key(
     *,
     root: Path,
-    command: list[str],
-    targets: list[str],
-    clusters: list[str],
-    tree_paths: list[str] | None = None,
+    steps: tuple[PlannedStep, ...],
+    metadata: tuple[str, ...],
 ) -> str:
-    del tree_paths
     parts = [
         git_head(root),
         tree_digest(root),
         config_digest(root),
         python_version_digest(),
-        "|".join(sorted(clusters)),
-        "|".join(sorted(targets)),
-        " ".join(command),
+        *metadata,
     ]
+    for step in steps:
+        parts.append(f"{step.kind}|{' '.join(step.argv)}")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()

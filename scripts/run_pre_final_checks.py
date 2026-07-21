@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 import time
@@ -34,27 +33,7 @@ def _changed_production_modules(changed: list[str]) -> list[str]:
     )
 
 
-def _ci_history_counts(artifacts: Path) -> dict[str, int]:
-    attempts = failures = successes = 0
-    if not artifacts.is_dir():
-        return {"fullCiAttempts": 0, "fullCiFailures": 0, "fullCiSuccesses": 0}
-    for path in sorted(artifacts.glob("ci-summary-*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if payload.get("mode") != "full":
-            continue
-        attempts += 1
-        if payload.get("result") == "success" and payload.get("exitCode") == 0:
-            successes += 1
-        else:
-            failures += 1
-    return {
-        "fullCiAttempts": attempts,
-        "fullCiFailures": failures,
-        "fullCiSuccesses": successes,
-    }
+from scripts.ci_history import summarize_ci_history  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             exit_code = rc
 
-    counts = _ci_history_counts(ROOT / ".artifacts" / "ci")
+    counts = summarize_ci_history(ROOT / ".artifacts" / "ci").to_json_dict()
     print(f"PRE_FINAL_RESULT={'success' if exit_code == 0 else 'failed'}")
     print(f"PRE_FINAL_EXIT={exit_code}")
     print(f"fullCiAttempts={counts['fullCiAttempts']}")

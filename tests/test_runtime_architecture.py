@@ -12,10 +12,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import spell_sync.settings as settings_mod
+from spell_sync.application.requests import ProjectRef
+from spell_sync.application.runtime_resolver import RuntimeResolver
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.dictionary_registry import DictionarySource, discover_from_sources
 from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
-from spell_sync.resolved_runtime import ResolvedRuntime, build_resolved_runtime
+from spell_sync.resolved_runtime import ResolvedRuntime
 from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
@@ -116,7 +118,7 @@ class TestRuntimeContext(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
-            resolved = build_resolved_runtime(wordlist)
+            resolved = RuntimeResolver().resolve_read(ProjectRef(wordlist=wordlist))
             run = sync_run_for(resolved)
             self.assertEqual(run.wordlist_file, wordlist)
 
@@ -148,11 +150,11 @@ class TestRuntimeContext(unittest.TestCase):
                         if func.func.id == "RuntimeResolver":
                             self.fail(f"{path.name} must not construct RuntimeResolver()")
 
-    def test_build_resolved_runtime_is_explicit(self):
+    def test_runtime_resolver_builds_explicit_runtime(self):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            resolved = build_resolved_runtime(wordlist)
+            resolved = RuntimeResolver().resolve_read(ProjectRef(wordlist=wordlist))
             self.assertIsInstance(resolved, ResolvedRuntime)
             self.assertEqual(resolved.context.wordlist, wordlist)
 

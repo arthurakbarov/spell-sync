@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from scripts.test_selection.digest import compute_run_key, tree_digest
+from scripts.test_selection.plan_steps import PlannedStep
 
 LEDGER_SCHEMA_VERSION = 2
 INDEX_PATH = Path(".artifacts/test-runs/index.json")
@@ -36,34 +37,26 @@ class StepResult:
 class TestRunRecord:
     schema_version: int
     run_key: str
-    command: tuple[str, ...]
+    metadata: tuple[str, ...]
     result: str
     exit_code: int
     started_at: str
     completed_at: str
     duration_seconds: float
     tree_digest: str
-    targets: tuple[str, ...]
-    clusters: tuple[str, ...]
-    validation_level: int
-    final_focused_evidence: bool
     steps: tuple[StepResult, ...] = field(default_factory=tuple)
 
     def to_json_dict(self) -> dict[str, object]:
         return {
             "schemaVersion": self.schema_version,
             "runKey": self.run_key,
-            "command": list(self.command),
+            "metadata": list(self.metadata),
             "result": self.result,
             "exitCode": self.exit_code,
             "startedAt": self.started_at,
             "completedAt": self.completed_at,
             "durationSeconds": self.duration_seconds,
             "treeDigest": self.tree_digest,
-            "targets": list(self.targets),
-            "clusters": list(self.clusters),
-            "validationLevel": self.validation_level,
-            "finalFocusedEvidence": self.final_focused_evidence,
             "steps": [step.to_json_dict() for step in self.steps],
         }
 
@@ -94,13 +87,9 @@ def _parse_step(item: object) -> StepResult | None:
 
 def _parse_record(payload: dict[str, object]) -> TestRunRecord | None:
     try:
-        command = payload.get("command")
-        targets = payload.get("targets")
-        clusters = payload.get("clusters")
-        if not isinstance(command, list) or not isinstance(targets, list):
-            return None
-        if not isinstance(clusters, list):
-            clusters = []
+        metadata_raw = payload.get("metadata", [])
+        if not isinstance(metadata_raw, list):
+            metadata_raw = []
         steps_raw = payload.get("steps", [])
         steps: list[StepResult] = []
         if isinstance(steps_raw, list):
@@ -111,17 +100,13 @@ def _parse_record(payload: dict[str, object]) -> TestRunRecord | None:
         return TestRunRecord(
             schema_version=int(payload.get("schemaVersion", 0)),
             run_key=str(payload.get("runKey", "")),
-            command=tuple(str(item) for item in command),
+            metadata=tuple(str(item) for item in metadata_raw),
             result=str(payload.get("result", "")),
             exit_code=int(payload.get("exitCode", 1)),
             started_at=str(payload.get("startedAt", "")),
             completed_at=str(payload.get("completedAt", "")),
             duration_seconds=float(payload.get("durationSeconds", 0.0)),
             tree_digest=str(payload.get("treeDigest", "")),
-            targets=tuple(str(item) for item in targets),
-            clusters=tuple(str(item) for item in clusters),
-            validation_level=int(payload.get("validationLevel", 2)),
-            final_focused_evidence=bool(payload.get("finalFocusedEvidence", True)),
             steps=tuple(steps),
         )
     except (TypeError, ValueError):
@@ -194,23 +179,22 @@ class TestRunLedger:
         self,
         *,
         run_key: str,
-        command: list[str],
-        targets: list[str],
-        clusters: list[str],
+        steps: tuple[PlannedStep, ...],
+        metadata: tuple[str, ...],
     ) -> TestRunRecord | None:
         current_digest = tree_digest(self.root)
+        step_sig = tuple((step.kind, step.argv) for step in steps)
         for record in self.iter_records():
             if record.result != "success" or record.exit_code != 0:
                 continue
             if record.run_key != run_key:
                 continue
-            if list(record.command) != command:
-                continue
-            if list(record.targets) != sorted(targets):
-                continue
-            if list(record.clusters) != sorted(clusters):
+            if record.metadata != metadata:
                 continue
             if record.tree_digest != current_digest:
+                continue
+            record_sig = tuple((step.kind, tuple(step.command)) for step in record.steps)
+            if record_sig != step_sig:
                 continue
             return record
         return None
@@ -219,31 +203,27 @@ class TestRunLedger:
         self,
         *,
         run_key: str,
-        command: list[str],
-        targets: list[str],
-        clusters: list[str],
+        steps: tuple[PlannedStep, ...],
+        metadata: tuple[str, ...],
         started_at: datetime,
         completed_at: datetime,
         duration_seconds: float,
         validation_level: int,
         final_focused_evidence: bool,
-        steps: list[StepResult],
+        step_results: list[StepResult],
     ) -> TestRunRecord:
+        del validation_level, final_focused_evidence
         record = TestRunRecord(
             schema_version=LEDGER_SCHEMA_VERSION,
             run_key=run_key,
-            command=tuple(command),
+            metadata=metadata,
             result="success",
             exit_code=0,
             started_at=started_at.isoformat(),
             completed_at=completed_at.isoformat(),
             duration_seconds=duration_seconds,
             tree_digest=tree_digest(self.root),
-            targets=tuple(sorted(targets)),
-            clusters=tuple(sorted(clusters)),
-            validation_level=validation_level,
-            final_focused_evidence=final_focused_evidence,
-            steps=tuple(steps),
+            steps=tuple(step_results),
         )
         index = self._load_index()
         records = index["records"]
@@ -263,13 +243,7 @@ class TestRunLedger:
     def compute_key(
         self,
         *,
-        command: list[str],
-        targets: list[str],
-        clusters: list[str],
+        steps: tuple[PlannedStep, ...],
+        metadata: tuple[str, ...],
     ) -> str:
-        return compute_run_key(
-            root=self.root,
-            command=command,
-            targets=targets,
-            clusters=clusters,
-        )
+        return compute_run_key(root=self.root, steps=steps, metadata=metadata)

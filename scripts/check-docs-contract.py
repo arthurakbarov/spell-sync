@@ -372,7 +372,37 @@ def _check_agent_workflow_docs(root: Path) -> list[ContractViolation]:
         path = root / rel
         if not path.is_file():
             continue
-        lines = path.read_text(encoding="utf-8").splitlines()
+        text = path.read_text(encoding="utf-8")
+        if rel.endswith("AGENT_DEVELOPMENT.md"):
+            if "check-ci-evidence.py" not in text:
+                violations.append(
+                    ContractViolation(
+                        "AGENT-006",
+                        path,
+                        None,
+                        "missing check-ci-evidence.py reference",
+                        "document final evidence verification after full CI on committed HEAD",
+                    )
+                )
+            if (
+                re.search(
+                    r"(?:Run full CI|scripts/ci\.sh)[\s\S]{0,300}?\bcommit",
+                    text,
+                    re.IGNORECASE,
+                )
+                and "committed HEAD" not in text
+            ):
+                violations.append(
+                    ContractViolation(
+                        "AGENT-007",
+                        path,
+                        None,
+                        "workflow documents full CI before commit",
+                        "commit tracked changes before final full CI; "
+                        "verify with check-ci-evidence.py",
+                    )
+                )
+        lines = text.splitlines()
         for line_no, line in enumerate(lines, start=1):
             if PINNED_PYTHON.search(line):
                 violations.append(
@@ -438,8 +468,6 @@ def _check_stale_version_claims(root: Path, version: str) -> list[ContractViolat
                         f"update version references to {version}",
                     )
                 )
-    return violations
-
     return violations
 
 

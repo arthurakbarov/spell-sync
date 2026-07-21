@@ -65,12 +65,3 @@ Report:
 - remaining final gates (full CI once)
 
 This skill does not run full CI.
-
-## Finalize workspace snapshot
-
-Before the final user report on modifying tasks:
-
-1. Remove stale non-canonical archives (script default cleanup).
-2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
-3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
-4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.

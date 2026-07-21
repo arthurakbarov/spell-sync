@@ -27,8 +27,11 @@ description: Perform an architecture migration while preserving safety contracts
    `python3 scripts/test_plan.py --explain` and run via `select-and-run-tests` once.
    Do not rerun overlapping clusters sequentially.
 8. **ADR** — add or update `docs/decisions/` when a decision is accepted.
-9. **Full CI once** — `scripts/ci.sh` on final stable tree only.
-10. **Package smoke** — covered by final CI when package boundaries change.
+9. **Pre-final checks** — `python3 scripts/run_pre_final_checks.py` before commits.
+10. **Commits and clean tree** — local commits; `git status --short` clean.
+11. **Full CI once** — `scripts/ci.sh` on committed HEAD only.
+12. **Final evidence** — `python3 scripts/check-ci-evidence.py`.
+13. **Package smoke** — covered by final CI when package boundaries change.
 
 ## Stop conditions
 
@@ -43,9 +46,4 @@ description: Perform an architecture migration while preserving safety contracts
 
 ## Finalize workspace snapshot
 
-Before the final user report on modifying tasks:
-
-1. Remove stale non-canonical archives (script default cleanup).
-2. Run skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`.
-3. Canonical paths: `$HOME/code.zip` and `$HOME/code.zip.sha256` only.
-4. Include **Workspace snapshot** in the report and end with `CODE_ARCHIVE` / `SHA256`.
+Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

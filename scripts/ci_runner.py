@@ -25,7 +25,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.test_selection.tree_state import content_tree_digest  # noqa: E402
+from scripts.ci_history import CiHistoryCounts, summarize_ci_history  # noqa: E402
+from scripts.test_selection.tree_state import (  # noqa: E402
+    content_tree_digest,
+    git_branch,
+    git_detached,
+    git_head,
+)
 
 ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
@@ -41,26 +47,8 @@ def _ci_tree_digest(root: Path) -> str:
 
 
 def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
-    attempts = failures = successes = 0
-    if not artifacts.is_dir():
-        return {"fullCiAttempts": 0, "fullCiFailures": 0, "fullCiSuccesses": 0}
-    for path in sorted(artifacts.glob("ci-summary-*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if payload.get("mode") != "full":
-            continue
-        attempts += 1
-        if payload.get("result") == "success" and payload.get("exitCode") == 0:
-            successes += 1
-        else:
-            failures += 1
-    return {
-        "fullCiAttempts": attempts,
-        "fullCiFailures": failures,
-        "fullCiSuccesses": successes,
-    }
+    counts = summarize_ci_history(artifacts)
+    return counts.to_json_dict()
 
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
@@ -461,13 +449,16 @@ class CiRunner:
                 }
             )
         completed = self.now().isoformat()
-        history = _full_ci_history_counts(self.artifacts)
+        prior = summarize_ci_history(self.artifacts)
         if self._mode == "full":
-            history = {
-                "fullCiAttempts": history["fullCiAttempts"] + 1,
-                "fullCiFailures": history["fullCiFailures"] + (0 if exit_code == 0 else 1),
-                "fullCiSuccesses": history["fullCiSuccesses"] + (1 if exit_code == 0 else 0),
-            }
+            history = CiHistoryCounts(
+                full_ci_attempts=prior.full_ci_attempts + 1,
+                full_ci_failures=prior.full_ci_failures + (0 if exit_code == 0 else 1),
+                full_ci_successes=prior.full_ci_successes + (1 if exit_code == 0 else 0),
+            )
+        else:
+            history = prior
+        history_dict = history.to_json_dict()
         payload = {
             "schemaVersion": SUMMARY_SCHEMA,
             "runId": self.run_id,
@@ -477,13 +468,17 @@ class CiRunner:
             "completedAt": completed,
             "mode": self._mode,
             "finalEvidence": self._final_evidence,
+            "gitHead": git_head(self.root),
+            "gitBranch": git_branch(self.root),
+            "gitDetached": git_detached(self.root),
             "treeDigest": self._tree_digest_after,
             "treeDigestBefore": self._tree_digest_before,
             "treeDigestAfter": self._tree_digest_after,
             "treeStable": tree_stable,
-            "fullCiAttempts": history["fullCiAttempts"],
-            "fullCiFailures": history["fullCiFailures"],
-            "fullCiSuccesses": history["fullCiSuccesses"],
+            "historyAtCompletion": history_dict,
+            "fullCiAttempts": history_dict["fullCiAttempts"],
+            "fullCiFailures": history_dict["fullCiFailures"],
+            "fullCiSuccesses": history_dict["fullCiSuccesses"],
             "checks": self.checks,
             "logPath": str(self._log_path),
             "historyLogPath": str(self._history_log_path),

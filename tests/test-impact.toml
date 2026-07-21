@@ -173,7 +173,7 @@ tests = [
 validators = [
   "scripts/check-target-capabilities.py --check",
 ]
-static_targets = [
+staticTargets = [
   "spell_sync",
 ]
 

@@ -13,6 +13,8 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from spell_sync.application.requests import ProjectRef
+from spell_sync.application.runtime_resolver import RuntimeResolver
 from spell_sync.cli_options import CliOptions
 from spell_sync.command_helpers import run_from_scope
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
@@ -49,7 +51,6 @@ from spell_sync.push_render import (
 )
 from spell_sync.push_transaction import PushTransaction, RollbackResult, txn_snapshot_root
 from spell_sync.recover_cmd import cmd_recover
-from spell_sync.resolved_runtime import build_resolved_runtime
 from spell_sync.runtime_settings import RuntimeSettings
 from spell_sync.sync_run import PushResult, SyncRun
 from tests.journal_test_utils import write_test_journal
@@ -310,7 +311,7 @@ class TestCommandHelpersCoverage(unittest.TestCase):
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
             (wordlist.parent / "spell-sync.toml").write_text("[bad\n", encoding="utf-8")
-            resolved = build_resolved_runtime(wordlist)
+            resolved = RuntimeResolver().resolve_read(ProjectRef(wordlist=wordlist))
             code = invalid_config_exit_from_scope(
                 "push",
                 resolved.config_result,
