@@ -60,6 +60,19 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             screen.action_safe_back()
             screen.action_safe_quit()
 
+    def test_operation_unmount_ends_mutation_when_unfinished(self) -> None:
+        service = fake_service()
+        controller = TuiController(service, ProjectRef())
+        screen = OperationScreen(
+            controller,
+            operation="pull",
+            pull_preview=sample_pull_preview(),
+        )
+        self.assertTrue(controller.begin_mutation())
+        screen._finished = False
+        screen.on_unmount()
+        self.assertFalse(controller.mutation_active)
+
     async def test_operation_apply_event_branches(self):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
