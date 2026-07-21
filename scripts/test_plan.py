@@ -42,6 +42,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Force a specific pytest target.",
     )
     parser.add_argument(
+        "--level",
+        choices=("module", "cluster"),
+        default="cluster",
+        help="Level 1 module tests or Level 2 cluster tests.",
+    )
+    parser.add_argument(
         "--format",
         choices=("text", "json"),
         default="text",
@@ -76,6 +82,10 @@ def format_text(plan, *, explain: bool = False) -> str:
     if explain:
         for reason in plan.reasons:
             lines.append(f"TEST_PLAN_REASON_DETAIL={reason}")
+        lines.append(f"TEST_PLAN_VALIDATION_LEVEL={plan.validation_level}")
+        lines.append(
+            f"TEST_PLAN_FINAL_FOCUSED_EVIDENCE={'true' if plan.final_focused_evidence else 'false'}"
+        )
         for target in plan.pytest_targets:
             lines.append(f"TEST_PLAN_PYTEST_TARGET={target}")
         for validator in plan.validators:
@@ -97,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         changed,
         cluster_override=args.cluster,
         target_override=args.target,
+        level=args.level,
         python=args.python,
     )
     if args.format == "json":

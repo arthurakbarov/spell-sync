@@ -344,27 +344,32 @@ def check_snapshot_finalization_skills(root: Path) -> list[str]:
         rel = skill_file.relative_to(root)
         if SNAPSHOT_FINALIZATION_MARKER not in text:
             errors.append(
-                f"[SNAPSHOT-001] {rel}: modifying skill missing '{SNAPSHOT_FINALIZATION_MARKER}' section"
+                f"[SNAPSHOT-001] {rel}: modifying skill missing "
+                f"'{SNAPSHOT_FINALIZATION_MARKER}' section"
             )
             continue
         if not SNAPSHOT_FORCE_REQUIRED.search(text):
             errors.append(
-                f"[SNAPSHOT-002] {rel}: snapshot finalization must require create-code-snapshot --force"
+                f"[SNAPSHOT-002] {rel}: snapshot finalization must require "
+                "create-code-snapshot --force"
             )
         if not SNAPSHOT_REPORT_FOOTER.search(text):
             errors.append(
-                f"[SNAPSHOT-003] {rel}: snapshot finalization must require CODE_ARCHIVE report footer"
+                f"[SNAPSHOT-003] {rel}: snapshot finalization must require "
+                "CODE_ARCHIVE report footer"
             )
         if "when recreation was required" in text.lower():
             errors.append(
-                f"[SNAPSHOT-004] {rel}: do not gate snapshot on optional recreation; always before report"
+                f"[SNAPSHOT-004] {rel}: do not gate snapshot on optional recreation; "
+                "always before report"
             )
     agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if agent_dev.is_file():
         text = agent_dev.read_text(encoding="utf-8")
         if "Workspace archive (mandatory before report)" not in text:
             errors.append(
-                "[SNAPSHOT-005] docs/AGENT_DEVELOPMENT.md missing mandatory workspace archive section"
+                "[SNAPSHOT-005] docs/AGENT_DEVELOPMENT.md missing mandatory "
+                "workspace archive section"
             )
     return errors
 

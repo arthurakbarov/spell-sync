@@ -118,6 +118,18 @@ def test_safety_cluster_cannot_be_manually_excluded() -> None:
     assert "transaction" in plan.clusters
 
 
+def test_all_registry_test_targets_exist() -> None:
+    proc = subprocess.run(
+        [sys.executable, "scripts/validate_test_impact.py"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "TEST_IMPACT_VALIDATION=success" in proc.stdout
+
+
 def test_full_ci_result_not_confused_with_focused_evidence() -> None:
     ci_runner = (ROOT / "scripts" / "ci_runner.py").read_text(encoding="utf-8")
     assert "finalEvidence" in ci_runner

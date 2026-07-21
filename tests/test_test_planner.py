@@ -180,6 +180,51 @@ def test_target_override(planner_mod, registry) -> None:
     assert plan.pytest_targets == ("tests/test_core.py",)
 
 
+def test_push_runtime_override_retains_safety_clusters(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/push_prepared.py"],
+        registry=registry,
+        cluster_override="runtime",
+    )
+    assert "runtime" in plan.clusters
+    assert "push" in plan.clusters
+    assert "transaction" in plan.clusters
+
+
+def test_target_override_is_level_zero(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/push_prepared.py"],
+        registry=registry,
+        target_override="tests/test_core.py",
+    )
+    assert plan.validation_level == 0
+    assert plan.final_focused_evidence is False
+    assert plan.pytest_targets == ("tests/test_core.py",)
+
+
+def test_module_level_uses_module_tests(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/application/runtime_resolver.py"],
+        registry=registry,
+        level="module",
+    )
+    assert "tests/test_explicit_runtime.py" in plan.pytest_targets
+    assert "tests/test_runtime_architecture.py" not in plan.pytest_targets
+
+
+def test_cluster_level_uses_cluster_tests(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/application/runtime_resolver.py"],
+        registry=registry,
+        level="cluster",
+    )
+    assert "tests/test_runtime_architecture.py" in plan.pytest_targets
+
+
 def test_plan_cli_json_output() -> None:
     proc = subprocess.run(
         [sys.executable, "scripts/test_plan.py", "--files", "docs/FOO.md", "--format", "json"],
@@ -190,7 +235,8 @@ def test_plan_cli_json_output() -> None:
     )
     assert proc.returncode == 0
     payload = json.loads(proc.stdout)
-    assert payload["schemaVersion"] == 1
+    assert payload["schemaVersion"] == 2
+    assert payload["validationLevel"] == 2
     assert payload["clusters"] == ["documentation"]
 
 

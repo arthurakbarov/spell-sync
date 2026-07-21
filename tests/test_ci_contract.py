@@ -73,6 +73,7 @@ def _make_test_root(tmp: Path) -> tuple[Path, Path]:
         "check-docs-contract.py",
         "check-agent-config.py",
         "check-target-capabilities.py",
+        "validate_test_impact.py",
     ):
         (root / "scripts" / name).write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     return root, artifacts
@@ -91,6 +92,7 @@ def _is_validator_script(argv: list[str]) -> bool:
             "check-docs-contract.py",
             "check-agent-config.py",
             "check-target-capabilities.py",
+            "validate_test_impact.py",
         )
     )
 

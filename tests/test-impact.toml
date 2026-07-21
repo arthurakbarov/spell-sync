@@ -42,7 +42,10 @@ production = [
   "spell_sync/application/mutation_scope.py",
   "spell_sync/mutation_guards.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_explicit_runtime.py",
+]
+clusterTests = [
   "tests/test_runtime_architecture.py",
   "tests/test_explicit_runtime.py",
   "tests/test_runtime_helpers.py",
@@ -71,9 +74,11 @@ production = [
   "spell_sync/pull*.py",
   "spell_sync/io.py",
 ]
-tests = [
+moduleTests = [
   "tests/test_pull_safety.py",
-  "tests/test_pull_flow.py",
+]
+clusterTests = [
+  "tests/test_pull_safety.py",
 ]
 validators = []
 
@@ -115,11 +120,13 @@ production = [
   "spell_sync/recovery*.py",
   "spell_sync/push_journal.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_recovery_discard_safety.py",
+]
+clusterTests = [
   "tests/test_recovery_discard_safety.py",
   "tests/test_recovery_facade_coverage.py",
   "tests/test_tui_recovery_safety.py",
-  "tests/test_recovery_flow.py",
 ]
 validators = []
 

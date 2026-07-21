@@ -21,6 +21,7 @@ ALL_PYTEST_CLUSTERS = frozenset(
         "cli-json",
         "packaging",
         "agent-workflow",
+        "test-selection",
     }
 )
 
@@ -29,9 +30,15 @@ ALL_PYTEST_CLUSTERS = frozenset(
 class ClusterSpec:
     name: str
     production: tuple[str, ...]
-    tests: tuple[str, ...]
+    module_tests: tuple[str, ...]
+    cluster_tests: tuple[str, ...]
     validators: tuple[str, ...] = ()
     static_targets: tuple[str, ...] = ()
+    allow_no_match: bool = False
+
+    @property
+    def tests(self) -> tuple[str, ...]:
+        return self.cluster_tests
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,12 +64,17 @@ def load_registry(path: Path) -> Registry:
     for name, section in data.get("clusters", {}).items():
         if not isinstance(section, dict):
             continue
+        legacy_tests = _as_tuple(section.get("tests"))
+        module_tests = _as_tuple(section.get("moduleTests")) or legacy_tests
+        cluster_tests = _as_tuple(section.get("clusterTests")) or legacy_tests
         clusters[name] = ClusterSpec(
             name=name,
             production=_as_tuple(section.get("production")),
-            tests=_as_tuple(section.get("tests")),
+            module_tests=module_tests,
+            cluster_tests=cluster_tests,
             validators=_as_tuple(section.get("validators")),
-            static_targets=_as_tuple(section.get("static_targets")),
+            static_targets=_as_tuple(section.get("staticTargets")),
+            allow_no_match=bool(section.get("allowNoMatch", False)),
         )
     meta = data.get("meta", {})
     if not isinstance(meta, dict):
@@ -100,12 +112,11 @@ def is_docs_only(path: str, registry: Registry) -> bool:
 
 def clusters_for_file(path: str, registry: Registry) -> set[str]:
     normalized = path.replace("\\", "/")
-    matched: set[str] = set()
     if normalized in registry.shared_fixtures or normalized == "tests/conftest.py":
         return set(ALL_PYTEST_CLUSTERS)
     if normalized.startswith("tests/") and normalized.endswith(".py"):
-        matched.add("_test_file")
-        return matched
+        return {"_test_file"}
+    matched: set[str] = set()
     if any(normalized.startswith(prefix) for prefix in registry.agent_paths):
         matched.add("agent-workflow")
     if any(normalized == item or normalized.startswith(item) for item in registry.ci_script_paths):
@@ -119,6 +130,15 @@ def clusters_for_file(path: str, registry: Registry) -> set[str]:
     if normalized.startswith("spell_sync/") and not matched:
         matched.add(CONSERVATIVE_FALLBACK_CLUSTER)
     return matched
+
+
+def required_safety_clusters(changed_files: list[str], registry: Registry) -> set[str]:
+    required: set[str] = set()
+    for path in changed_files:
+        for cluster_name in clusters_for_file(path, registry):
+            if cluster_name in SAFETY_CRITICAL_CLUSTERS:
+                required.add(cluster_name)
+    return required
 
 
 def dedupe_sorted(items: set[str] | list[str]) -> list[str]:
