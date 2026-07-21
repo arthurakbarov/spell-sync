@@ -10,18 +10,19 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 3: explicit runtime — content-addressed validation, test selection infrastructure,
-private runtime construction, and commit-bound final CI evidence.
+Phase 4: focused application services and thin facade — **not started**. Phase 3
+(explicit runtime, runtime identity safety, commit-bound final CI evidence) is
+**complete** and owner-approved.
 
 [architecture-status:start]
-current: phase-3
+current: phase-4
 phase-1: complete
 phase-2: complete
 phase-2b: complete
 phase-2c: complete
 phase-2d: complete
 phase-2e: complete
-phase-3: awaiting-approval
+phase-3: complete
 phase-4: not-started
 [architecture-status:end]
 
@@ -29,43 +30,72 @@ phase-4: not-started
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `c9b46bc` docs: add platform validation readiness report | yes |
-| spell-sync-dev | `3dcf017` chore: remove obsolete private export tooling | yes |
-| spell-words | `c7ffed5` chore: add data repository agent guide | yes |
+| spell-sync | `1ba73ba` test: cover runtime identity subset policy and pull fingerprint guard | yes |
+| spell-sync-dev | `334ab73` test: make snapshot suite fast and timeout-safe | yes |
+| spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
+
+Phase 3 final CI evidence: `1ba73ba`, run `20260721T040009.370414Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
 ```text
 CLI (cli.py, commands.py, *_cmd.py)
-  → CliOptions, command_helpers, sync_run, sync_context
+  → cli_request_adapter → typed application requests
   → SpellSyncService (application/service.py)
-  → builders.py, sync_run, push_*, pull, project_setup, diagnostics
+  → RuntimeResolver (application/runtime_resolver.py)
+  → private _runtime_factory
+  → ResolvedRuntime (config + journal + RuntimeIdentity)
+  → RuntimeContext (wordlist, RuntimeSettings, dictionaries, strict_push)
+  → sync_run / push_* / pull / project_setup / diagnostics (core)
 
 TUI (tui/controller.py, screens/)
-  → CliOptions, SpellSyncService protocol
-  → workers → service methods
+  → typed requests + SpellSyncService protocol
+  → workers → same application path as CLI (no subprocess CLI, no direct core writers)
 
 Settings (settings.py)
-  → module cache (load_config_result)
-  → explicit settings dict passed to discover_dictionaries / config flags
+  → load_config_result per resolve (no module settings cache)
+  → RuntimeSettings on RuntimeContext
 
-Validated runtime (command_helpers.py, application/runtime_resolver.py)
-  → RuntimeResolver.bound optional reuse
-  → mutating_command_scope_for(bound=...) without ContextVar
+Mutation lifecycle (Pull/Push/Recovery/target settings)
+  confirmed preview (+ RuntimeIdentity at preview time)
+  → operation lock
+  → fresh config / settings / targets / journal resolution under lock
+  → fresh RuntimeIdentity
+  → comparison with preview identity (mismatch → STOPPED_SAFELY, no replan)
+  → target fingerprint validation
+  → transaction / journal / write
 ```
+
+Runtime resolution invariants:
+
+- Application facade owns runtime resolution; CLI and TUI do not construct runtime independently.
+- `_runtime_factory` is private to resolution paths.
+- No production `ContextVar` for settings or validated runtime.
+- No module-level config cache.
+- No hidden mutation runtime reused from preview time; execution resolves fresh state under lock.
+- Changed runtime after preview blocks execution; no automatic replanning.
 
 ## Global state inventory
 
 | Location | Symbol | Kind |
 |----------|--------|------|
-| `settings.py` | `_settings_cache`, `_settings_cache_key` | module cache |
-| `technical_logging.py:14-16` | `_CONFIGURED`, `_HANDLER`, `_CONFIGURED_LOG` | module logging state |
+| `technical_logging.py` | `_CONFIGURED`, `_HANDLER`, `_CONFIGURED_LOG` | module logging bootstrap |
 
-No production `ContextVar` for settings or validated runtime (removed in Phase 3).
-No module-level mutable state in `runtime_resolver.py`, `sync_context.py` (builders only),
-`validated_runtime.py` (frozen dataclass factory).
+Removed in Phase 3 (must not reappear):
+
+- `_settings_cache`, `_settings_cache_key` (settings module cache)
+- `ContextVar` runtime scope for settings or validated runtime
+- bound mutation runtime reuse across preview and execution
+- stale preview runtime carried into execution
+
+No production `ContextVar` for settings or validated runtime.
+No module-level config cache in `settings.py`.
+No hidden mutation runtime; fresh resolution under the operation lock via
+`mutation_scope_for` / `RuntimeResolver.mutation_scope`.
+`ResolvedRuntime` is the canonical resolved bundle; `ValidatedRuntime` remains a
+compatibility alias only where legacy naming persists in tests or docs migration.
 
 ## Service responsibility inventory
 
@@ -127,48 +157,168 @@ blocking, and privacy rules.
 8. Agent config refresh
 9. Version 0.3.0
 
-## Phase 3 — Explicit runtime
+## Phase 3 — Explicit runtime (complete)
 
 ### Goal
 
 Replace implicit ContextVar-based settings and validated runtime with explicit resolution
-through `RuntimeResolver`, passed into the application facade.
+through `RuntimeResolver`, runtime identity binding for preview/execution consistency,
+and commit-bound final CI evidence.
+
+### Scope (delivered)
+
+- `spell_sync/application/runtime_resolver.py`, `application/_runtime_factory.py`
+- `spell_sync/runtime_identity.py`, `spell_sync/resolved_runtime.py`
+- `spell_sync/settings.py`, `spell_sync/sync_context.py`, `spell_sync/application/mutation_scope.py`
+- `spell_sync/application/service.py`, `spell_sync/push_prepared.py`, `spell_sync/application/builders.py`
+- Test selection infrastructure (`tests/test-impact.toml`, `scripts/test_selection/`, focused runners)
+- Architecture tests, ADR, CI clean-tree and evidence gates
+
+### Required outcomes (delivered)
+
+- No production `ContextVar` for settings or validated runtime
+- No module-level config cache
+- `RuntimeResolver` resolves `ProjectRef` → `ResolvedRuntime` explicitly
+- Fresh mutation resolution under the operation lock; no hidden reuse of preview runtime
+- `RuntimeIdentity` stored at preview; execution compares fresh identity under lock
+- Runtime or fingerprint mismatch stops safely; no automatic replanning
+- CLI JSON, exit codes, and Pull/Push semantics unchanged
+- Final CI evidence binds to committed clean HEAD
+
+### Safety contracts (preserved)
+
+- Operation lock, journal, Recovery, preview/execute binding unchanged
+- Target fingerprint validation after identity match
+- Privacy and mutation invariants unchanged
+
+### Phase-specific validation (passed)
+
+- `tests/test_explicit_runtime.py`, `tests/test_runtime_identity.py`
+- `tests/test_runtime_architecture.py`, Pull/Push/Recovery safety suites
+- Full final CI on `1ba73ba` with `finalEvidence=true`
+- ADR `docs/decisions/0002-explicit-runtime.md` accepted
+
+### Completion criteria (met)
+
+- Architecture and runtime identity tests pass; full CI green on accepted HEAD
+- Owner approval recorded; tracker status `complete`
+- Phase 4 remains `not-started`
+
+## Phase 4 — Focused application services and thin facade
+
+### Preflight maintenance
+
+Two narrow fixes are **required before** service decomposition begins (documented here;
+not part of Phase 3 close-out):
+
+1. **NUL-safe untracked digest** — In `scripts/test_selection/tree_state.py`, `_untracked_paths()`
+   must use `git ls-files -o --exclude-standard -z` with NUL parsing. Add regression test:
+   untracked filename contains newline; content changes A → B; tree digest changes. Do not
+   use line-based Git path parsing.
+
+2. **Snapshot Git timeout** — In spell-sync-dev `scripts/create-code-snapshot.py`, production
+   `_git_command()` must use a controlled subprocess timeout and stable snapshot failure
+   (not timeout only in test helpers).
+
+### Goal
+
+Split the monolithic `SpellSyncService` and presentation builders into focused UI-neutral
+services while keeping one compatible application facade for CLI and TUI.
 
 ### Scope
 
-- `spell_sync/application/runtime_resolver.py` (new)
-- `spell_sync/settings.py`, `spell_sync/config.py`, `spell_sync/dictionaries.py`
-- `spell_sync/command_helpers.py`, `spell_sync/sync_context.py`, `spell_sync/validated_runtime.py`
-- `spell_sync/application/service.py`, `spell_sync/application/project_resolution.py`
-- Architecture tests and ADR
+Minimum:
+
+```text
+spell_sync/application/service.py
+spell_sync/application/builders.py
+spell_sync/application/reports.py
+spell_sync/application/runtime_resolver.py
+spell_sync/application/*
+spell_sync/tui/controller.py
+application service protocols
+architecture tests
+project map
+ADR
+```
 
 ### Required outcomes
 
-- No production `ContextVar` for settings or validated runtime
-- `RuntimeResolver` resolves `ProjectRef` → `ValidatedRuntime` explicitly
-- Mutating commands reuse bound runtime without implicit globals
-- CLI JSON, exit codes, and Pull/Push semantics unchanged
+- `SpellSyncService` becomes a thin compatibility facade.
+- Focused services by responsibility:
+  - inspection / status / doctor;
+  - Pull/Push synchronization;
+  - Recovery;
+  - setup / init;
+  - target settings;
+  - diagnostics / history / support report.
+- Presentation builders separated from mutation orchestration.
+- CLI and TUI use one application path.
+- Focused services do not import CLI/TUI modules.
+- Core does not import the application layer.
+- Runtime resolution remains through `RuntimeResolver`.
+- Mutation services receive fresh scoped runtime.
+- No parallel execution paths.
+- Legacy facade methods either delegate to one canonical service path or are removed after
+  all consumers migrate.
+- No unused service abstractions remain.
 
 ### Safety contracts
 
-- Operation lock, journal, Recovery, and preview/execute binding unchanged
-- Single config+journal load under lock preserved
+Unchanged:
+
+- Pull union semantics;
+- Push replication / filter semantics;
+- built-in dictionary exclusion;
+- operation lock;
+- journal and Recovery blocker;
+- snapshots / backups / rollback;
+- exact confirmation ID;
+- RuntimeIdentity preview/execution binding;
+- target fingerprints;
+- no automatic replan;
+- privacy contracts;
+- CLI JSON and exit codes.
 
 ### Deferred
 
-- Service decomposition (Phase 4)
-- Structured technical events (Phase 5)
+Do not start:
+
+- structured technical events (Phase 5);
+- version `0.3.0`;
+- CLI redesign;
+- TUI redesign;
+- release / tag / publication;
+- product semantic changes.
 
 ### Phase-specific validation
 
-- `tests/test_explicit_runtime.py` (architecture guards)
-- `tests/test_application_requests.py`
+Minimum:
+
+```text
+architecture dependency tests
+application facade delegation tests
+focused service tests
+runtime identity tests
+Pull/Push transaction safety
+Recovery safety
+CLI/TUI equivalence
+TUI architecture tests
+full final CI
+installed-wheel smoke
+```
 
 ### Completion criteria
 
-- Architecture tests pass; full CI green
-- Tracker status `awaiting-approval`
-- ADR `docs/decisions/0002-explicit-runtime.md` accepted in repo
+- Facade substantially thinner; responsibilities have a single owner.
+- No CLI/TUI bypasses.
+- Mutation invariants preserved.
+- Architecture guards forbid reverse dependencies.
+- Legacy parallel helpers removed.
+- Docs, ADR, and project map current.
+- Final CI on final committed clean HEAD.
+- Phase status `awaiting-approval`.
+- Phase 5 not started.
 
 ## Phase 2B: complete application boundary
 
@@ -207,8 +357,8 @@ Public: `prepare_pull`, `execute_pull`, `load_push_preview`, `execute_push_previ
 
 Private: `_prepare_push_for_run`, `_execute_push_for_run`, `_run_push_for_run`.
 
-Push strict resolution: `effective_push_strict()` in `project_resolution.py` (implicit
-settings until Phase 3).
+Push strict resolution: `effective_push_strict()` in `project_resolution.py` (explicit
+runtime settings from `ResolvedRuntime` / preview context).
 
 ### Compatibility contracts
 
@@ -272,16 +422,20 @@ Summary:
 - Phase 1 (spell-sync-dev): removed obsolete private export and review-bundle tooling
 - Phase 2: typed application requests + CLI adapter
 - Phase 2B: pure request DTOs, service-only CLI mutations, dependency direction
+- Phase 2C–2E: deterministic CI, agent workflow, test selection infrastructure
+- Phase 3: explicit runtime, RuntimeIdentity, clean-tree final CI evidence (owner-approved)
 
 ## Last validation
 
 ```text
-Phase 2B: pytest 1559+ passed; scripts/ci.sh green; 100% line coverage (2026-07-20)
+Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.370414Z); 100% line coverage
+Phase 2B: pytest 1559+ passed; scripts/ci.sh green (2026-07-20)
 ```
 
 ## Remaining work
 
-Phases 3–10 on public spell-sync repository (see migration order).
+Phases 4–10 on public spell-sync repository (see migration order). Phase 4 preflight
+maintenance (NUL-safe untracked digest, snapshot Git timeout) before decomposition.
 
 ## Deferred work
 
