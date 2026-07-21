@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .event_metadata import EventReason
 from .events import (
     EventId,
     PresentedEvent,
@@ -61,35 +62,40 @@ _MESSAGES: dict[EventId, str] = {
     EventId.SETUP_WORDLIST_CREATED: "Writing wordlist",
     EventId.SETUP_VERIFYING: "Verifying project files",
     EventId.SETUP_COMPLETED: "Project setup completed",
+    EventId.SETUP_STOPPED_SAFELY: "Setup stopped safely",
+    EventId.SETUP_FAILED: "Setup failed",
+    EventId.SETUP_INCOMPLETE: "Setup incomplete",
     EventId.TARGETS_LOCK_ACQUIRED: "Acquiring project lock",
     EventId.TARGETS_CONFLICTS_CHECKED: "Checking configuration fingerprint",
     EventId.TARGETS_WRITE_STARTED: "Writing spell-sync.toml",
     EventId.TARGETS_VERIFYING: "Verifying configuration",
     EventId.TARGETS_COMPLETED: "Configuration updated",
+    EventId.TARGETS_STOPPED_SAFELY: "Configuration update stopped safely",
+    EventId.TARGETS_FAILED: "Configuration update failed",
     EventId.DIAGNOSTICS_HISTORY_WRITE_FAILED: "Operation history could not be saved",
     EventId.DIAGNOSTICS_LOGGING_SETUP_FAILED: "Technical log unavailable",
 }
 
-_REASON_MESSAGES: dict[str, str] = {
-    "rollback_incomplete": "Push rollback did not complete cleanly",
-    "journal_in_progress": "Push journal still in progress",
+_REASON_MESSAGES: dict[EventReason, str] = {
+    EventReason.ROLLBACK_INCOMPLETE: "Push rollback did not complete cleanly",
+    EventReason.JOURNAL_INVALID: "Push journal still in progress",
 }
 
 
 def present_event(event: TechnicalEvent) -> PresentedEvent:
     message = _MESSAGES.get(event.event_id, event.event_id.value)
     if event.event_id is EventId.PUSH_TARGET_CHANGED and event.target_id:
-        message = f"{event.target_id} changed after preview"
+        message = f"{event.target_id.value} changed after preview"
     elif event.event_id is EventId.PUSH_TARGET_STARTED and event.target_id:
-        message = f"Updating {event.target_id}"
+        message = f"Updating {event.target_id.value}"
     elif event.event_id is EventId.RECOVERY_TARGET_RESTORE_STARTED and event.target_id:
-        message = f"Recovering {event.target_id}"
+        message = f"Recovering {event.target_id.value}"
     elif event.event_id is EventId.RECOVERY_TARGET_REMOVE_STARTED and event.target_id:
-        message = f"Recovering {event.target_id}"
+        message = f"Recovering {event.target_id.value}"
     elif event.event_id is EventId.RECOVERY_WORDLIST_RESTORE_STARTED:
         message = "Recovering wordlist"
-    elif event.reason_code and event.reason_code in _REASON_MESSAGES:
-        message = _REASON_MESSAGES[event.reason_code]
+    elif event.reason is not None and event.reason in _REASON_MESSAGES:
+        message = _REASON_MESSAGES[event.reason]
     return PresentedEvent(
         operation=event.operation,
         event_id=event.event_id,

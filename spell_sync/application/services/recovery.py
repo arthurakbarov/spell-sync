@@ -6,6 +6,8 @@ from ...exit_codes import ExitCode
 from ...push_journal import JournalLoadStatus
 from .. import _operation_deps
 from ..builders import build_recovery_preview
+from ..event_helpers import build_technical_event
+from ..event_metadata import EventReason
 from ..events import (
     EventCategory,
     EventId,
@@ -13,11 +15,10 @@ from ..events import (
     EventSeverity,
     EventSink,
     OperationKind,
-    TechnicalEvent,
 )
 from ..reports import RecoveryExecution, RecoveryOutcome, RecoveryPreview, RecoveryStatus
 from ..requests import RecoveryRequest
-from ._shared import emit_technical
+from ._shared import emit_technical, make_operation_emitter
 from .context import ApplicationContext
 
 
@@ -42,6 +43,7 @@ class RecoveryService:
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         correlation_id = preview.preview_fingerprint
+        emitter = make_operation_emitter(event_sink)
 
         if confirmed_transaction_id != preview.preview_fingerprint:
             return RecoveryExecution(
@@ -59,8 +61,8 @@ class RecoveryService:
             )
 
         emit_technical(
-            event_sink,
-            TechnicalEvent(
+            emitter,
+            build_technical_event(
                 event_id=EventId.RECOVERY_VALIDATING,
                 operation=OperationKind.RECOVER,
                 category=EventCategory.RECOVERY,
@@ -77,15 +79,15 @@ class RecoveryService:
         ) as scope:
             if isinstance(scope, int):
                 emit_technical(
-                    event_sink,
-                    TechnicalEvent(
+                    emitter,
+                    build_technical_event(
                         event_id=EventId.RECOVERY_BLOCKED,
                         operation=OperationKind.RECOVER,
                         category=EventCategory.SAFETY,
                         severity=EventSeverity.ERROR,
                         phase=EventPhase.EXECUTING,
                         correlation_id=correlation_id,
-                        outcome=RecoveryOutcome.FAILED.value,
+                        outcome=RecoveryOutcome.FAILED,
                     ),
                 )
                 return RecoveryExecution(
@@ -96,8 +98,8 @@ class RecoveryService:
                 )
 
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_LOCK_ACQUIRED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.LIFECYCLE,
@@ -125,8 +127,8 @@ class RecoveryService:
                 )
 
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_SNAPSHOTS_VALIDATED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.RECOVERY,
@@ -136,8 +138,8 @@ class RecoveryService:
                 ),
             )
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_CONFLICTS_CHECKED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.RECOVERY,
@@ -157,8 +159,8 @@ class RecoveryService:
                 else:
                     event_id = EventId.RECOVERY_TARGET_RESTORE_STARTED
                 emit_technical(
-                    event_sink,
-                    TechnicalEvent(
+                    emitter,
+                    build_technical_event(
                         event_id=event_id,
                         operation=OperationKind.RECOVER,
                         category=EventCategory.RECOVERY,
@@ -199,15 +201,15 @@ class RecoveryService:
                     else RecoveryOutcome.RECOVERY_INCOMPLETE
                 )
                 emit_technical(
-                    event_sink,
-                    TechnicalEvent(
+                    emitter,
+                    build_technical_event(
                         event_id=EventId.RECOVERY_FAILED,
                         operation=OperationKind.RECOVER,
                         category=EventCategory.RECOVERY,
                         severity=EventSeverity.ERROR,
                         phase=EventPhase.EXECUTING,
                         correlation_id=correlation_id,
-                        outcome=outcome.value,
+                        outcome=outcome,
                     ),
                 )
                 return RecoveryExecution(
@@ -229,16 +231,16 @@ class RecoveryService:
             cleanup_result = _operation_deps.cleanup_after_successful_recovery(journal)
             if not cleanup_result.ok:
                 emit_technical(
-                    event_sink,
-                    TechnicalEvent(
+                    emitter,
+                    build_technical_event(
                         event_id=EventId.RECOVERY_FAILED,
                         operation=OperationKind.RECOVER,
                         category=EventCategory.RECOVERY,
                         severity=EventSeverity.ERROR,
                         phase=EventPhase.FINALIZING,
                         correlation_id=correlation_id,
-                        reason_code="cleanup_incomplete",
-                        outcome=RecoveryOutcome.RECOVERY_INCOMPLETE.value,
+                        reason=EventReason.CLEANUP_FAILED,
+                        outcome=RecoveryOutcome.RECOVERY_INCOMPLETE,
                     ),
                 )
                 return RecoveryExecution(
@@ -255,8 +257,8 @@ class RecoveryService:
                     failed=result.failed,
                 )
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_CLEANUP_STARTED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.RECOVERY,
@@ -266,15 +268,15 @@ class RecoveryService:
                 ),
             )
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_COMPLETED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.RECOVERY,
                     severity=EventSeverity.SUCCESS,
                     phase=EventPhase.COMPLETED,
                     correlation_id=correlation_id,
-                    outcome=RecoveryOutcome.RECOVERED.value,
+                    outcome=RecoveryOutcome.RECOVERED,
                 ),
             )
             outcome = (
@@ -308,6 +310,7 @@ class RecoveryService:
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
         correlation_id = preview.preview_fingerprint
+        emitter = make_operation_emitter(event_sink)
 
         if confirmed_transaction_id != preview.preview_fingerprint:
             return RecoveryExecution(
@@ -354,15 +357,15 @@ class RecoveryService:
                     message=discard_result.detail or "Cleanup could not remove recovery artifacts.",
                 )
             emit_technical(
-                event_sink,
-                TechnicalEvent(
+                emitter,
+                build_technical_event(
                     event_id=EventId.RECOVERY_CLEANUP_COMPLETED,
                     operation=OperationKind.RECOVER,
                     category=EventCategory.RECOVERY,
                     severity=EventSeverity.SUCCESS,
                     phase=EventPhase.COMPLETED,
                     correlation_id=correlation_id,
-                    outcome=RecoveryOutcome.CLEANUP_COMPLETED.value,
+                    outcome=RecoveryOutcome.CLEANUP_COMPLETED,
                 ),
             )
             return RecoveryExecution(

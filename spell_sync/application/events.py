@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
+from .event_metadata import CorrelationId, EventReason, TargetId, TerminalOutcome
+
 
 class OperationKind(str, Enum):
     STATUS = "status"
@@ -96,12 +98,17 @@ class EventId(str, Enum):
     SETUP_WORDLIST_CREATED = "setup.wordlist_created"
     SETUP_VERIFYING = "setup.verifying"
     SETUP_COMPLETED = "setup.completed"
+    SETUP_STOPPED_SAFELY = "setup.stopped_safely"
+    SETUP_FAILED = "setup.failed"
+    SETUP_INCOMPLETE = "setup.incomplete"
 
     TARGETS_LOCK_ACQUIRED = "targets.lock_acquired"
     TARGETS_CONFLICTS_CHECKED = "targets.conflicts_checked"
     TARGETS_WRITE_STARTED = "targets.write_started"
     TARGETS_VERIFYING = "targets.verifying"
     TARGETS_COMPLETED = "targets.completed"
+    TARGETS_STOPPED_SAFELY = "targets.stopped_safely"
+    TARGETS_FAILED = "targets.failed"
 
     DIAGNOSTICS_HISTORY_WRITE_FAILED = "diagnostics.history_write_failed"
     DIAGNOSTICS_LOGGING_SETUP_FAILED = "diagnostics.logging_setup_failed"
@@ -118,10 +125,10 @@ class TechnicalEvent:
     category: EventCategory
     severity: EventSeverity
     phase: EventPhase | None = None
-    correlation_id: str | None = None
-    target_id: str | None = None
-    reason_code: str | None = None
-    outcome: str | None = None
+    correlation_id: CorrelationId | None = None
+    target_id: TargetId | None = None
+    reason: EventReason | None = None
+    outcome: TerminalOutcome | None = None
     completed: int | None = None
     total: int | None = None
 
@@ -135,7 +142,7 @@ class PresentedEvent:
     message: str
     severity: EventSeverity
     phase: EventPhase | None = None
-    target_id: str | None = None
+    target_id: TargetId | None = None
     completed: int | None = None
     total: int | None = None
 
@@ -166,10 +173,7 @@ class EventEmitter:
         if self.presentation_sink is not None:
             from .event_presenter import present_event
 
-            try:
-                self.presentation_sink(present_event(event))
-            except Exception:
-                pass
+            self.presentation_sink(present_event(event))
 
 
 def operation_emitter(presentation_sink: PresentationEventSink | None) -> EventEmitter:

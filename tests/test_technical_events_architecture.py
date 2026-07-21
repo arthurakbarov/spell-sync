@@ -146,9 +146,108 @@ class TestTechnicalEventsArchitecture(unittest.TestCase):
             msg="[ARCH-TE-010] only events.py may construct EventEmitter(...)",
         )
 
-    def test_emit_technical_routes_through_operation_emitter(self) -> None:
+    def test_emit_technical_uses_canonical_emitter(self) -> None:
         from spell_sync.application.services import _shared
 
         source = inspect.getsource(_shared.emit_technical)
-        self.assertIn("operation_emitter", source)
+        self.assertIn("emitter.emit", source)
         self.assertNotIn("EventEmitter(", source)
+
+    def test_make_operation_emitter_wraps_operation_emitter(self) -> None:
+        from spell_sync.application.services import _shared
+
+        source = inspect.getsource(_shared.make_operation_emitter)
+        self.assertIn("operation_emitter", source)
+
+    def test_event_emitter_only_suppresses_technical_sink_exceptions(self) -> None:
+        source = (_SPELL_SYNC / "application" / "events.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        emit_method = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef) and node.name == "EventEmitter"
+            for item in node.body
+            if isinstance(item, ast.FunctionDef) and item.name == "emit"
+        )
+        presentation_in_except = False
+        for node in ast.walk(emit_method):
+            if isinstance(node, ast.Try):
+                for handler in node.handlers:
+                    if handler.type is None or (
+                        isinstance(handler.type, ast.Name) and handler.type.id == "Exception"
+                    ):
+                        for child in ast.walk(handler):
+                            if isinstance(child, ast.Call) and isinstance(
+                                child.func, ast.Attribute
+                            ):
+                                if child.func.attr == "presentation_sink" or (
+                                    isinstance(child.func.value, ast.Name)
+                                    and child.func.value.id == "self"
+                                    and child.func.attr in {"presentation_sink", "__call__"}
+                                ):
+                                    presentation_in_except = True
+        for node in ast.walk(emit_method):
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+                func = node.value.func
+                if isinstance(func, ast.Attribute) and func.attr == "presentation_sink":
+                    break
+        else:
+            self.fail("[ARCH-TE-011] presentation sink must be invoked from emit()")
+        self.assertFalse(
+            presentation_in_except,
+            msg="[ARCH-TE-011] presentation sink must not be inside technical except",
+        )
+
+    def test_technical_event_uses_typed_metadata_fields(self) -> None:
+        self.assertTrue(
+            _class_has_field(_EVENTS_PY, "TechnicalEvent", "reason"),
+            msg="[ARCH-TE-012] TechnicalEvent.reason must be typed",
+        )
+        self.assertFalse(
+            _class_has_field(_EVENTS_PY, "TechnicalEvent", "reason_code"),
+            msg="[ARCH-TE-012] TechnicalEvent must not expose reason_code",
+        )
+
+    def test_setup_and_targets_services_always_wire_emitter(self) -> None:
+        for name in ("setup.py", "target_settings.py"):
+            source = (_APPLICATION_SERVICES / name).read_text(encoding="utf-8")
+            self.assertIn(
+                "make_operation_emitter",
+                source,
+                msg=f"[ARCH-TE-013] {name} must use make_operation_emitter",
+            )
+            self.assertIn(
+                "emitter.emit",
+                source,
+                msg=f"[ARCH-TE-013] {name} must pass emitter.emit to core",
+            )
+
+    def test_structured_formatter_writes_pure_json(self) -> None:
+        from spell_sync.diagnostics.technical_logging import _SafeFormatter
+
+        source = inspect.getsource(_SafeFormatter.format)
+        self.assertIn("structured_event", source)
+        self.assertIn("validate_structured_log_message", source)
+
+    def test_no_direct_structured_event_logger_calls_outside_writer(self) -> None:
+        writer = _SPELL_SYNC / "diagnostics" / "technical_event_log.py"
+        offenders: list[str] = []
+        for path in _SPELL_SYNC.rglob("*.py"):
+            if path == writer:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if 'extra={"structured_event": True}' in text or "structured_event': True" in text:
+                offenders.append(str(path.relative_to(_REPO_ROOT)))
+        self.assertEqual(
+            offenders,
+            [],
+            msg="[ARCH-TE-014] only technical_event_log may set structured_event on logger",
+        )
+
+    def test_event_metadata_defines_typed_reason_and_outcome(self) -> None:
+        metadata = _SPELL_SYNC / "application" / "event_metadata.py"
+        text = metadata.read_text(encoding="utf-8")
+        self.assertIn("class EventReason", text)
+        self.assertIn("class TerminalOutcome", text)
+        self.assertIn("class CorrelationId", text)
+        self.assertIn("class TargetId", text)

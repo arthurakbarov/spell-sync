@@ -22,13 +22,14 @@ from ..project_setup.target_settings import (
 )
 from ..push_prepared import PreparedPush
 from ..sync_models import DictionaryDiff, PushResult
+from .event_helpers import build_technical_event
+from .event_metadata import EventReason
 from .events import (
     EventCategory,
     EventId,
     EventSeverity,
     EventSink,
     OperationKind,
-    TechnicalEvent,
     operation_emitter,
 )
 from .reports import (
@@ -98,12 +99,12 @@ class SpellSyncService:
             setup = configure_file_logging(self._state_paths)
             if not setup.ok:
                 operation_emitter(None).emit(
-                    TechnicalEvent(
+                    build_technical_event(
                         event_id=EventId.DIAGNOSTICS_LOGGING_SETUP_FAILED,
                         operation=OperationKind.STATUS,
                         category=EventCategory.DIAGNOSTIC,
                         severity=EventSeverity.WARNING,
-                        reason_code="log_setup_failed",
+                        reason=EventReason.LOGGING_SETUP_FAILED,
                     )
                 )
 

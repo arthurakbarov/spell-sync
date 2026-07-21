@@ -18,12 +18,13 @@ from ..builders import (
     build_setup_operation_report,
     build_target_settings_operation_report,
 )
+from ..event_helpers import build_technical_event
+from ..event_metadata import EventReason
 from ..events import (
     EventCategory,
     EventId,
     EventSeverity,
     OperationKind,
-    TechnicalEvent,
     operation_emitter,
 )
 from ..reports import (
@@ -101,14 +102,14 @@ class DiagnosticsService:
         if write_result.ok:
             return report
         operation_emitter(None).emit(
-            TechnicalEvent(
+            build_technical_event(
                 event_id=EventId.DIAGNOSTICS_HISTORY_WRITE_FAILED,
                 operation=OperationKind(report.operation),
                 category=EventCategory.DIAGNOSTIC,
                 severity=EventSeverity.WARNING,
                 correlation_id=record.record_id,
-                reason_code="history_append_failed",
-                outcome=report.outcome.value,
+                reason=EventReason.HISTORY_APPEND_FAILED,
+                outcome=report.outcome,
             )
         )
         warnings = report.warnings + (HISTORY_SAVE_WARNING,)

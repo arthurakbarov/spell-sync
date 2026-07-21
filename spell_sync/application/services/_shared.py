@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ...runtime_identity import RuntimeIdentity
-from ..events import PresentationEventSink, TechnicalEvent, operation_emitter
+from ..events import EventEmitter, PresentationEventSink, TechnicalEvent, operation_emitter
 
 HISTORY_SAVE_WARNING = "Operation completed, but its history record could not be saved."
 
@@ -13,8 +13,12 @@ RUNTIME_CHANGED_MESSAGE = (
 )
 
 
-def emit_technical(presentation_sink: PresentationEventSink | None, event: TechnicalEvent) -> None:
-    operation_emitter(presentation_sink).emit(event)
+def make_operation_emitter(presentation_sink: PresentationEventSink | None) -> EventEmitter:
+    return operation_emitter(presentation_sink)
+
+
+def emit_technical(emitter: EventEmitter, event: TechnicalEvent) -> None:
+    emitter.emit(event)
 
 
 def running_app_skip_reasons_for(settings):
