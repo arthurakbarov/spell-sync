@@ -81,7 +81,9 @@ fresh runtime under the operation lock.
 Mutating operations emit typed **technical events** (`EventId`, `TechnicalEvent`) through a
 single `EventEmitter` path. Presentation copy is produced at CLI/TUI boundaries only
 (`event_presenter.py`); the rotating technical log stores privacy-safe JSON Lines records
-(`schemaVersion: 1`). See ADR `docs/decisions/0004-structured-technical-events.md`.
+(`schemaVersion: 1`) as **exact JSON objects per line** (no stdlib log prefix on structured
+records). Metadata fields (`CorrelationId`, `TargetId`, `EventReason`, `TerminalOutcome`) are
+validated before serialization. See ADR `docs/decisions/0004-structured-technical-events.md`.
 
 ## Core modules
 

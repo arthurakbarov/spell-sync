@@ -10,9 +10,10 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 5: structured technical events and diagnostics — **in progress** (implementation
-finalized; **awaiting owner approval**). Phase 4 (focused application services and thin facade)
-is **complete** and owner-approved.
+Phase 5: structured technical events and diagnostics — **awaiting owner approval** (corrective
+fixes applied; JSON Lines formatter, typed metadata, terminal events, and architecture guards
+complete). Phase 4 (focused application services and thin facade) is **complete** and
+owner-approved.
 
 [architecture-status:start]
 current: phase-5
