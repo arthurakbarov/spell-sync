@@ -133,6 +133,10 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             screen = app.screen
             assert isinstance(screen, DoctorScreen)
             btn = screen.query_one("#btn-export-support", Button)
+            for _ in range(30):
+                if btn.disabled:
+                    break
+                await pilot.pause()
             self.assertTrue(btn.disabled)
             await wait_for_text(pilot, "#doctor-export-status", "Report saved")
             self.assertFalse(btn.disabled)

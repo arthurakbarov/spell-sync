@@ -178,6 +178,7 @@ class TestLineCoverageGaps(unittest.TestCase):
                     )
         self.assertEqual(executed.outcome, RecoveryOutcome.RECOVERED)
         from spell_sync.application.events import EventId
+
         self.assertTrue(
             any(event.event_id is EventId.RECOVERY_WORDLIST_RESTORE_STARTED for event in events)
         )
