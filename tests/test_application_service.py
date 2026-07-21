@@ -466,7 +466,7 @@ class TestSpellSyncService(unittest.TestCase):
                     )
         execute.assert_called_once()
         self.assertEqual(ok.outcome, OperationOutcome.COMPLETED)
-        self.assertTrue(any(event.stage == "completed" for event in events))
+        self.assertTrue(any(event.event_id is EventId.PULL_COMPLETED for event in events))
 
     def test_execute_push_preview_conflict_and_success(self):
         from spell_sync.application.reports import OperationOutcome, PushPreview

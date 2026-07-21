@@ -149,17 +149,19 @@ class TestRemainingCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist = Path(tmp) / "wordlist.txt"
             prepared = prepare_project_setup(SetupDraft(wordlist, (), create_wordlist=True))
-            stages: list[str] = []
+            from spell_sync.application.events import EventId, TechnicalEvent
 
-            def sink(stage: str, message: str) -> None:
-                stages.append(stage)
+            event_ids: list[EventId] = []
+
+            def sink(event: TechnicalEvent) -> None:
+                event_ids.append(event.event_id)
 
             execute_project_setup(
                 prepared,
                 confirmed_setup_id=prepared.setup_id,
                 event_sink=sink,
             )
-            self.assertIn("completed", stages)
+            self.assertIn(EventId.SETUP_COMPLETED, event_ids)
 
     def test_build_setup_report_existing_wordlist(self):
         prepared = prepare_project_setup(

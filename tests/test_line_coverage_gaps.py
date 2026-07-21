@@ -177,8 +177,13 @@ class TestLineCoverageGaps(unittest.TestCase):
                         event_sink=events.append,
                     )
         self.assertEqual(executed.outcome, RecoveryOutcome.RECOVERED)
-        self.assertTrue(any(event.stage == "restoring_wordlist" for event in events))
-        self.assertTrue(any(event.stage == "removing_created_target" for event in events))
+        from spell_sync.application.events import EventId
+        self.assertTrue(
+            any(event.event_id is EventId.RECOVERY_WORDLIST_RESTORE_STARTED for event in events)
+        )
+        self.assertTrue(
+            any(event.event_id is EventId.RECOVERY_TARGET_REMOVE_STARTED for event in events)
+        )
 
         cleanup_preview = sample_recovery_preview(
             status=RecoveryStatus.COMPLETED_CLEANUP_PENDING,

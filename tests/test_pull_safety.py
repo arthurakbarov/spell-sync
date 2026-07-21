@@ -202,12 +202,14 @@ class TestPullSafety(unittest.TestCase):
                     confirmed_plan_id=preview.plan_identifier,
                     event_sink=events.append,
                 )
-        stages = [event.stage for event in events]
-        self.assertIn("validating", stages)
-        self.assertIn("acquiring_lock", stages)
-        self.assertIn("verifying_plan", stages)
-        self.assertIn("writing_wordlist", stages)
-        self.assertIn("completed", stages)
+        from spell_sync.application.events import EventId
+
+        event_ids = [event.event_id for event in events]
+        self.assertIn(EventId.PULL_VALIDATING, event_ids)
+        self.assertIn(EventId.PULL_LOCK_ACQUIRED, event_ids)
+        self.assertIn(EventId.PULL_PLAN_VERIFIED, event_ids)
+        self.assertIn(EventId.PULL_WRITE_STARTED, event_ids)
+        self.assertIn(EventId.PULL_COMPLETED, event_ids)
 
 
 if __name__ == "__main__":
