@@ -416,6 +416,28 @@ class TestDocsContract(unittest.TestCase):
             violations = [v for v in mod.check_repository(root) if v.check_id == "PHASE-011"]
             self.assertEqual(len(violations), 1, msg="[DOCS-CONTRACT-021] awaiting must be current")
 
+    def test_duplicate_phase_section_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracker = (
+                "## Current phase\n\nPhase 4 active.\n\n"
+                "[architecture-status:start]\n"
+                "current: phase-4\n"
+                "phase-4: awaiting-approval\n"
+                "[architecture-status:end]\n\n"
+                "## Phase 4 — Focused application services and thin facade\n\n"
+                "First.\n\n"
+                "## Phase 4 — Focused application services and thin facade\n\n"
+                "Duplicate.\n"
+            )
+            _init_synthetic_repo(root, {"docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": tracker})
+            violations = mod.check_repository(root)
+            self.assertTrue(
+                any(v.check_id == "PHASE-013" for v in violations),
+                msg="[DOCS-CONTRACT-PHASE-013] duplicate architecture phase section must fail",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

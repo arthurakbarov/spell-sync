@@ -12,12 +12,14 @@ alwaysApply: true
 5. Run focused pytest before full `scripts/ci.sh`.
 6. Commit tracked changes and verify clean trees before final full CI.
 7. Verify `python3 scripts/check-ci-evidence.py` after final CI; snapshot only after evidence success.
-6. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.
-7. Update tests, docs, contracts, and ADRs together with code changes.
-8. Do not claim pass without command evidence.
-9. Capture baseline Git state for all three workspace repositories at task start.
-10. On modifying tasks: finalize workspace snapshot per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot, then report.
-11. Do not advance to the next phase without owner approval (`advance-current-phase`).
-12. Do not push, tag, release, or publish without explicit owner request.
+8. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.
+9. Update tests, docs, contracts, and ADRs together with code changes.
+10. Do not claim pass without command evidence.
+11. Capture baseline Git state for all three workspace repositories at task start.
+12. Final task state: `git stash list` must be empty. Do not hide unfinished work in persistent
+    Git stash between phases; use a named local branch with a normal WIP commit instead.
+13. On modifying tasks: finalize workspace snapshot per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot, then report.
+14. Do not advance to the next phase without owner approval (`advance-current-phase`).
+15. Do not push, tag, release, or publish without explicit owner request.
 
 SSOT: `@docs/AGENT_DEVELOPMENT.md`

@@ -229,6 +229,20 @@ def scan_stale(text: str) -> list[str]:
     return hits
 
 
+def check_persistent_git_stash(root: Path) -> list[str]:
+    result = subprocess.run(
+        ["git", "-C", str(root), "stash", "list"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    if result.stdout.strip():
+        return ["[AGENT-WORKFLOW-GIT-004] persistent Git stash remains after task completion"]
+    return []
+
+
 def git_ls_files(root: Path) -> list[str]:
     result = subprocess.run(
         ["git", "-C", str(root), "ls-files"],
@@ -622,6 +636,8 @@ def validate_agent_config(root: Path) -> list[str]:
                 errors.append(f"{rel}: marked path does not exist: {marked}")
     else:
         errors.append("missing AGENTS.md")
+
+    errors.extend(check_persistent_git_stash(root))
 
     return errors
 

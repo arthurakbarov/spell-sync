@@ -12,7 +12,7 @@ Canonical module responsibilities after Phase 4 service decomposition.
 
 | Module | Role |
 |--------|------|
-| `application/services/context.py` | Shared `ApplicationContext` (runtime, history, paths) |
+| `application/services/context.py` | Shared frozen `ApplicationContext` (runtime, history, paths) |
 | `application/services/diagnostics.py` | Operation history, technical log, support report, report finalization |
 | `application/services/inspection.py` | Status, dashboard, doctor (read-only) |
 | `application/services/sync.py` | Pull/Push preview and execution orchestration |

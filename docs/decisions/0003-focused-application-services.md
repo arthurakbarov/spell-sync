@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Phase 4)
+Implemented — awaiting phase approval
 
 ## Context
 
@@ -25,15 +25,20 @@ exit codes, or preview/execution safety contracts.
    - `TargetSettingsService` — target settings updates
 
 2. Share dependencies through frozen `ApplicationContext` (`RuntimeResolver`,
-   `OperationHistoryStore`, `AppStatePaths`).
+   `OperationHistoryStore`, `AppStatePaths`). Wiring references are immutable after
+   construction; dependency internal state remains mutable.
 
 3. Keep `SpellSyncService` as a thin compatibility facade that delegates 1:1 to focused
-   services. CLI and TUI continue to call the facade only.
+   services without private operation orchestration helpers. CLI and TUI continue to call
+   the facade only.
 
-4. Leave presentation builders in `application/builders.py`; mutation orchestration lives
-   in sync/recovery/setup/target services, not in builders.
+4. Keep shared low-level mutation imports in `_operation_deps.py` for focused services only;
+   the facade must not import or re-export `_operation_deps`.
 
-5. Preflight maintenance (before decomposition):
+5. Leave presentation builders in `application/builders.py`; mutation orchestration lives
+   in sync/recovery/setup/target services, not in builders or the facade.
+
+6. Preflight maintenance (before decomposition):
    - NUL-safe untracked path parsing in `scripts/test_selection/tree_state.py`
    - subprocess timeout for production `_git_command()` in spell-sync-dev snapshot tooling
 

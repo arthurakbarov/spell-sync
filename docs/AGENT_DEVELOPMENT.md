@@ -47,13 +47,16 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 9. Run pre-final checks (`scripts/run_pre_final_checks.py`) before commits.
 10. Set phase status to `awaiting-approval` when implementation is complete; commit all tracked changes locally.
 11. Verify clean working trees (`git status --short`) in every affected repository.
-12. Run full `scripts/ci.sh` **once** on the committed HEAD (final evidence).
-13. Verify final evidence: `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
-14. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; new full CI.
-15. Update every affected document, test, and contract in the same task (before step 10).
-16. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
-17. Re-verify `git status --short` and `python3 scripts/check-ci-evidence.py` after snapshot.
-18. Produce an evidence-based report (see **Final report contract** below).
+12. Final task state: `git stash list` must be empty in the public spell-sync repository.
+    Do not hide unfinished work in persistent Git stash between phases; preserve separate WIP
+    on a named local branch with a normal commit instead.
+13. Run full `scripts/ci.sh` **once** on the committed HEAD (final evidence).
+14. Verify final evidence: `python3 scripts/check-ci-evidence.py` (`CI_EVIDENCE_RESULT=success`).
+15. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; new full CI.
+16. Update every affected document, test, and contract in the same task (before step 10).
+17. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
+18. Re-verify `git status --short` and `python3 scripts/check-ci-evidence.py` after snapshot.
+19. Produce an evidence-based report (see **Final report contract** below).
 
 After successful final CI and evidence verification, do not modify tracked repository files
 (ignored CI artifacts, owner snapshot outside repositories, and read-only inspection only).

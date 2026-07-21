@@ -24,6 +24,7 @@ phase-2d: complete
 phase-2e: complete
 phase-3: complete
 phase-4: awaiting-approval
+phase-5: not-started
 [architecture-status:end]
 
 ## Verified baseline
@@ -205,14 +206,14 @@ and commit-bound final CI evidence.
 
 ## Phase 4 — Focused application services and thin facade
 
+**Status:** awaiting approval
+
 ### Preflight maintenance (complete)
 
 1. **NUL-safe untracked digest** — `_untracked_paths()` uses `git ls-files -z`; regression
    test in `tests/test_tree_digest.py`.
 2. **Snapshot Git timeout** — spell-sync-dev `_git_command()` uses
    `GIT_SUBPROCESS_TIMEOUT_SECONDS`.
-
-## Phase 4 — Focused application services and thin facade (awaiting approval)
 
 ### Delivered
 
@@ -322,6 +323,71 @@ installed-wheel smoke
 - Phase status `awaiting-approval`.
 - Phase 5 not started.
 
+## Phase 5 — Structured technical events and diagnostics
+
+### Goal
+
+Replace scattered free-form stage strings and ad-hoc technical logging with typed
+structured technical events while keeping presentation-neutral application and core
+boundaries.
+
+### Scope
+
+Minimum:
+
+```text
+spell_sync/application/events.py
+spell_sync/diagnostics/*
+application focused services
+CLI/TUI event adapters
+operation history/report integration
+support report
+architecture tests
+ADR
+```
+
+### Required outcomes
+
+- typed event identifiers instead of arbitrary stage strings;
+- stable severity/category/operation metadata;
+- safe structured payload without user words;
+- one canonical emission path;
+- CLI/TUI convert events to presentation only;
+- technical file logging receives sanitized structured events;
+- history and support report use safe event summaries;
+- no parallel old/new event pipeline after migration;
+- stable JSON compatibility or explicit internal-only boundary;
+- architecture tests forbid new free-form event stages.
+
+### Safety and privacy
+
+- do not record user dictionary words;
+- do not record raw config;
+- do not record credential-like environment values;
+- do not record absolute private HOME paths without redaction policy;
+- do not copy Recovery/journal contents into logs;
+- logging failure must not block Pull/Push/Recovery;
+- events must not change product semantics.
+
+### Deferred
+
+- version `0.3.0`;
+- CLI redesign;
+- TUI redesign;
+- telemetry/network transport;
+- remote logging;
+- release/tag/publication.
+
+### Completion criteria
+
+- one structured event contract;
+- no duplicate event pipeline;
+- CLI/TUI adapters green;
+- privacy tests;
+- application services use typed events;
+- full CI on committed clean HEAD;
+- status `awaiting-approval`.
+
 ## Phase 2B: complete application boundary
 
 ### CLI bypass inventory (resolved)
@@ -356,8 +422,6 @@ Core/project modules no longer import `spell_sync.application`. Resolution lives
 Public: `prepare_pull`, `execute_pull`, `load_push_preview`, `execute_push_preview`,
 `execute_push_dry_run`, `inspect_recovery`, `execute_recovery*`, `load_doctor_report`,
 `load_doctor_targets`, `load_push_plan`, `load_push_removals`.
-
-Private: `_prepare_push_for_run`, `_execute_push_for_run`, `_run_push_for_run`.
 
 Push strict resolution: `effective_push_strict()` in `project_resolution.py` (explicit
 runtime settings from `ResolvedRuntime` / preview context).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -213,3 +214,29 @@ def test_required_skills_present(validator) -> None:
 def test_banned_workflow_term_detected(validator) -> None:
     hits = validator.scan_banned_workflow_terms("Upload handoff via review ZIP")
     assert hits
+
+
+def test_persistent_git_stash_fails(validator, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=ci@test",
+            "-c",
+            "user.name=ci",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "init",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "wip.txt").write_text("wip\n", encoding="utf-8")
+    subprocess.run(["git", "add", "wip.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "stash", "push", "-m", "wip"], cwd=repo, check=True)
+    errors = validator.check_persistent_git_stash(repo)
+    assert errors == ["[AGENT-WORKFLOW-GIT-004] persistent Git stash remains after task completion"]

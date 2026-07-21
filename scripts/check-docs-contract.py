@@ -42,6 +42,7 @@ IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md"
 CURRENT_PHASE_HEADING = "## Current phase"
 ARCHITECTURE_STATUS_START = "[architecture-status:start]"
 ARCHITECTURE_STATUS_END = "[architecture-status:end]"
+_PHASE_SECTION_HEADING = re.compile(r"^## Phase (\d+[a-z]?)(?: — |: )", re.MULTILINE)
 KNOWN_STATUSES = frozenset(
     {"complete", "in-progress", "not-started", "planned", "awaiting-approval", "blocked"}
 )
@@ -323,6 +324,72 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
     return violations
 
 
+def _phase_section_index(text: str) -> dict[str, list[int]]:
+    sections: dict[str, list[int]] = {}
+    for match in _PHASE_SECTION_HEADING.finditer(text):
+        phase_id = f"phase-{match.group(1).lower()}"
+        line_no = text[: match.start()].count("\n") + 1
+        sections.setdefault(phase_id, []).append(line_no)
+    return sections
+
+
+def _check_architecture_phase_sections(root: Path) -> list[ContractViolation]:
+    tracker = root / IMPLEMENTATION_TRACKER
+    violations: list[ContractViolation] = []
+    if not tracker.is_file():
+        return violations
+    text = tracker.read_text(encoding="utf-8")
+    statuses, parse_error = _parse_architecture_status(text)
+    if parse_error or statuses is None:
+        return violations
+
+    sections = _phase_section_index(text)
+    for phase_id, line_numbers in sections.items():
+        if len(line_numbers) <= 1:
+            continue
+        violations.append(
+            ContractViolation(
+                "PHASE-013",
+                tracker,
+                line_numbers[1],
+                f"duplicate architecture phase section: {phase_id}",
+                f"keep one canonical section for {phase_id}",
+            )
+        )
+
+    current = statuses.get("current")
+    for key, value in statuses.items():
+        if key == "current":
+            continue
+        if value == "awaiting-approval" and key not in sections:
+            violations.append(
+                ContractViolation(
+                    "PHASE-014",
+                    tracker,
+                    None,
+                    f"awaiting-approval phase missing section: {key}",
+                    f"add ## Phase section for {key}",
+                )
+            )
+
+    if current and current.startswith("phase-"):
+        suffix = current.removeprefix("phase-")
+        if suffix.isdigit():
+            next_id = f"phase-{int(suffix) + 1}"
+            if statuses.get(next_id) == "not-started" and next_id not in sections:
+                violations.append(
+                    ContractViolation(
+                        "PHASE-015",
+                        tracker,
+                        None,
+                        f"not-started next phase missing section: {next_id}",
+                        f"add ## Phase section for {next_id}",
+                    )
+                )
+
+    return violations
+
+
 def _ci_summary_schema(root: Path) -> int:
     ci_runner = root / "scripts" / "ci_runner.py"
     text = ci_runner.read_text(encoding="utf-8")
@@ -592,6 +659,7 @@ def check_repository(root: Path) -> list[ContractViolation]:
         )
 
     violations.extend(_check_current_phase_section(root))
+    violations.extend(_check_architecture_phase_sections(root))
     violations.extend(_check_stale_version_claims(root, version))
     violations.extend(_check_agent_workflow_docs(root))
     violations.extend(_check_testing_strategy_doc(root))
