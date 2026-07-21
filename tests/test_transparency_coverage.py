@@ -268,7 +268,7 @@ def test_support_report_unreadable_and_pending(
     assert any(item.reason_code == "target_unreadable" for item in report.targets)
     with (
         patch(
-            "spell_sync.resolved_runtime.load_journal_result",
+            "spell_sync.application._runtime_factory.load_journal_result",
             return_value=MagicMock(
                 status=__import__(
                     "spell_sync.push_journal", fromlist=["JournalLoadStatus"]
