@@ -3,29 +3,130 @@
 from __future__ import annotations
 
 import json
+import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
-from ..application.events import EventId, TechnicalEvent
+from ..application.event_metadata import (
+    CorrelationId,
+    EventReason,
+    TargetId,
+    TerminalOutcome,
+)
+from ..application.events import (
+    EventCategory,
+    EventId,
+    EventPhase,
+    EventSeverity,
+    OperationKind,
+    TechnicalEvent,
+)
 from .safe_log import sanitize_log_message
 from .technical_logging import get_spell_sync_logger
 
 SCHEMA_VERSION = 1
+_TIMESTAMP_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
+)
 
-_FORBIDDEN_PAYLOAD_KEYS = frozenset(
+_ALLOWED_KEYS = frozenset(
     {
-        "message",
-        "payload",
-        "path",
-        "words",
-        "raw_config",
-        "environment",
-        "exception_text",
-        "journal_payload",
-        "wordlist",
-        "dictionary",
+        "schemaVersion",
+        "timestamp",
+        "eventId",
+        "operation",
+        "category",
+        "severity",
+        "phase",
+        "correlationId",
+        "targetId",
+        "reasonCode",
+        "outcome",
+        "completed",
+        "total",
     }
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedTechnicalLogEvent:
+    event_id: EventId
+    operation: OperationKind
+    category: EventCategory
+    severity: EventSeverity
+    timestamp: str
+    phase: EventPhase | None = None
+    correlation_id: CorrelationId | None = None
+    target_id: TargetId | None = None
+    reason: EventReason | None = None
+    outcome: TerminalOutcome | None = None
+    completed: int | None = None
+    total: int | None = None
+
+
+def _enum_value(enum_cls: type[Enum], raw: Any, field: str) -> str:
+    if not isinstance(raw, str):
+        raise ValueError(f"invalid {field} type")
+    valid = {item.value for item in enum_cls}
+    if raw not in valid:
+        raise ValueError(f"invalid {field}")
+    return raw
+
+
+def validate_structured_log_message(message: str) -> str:
+    """Validate logger message and return exact JSON line for file output."""
+    stripped = message.strip()
+    if not stripped.startswith("{") or not stripped.endswith("}"):
+        raise ValueError("structured log message must be a JSON object")
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        raise ValueError("structured log message is not valid JSON") from exc
+    validated = _validate_parsed_dict(data)
+    return json.dumps(validated, sort_keys=True, separators=(",", ":"))
+
+
+def _validate_parsed_dict(data: dict[str, Any]) -> dict[str, Any]:
+    extra = set(data) - _ALLOWED_KEYS
+    if extra:
+        raise ValueError(f"unexpected structured log keys: {sorted(extra)}")
+    if data.get("schemaVersion") != SCHEMA_VERSION:
+        raise ValueError("unsupported schemaVersion")
+    timestamp = data.get("timestamp")
+    if not isinstance(timestamp, str) or not _TIMESTAMP_PATTERN.fullmatch(timestamp):
+        raise ValueError("invalid timestamp")
+    _enum_value(EventId, data.get("eventId"), "eventId")
+    _enum_value(OperationKind, data.get("operation"), "operation")
+    _enum_value(EventCategory, data.get("category"), "category")
+    _enum_value(EventSeverity, data.get("severity"), "severity")
+    phase = data.get("phase")
+    if phase is not None:
+        phase = _enum_value(EventPhase, phase, "phase")
+    correlation_id = data.get("correlationId")
+    if correlation_id is not None:
+        CorrelationId.parse(correlation_id)
+    target_id = data.get("targetId")
+    if target_id is not None:
+        TargetId.parse(target_id)
+    reason_code = data.get("reasonCode")
+    if reason_code is not None:
+        _enum_value(EventReason, reason_code, "reasonCode")
+    outcome = data.get("outcome")
+    if outcome is not None:
+        _enum_value(TerminalOutcome, outcome, "outcome")
+    completed = data.get("completed")
+    total = data.get("total")
+    if completed is not None:
+        if not isinstance(completed, int) or completed < 0:
+            raise ValueError("invalid completed")
+    if total is not None:
+        if not isinstance(total, int) or total < 0:
+            raise ValueError("invalid total")
+    if completed is not None and total is not None and completed > total:
+        raise ValueError("completed exceeds total")
+    return data
 
 
 def technical_event_to_dict(
@@ -45,35 +146,34 @@ def technical_event_to_dict(
     if event.phase is not None:
         payload["phase"] = event.phase.value
     if event.correlation_id is not None:
-        payload["correlationId"] = event.correlation_id
+        payload["correlationId"] = event.correlation_id.value
     if event.target_id is not None:
-        payload["targetId"] = event.target_id
-    if event.reason_code is not None:
-        payload["reasonCode"] = event.reason_code
+        payload["targetId"] = event.target_id.value
+    if event.reason is not None:
+        payload["reasonCode"] = event.reason.value
     if event.outcome is not None:
-        payload["outcome"] = event.outcome
+        payload["outcome"] = event.outcome.value
     if event.completed is not None:
         payload["completed"] = event.completed
     if event.total is not None:
         payload["total"] = event.total
-    for key in payload:
-        if key in _FORBIDDEN_PAYLOAD_KEYS:
-            raise ValueError(f"forbidden technical event field: {key}")
-    return payload
+    return _validate_parsed_dict(payload)
 
 
 def serialize_technical_event(event: TechnicalEvent) -> str:
-    ordered = technical_event_to_dict(event)
-    return json.dumps(ordered, sort_keys=True, separators=(",", ":"))
+    return json.dumps(technical_event_to_dict(event), sort_keys=True, separators=(",", ":"))
 
 
 def write_technical_event(event: TechnicalEvent) -> None:
-    line = serialize_technical_event(event)
+    try:
+        line = serialize_technical_event(event)
+    except ValueError:
+        return
     logger = get_spell_sync_logger()
     logger.info(line, extra={"structured_event": True})
 
 
-def parse_technical_log_line(line: str) -> dict[str, Any] | None:
+def parse_technical_log_line(line: str) -> ParsedTechnicalLogEvent | None:
     stripped = line.strip()
     if not stripped.startswith("{"):
         return None
@@ -83,20 +183,41 @@ def parse_technical_log_line(line: str) -> dict[str, Any] | None:
         return None
     if not isinstance(data, dict):
         return None
-    if data.get("schemaVersion") != SCHEMA_VERSION:
+    try:
+        validated = _validate_parsed_dict(data)
+    except ValueError:
         return None
-    event_id = data.get("eventId")
-    if not isinstance(event_id, str) or event_id not in {item.value for item in EventId}:
-        return None
-    return data
+    return ParsedTechnicalLogEvent(
+        event_id=EventId(validated["eventId"]),
+        operation=OperationKind(validated["operation"]),
+        category=EventCategory(validated["category"]),
+        severity=EventSeverity(validated["severity"]),
+        timestamp=validated["timestamp"],
+        phase=EventPhase(validated["phase"]) if validated.get("phase") is not None else None,
+        correlation_id=(
+            CorrelationId.parse(validated["correlationId"])
+            if validated.get("correlationId") is not None
+            else None
+        ),
+        target_id=(
+            TargetId.parse(validated["targetId"]) if validated.get("targetId") is not None else None
+        ),
+        reason=(
+            EventReason(validated["reasonCode"])
+            if validated.get("reasonCode") is not None
+            else None
+        ),
+        outcome=(
+            TerminalOutcome(validated["outcome"]) if validated.get("outcome") is not None else None
+        ),
+        completed=validated.get("completed"),
+        total=validated.get("total"),
+    )
 
 
 def format_log_line_for_display(line: str) -> str:
     parsed = parse_technical_log_line(line)
     if parsed is None:
         return sanitize_log_message(line)
-    event_id = parsed.get("eventId", "unknown")
-    severity = parsed.get("severity", "info")
-    target = parsed.get("targetId")
-    suffix = f" target={target}" if target else ""
-    return sanitize_log_message(f"{severity} {event_id}{suffix}")
+    suffix = f" target={parsed.target_id.value}" if parsed.target_id is not None else ""
+    return sanitize_log_message(f"{parsed.severity.value} {parsed.event_id.value}{suffix}")

@@ -22,6 +22,10 @@ SPELL_SYNC_LOGGER = "spell_sync"
 
 class _SafeFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        if getattr(record, "structured_event", False):
+            from .technical_event_log import validate_structured_log_message
+
+            return validate_structured_log_message(record.getMessage())
         return format_safe_log_record(record, super().format(record))
 
 

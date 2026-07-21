@@ -5,6 +5,14 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+import pytest
+
+from spell_sync.application.event_metadata import (
+    CorrelationId,
+    EventReason,
+    TargetId,
+    TerminalOutcome,
+)
 from spell_sync.application.events import (
     EventCategory,
     EventEmitter,
@@ -16,6 +24,7 @@ from spell_sync.application.events import (
 )
 from spell_sync.diagnostics.technical_event_log import (
     SCHEMA_VERSION,
+    ParsedTechnicalLogEvent,
     format_log_line_for_display,
     parse_technical_log_line,
     serialize_technical_event,
@@ -32,8 +41,8 @@ def _sample_event(**kwargs) -> TechnicalEvent:
         category=EventCategory.LIFECYCLE,
         severity=EventSeverity.SUCCESS,
         phase=EventPhase.EXECUTING,
-        correlation_id="plan-12345678",
-        target_id="chrome",
+        correlation_id=CorrelationId.parse("plan-12345678"),
+        target_id=TargetId.parse("chrome"),
     )
     defaults.update(kwargs)
     return TechnicalEvent(**defaults)
@@ -73,8 +82,8 @@ def test_serialize_technical_event_is_sorted_json() -> None:
 def test_parse_technical_log_line_accepts_structured_json() -> None:
     line = serialize_technical_event(_sample_event())
     parsed = parse_technical_log_line(line)
-    assert parsed is not None
-    assert parsed["eventId"] == "push.plan_verified"
+    assert isinstance(parsed, ParsedTechnicalLogEvent)
+    assert parsed.event_id is EventId.PUSH_PLAN_VERIFIED
 
 
 def test_parse_technical_log_line_returns_none_for_legacy_text() -> None:
@@ -87,17 +96,35 @@ def test_parse_technical_log_line_returns_none_for_malformed_json() -> None:
     assert parse_technical_log_line('{"schemaVersion":99}') is None
     assert parse_technical_log_line('{"schemaVersion":1,"eventId":"unknown.event"}') is None
     assert parse_technical_log_line('{"schemaVersion":1,"eventId":1}') is None
+    assert (
+        parse_technical_log_line(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "timestamp": "2026-07-21T12:00:00Z",
+                    "eventId": "push.plan_verified",
+                    "operation": "push",
+                    "category": "lifecycle",
+                    "severity": "success",
+                    "correlationId": "bad id with spaces",
+                }
+            )
+        )
+        is None
+    )
 
 
 def test_format_log_line_for_display_handles_structured_and_legacy_lines() -> None:
     structured = serialize_technical_event(_sample_event())
-    assert "push.plan_verified" in format_log_line_for_display(structured)
+    formatted = format_log_line_for_display(structured)
+    assert "push.plan_verified" in formatted
+    assert not formatted.strip().startswith("{")
     legacy = "removed words: [secret-token-value]"
-    formatted = format_log_line_for_display(legacy)
-    assert "secret-token-value" not in formatted
+    sanitized = format_log_line_for_display(legacy)
+    assert "secret-token-value" not in sanitized
 
 
-def test_write_technical_event_logs_structured_line(tmp_path, monkeypatch) -> None:
+def test_write_technical_event_end_to_end_jsonl_round_trip(tmp_path) -> None:
     from spell_sync.diagnostics.paths import resolve_app_state_paths
     from spell_sync.diagnostics.technical_logging import (
         configure_file_logging,
@@ -107,11 +134,47 @@ def test_write_technical_event_logs_structured_line(tmp_path, monkeypatch) -> No
     paths = resolve_app_state_paths(state_root=tmp_path / "state")
     configure_file_logging(paths)
     write_technical_event(_sample_event())
+    raw_lines = paths.technical_log.read_text(encoding="utf-8").splitlines()
+    assert len(raw_lines) == 1
+    raw_line = raw_lines[0]
+    assert raw_line.startswith("{")
+    assert raw_line.endswith("}")
+    json.loads(raw_line)
+    assert parse_technical_log_line(raw_line) is not None
     snapshot = read_technical_log_tail(paths)
-    assert any('"eventId":"push.plan_verified"' in line.replace(" ", "") for line in snapshot.lines)
+    assert len(snapshot.lines) == 1
+    assert "push.plan_verified" in snapshot.lines[0]
+    assert raw_line not in snapshot.lines[0]
 
 
-def test_event_emitter_is_fail_open_when_sink_raises() -> None:
+def test_read_technical_log_tail_handles_mixed_rotation_backup(tmp_path) -> None:
+    from spell_sync.diagnostics.paths import resolve_app_state_paths
+    from spell_sync.diagnostics.technical_logging import (
+        BACKUP_COUNT,
+        configure_file_logging,
+        read_technical_log_tail,
+    )
+
+    paths = resolve_app_state_paths(state_root=tmp_path / "state")
+    configure_file_logging(paths)
+    legacy = "2026-07-21 INFO removed words: sentinel-value"
+    structured = serialize_technical_event(_sample_event())
+    malformed = '{"schemaVersion":1,"eventId":"push.plan_verified","operation":"push"}'
+    paths.technical_log.parent.mkdir(parents=True, exist_ok=True)
+    paths.technical_log.write_text(
+        "\n".join((legacy, structured, malformed)) + "\n",
+        encoding="utf-8",
+    )
+    backup = paths.technical_log.with_suffix(paths.technical_log.suffix + ".1")
+    backup.write_text("rotated legacy line\n", encoding="utf-8")
+    assert BACKUP_COUNT >= 1
+    snapshot = read_technical_log_tail(paths)
+    assert len(snapshot.lines) == 3
+    assert all("sentinel-value" not in line for line in snapshot.lines)
+    assert any("push.plan_verified" in line for line in snapshot.lines)
+
+
+def test_event_emitter_technical_sink_fail_open_presentation_still_runs() -> None:
     seen: list[str] = []
 
     def failing_technical(_event: TechnicalEvent) -> None:
@@ -124,32 +187,17 @@ def test_event_emitter_is_fail_open_when_sink_raises() -> None:
     emitter.emit(_sample_event())
     assert seen == ["push.plan_verified"]
 
+
+def test_event_emitter_presentation_sink_exception_is_not_swallowed() -> None:
     def failing_presentation(_event) -> None:
         raise RuntimeError("presentation sink failed")
 
     emitter = EventEmitter(
         presentation_sink=failing_presentation,
-        technical_sink=lambda _event: seen.append("technical"),
+        technical_sink=lambda _event: None,
     )
-    emitter.emit(_sample_event())
-    assert "technical" in seen
-
-
-def test_technical_event_to_dict_rejects_forbidden_payload_keys(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "spell_sync.diagnostics.technical_event_log._FORBIDDEN_PAYLOAD_KEYS",
-        frozenset({"severity"}),
-    )
-    try:
-        technical_event_to_dict(_sample_event())
-    except ValueError as exc:
-        assert "forbidden technical event field" in str(exc)
-    else:
-        raise AssertionError("expected ValueError")
-
-
-def test_parse_technical_log_line_returns_none_for_non_object_json() -> None:
-    assert parse_technical_log_line('"hello"') is None
+    with pytest.raises(RuntimeError, match="presentation sink failed"):
+        emitter.emit(_sample_event())
 
 
 def test_format_log_line_for_display_omits_target_suffix_when_missing() -> None:
@@ -168,3 +216,37 @@ def test_parse_technical_log_line_returns_none_when_json_is_not_object(monkeypat
 
     monkeypatch.setattr(technical_event_log.json, "loads", fake_loads)
     assert technical_event_log.parse_technical_log_line('{"eventId":"push.completed"}') is None
+
+
+def test_write_technical_event_fail_open_on_invalid_event() -> None:
+    invalid = TechnicalEvent(
+        event_id=EventId.PUSH_COMPLETED,
+        operation=OperationKind.PUSH,
+        category=EventCategory.LIFECYCLE,
+        severity=EventSeverity.SUCCESS,
+        correlation_id=CorrelationId.parse("ok-id"),
+        completed=-1,
+    )
+    write_technical_event(invalid)
+
+
+def test_structured_formatter_rejects_invalid_logger_message() -> None:
+    from spell_sync.diagnostics.technical_event_log import validate_structured_log_message
+
+    with pytest.raises(ValueError):
+        validate_structured_log_message("not json")
+    with pytest.raises(ValueError):
+        validate_structured_log_message(
+            json.dumps({"schemaVersion": 1, "eventId": "push.completed", "operation": "push"})
+        )
+
+
+def test_terminal_metadata_serializes_typed_reason_and_outcome() -> None:
+    event = _sample_event(
+        event_id=EventId.PUSH_FAILED,
+        reason=EventReason.ROLLBACK_INCOMPLETE,
+        outcome=TerminalOutcome.FAILED,
+    )
+    payload = technical_event_to_dict(event)
+    assert payload["reasonCode"] == "rollback_incomplete"
+    assert payload["outcome"] == "failed"
