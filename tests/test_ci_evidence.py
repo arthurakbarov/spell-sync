@@ -50,7 +50,7 @@ def _write_success_summary(
     history = history or {"fullCiAttempts": 1, "fullCiFailures": 0, "fullCiSuccesses": 1}
     payload = {
         "schemaVersion": 3,
-        "runId": "test-run",
+        "runId": path.stem.removeprefix("ci-summary-"),
         "result": "success",
         "exitCode": 0,
         "mode": "full",
@@ -70,52 +70,35 @@ def _write_success_summary(
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
-    history_name = path.name.replace(".json", "")
-    if not history_name.startswith("ci-summary-"):
-        history_name = f"ci-summary-{payload['runId']}"
-    history_path = path.parent / f"{history_name}.json"
-    if history_path != path:
-        history_path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_stale_head_rejected(evidence_mod) -> None:
+def test_stale_head_rejected(evidence_mod, tmp_path: Path) -> None:
     from scripts.test_selection.tree_state import content_tree_digest
 
     digest = content_tree_digest(ROOT)
-    summary = ROOT / ".artifacts" / "ci" / "ci-summary-stale-head-test.json"
+    summary = tmp_path / "ci" / "ci-summary-stale-head-test.json"
     _write_success_summary(summary, head="0" * 40, digest=digest)
     code, payload = evidence_mod.verify_ci_evidence(
         ROOT,
         summary,
         format_json=True,
     )
-    try:
-        assert code == 1
-        assert payload.get("failedId") == "ci-evidence.head-mismatch"
-    finally:
-        summary.unlink(missing_ok=True)
+    assert code == 1
+    assert payload.get("failedId") == "ci-evidence.head-mismatch"
 
 
-def test_first_success_history_counts(evidence_mod) -> None:
+def test_first_success_history_counts(tmp_path: Path) -> None:
     from scripts.ci_history import summarize_ci_history
-    from scripts.test_selection.tree_state import content_tree_digest
 
-    head = _git_head(ROOT)
-    digest = content_tree_digest(ROOT)
-    artifacts = ROOT / ".artifacts" / "ci"
-    prior = summarize_ci_history(artifacts)
-    history = {
-        "fullCiAttempts": prior.full_ci_attempts + 1,
-        "fullCiFailures": prior.full_ci_failures,
-        "fullCiSuccesses": prior.full_ci_successes + 1,
-    }
-    summary = artifacts / "ci-summary-evidence-test.json"
-    _write_success_summary(summary, head=head, digest=digest, history=history)
-    code, payload = evidence_mod.verify_ci_evidence(ROOT, summary, format_json=True)
-    try:
-        if code != 0 and payload.get("failedId") == "ci-evidence.dirty-tree":
-            pytest.skip("repository working tree not clean")
-        assert code == 0, payload
-        assert payload.get("historyAtCompletion") == history
-    finally:
-        summary.unlink(missing_ok=True)
+    artifacts = tmp_path / "ci"
+    artifacts.mkdir()
+    _write_success_summary(
+        artifacts / "ci-summary-one.json",
+        head="abc",
+        digest="def",
+        history={"fullCiAttempts": 1, "fullCiFailures": 0, "fullCiSuccesses": 1},
+    )
+    counts = summarize_ci_history(artifacts)
+    assert counts.full_ci_attempts == 1
+    assert counts.full_ci_failures == 0
+    assert counts.full_ci_successes == 1

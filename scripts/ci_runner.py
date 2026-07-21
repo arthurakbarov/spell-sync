@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ci_history import CiHistoryCounts, summarize_ci_history  # noqa: E402
+from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     content_tree_digest,
     git_branch,
@@ -449,16 +449,6 @@ class CiRunner:
                 }
             )
         completed = self.now().isoformat()
-        prior = summarize_ci_history(self.artifacts)
-        if self._mode == "full":
-            history = CiHistoryCounts(
-                full_ci_attempts=prior.full_ci_attempts + 1,
-                full_ci_failures=prior.full_ci_failures + (0 if exit_code == 0 else 1),
-                full_ci_successes=prior.full_ci_successes + (1 if exit_code == 0 else 0),
-            )
-        else:
-            history = prior
-        history_dict = history.to_json_dict()
         payload = {
             "schemaVersion": SUMMARY_SCHEMA,
             "runId": self.run_id,
@@ -475,10 +465,6 @@ class CiRunner:
             "treeDigestBefore": self._tree_digest_before,
             "treeDigestAfter": self._tree_digest_after,
             "treeStable": tree_stable,
-            "historyAtCompletion": history_dict,
-            "fullCiAttempts": history_dict["fullCiAttempts"],
-            "fullCiFailures": history_dict["fullCiFailures"],
-            "fullCiSuccesses": history_dict["fullCiSuccesses"],
             "checks": self.checks,
             "logPath": str(self._log_path),
             "historyLogPath": str(self._history_log_path),
@@ -489,9 +475,21 @@ class CiRunner:
         text = "\n".join(self.log_lines) + "\n"
         _atomic_write(self._log_path, text)
         _atomic_write(self._history_log_path, text)
+        if self._mode == "full":
+            _atomic_write(
+                self._history_summary_path,
+                json.dumps(payload, indent=2) + "\n",
+            )
+            history = summarize_ci_history(self.artifacts)
+            history_dict = history.to_json_dict()
+            payload["historyAtCompletion"] = history_dict
+            payload["fullCiAttempts"] = history_dict["fullCiAttempts"]
+            payload["fullCiFailures"] = history_dict["fullCiFailures"]
+            payload["fullCiSuccesses"] = history_dict["fullCiSuccesses"]
         summary_text = json.dumps(payload, indent=2) + "\n"
         _atomic_write(self._summary_path, summary_text)
-        _atomic_write(self._history_summary_path, summary_text)
+        if self._mode == "full":
+            _atomic_write(self._history_summary_path, summary_text)
         _cleanup_orphan_artifacts(
             self.artifacts,
             current_run_id=self.run_id,
