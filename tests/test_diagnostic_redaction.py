@@ -62,10 +62,7 @@ def test_format_safe_log_record_preserves_structured_event_line() -> None:
         exc_info=None,
     )
     record.structured_event = True
-    assert (
-        format_safe_log_record(record, "ignored prefix")
-        == "ignored prefix"
-    )
+    assert format_safe_log_record(record, "ignored prefix") == "ignored prefix"
 
 
 def test_format_safe_log_record_strips_traceback_message(tmp_path: Path) -> None:

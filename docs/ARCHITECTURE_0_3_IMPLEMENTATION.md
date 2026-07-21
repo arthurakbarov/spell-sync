@@ -32,7 +32,7 @@ phase-5: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `9bbdccc` docs: complete phase 4 and open phase 5 | no (Phase 5 WIP) |
+| spell-sync | `56617d3` Phase 5 corrective fixes (structured JSONL + typed metadata) | yes |
 | spell-sync-dev | `7bb8ecf` test: cover snapshot git timeout | yes |
 | spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
 
@@ -40,8 +40,9 @@ Public version: `0.2.1` (`pyproject.toml`).
 
 Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
 
-Phase 5 final CI evidence: **pending** — run full `scripts/ci.sh` on committed clean HEAD after
-owner approval.
+Phase 5 final CI evidence: `734f380`, run `20260721T201808.293806Z`,
+treeDigest `978d6b9d40b4f10767e3a68e67a67a6a9a5af2ff1d1fc3493c9a871a98578e5c`,
+`finalEvidence=true`, `treeStable=true`.
 
 ## Current dependency graph
 
