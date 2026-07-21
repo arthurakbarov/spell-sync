@@ -124,6 +124,21 @@ def test_format_log_line_for_display_handles_structured_and_legacy_lines() -> No
     assert "secret-token-value" not in sanitized
 
 
+def test_format_log_line_for_display_redacts_malformed_json_sentinel() -> None:
+    malformed = (
+        '{"schemaVersion":1,"eventId":"push.plan_verified","operation":"push",'
+        '"reasonCode":"SENSITIVE_USER_WORD_7f3a"}'
+    )
+    formatted = format_log_line_for_display(malformed)
+    assert formatted == "[malformed structured log line]"
+    assert "SENSITIVE_USER_WORD_7f3a" not in formatted
+
+
+def test_target_id_parses_chrome_profile_with_space() -> None:
+    parsed = TargetId.parse("chrome:Profile 1")
+    assert parsed.value == "chrome:Profile 1"
+
+
 def test_write_technical_event_end_to_end_jsonl_round_trip(tmp_path) -> None:
     from spell_sync.diagnostics.paths import resolve_app_state_paths
     from spell_sync.diagnostics.technical_logging import (
@@ -347,3 +362,90 @@ def test_event_emitter_skips_technical_when_sink_is_none() -> None:
     emitter = EventEmitter(presentation_sink=presentation, technical_sink=None)
     emitter.emit(_sample_event())
     assert seen == ["push.plan_verified"]
+
+
+def test_recovery_confirmation_mismatch_emits_terminal_event(monkeypatch) -> None:
+    from unittest.mock import MagicMock
+
+    from spell_sync.application.events import EventEmitter
+    from spell_sync.application.reports import RecoveryOutcome
+    from spell_sync.application.requests import ProjectRef, RecoveryRequest
+    from spell_sync.application.services.context import ApplicationContext
+    from spell_sync.application.services.recovery import RecoveryService
+    from tests.tui.fake_service import sample_recovery_preview
+
+    captured: list[TechnicalEvent] = []
+    monkeypatch.setattr(
+        "spell_sync.application.services.recovery.make_operation_emitter",
+        lambda _sink: EventEmitter(presentation_sink=None, technical_sink=captured.append),
+    )
+    service = RecoveryService(
+        ApplicationContext(
+            runtime=MagicMock(),
+            history_store=MagicMock(),
+            state_paths=MagicMock(),
+        )
+    )
+    preview = sample_recovery_preview()
+    result = service.execute_recovery(
+        RecoveryRequest(project=ProjectRef()),
+        preview,
+        confirmed_transaction_id="wrong-id",
+    )
+    assert result.outcome == RecoveryOutcome.FAILED
+    assert len(captured) == 1
+    terminal = captured[0]
+    assert terminal.event_id is EventId.RECOVERY_FAILED
+    assert terminal.reason is EventReason.CONFIRMATION_MISMATCH
+    assert terminal.outcome is TerminalOutcome.FAILED
+    assert terminal.phase is EventPhase.COMPLETED
+
+
+def test_recovery_discard_success_emits_terminal_event(monkeypatch) -> None:
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    from spell_sync.application.events import EventEmitter
+    from spell_sync.application.reports import RecoveryOutcome, RecoveryStatus
+    from spell_sync.application.requests import ProjectRef, RecoveryRequest
+    from spell_sync.application.services.context import ApplicationContext
+    from spell_sync.application.services.recovery import RecoveryService
+    from tests.tui.fake_service import sample_recovery_preview
+
+    captured: list[TechnicalEvent] = []
+    monkeypatch.setattr(
+        "spell_sync.application.services.recovery.make_operation_emitter",
+        lambda _sink: EventEmitter(presentation_sink=None, technical_sink=captured.append),
+    )
+    scope = MagicMock()
+    scope.context.wordlist_file = Path("/tmp/wordlist.txt")
+    runtime = MagicMock()
+    runtime.mutation_scope.return_value.__enter__.return_value = scope
+    runtime.mutation_scope.return_value.__exit__.return_value = False
+    service = RecoveryService(
+        ApplicationContext(
+            runtime=runtime,
+            history_store=MagicMock(),
+            state_paths=MagicMock(),
+        )
+    )
+    preview = sample_recovery_preview(
+        status=RecoveryStatus.CORRUPT_JOURNAL,
+        can_discard=True,
+        can_recover=False,
+    )
+    with patch(
+        "spell_sync.application._operation_deps.safe_discard_journal_file",
+        return_value=(True, None),
+    ):
+        result = service.execute_recovery_discard(
+            RecoveryRequest(project=ProjectRef()),
+            preview,
+            confirmed_transaction_id=preview.preview_fingerprint,
+        )
+    assert result.outcome == RecoveryOutcome.DISCARDED
+    assert len(captured) == 1
+    terminal = captured[0]
+    assert terminal.event_id is EventId.RECOVERY_DISCARDED
+    assert terminal.outcome is TerminalOutcome.DISCARDED
+    assert terminal.phase is EventPhase.COMPLETED

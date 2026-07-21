@@ -15,6 +15,9 @@ from spell_sync.application.events import (
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPELL_SYNC = _REPO_ROOT / "spell_sync"
 _EVENTS_PY = _SPELL_SYNC / "application" / "events.py"
+_TECHNICAL_EVENT_MODEL = _SPELL_SYNC / "diagnostics" / "technical_event_model.py"
+_EVENT_METADATA = _SPELL_SYNC / "diagnostics" / "event_metadata.py"
+_PROJECT_SETUP = _SPELL_SYNC / "project_setup"
 _OPERATION_SCREEN = _SPELL_SYNC / "tui" / "screens" / "operation_screen.py"
 _APPLICATION_SERVICES = _SPELL_SYNC / "application" / "services"
 
@@ -66,7 +69,7 @@ def _application_service_sources() -> list[Path]:
 
 class TestTechnicalEventsArchitecture(unittest.TestCase):
     def test_technical_event_is_frozen_with_slots(self) -> None:
-        frozen, slots = _dataclass_flags(_EVENTS_PY, "TechnicalEvent")
+        frozen, slots = _dataclass_flags(_TECHNICAL_EVENT_MODEL, "TechnicalEvent")
         self.assertTrue(frozen, msg="[ARCH-TE-001] TechnicalEvent must be frozen")
         self.assertTrue(slots, msg="[ARCH-TE-002] TechnicalEvent must use slots")
 
@@ -200,11 +203,11 @@ class TestTechnicalEventsArchitecture(unittest.TestCase):
 
     def test_technical_event_uses_typed_metadata_fields(self) -> None:
         self.assertTrue(
-            _class_has_field(_EVENTS_PY, "TechnicalEvent", "reason"),
+            _class_has_field(_TECHNICAL_EVENT_MODEL, "TechnicalEvent", "reason"),
             msg="[ARCH-TE-012] TechnicalEvent.reason must be typed",
         )
         self.assertFalse(
-            _class_has_field(_EVENTS_PY, "TechnicalEvent", "reason_code"),
+            _class_has_field(_TECHNICAL_EVENT_MODEL, "TechnicalEvent", "reason_code"),
             msg="[ARCH-TE-012] TechnicalEvent must not expose reason_code",
         )
 
@@ -245,9 +248,20 @@ class TestTechnicalEventsArchitecture(unittest.TestCase):
         )
 
     def test_event_metadata_defines_typed_reason_and_outcome(self) -> None:
-        metadata = _SPELL_SYNC / "application" / "event_metadata.py"
-        text = metadata.read_text(encoding="utf-8")
+        text = _EVENT_METADATA.read_text(encoding="utf-8")
         self.assertIn("class EventReason", text)
         self.assertIn("class TerminalOutcome", text)
         self.assertIn("class CorrelationId", text)
         self.assertIn("class TargetId", text)
+
+    def test_project_setup_does_not_import_application_package(self) -> None:
+        offenders: list[str] = []
+        for path in sorted(_PROJECT_SETUP.glob("*.py")):
+            source = path.read_text(encoding="utf-8")
+            if "from ..application." in source or "from spell_sync.application." in source:
+                offenders.append(str(path.relative_to(_REPO_ROOT)))
+        self.assertEqual(
+            offenders,
+            [],
+            msg="[ARCH-TE-015] project_setup must not import spell_sync.application",
+        )

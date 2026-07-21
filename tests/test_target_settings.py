@@ -374,12 +374,16 @@ def test_execute_pending_recovery_blocks(
     assert prepared.can_execute is False
 
 
-def test_resolve_enabled_preserves_corrupt_enabled(tmp_path: Path) -> None:
+def test_resolve_enabled_preserves_corrupt_enabled(
+    tmp_path: Path,
+    mock_targets,
+) -> None:
     wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
-    discovery = discover_setup_targets(
-        selected_targets=("chrome",),
-        enabled_targets=frozenset({"chrome"}),
-    )
+    with mock_targets(frozenset({"chrome"})):
+        discovery = discover_setup_targets(
+            selected_targets=("chrome",),
+            enabled_targets=frozenset({"chrome"}),
+        )
     corrupt = next(target for target in discovery.targets if target.identifier == "chrome")
     corrupt = corrupt.__class__(
         **{
