@@ -16,11 +16,9 @@ from spell_sync.cli_options import CliOptions
 from spell_sync.commands import cmd_init
 from spell_sync.config_check_cmd import cmd_config_check
 from spell_sync.project import ProjectContext
-from spell_sync.push_journal import JournalLoadResult, JournalLoadStatus
-from spell_sync.resolved_runtime import ResolvedRuntime
 from spell_sync.runtime_settings import RuntimeSettings
-from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.sync_context import RuntimeContext
+from tests.runtime_helpers import make_resolved_runtime
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,9 +47,6 @@ def test_project_context_uses_resolved_wordlist_parent(tmp_path: Path) -> None:
     assert context.wordlist == wordlist
     assert context.project_dir == wordlist.resolve().parent
     assert context.config_paths[-1] == context.project_dir / "spell-sync.toml"
-
-
-from tests.runtime_helpers import make_resolved_runtime
 
 
 def test_runtime_resolver_bound_reuses_context(tmp_path: Path) -> None:

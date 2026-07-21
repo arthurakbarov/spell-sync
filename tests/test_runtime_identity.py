@@ -15,8 +15,11 @@ from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.paths import EDITOR_DICT_FILENAME
 from spell_sync.push_journal import journal_path_for_wordlist
+from spell_sync.runtime_identity import build_runtime_identity
 from spell_sync.runtime_settings import RuntimeSettings
-from tests.runtime_helpers import make_sync_run
+from spell_sync.target_capabilities import TargetFilterKind
+from spell_sync.words import subset_english
+from tests.runtime_helpers import make_runtime_context, make_sync_run
 
 
 def _patch_discover(
@@ -272,6 +275,35 @@ class TestRuntimeIdentityPull(unittest.TestCase):
             )
             self.assertEqual(execution.outcome, OperationOutcome.STOPPED_SAFELY)
             self.assertEqual(wordlist.read_text(encoding="utf-8"), before)
+
+
+class TestRuntimeIdentitySubsetPolicy(unittest.TestCase):
+    def test_subset_policy_from_dictionary_filter_kinds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            dictionary = Dictionary(
+                "win-en",
+                str(Path(tmp) / "win-en.txt"),
+                DictionaryFormat.TEXT,
+            )
+            context = make_runtime_context(wordlist, dictionaries=[dictionary])
+            identity = build_runtime_identity(context)
+            self.assertEqual(identity.targets[0].subset_policy, TargetFilterKind.LATIN.value)
+
+    def test_subset_policy_from_dictionary_subset_fn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            dictionary = Dictionary(
+                "custom-subset",
+                str(Path(tmp) / "custom.txt"),
+                DictionaryFormat.TEXT,
+                subset=subset_english,
+            )
+            context = make_runtime_context(wordlist, dictionaries=[dictionary])
+            identity = build_runtime_identity(context)
+            self.assertEqual(identity.targets[0].subset_policy, "subset_english")
 
 
 class TestRuntimeIdentityFingerprintConflict(unittest.TestCase):

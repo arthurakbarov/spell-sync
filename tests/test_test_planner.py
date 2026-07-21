@@ -259,6 +259,29 @@ def test_cluster_level_uses_cluster_tests(planner_mod, registry) -> None:
     assert "tests/test_runtime_architecture.py" in plan.pytest_targets
 
 
+def test_module_tests_subset_of_cluster_tests(planner_mod, registry) -> None:
+    cases = [
+        "spell_sync/push_prepared.py",
+        "spell_sync/settings.py",
+        "spell_sync/tui/controller.py",
+        "spell_sync/cli.py",
+    ]
+    for file_path in cases:
+        module_plan = planner_mod.build_plan(
+            ROOT,
+            [file_path],
+            registry=registry,
+            level="module",
+        )
+        cluster_plan = planner_mod.build_plan(
+            ROOT,
+            [file_path],
+            registry=registry,
+            level="cluster",
+        )
+        assert set(module_plan.pytest_targets) <= set(cluster_plan.pytest_targets), file_path
+
+
 def test_plan_cli_json_output() -> None:
     proc = subprocess.run(
         [sys.executable, "scripts/test_plan.py", "--files", "docs/FOO.md", "--format", "json"],

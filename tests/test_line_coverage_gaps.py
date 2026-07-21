@@ -92,6 +92,24 @@ class TestLineCoverageGaps(unittest.TestCase):
                 )
             self.assertEqual(result, ExitCode.PUSH_ABORT)
 
+    def test_execute_prepared_pull_fingerprint_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            from spell_sync.push_journal import file_content_hash
+
+            stale_fingerprint = file_content_hash(wordlist)
+            wordlist.write_text("changed\n", encoding="utf-8")
+            run = make_sync_run(wordlist)
+            result = run.execute_prepared_pull(
+                merged_words=("alpha", "changed"),
+                before_count=1,
+                after_count=2,
+                wordlist_fingerprint=stale_fingerprint,
+            )
+            self.assertEqual(result, ExitCode.PUSH_ABORT)
+            self.assertEqual(wordlist.read_text(encoding="utf-8"), "changed\n")
+
     def test_recovery_service_remaining_paths(self):
         service = SpellSyncService()
         preview = sample_recovery_preview(
