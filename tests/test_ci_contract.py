@@ -74,8 +74,20 @@ def _make_test_root(tmp: Path) -> tuple[Path, Path]:
         "check-agent-config.py",
         "check-target-capabilities.py",
         "validate_test_impact.py",
+        "validate_ci_impact.py",
     ):
         (root / "scripts" / name).write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    ci_dir = root / "ci"
+    ci_dir.mkdir()
+    source_registry = ROOT / "ci" / "ci-impact.toml"
+    if source_registry.is_file():
+        (ci_dir / "ci-impact.toml").write_text(
+            source_registry.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    else:
+        (ci_dir / "ci-impact.toml").write_text(
+            "schemaVersion = 1\n[classes.product]\npatterns = []\n", encoding="utf-8"
+        )
     return root, artifacts
 
 
@@ -93,6 +105,7 @@ def _is_validator_script(argv: list[str]) -> bool:
             "check-agent-config.py",
             "check-target-capabilities.py",
             "validate_test_impact.py",
+            "validate_ci_impact.py",
         )
     )
 
@@ -252,13 +265,16 @@ class TestCiContract(unittest.TestCase):
             "mode",
             "finalEvidence",
             "treeDigest",
+            "ciInputDigest",
+            "gitHeadAtRun",
+            "evidenceScope",
             "checks",
             "logPath",
             "historyLogPath",
             "historySummaryPath",
         ):
             self.assertIn(key, summary, msg=f"[CI-CONTRACT-005] missing {key}")
-        self.assertEqual(summary["schemaVersion"], 3)
+        self.assertEqual(summary["schemaVersion"], 4)
 
     def test_success_final_output(self) -> None:
         buf = io.StringIO()
@@ -374,6 +390,27 @@ class TestCiContract(unittest.TestCase):
         pip_root = self.root / "my-pip-tools"
         pip_root.mkdir()
         (pip_root / "pyproject.toml").write_text(MINIMAL_PYPROJECT, encoding="utf-8")
+        ci_dir = pip_root / "ci"
+        ci_dir.mkdir()
+        (ci_dir / "ci-impact.toml").write_text(
+            (ROOT / "ci" / "ci-impact.toml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (pip_root / "scripts").mkdir()
+        for name in (
+            "check-docs-style.sh",
+            "check-docs-contract.py",
+            "check-agent-config.py",
+            "check-target-capabilities.py",
+            "validate_test_impact.py",
+            "validate_ci_impact.py",
+        ):
+            target = pip_root / "scripts" / name
+            if name.endswith(".sh"):
+                target.write_text("#!/bin/sh\nexit 0\n")
+                target.chmod(0o755)
+            else:
+                target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         artifacts = pip_root / ".artifacts" / "ci"
         rc = self.mod.CiRunner(
             root=pip_root,
