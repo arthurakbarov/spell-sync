@@ -103,6 +103,12 @@ def registry_schema_errors(data: dict[str, object]) -> list[str]:
             if not isinstance(section, dict):
                 continue
             for key in section:
+                if key == "tests":
+                    errors.append(
+                        f"[TEST-IMPACT-SCHEMA-003] cluster: {cluster_name} key: tests "
+                        "remediation: use moduleTests and clusterTests"
+                    )
+                    continue
                 if key not in CLUSTER_KEYS:
                     remediation = "use staticTargets" if key == "static_targets" else "remove key"
                     errors.append(
@@ -122,8 +128,13 @@ def load_registry(path: Path) -> Registry:
         if not isinstance(section, dict):
             continue
         legacy_tests = _as_tuple(section.get("tests"))
-        module_tests = _as_tuple(section.get("moduleTests")) or legacy_tests
-        cluster_tests = _as_tuple(section.get("clusterTests")) or legacy_tests
+        if legacy_tests:
+            raise ValueError(
+                f"[TEST-IMPACT-SCHEMA-003] cluster: {name} key: tests "
+                "remediation: use moduleTests and clusterTests"
+            )
+        module_tests = _as_tuple(section.get("moduleTests"))
+        cluster_tests = _as_tuple(section.get("clusterTests"))
         clusters[name] = ClusterSpec(
             name=name,
             production=_as_tuple(section.get("production")),

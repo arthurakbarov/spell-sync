@@ -35,17 +35,21 @@ tests = [
 [clusters.runtime]
 production = [
   "spell_sync/runtime_settings.py",
+  "spell_sync/runtime_identity.py",
   "spell_sync/resolved_runtime.py",
   "spell_sync/sync_context.py",
   "spell_sync/validated_runtime.py",
   "spell_sync/application/runtime_resolver.py",
   "spell_sync/application/mutation_scope.py",
+  "spell_sync/application/_runtime_factory.py",
   "spell_sync/mutation_guards.py",
 ]
 moduleTests = [
+  "tests/test_runtime_identity.py",
   "tests/test_explicit_runtime.py",
 ]
 clusterTests = [
+  "tests/test_runtime_identity.py",
   "tests/test_runtime_architecture.py",
   "tests/test_explicit_runtime.py",
   "tests/test_runtime_helpers.py",
@@ -60,7 +64,11 @@ production = [
   "spell_sync/project_setup/*.py",
   "spell_sync/config_check_cmd.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_settings.py",
+  "tests/test_target_settings.py",
+]
+clusterTests = [
   "tests/test_settings.py",
   "tests/test_project_setup.py",
   "tests/test_target_settings.py",
@@ -89,8 +97,14 @@ production = [
   "spell_sync/application/service.py",
   "spell_sync/io.py",
   "spell_sync/app_process_check.py",
+  "spell_sync/runtime_identity.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_runtime_identity.py",
+  "tests/test_push_transaction.py",
+]
+clusterTests = [
+  "tests/test_runtime_identity.py",
   "tests/test_push_transaction.py",
   "tests/test_transaction_safety.py",
   "tests/test_push_safety_coverage.py",
@@ -106,7 +120,11 @@ production = [
   "spell_sync/operation_lock.py",
   "spell_sync/push_prepared.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_push_journal.py",
+  "tests/test_operation_lock.py",
+]
+clusterTests = [
   "tests/test_push_transaction.py",
   "tests/test_transaction_safety.py",
   "tests/test_push_journal.py",
@@ -135,11 +153,15 @@ production = [
   "spell_sync/tui/",
   "spell_sync/application/service.py",
 ]
-tests = [
+moduleTests = [
+  "tests/tui/test_review_workflow.py",
+]
+clusterTests = [
   "tests/tui/test_architecture.py",
   "tests/test_tui_mutation_safety.py",
   "tests/test_tui_recovery_safety.py",
   "tests/test_gui_smoke.py",
+  "tests/tui/test_review_workflow.py",
 ]
 validators = []
 
@@ -151,7 +173,11 @@ production = [
   "spell_sync/json_output.py",
   "spell_sync/application/requests.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_json_contract.py",
+  "tests/test_application_requests.py",
+]
+clusterTests = [
   "tests/test_cli.py",
   "tests/test_commands.py",
   "tests/test_json_contract.py",
@@ -166,7 +192,10 @@ production = [
   "spell_sync/__init__.py",
   "spell_sync/version.py",
 ]
-tests = [
+moduleTests = [
+  "tests/test_installed_workflow.py",
+]
+clusterTests = [
   "tests/test_installed_workflow.py",
   "tests/test_ci_contract.py",
 ]
@@ -190,10 +219,15 @@ production = [
   "scripts/test_selection/",
   "tests/test-impact.toml",
 ]
-tests = [
+moduleTests = [
+  "tests/test_test_planner.py",
+  "tests/test_focused_test_runner.py",
+]
+clusterTests = [
   "tests/test_agent_config_validator.py",
   "tests/test_docs_contract.py",
   "tests/test_ci_contract.py",
+  "tests/test_ci_evidence.py",
   "tests/test_test_planner.py",
   "tests/test_focused_test_runner.py",
   "tests/test_test_efficiency_contract.py",
@@ -209,7 +243,8 @@ production = [
   "README.md",
   "CONTRIBUTING.md",
 ]
-tests = []
+moduleTests = []
+clusterTests = []
 validators = [
   "scripts/check-docs-style.sh",
   "scripts/check-docs-contract.py",
@@ -222,7 +257,11 @@ production = [
   "scripts/test_selection/",
   "tests/test-impact.toml",
 ]
-tests = [
+moduleTests = [
+  "tests/test_test_planner.py",
+  "tests/test_focused_test_runner.py",
+]
+clusterTests = [
   "tests/test_test_planner.py",
   "tests/test_focused_test_runner.py",
   "tests/test_test_efficiency_contract.py",
