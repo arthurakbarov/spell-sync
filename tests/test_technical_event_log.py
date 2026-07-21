@@ -86,6 +86,7 @@ def test_parse_technical_log_line_returns_none_for_malformed_json() -> None:
     assert parse_technical_log_line("{not-json") is None
     assert parse_technical_log_line('{"schemaVersion":99}') is None
     assert parse_technical_log_line('{"schemaVersion":1,"eventId":"unknown.event"}') is None
+    assert parse_technical_log_line('{"schemaVersion":1,"eventId":1}') is None
 
 
 def test_format_log_line_for_display_handles_structured_and_legacy_lines() -> None:
