@@ -104,4 +104,7 @@ def read_technical_log_tail(
     if len(lines) > max_lines:
         lines = lines[-max_lines:]
         truncated = True
-    return TechnicalLogSnapshot(path=log_path, lines=tuple(lines), truncated=truncated)
+    from .technical_event_log import format_log_line_for_display
+
+    display_lines = tuple(format_log_line_for_display(line) for line in lines)
+    return TechnicalLogSnapshot(path=log_path, lines=display_lines, truncated=truncated)

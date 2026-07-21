@@ -16,13 +16,21 @@ from ...sync_models import DictionaryDiff, PushResult
 from ...sync_run import SyncRun
 from .. import _operation_deps
 from ..builders import build_pull_add_from_preview, build_push_preview
-from ..events import EventLevel, EventSink, OperationEvent, OperationKind
+from ..events import (
+    EventCategory,
+    EventId,
+    EventPhase,
+    EventSeverity,
+    EventSink,
+    OperationKind,
+    TechnicalEvent,
+)
 from ..operation_explanations import build_push_target_updates
 from ..reports import OperationOutcome, PullExecution, PullPreview, PushExecution, PushPreview
 from ..requests import PullRequest, PushRequest, RecoveryRequest
 from ._shared import (
     RUNTIME_CHANGED_MESSAGE,
-    emit,
+    emit_technical,
     running_app_skip_reasons_for,
     runtime_identity_matches,
 )
@@ -125,7 +133,13 @@ class SyncService:
                     push_preview=preview,
                 )
             run = SyncRun(context=scope.context)
-            result = self._execute_push_for_run(run, prepared, dry_run=True)
+            result = self._execute_push_for_run(
+                run,
+                prepared,
+                dry_run=True,
+                event_sink=None,
+                correlation_id=preview.plan_identifier,
+            )
             execution = self.push_execution_from_result(prepared, result)
             return PushExecution(
                 prepared=execution.prepared,
@@ -153,6 +167,8 @@ class SyncService:
         confirmed_plan_id: str,
         event_sink: EventSink | None = None,
     ) -> PullExecution:
+        correlation_id = preview.plan_identifier
+
         if confirmed_plan_id != preview.plan_identifier:
             return PullExecution(
                 preview=preview,
@@ -168,9 +184,16 @@ class SyncService:
                 message="Pull preview is not executable.",
             )
 
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(OperationKind.PULL, "validating", "Validating pull preview"),
+            TechnicalEvent(
+                event_id=EventId.PULL_VALIDATING,
+                operation=OperationKind.PULL,
+                category=EventCategory.LIFECYCLE,
+                severity=EventSeverity.INFO,
+                phase=EventPhase.PREPARING,
+                correlation_id=correlation_id,
+            ),
         )
         with self._ctx.runtime.mutation_scope(
             request.project,
@@ -178,13 +201,16 @@ class SyncService:
             json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PULL,
-                        "failed",
-                        "Pull blocked by lock, config, or recovery state",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.PULL_BLOCKED,
+                        operation=OperationKind.PULL,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.PREPARING,
+                        correlation_id=correlation_id,
+                        outcome=OperationOutcome.FAILED.value,
                     ),
                 )
                 return PullExecution(
@@ -194,26 +220,32 @@ class SyncService:
                     message="Pull could not acquire a safe execution context.",
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PULL,
-                    "acquiring_lock",
-                    "Operation lock acquired",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.PULL_LOCK_ACQUIRED,
+                    operation=OperationKind.PULL,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
             run = SyncRun(context=scope.context)
             if preview.runtime_identity is not None and not runtime_identity_matches(
                 preview.runtime_identity, scope.identity
             ):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PULL,
-                        "verifying_plan",
-                        RUNTIME_CHANGED_AFTER_PREVIEW,
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.PULL_RUNTIME_CHANGED,
+                        operation=OperationKind.PULL,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        reason_code=RUNTIME_CHANGED_AFTER_PREVIEW,
+                        outcome=OperationOutcome.STOPPED_SAFELY.value,
                     ),
                 )
                 return PullExecution(
@@ -224,13 +256,16 @@ class SyncService:
                     warnings=preview.warnings,
                 )
             if Path(preview.wordlist_path).resolve() != Path(run.wordlist_str).resolve():
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PULL,
-                        "failed",
-                        "Preview wordlist path mismatch",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.PULL_WORDLIST_MISMATCH,
+                        operation=OperationKind.PULL,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        outcome=OperationOutcome.FAILED.value,
                     ),
                 )
                 return PullExecution(
@@ -240,21 +275,26 @@ class SyncService:
                     message="Pull preview does not match the active wordlist.",
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PULL,
-                    "verifying_plan",
-                    "Verifying prepared pull plan",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.PULL_PLAN_VERIFIED,
+                    operation=OperationKind.PULL,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PULL,
-                    "writing_wordlist",
-                    "Writing canonical wordlist",
+                TechnicalEvent(
+                    event_id=EventId.PULL_WRITE_STARTED,
+                    operation=OperationKind.PULL,
+                    category=EventCategory.TRANSACTION,
+                    severity=EventSeverity.INFO,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
             result = run.execute_prepared_pull(
@@ -270,13 +310,22 @@ class SyncService:
                     and current is not None
                     and current != preview.wordlist_fingerprint
                 )
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PULL,
-                        "failed",
-                        "Wordlist changed after preview" if conflict else "Pull write failed",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=(
+                            EventId.PULL_WORDLIST_CHANGED if conflict else EventId.PULL_WRITE_FAILED
+                        ),
+                        operation=OperationKind.PULL,
+                        category=EventCategory.SAFETY if conflict else EventCategory.TRANSACTION,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        outcome=(
+                            OperationOutcome.STOPPED_SAFELY.value
+                            if conflict
+                            else OperationOutcome.FAILED.value
+                        ),
                     ),
                 )
                 return PullExecution(
@@ -293,13 +342,16 @@ class SyncService:
                     warnings=preview.warnings,
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PULL,
-                    "completed",
-                    "Pull completed",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.PULL_COMPLETED,
+                    operation=OperationKind.PULL,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
+                    correlation_id=correlation_id,
+                    outcome=OperationOutcome.COMPLETED.value,
                 ),
             )
             before, after = result
@@ -316,25 +368,32 @@ class SyncService:
         run: SyncRun,
         *,
         event_sink: EventSink | None = None,
+        correlation_id: str | None = None,
     ) -> PreparedPush | ExitCode:
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                "building_plan",
-                "Building push plan",
+            TechnicalEvent(
+                event_id=EventId.PUSH_BUILDING_PLAN,
+                operation=OperationKind.PUSH,
+                category=EventCategory.LIFECYCLE,
+                severity=EventSeverity.INFO,
+                phase=EventPhase.PREPARING,
+                correlation_id=correlation_id,
             ),
         )
         skip_names: frozenset[str] = frozenset()
         prepared = run.prepare_push_operation(skip_names=skip_names)
         if isinstance(prepared, ExitCode):
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "building_plan",
-                    "Push plan failed",
-                    level=EventLevel.ERROR,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_PLAN_FAILED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.ERROR,
+                    phase=EventPhase.PREPARING,
+                    correlation_id=correlation_id,
+                    outcome=OperationOutcome.FAILED.value,
                 ),
             )
         return prepared
@@ -346,53 +405,79 @@ class SyncService:
         *,
         dry_run: bool,
         event_sink: EventSink | None = None,
+        correlation_id: str | None = None,
     ) -> PushResult | ExitCode:
         conflict = _operation_deps.plan_fingerprint_conflict(prepared)
         if conflict is not None:
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "verifying_plan",
-                    f"{conflict} changed after plan",
-                    level=EventLevel.ERROR,
-                    target=conflict,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_TARGET_CHANGED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.SAFETY,
+                    severity=EventSeverity.ERROR,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
+                    target_id=conflict,
+                    outcome=OperationOutcome.STOPPED_SAFELY.value,
                 ),
             )
             return ExitCode.PUSH_ABORT
 
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                "verifying_plan",
-                "Prepared plan verified",
-                level=EventLevel.SUCCESS,
+            TechnicalEvent(
+                event_id=EventId.PUSH_PLAN_VERIFIED,
+                operation=OperationKind.PUSH,
+                category=EventCategory.LIFECYCLE,
+                severity=EventSeverity.SUCCESS,
+                phase=EventPhase.EXECUTING,
+                correlation_id=correlation_id,
             ),
         )
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                "creating_snapshots" if not dry_run else "dry_run",
-                "Starting push execution",
+            TechnicalEvent(
+                event_id=(
+                    EventId.PUSH_DRY_RUN_STARTED if dry_run else EventId.PUSH_EXECUTION_STARTED
+                ),
+                operation=OperationKind.PUSH,
+                category=EventCategory.TRANSACTION,
+                severity=EventSeverity.INFO,
+                phase=EventPhase.EXECUTING,
+                correlation_id=correlation_id,
             ),
         )
         if dry_run:
             result = run._run_push_transaction(dry_run=True, prepared=prepared)
         else:
             result = run.push_from_wordlist(prepared=prepared)
-        level = EventLevel.SUCCESS if isinstance(result, PushResult) else EventLevel.ERROR
-        stage = "completed" if isinstance(result, PushResult) else "failed"
-        emit(
-            event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                stage,
-                "Push execution finished",
-                level=level,
-            ),
-        )
+        if isinstance(result, PushResult):
+            emit_technical(
+                event_sink,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_COMPLETED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
+                    correlation_id=correlation_id,
+                    outcome=OperationOutcome.COMPLETED.value,
+                ),
+            )
+        else:
+            emit_technical(
+                event_sink,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_FAILED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.TRANSACTION,
+                    severity=EventSeverity.ERROR,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
+                    outcome=OperationOutcome.FAILED.value,
+                ),
+            )
         return result
 
     def _run_push_for_run(
@@ -402,12 +487,14 @@ class SyncService:
         *,
         dry_run: bool,
         event_sink: EventSink | None = None,
+        correlation_id: str | None = None,
     ) -> PushExecution:
         result = self._execute_push_for_run(
             run,
             prepared,
             dry_run=dry_run,
             event_sink=event_sink,
+            correlation_id=correlation_id,
         )
         return self.push_execution_from_result(prepared, result)
 
@@ -479,6 +566,8 @@ class SyncService:
     ) -> PushExecution:
         """Execute push using the exact PreparedPush from preview (no re-prepare)."""
         prepared = preview.prepared
+        correlation_id = preview.plan_identifier
+
         if prepared is None or not preview.is_executable:
             return PushExecution(
                 prepared=prepared,
@@ -499,9 +588,16 @@ class SyncService:
             )
 
         updates = build_push_target_updates(preview, None)
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(OperationKind.PUSH, "validating", "Validating configuration"),
+            TechnicalEvent(
+                event_id=EventId.PUSH_VALIDATING,
+                operation=OperationKind.PUSH,
+                category=EventCategory.LIFECYCLE,
+                severity=EventSeverity.INFO,
+                phase=EventPhase.PREPARING,
+                correlation_id=correlation_id,
+            ),
         )
         strict_override = request.strict_override
         with self._ctx.runtime.mutation_scope(
@@ -511,13 +607,16 @@ class SyncService:
             json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PUSH,
-                        "failed",
-                        "Push blocked by lock, config, or recovery state",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.PUSH_BLOCKED,
+                        operation=OperationKind.PUSH,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.PREPARING,
+                        correlation_id=correlation_id,
+                        outcome=OperationOutcome.FAILED.value,
                     ),
                 )
                 return PushExecution(
@@ -529,24 +628,30 @@ class SyncService:
                     plan_identifier=preview.plan_identifier,
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "acquiring_lock",
-                    "Operation lock acquired",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_LOCK_ACQUIRED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
 
             if not runtime_identity_matches(prepared.runtime_identity, scope.identity):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PUSH,
-                        "verifying_plan",
-                        RUNTIME_CHANGED_AFTER_PREVIEW,
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.PUSH_RUNTIME_CHANGED,
+                        operation=OperationKind.PUSH,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        reason_code=RUNTIME_CHANGED_AFTER_PREVIEW,
+                        outcome=OperationOutcome.STOPPED_SAFELY.value,
                     ),
                 )
                 return PushExecution(
@@ -561,14 +666,17 @@ class SyncService:
 
             conflict = _operation_deps.plan_fingerprint_conflict(prepared)
             if conflict is not None:
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PUSH,
-                        "verifying_plan",
-                        f"{conflict} changed after preview",
-                        level=EventLevel.ERROR,
-                        target=conflict,
+                    TechnicalEvent(
+                        event_id=EventId.PUSH_TARGET_CHANGED,
+                        operation=OperationKind.PUSH,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        target_id=conflict,
+                        outcome=OperationOutcome.STOPPED_SAFELY.value,
                     ),
                 )
                 return PushExecution(
@@ -584,43 +692,54 @@ class SyncService:
                     plan_identifier=preview.plan_identifier,
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "verifying_plan",
-                    "Prepared plan verified",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_PLAN_VERIFIED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
             total = max(len(prepared.targets), 1)
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "creating_snapshots",
-                    "Creating recovery snapshots",
+                TechnicalEvent(
+                    event_id=EventId.PUSH_SNAPSHOTS_STARTED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.TRANSACTION,
+                    severity=EventSeverity.INFO,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                     completed=0,
                     total=total,
                 ),
             )
             if prepared.wordlist_needs_write:
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PUSH,
-                        "writing_wordlist",
-                        "Updating canonical wordlist",
+                    TechnicalEvent(
+                        event_id=EventId.PUSH_WORDLIST_WRITE_STARTED,
+                        operation=OperationKind.PUSH,
+                        category=EventCategory.TRANSACTION,
+                        severity=EventSeverity.INFO,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
                     ),
                 )
             for index, target in enumerate(prepared.targets, start=1):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.PUSH,
-                        "writing_target",
-                        f"Updating {target.planned.dictionary.name}",
-                        target=target.planned.dictionary.name,
+                    TechnicalEvent(
+                        event_id=EventId.PUSH_TARGET_STARTED,
+                        operation=OperationKind.PUSH,
+                        category=EventCategory.TARGET,
+                        severity=EventSeverity.INFO,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        target_id=target.planned.dictionary.name,
                         completed=index,
                         total=total,
                     ),
@@ -638,6 +757,7 @@ class SyncService:
                 result,
                 updates=updates,
                 event_sink=event_sink,
+                correlation_id=correlation_id,
             )
 
     def _finalize_push_preview_result(
@@ -648,16 +768,20 @@ class SyncService:
         *,
         updates: tuple,
         event_sink: EventSink | None,
+        correlation_id: str,
     ) -> PushExecution:
         wordlist = Path(prepared.ctx.wordlist_str)
         if isinstance(result, PushAbort):
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "rolling_back",
-                    result.message,
-                    level=EventLevel.ERROR,
+                TechnicalEvent(
+                    event_id=EventId.PUSH_ROLLBACK_STARTED,
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.TRANSACTION,
+                    severity=EventSeverity.ERROR,
+                    phase=EventPhase.ROLLING_BACK,
+                    correlation_id=correlation_id,
+                    reason_code=result.reason,
                 ),
             )
             recovery = result.reason == "rollback_incomplete"
@@ -667,14 +791,19 @@ class SyncService:
             outcome = (
                 OperationOutcome.RECOVERY_REQUIRED if recovery else OperationOutcome.STOPPED_SAFELY
             )
-            stage = "failed" if recovery else "completed"
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    stage,
-                    "Push stopped after rollback handling",
-                    level=EventLevel.ERROR if recovery else EventLevel.WARNING,
+                TechnicalEvent(
+                    event_id=(
+                        EventId.PUSH_RECOVERY_REQUIRED if recovery else EventId.PUSH_STOPPED_SAFELY
+                    ),
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.SAFETY if recovery else EventCategory.TRANSACTION,
+                    severity=EventSeverity.ERROR if recovery else EventSeverity.WARNING,
+                    phase=EventPhase.ROLLING_BACK,
+                    correlation_id=correlation_id,
+                    reason_code=result.reason if recovery else None,
+                    outcome=outcome.value,
                 ),
             )
             return PushExecution(
@@ -695,13 +824,17 @@ class SyncService:
             outcome = (
                 OperationOutcome.RECOVERY_REQUIRED if recovery else OperationOutcome.STOPPED_SAFELY
             )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.PUSH,
-                    "failed",
-                    "Push aborted",
-                    level=EventLevel.ERROR,
+                TechnicalEvent(
+                    event_id=(EventId.PUSH_RECOVERY_REQUIRED if recovery else EventId.PUSH_FAILED),
+                    operation=OperationKind.PUSH,
+                    category=EventCategory.SAFETY if recovery else EventCategory.TRANSACTION,
+                    severity=EventSeverity.ERROR,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
+                    reason_code="journal_in_progress" if recovery else None,
+                    outcome=outcome.value,
                 ),
             )
             return PushExecution(
@@ -725,22 +858,27 @@ class SyncService:
             if result.skipped
             else OperationOutcome.COMPLETED
         )
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                "finalizing",
-                "Finalizing transaction",
-                level=EventLevel.SUCCESS,
+            TechnicalEvent(
+                event_id=EventId.PUSH_FINALIZING,
+                operation=OperationKind.PUSH,
+                category=EventCategory.TRANSACTION,
+                severity=EventSeverity.SUCCESS,
+                phase=EventPhase.FINALIZING,
+                correlation_id=correlation_id,
             ),
         )
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(
-                OperationKind.PUSH,
-                "completed",
-                "Push completed",
-                level=EventLevel.SUCCESS,
+            TechnicalEvent(
+                event_id=EventId.PUSH_COMPLETED,
+                operation=OperationKind.PUSH,
+                category=EventCategory.LIFECYCLE,
+                severity=EventSeverity.SUCCESS,
+                phase=EventPhase.COMPLETED,
+                correlation_id=correlation_id,
+                outcome=outcome.value,
             ),
         )
         written = ", ".join(result.written) if result.written else "none"

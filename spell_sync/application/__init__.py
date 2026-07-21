@@ -1,6 +1,6 @@
 """Application layer shared by CLI and TUI."""
 
-from .events import EventLevel, EventSink, OperationEvent, OperationKind
+from .events import EventId, EventLevel, EventSink, OperationKind, PresentedEvent, TechnicalEvent
 from .reports import (
     DashboardIssue,
     DashboardSeverity,
@@ -33,13 +33,14 @@ __all__ = [
     "DashboardState",
     "DoctorCheckView",
     "DoctorSnapshot",
+    "EventId",
     "EventLevel",
     "EventSink",
-    "OperationEvent",
     "OperationKind",
     "OperationOutcome",
     "OperationPhase",
     "OperationReport",
+    "PresentedEvent",
     "PullExecution",
     "PullPreview",
     "PullSourcePreview",
@@ -57,6 +58,7 @@ __all__ = [
     "TargetPreview",
     "TargetStatusRow",
     "TargetUpdateReport",
+    "TechnicalEvent",
 ]
 
 

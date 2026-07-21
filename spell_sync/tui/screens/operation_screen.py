@@ -14,7 +14,7 @@ from textual.timer import Timer
 from textual.widgets import Button, Footer, Header, ProgressBar, Static
 from textual.worker import WorkerState
 
-from ...application.events import EventLevel, OperationEvent
+from ...application.events import EventId, EventPhase, EventSeverity, PresentedEvent
 from ...application.reports import (
     OperationOutcome,
     OperationPhase,
@@ -35,6 +35,37 @@ from ..workers import LoadTokenMixin
 _CANCELLATION_POLICY = (
     "Active write operations cannot be cancelled safely. "
     "The operation must finish or roll back before the screen can close."
+)
+
+_EXECUTING_EVENT_IDS = frozenset(
+    {
+        EventId.PULL_LOCK_ACQUIRED,
+        EventId.PULL_PLAN_VERIFIED,
+        EventId.PULL_WRITE_STARTED,
+        EventId.PUSH_LOCK_ACQUIRED,
+        EventId.PUSH_PLAN_VERIFIED,
+        EventId.PUSH_SNAPSHOTS_STARTED,
+        EventId.PUSH_WORDLIST_WRITE_STARTED,
+        EventId.PUSH_TARGET_STARTED,
+        EventId.RECOVERY_VALIDATING,
+        EventId.RECOVERY_LOCK_ACQUIRED,
+        EventId.RECOVERY_SNAPSHOTS_VALIDATED,
+        EventId.RECOVERY_CONFLICTS_CHECKED,
+        EventId.RECOVERY_WORDLIST_RESTORE_STARTED,
+        EventId.RECOVERY_TARGET_RESTORE_STARTED,
+        EventId.RECOVERY_TARGET_REMOVE_STARTED,
+        EventId.SETUP_LOCK_ACQUIRED,
+        EventId.SETUP_CONFLICTS_CHECKED,
+        EventId.SETUP_DIRECTORY_CREATED,
+        EventId.SETUP_CONFIG_CREATED,
+        EventId.SETUP_WHITELIST_CREATED,
+        EventId.SETUP_WORDLIST_CREATED,
+        EventId.SETUP_VERIFYING,
+        EventId.TARGETS_LOCK_ACQUIRED,
+        EventId.TARGETS_CONFLICTS_CHECKED,
+        EventId.TARGETS_WRITE_STARTED,
+        EventId.TARGETS_VERIFYING,
+    }
 )
 
 
@@ -67,7 +98,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._setup_prepared = setup_prepared
         self._target_settings_prepared = target_settings_prepared
         self._on_complete = on_complete
-        self._events: list[OperationEvent] = []
+        self._events: list[PresentedEvent] = []
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
         self._finished = False
@@ -118,7 +149,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         if not self._finished:
             self._controller.end_mutation()
 
-    def _sink(self, event: OperationEvent) -> None:
+    def _sink(self, event: PresentedEvent) -> None:
         # Thread-safe append only; UI reads via interval flush.
         with self._events_lock:
             self._events.append(event)
@@ -147,33 +178,27 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         if worker.state is WorkerState.SUCCESS:
             self._complete_with_result(worker.result)
 
-    def _apply_event(self, event: OperationEvent) -> None:
-        if event.stage in {
-            "acquiring_lock",
-            "verifying_plan",
-            "creating_snapshots",
-            "validating_journal",
-            "validating_snapshots",
-            "checking_conflicts",
-            "restoring_wordlist",
-            "restoring_target",
-            "removing_created_target",
-        }:
+    def _apply_event(self, event: PresentedEvent) -> None:
+        if event.phase is EventPhase.EXECUTING or event.event_id in _EXECUTING_EVENT_IDS:
             self._mutating = True
             self.phase = OperationPhase.EXECUTING
-        if event.stage == "rolling_back":
+        elif (
+            event.phase is EventPhase.ROLLING_BACK
+            or event.event_id is EventId.PUSH_ROLLBACK_STARTED
+        ):
             self.phase = OperationPhase.ROLLING_BACK
-        if event.stage == "finalizing":
+        elif event.phase is EventPhase.FINALIZING or event.event_id is EventId.PUSH_FINALIZING:
             self.phase = OperationPhase.FINALIZING
+
         prefix = {
-            EventLevel.SUCCESS: "✓",
-            EventLevel.WARNING: "!",
-            EventLevel.ERROR: "×",
-            EventLevel.INFO: "→",
-        }[event.level]
+            EventSeverity.SUCCESS: "✓",
+            EventSeverity.WARNING: "!",
+            EventSeverity.ERROR: "×",
+            EventSeverity.INFO: "→",
+        }[event.severity]
         line = f"{prefix} {event.message}"
-        if event.target:
-            line = f"{prefix} {event.message} ({event.target})"
+        if event.target_id:
+            line = f"{prefix} {event.message} ({event.target_id})"
         self._stage_lines.append(line)
         self.query_one("#operation-stages", Static).update("\n".join(self._stage_lines[-12:]))
         if event.completed is not None and event.total:

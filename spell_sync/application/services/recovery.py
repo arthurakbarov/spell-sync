@@ -6,10 +6,18 @@ from ...exit_codes import ExitCode
 from ...push_journal import JournalLoadStatus
 from .. import _operation_deps
 from ..builders import build_recovery_preview
-from ..events import EventLevel, EventSink, OperationEvent, OperationKind
+from ..events import (
+    EventCategory,
+    EventId,
+    EventPhase,
+    EventSeverity,
+    EventSink,
+    OperationKind,
+    TechnicalEvent,
+)
 from ..reports import RecoveryExecution, RecoveryOutcome, RecoveryPreview, RecoveryStatus
 from ..requests import RecoveryRequest
-from ._shared import emit
+from ._shared import emit_technical
 from .context import ApplicationContext
 
 
@@ -33,6 +41,8 @@ class RecoveryService:
         dry_run: bool = False,
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
+        correlation_id = preview.preview_fingerprint
+
         if confirmed_transaction_id != preview.preview_fingerprint:
             return RecoveryExecution(
                 preview=preview,
@@ -48,9 +58,16 @@ class RecoveryService:
                 message="Recovery is not available for this preview.",
             )
 
-        emit(
+        emit_technical(
             event_sink,
-            OperationEvent(OperationKind.RECOVER, "validating_journal", "Validating journal"),
+            TechnicalEvent(
+                event_id=EventId.RECOVERY_VALIDATING,
+                operation=OperationKind.RECOVER,
+                category=EventCategory.RECOVERY,
+                severity=EventSeverity.INFO,
+                phase=EventPhase.PREPARING,
+                correlation_id=correlation_id,
+            ),
         )
         with self._ctx.runtime.mutation_scope(
             request.project,
@@ -59,13 +76,16 @@ class RecoveryService:
             json_output=request.json_output,
         ) as scope:
             if isinstance(scope, int):
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.RECOVER,
-                        "failed",
-                        "Recovery blocked by lock or configuration",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.RECOVERY_BLOCKED,
+                        operation=OperationKind.RECOVER,
+                        category=EventCategory.SAFETY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        outcome=RecoveryOutcome.FAILED.value,
                     ),
                 )
                 return RecoveryExecution(
@@ -75,13 +95,15 @@ class RecoveryService:
                     message="Recovery could not acquire a safe execution context.",
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "acquiring_lock",
-                    "Operation lock acquired",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_LOCK_ACQUIRED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.LIFECYCLE,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
             journal_result = scope.journal_result
@@ -102,37 +124,48 @@ class RecoveryService:
                     message="Recovery journal changed after preview.",
                 )
 
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "validating_snapshots",
-                    "Validating recovery snapshots",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_SNAPSHOTS_VALIDATED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.RECOVERY,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "checking_conflicts",
-                    "Checking recovery conflicts",
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_CONFLICTS_CHECKED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.RECOVERY,
+                    severity=EventSeverity.INFO,
+                    phase=EventPhase.EXECUTING,
+                    correlation_id=correlation_id,
                 ),
             )
             total = max(len(preview.items), 1)
             for index, item in enumerate(preview.items, start=1):
                 if item.status != "ready":
                     continue
-                stage = "restoring_wordlist" if item.name == "wordlist" else "restoring_target"
-                if not item.existed_before and item.write_started:
-                    stage = "removing_created_target"
-                emit(
+                if item.name == "wordlist":
+                    event_id = EventId.RECOVERY_WORDLIST_RESTORE_STARTED
+                elif not item.existed_before and item.write_started:
+                    event_id = EventId.RECOVERY_TARGET_REMOVE_STARTED
+                else:
+                    event_id = EventId.RECOVERY_TARGET_RESTORE_STARTED
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.RECOVER,
-                        stage,
-                        f"Recovering {item.name}",
-                        target=item.name,
+                    TechnicalEvent(
+                        event_id=event_id,
+                        operation=OperationKind.RECOVER,
+                        category=EventCategory.RECOVERY,
+                        severity=EventSeverity.INFO,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        target_id=item.name,
                         completed=index,
                         total=total,
                     ),
@@ -165,13 +198,16 @@ class RecoveryService:
                     if result.conflicts
                     else RecoveryOutcome.RECOVERY_INCOMPLETE
                 )
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.RECOVER,
-                        "failed",
-                        "Recovery incomplete",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.RECOVERY_FAILED,
+                        operation=OperationKind.RECOVER,
+                        category=EventCategory.RECOVERY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        outcome=outcome.value,
                     ),
                 )
                 return RecoveryExecution(
@@ -192,13 +228,17 @@ class RecoveryService:
 
             cleanup_result = _operation_deps.cleanup_after_successful_recovery(journal)
             if not cleanup_result.ok:
-                emit(
+                emit_technical(
                     event_sink,
-                    OperationEvent(
-                        OperationKind.RECOVER,
-                        "failed",
-                        cleanup_result.detail or "Recovery cleanup incomplete",
-                        level=EventLevel.ERROR,
+                    TechnicalEvent(
+                        event_id=EventId.RECOVERY_FAILED,
+                        operation=OperationKind.RECOVER,
+                        category=EventCategory.RECOVERY,
+                        severity=EventSeverity.ERROR,
+                        phase=EventPhase.FINALIZING,
+                        correlation_id=correlation_id,
+                        reason_code="cleanup_incomplete",
+                        outcome=RecoveryOutcome.RECOVERY_INCOMPLETE.value,
                     ),
                 )
                 return RecoveryExecution(
@@ -214,22 +254,27 @@ class RecoveryService:
                     conflicts=result.conflicts,
                     failed=result.failed,
                 )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "cleaning_artifacts",
-                    "Cleaning recovery artifacts",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_CLEANUP_STARTED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.RECOVERY,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.FINALIZING,
+                    correlation_id=correlation_id,
                 ),
             )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "completed",
-                    "Recovery completed",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_COMPLETED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.RECOVERY,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
+                    correlation_id=correlation_id,
+                    outcome=RecoveryOutcome.RECOVERED.value,
                 ),
             )
             outcome = (
@@ -262,6 +307,8 @@ class RecoveryService:
         confirmed_transaction_id: str,
         event_sink: EventSink | None = None,
     ) -> RecoveryExecution:
+        correlation_id = preview.preview_fingerprint
+
         if confirmed_transaction_id != preview.preview_fingerprint:
             return RecoveryExecution(
                 preview=preview,
@@ -306,13 +353,16 @@ class RecoveryService:
                     outcome=RecoveryOutcome.FAILED,
                     message=discard_result.detail or "Cleanup could not remove recovery artifacts.",
                 )
-            emit(
+            emit_technical(
                 event_sink,
-                OperationEvent(
-                    OperationKind.RECOVER,
-                    "cleaning_artifacts",
-                    "Cleanup completed",
-                    level=EventLevel.SUCCESS,
+                TechnicalEvent(
+                    event_id=EventId.RECOVERY_CLEANUP_COMPLETED,
+                    operation=OperationKind.RECOVER,
+                    category=EventCategory.RECOVERY,
+                    severity=EventSeverity.SUCCESS,
+                    phase=EventPhase.COMPLETED,
+                    correlation_id=correlation_id,
+                    outcome=RecoveryOutcome.CLEANUP_COMPLETED.value,
                 ),
             )
             return RecoveryExecution(

@@ -49,6 +49,8 @@ def safe_repr(value: Any) -> str:
 
 
 def format_safe_log_record(record: logging.LogRecord, formatted: str) -> str:
+    if getattr(record, "structured_event", False):
+        return formatted
     if isinstance(record.msg, str):
         record.msg = sanitize_log_message(record.msg)
     if record.exc_info:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..diagnostics.history_store import OperationHistoryStore
 from ..diagnostics.paths import AppStatePaths, resolve_app_state_paths
-from ..diagnostics.technical_logging import configure_file_logging, get_spell_sync_logger
+from ..diagnostics.technical_logging import configure_file_logging
 from ..diagnostics.types import HistoryClearResult, OperationHistorySnapshot, TechnicalLogSnapshot
 from ..exit_codes import ExitCode
 from ..health.types import DoctorReport
@@ -22,7 +22,15 @@ from ..project_setup.target_settings import (
 )
 from ..push_prepared import PreparedPush
 from ..sync_models import DictionaryDiff, PushResult
-from .events import EventSink, OperationKind
+from .events import (
+    EventCategory,
+    EventId,
+    EventSeverity,
+    EventSink,
+    OperationKind,
+    TechnicalEvent,
+    operation_emitter,
+)
 from .reports import (
     DashboardState,
     DoctorSnapshot,
@@ -89,9 +97,14 @@ class SpellSyncService:
         if enable_file_logging:
             setup = configure_file_logging(self._state_paths)
             if not setup.ok:
-                get_spell_sync_logger().warning(
-                    "technical log unavailable",
-                    extra={"reason_code": "log_setup_failed"},
+                operation_emitter(None).emit(
+                    TechnicalEvent(
+                        event_id=EventId.DIAGNOSTICS_LOGGING_SETUP_FAILED,
+                        operation=OperationKind.STATUS,
+                        category=EventCategory.DIAGNOSTIC,
+                        severity=EventSeverity.WARNING,
+                        reason_code="log_setup_failed",
+                    )
                 )
 
     @property

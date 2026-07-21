@@ -10,9 +10,9 @@ from ...project_setup.draft import SetupDraft
 from ...project_setup.execute import ProjectSetupExecution, execute_project_setup
 from ...project_setup.prepare import PreparedProjectSetup, prepare_project_setup
 from ...project_setup.state import ProjectSetupState, inspect_project_setup, validate_setup_wordlist
-from ..events import EventLevel, EventSink, OperationEvent, OperationKind
+from ..events import EventSink
 from ..requests import SetupRequest
-from ._shared import emit
+from ._shared import emit_technical
 from .context import ApplicationContext
 
 
@@ -39,21 +39,14 @@ class SetupService:
         confirmed_setup_id: str,
         event_sink: EventSink | None = None,
     ) -> ProjectSetupExecution:
-        def _sink(stage: str, message: str) -> None:
-            emit(
-                event_sink,
-                OperationEvent(
-                    OperationKind.SETUP,
-                    stage,
-                    message,
-                    level=EventLevel.SUCCESS if stage == "completed" else EventLevel.INFO,
-                ),
-            )
-
         return execute_project_setup(
             prepared,
             confirmed_setup_id=confirmed_setup_id,
-            event_sink=_sink if event_sink is not None else None,
+            event_sink=(
+                (lambda event: emit_technical(event_sink, event))
+                if event_sink is not None
+                else None
+            ),
         )
 
     def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:

@@ -6,9 +6,18 @@ import hashlib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from ..io import atomic_write
+
+if TYPE_CHECKING:
+    from ..application.events import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+        TechnicalEvent,
+    )
 from ..operation_lock import OperationLocked, acquire_operation_lock
 from ..push_journal import file_content_hash
 from ..settings import ConfigStatus, config_blocks_mutating, load_config_result
@@ -67,7 +76,7 @@ class TargetSettingsExecution:
     warnings: tuple[str, ...] = ()
 
 
-EventSink = Callable[[str, str], None]
+EventSink = Callable[["TechnicalEvent"], None]
 
 
 def _project_config_path(wordlist: Path) -> Path:
@@ -279,9 +288,36 @@ def execute_target_settings_update(
     confirmed_update_id: str,
     event_sink: EventSink | None = None,
 ) -> TargetSettingsExecution:
-    def emit(stage: str, message: str) -> None:
-        if event_sink is not None:
-            event_sink(stage, message)
+    from ..application.events import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+        OperationKind,
+        TechnicalEvent,
+    )
+
+    update_id = prepared.update_id
+
+    def emit(
+        event_id: EventId,
+        *,
+        severity: EventSeverity = EventSeverity.INFO,
+        phase: EventPhase | None = None,
+        category: EventCategory = EventCategory.LIFECYCLE,
+    ) -> None:
+        if event_sink is None:
+            return
+        event_sink(
+            TechnicalEvent(
+                event_id=event_id,
+                operation=OperationKind.TARGETS,
+                category=category,
+                severity=severity,
+                phase=phase,
+                correlation_id=update_id,
+            )
+        )
 
     if confirmed_update_id != prepared.update_id:
         return TargetSettingsExecution(
@@ -306,9 +342,9 @@ def execute_target_settings_update(
         )
 
     try:
-        emit("acquiring_lock", "Acquiring project lock")
+        emit(EventId.TARGETS_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
         with acquire_operation_lock(prepared.wordlist_path, "targets"):
-            emit("checking_conflicts", "Checking configuration fingerprint")
+            emit(EventId.TARGETS_CONFLICTS_CHECKED, phase=EventPhase.EXECUTING)
             if not _fingerprint_matches(prepared.config_path, prepared.config_fingerprint_before):
                 return TargetSettingsExecution(
                     prepared=prepared,
@@ -316,9 +352,13 @@ def execute_target_settings_update(
                     message=_STALE_CONFIG_MESSAGE,
                     warnings=prepared.warnings,
                 )
-            emit("writing_configuration", "Writing spell-sync.toml")
+            emit(
+                EventId.TARGETS_WRITE_STARTED,
+                phase=EventPhase.EXECUTING,
+                category=EventCategory.TRANSACTION,
+            )
             atomic_write(prepared.config_path, prepared.rendered_config_bytes, keep_backup=True)
-            emit("verifying_configuration", "Verifying configuration")
+            emit(EventId.TARGETS_VERIFYING, phase=EventPhase.FINALIZING)
             config_result = load_config_result(wordlist=prepared.wordlist_path)
             if config_result.status in (
                 ConfigStatus.SYNTAX_ERROR,
@@ -353,7 +393,11 @@ def execute_target_settings_update(
             warnings=prepared.warnings,
         )
 
-    emit("completed", "Configuration updated")
+    emit(
+        EventId.TARGETS_COMPLETED,
+        severity=EventSeverity.SUCCESS,
+        phase=EventPhase.COMPLETED,
+    )
     enabled_names = ", ".join(
         target_display_name(target_id) for target_id in sorted(prepared.enabled_target_ids)
     )

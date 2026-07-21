@@ -5,9 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from ..io import atomic_write
+
+if TYPE_CHECKING:
+    from ..application.events import (
+        EventCategory,
+        EventId,
+        EventPhase,
+        EventSeverity,
+        TechnicalEvent,
+    )
 from ..operation_lock import OperationLocked, acquire_operation_lock
 from ..push_journal import file_content_hash
 from ..settings import ConfigStatus, load_config_result
@@ -30,7 +39,7 @@ class ProjectSetupExecution:
     warnings: tuple[str, ...] = ()
 
 
-EventSink = Callable[[str, str], None]
+EventSink = Callable[["TechnicalEvent"], None]
 
 
 def _fingerprint_matches(path: Path, fingerprint: str | None) -> bool:
@@ -40,15 +49,65 @@ def _fingerprint_matches(path: Path, fingerprint: str | None) -> bool:
     return current == fingerprint
 
 
+def _emit_setup_event(
+    event_sink: EventSink | None,
+    *,
+    setup_id: str,
+    event_id: EventId,
+    severity: EventSeverity | None = None,
+    phase: EventPhase | None = None,
+    category: EventCategory | None = None,
+) -> None:
+    from ..application.events import (
+        EventCategory as EventCategoryEnum,
+    )
+    from ..application.events import (
+        EventSeverity as EventSeverityEnum,
+    )
+    from ..application.events import (
+        OperationKind,
+        TechnicalEvent,
+    )
+
+    if event_sink is None:
+        return
+    event_sink(
+        TechnicalEvent(
+            event_id=event_id,
+            operation=OperationKind.SETUP,
+            category=category or EventCategoryEnum.LIFECYCLE,
+            severity=severity or EventSeverityEnum.INFO,
+            phase=phase,
+            correlation_id=setup_id,
+        )
+    )
+
+
 def execute_project_setup(
     prepared: PreparedProjectSetup,
     *,
     confirmed_setup_id: str,
     event_sink: EventSink | None = None,
 ) -> ProjectSetupExecution:
-    def emit(stage: str, message: str) -> None:
-        if event_sink is not None:
-            event_sink(stage, message)
+    from ..application.events import EventCategory, EventId, EventPhase, EventSeverity
+
+    setup_id = prepared.setup_id
+
+    def emit(
+        event_id: EventId,
+        *,
+        severity: EventSeverity = EventSeverity.INFO,
+        phase: EventPhase | None = None,
+        category: EventCategory = EventCategory.LIFECYCLE,
+    ) -> None:
+        _emit_setup_event(
+            event_sink,
+            setup_id=setup_id,
+            event_id=event_id,
+            severity=severity,
+            phase=phase,
+            category=category,
+        )
 
     if confirmed_setup_id != prepared.setup_id:
         return ProjectSetupExecution(
@@ -63,7 +122,7 @@ def execute_project_setup(
             message="Setup preview has conflicts and cannot execute.",
         )
 
-    emit("validating_paths", "Validating setup paths")
+    emit(EventId.SETUP_VALIDATING, phase=EventPhase.PREPARING)
     for item in prepared.files:
         if item.action is SetupFileAction.CONFLICT:
             return ProjectSetupExecution(
@@ -87,11 +146,15 @@ def execute_project_setup(
 
     created: list[Path] = []
     try:
-        emit("acquiring_lock", "Acquiring project lock")
+        emit(EventId.SETUP_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
         with acquire_operation_lock(prepared.wordlist_path, "setup"):
-            emit("checking_conflicts", "Checking setup conflicts")
+            emit(EventId.SETUP_CONFLICTS_CHECKED, phase=EventPhase.EXECUTING)
             for directory in prepared.directories_to_create:
-                emit("creating_directory", f"Creating {directory.name}")
+                emit(
+                    EventId.SETUP_DIRECTORY_CREATED,
+                    phase=EventPhase.EXECUTING,
+                    category=EventCategory.TRANSACTION,
+                )
                 if not directory.is_dir():
                     directory.mkdir(parents=True, exist_ok=False)
 
@@ -99,16 +162,28 @@ def execute_project_setup(
                 if item.action is not SetupFileAction.CREATE:
                     continue
                 if item.path.name.endswith(".toml"):
-                    emit("creating_configuration", f"Writing {item.relative_name}")
+                    emit(
+                        EventId.SETUP_CONFIG_CREATED,
+                        phase=EventPhase.EXECUTING,
+                        category=EventCategory.TRANSACTION,
+                    )
                 elif "whitelist" in item.relative_name:
-                    emit("creating_whitelist", f"Writing {item.relative_name}")
+                    emit(
+                        EventId.SETUP_WHITELIST_CREATED,
+                        phase=EventPhase.EXECUTING,
+                        category=EventCategory.TRANSACTION,
+                    )
                 else:
-                    emit("creating_wordlist", f"Writing {item.relative_name}")
+                    emit(
+                        EventId.SETUP_WORDLIST_CREATED,
+                        phase=EventPhase.EXECUTING,
+                        category=EventCategory.TRANSACTION,
+                    )
                 assert item.content is not None
                 atomic_write(item.path, item.content, keep_backup=False)
                 created.append(item.path)
 
-            emit("verifying_project", "Verifying project files")
+            emit(EventId.SETUP_VERIFYING, phase=EventPhase.FINALIZING)
             config_result = load_config_result(wordlist=prepared.wordlist_path)
             if config_result.status not in (ConfigStatus.VALID, ConfigStatus.UNKNOWN_KEY):
                 raise RuntimeError("Created configuration failed validation.")
@@ -144,7 +219,12 @@ def execute_project_setup(
             created_files=tuple(path.name for path in created),
         )
 
-    emit("completed", "Project setup completed")
+    emit(
+        EventId.SETUP_COMPLETED,
+        severity=EventSeverity.SUCCESS,
+        phase=EventPhase.COMPLETED,
+        category=EventCategory.LIFECYCLE,
+    )
     message = (
         "Project created. The existing canonical wordlist was kept unchanged."
         if prepared.existing_wordlist_kept

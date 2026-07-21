@@ -12,9 +12,9 @@ from ...project_setup.target_settings import (
     prepare_target_settings_update,
 )
 from ...push_journal import JournalLoadStatus
-from ..events import EventLevel, EventSink, OperationEvent, OperationKind
+from ..events import EventSink
 from ..requests import PrepareTargetSettingsUpdateRequest, TargetSettingsRequest
-from ._shared import emit
+from ._shared import emit_technical
 from .context import ApplicationContext
 
 
@@ -50,19 +50,12 @@ class TargetSettingsService:
         confirmed_update_id: str,
         event_sink: EventSink | None = None,
     ) -> TargetSettingsExecution:
-        def _sink(stage: str, message: str) -> None:
-            emit(
-                event_sink,
-                OperationEvent(
-                    OperationKind.TARGETS,
-                    stage,
-                    message,
-                    level=EventLevel.SUCCESS if stage == "completed" else EventLevel.INFO,
-                ),
-            )
-
         return execute_target_settings_update(
             prepared,
             confirmed_update_id=confirmed_update_id,
-            event_sink=_sink if event_sink is not None else None,
+            event_sink=(
+                (lambda event: emit_technical(event_sink, event))
+                if event_sink is not None
+                else None
+            ),
         )
