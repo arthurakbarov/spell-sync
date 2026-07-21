@@ -26,6 +26,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
+from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
+from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -36,7 +38,7 @@ from scripts.test_selection.tree_state import (  # noqa: E402
 
 ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
-SUMMARY_SCHEMA = 3
+SUMMARY_SCHEMA = 4
 MIN_PYTHON = (3, 11)
 INTERNAL_CHECK_ID = "ci.internal"
 
@@ -54,6 +56,7 @@ def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     return [
+        ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
         ("docs.contract", [py, "scripts/check-docs-contract.py"]),
@@ -359,6 +362,8 @@ class CiRunner:
         self._final_evidence = True
         self._tree_digest_before = ""
         self._tree_digest_after = ""
+        self._ci_input_digest_before = ""
+        self._ci_input_digest_after = ""
 
     def _bind_run_artifacts(self) -> RunArtifacts:
         run_id = _unique_run_id(self.artifacts, self.now())
@@ -435,7 +440,10 @@ class CiRunner:
         failed = sum(1 for c in self.checks if c["status"] == "failed")
         failed_id = next((str(c["id"]) for c in self.checks if c["status"] == "failed"), "")
         self._tree_digest_after = _ci_tree_digest(self.root)
+        registry = load_registry(self.root / REGISTRY_REL_PATH)
+        self._ci_input_digest_after = compute_ci_input_state(self.root, registry).digest
         tree_stable = self._tree_digest_before == self._tree_digest_after
+        ci_input_stable = self._ci_input_digest_before == self._ci_input_digest_after
         if self._mode == "full" and not tree_stable and exit_code == 0:
             exit_code = 1
             failed = max(failed, 1)
@@ -449,7 +457,21 @@ class CiRunner:
                     "summary": "source/test/config tree changed during CI",
                 }
             )
+        if self._mode == "full" and not ci_input_stable and exit_code == 0:
+            exit_code = 1
+            failed = max(failed, 1)
+            failed_id = "ci.ci-input-changed"
+            self._final_evidence = False
+            self.checks.append(
+                {
+                    "id": "ci.ci-input-changed",
+                    "status": "failed",
+                    "exitCode": 1,
+                    "summary": "CI-relevant inputs changed during CI",
+                }
+            )
         completed = self.now().isoformat()
+        run_head = git_head(self.root)
         payload = {
             "schemaVersion": SUMMARY_SCHEMA,
             "runId": self.run_id,
@@ -459,13 +481,22 @@ class CiRunner:
             "completedAt": completed,
             "mode": self._mode,
             "finalEvidence": self._final_evidence,
-            "gitHead": git_head(self.root),
+            "gitHeadAtRun": run_head,
+            "gitHead": run_head,
             "gitBranch": git_branch(self.root),
             "gitDetached": git_detached(self.root),
+            "repositoryTreeDigest": self._tree_digest_after,
             "treeDigest": self._tree_digest_after,
             "treeDigestBefore": self._tree_digest_before,
             "treeDigestAfter": self._tree_digest_after,
             "treeStable": tree_stable,
+            "ciInputDigest": self._ci_input_digest_after,
+            "ciInputDigestBefore": self._ci_input_digest_before,
+            "ciInputDigestAfter": self._ci_input_digest_after,
+            "ciInputStable": ci_input_stable,
+            "ciImpactSchemaVersion": registry.schema_version,
+            "evidenceScope": "full-ci-inputs",
+            "reusableAcrossNonCiCommits": True,
             "checks": self.checks,
             "logPath": str(self._log_path),
             "historyLogPath": str(self._history_log_path),
@@ -642,7 +673,9 @@ print(importlib.metadata.version("spell-sync"))
             resume_failed=resume_failed is not None,
         )
         self._final_evidence = self._mode == "full"
+        registry = load_registry(self.root / REGISTRY_REL_PATH)
         self._tree_digest_before = _ci_tree_digest(self.root)
+        self._ci_input_digest_before = compute_ci_input_state(self.root, registry).digest
 
         try:
             self.started_at = self.now().isoformat()

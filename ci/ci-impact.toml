@@ -1,0 +1,100 @@
+schemaVersion = 1
+
+[meta]
+registryPath = "ci/ci-impact.toml"
+impactModule = "scripts/ci_impact"
+
+[excluded]
+patterns = [
+  ".artifacts/**",
+  "build/**",
+  "dist/**",
+  "spell_sync.egg-info/**",
+  ".pytest_cache/**",
+  ".mypy_cache/**",
+  ".coverage",
+  "coverage.json",
+  "htmlcov/**",
+]
+
+[allowedUnclassified]
+patterns = [
+  "LICENSE",
+]
+
+[classes.product]
+patterns = [
+  "spell_sync/*.py",
+  "spell_sync/*/*.py",
+  "spell_sync/*/*/*.py",
+  "spell_sync/*/*/*/*.py",
+]
+
+[classes.tests]
+patterns = [
+  "tests/**",
+]
+
+[classes.build]
+patterns = [
+  "pyproject.toml",
+  "MANIFEST.in",
+  "scripts/build*.py",
+]
+
+[classes.toolchain]
+patterns = [
+  "scripts/ci.sh",
+  "scripts/ci_runner.py",
+  "scripts/ci_history.py",
+  "scripts/check-ci-evidence.py",
+  "scripts/check-ci-necessity.py",
+  "scripts/ci_input_state.py",
+  "scripts/documentation_state.py",
+  "scripts/run_lightweight_validation.py",
+  "scripts/run_pre_final_checks.py",
+  "scripts/run_focused_tests.py",
+  "scripts/test_plan.py",
+  "scripts/test_selection/**",
+  "scripts/lib/**",
+  "scripts/ci_impact/**",
+  "ci/**",
+]
+
+[classes.packageData]
+patterns = [
+  "spell_sync/bundled/**",
+  "spell_sync/**/*.json",
+  "spell_sync/**/*.toml",
+  "spell_sync/**/*.txt",
+  "spell_sync/**/*.tcss",
+]
+
+[classes.validators]
+patterns = [
+  "scripts/check-agent-config.py",
+  "scripts/check-docs-contract.py",
+  "scripts/check-target-capabilities.py",
+  "scripts/check-docs-style.sh",
+  "scripts/validate_*.py",
+]
+
+[classes.documentation]
+patterns = [
+  "docs/**",
+  "README.md",
+]
+
+[classes.agentWorkflow]
+patterns = [
+  ".cursor/**",
+  "AGENTS.md",
+]
+
+[classes.repositoryMetadata]
+patterns = [
+  ".gitignore",
+  ".gitattributes",
+  ".editorconfig",
+  ".github/**",
+]
