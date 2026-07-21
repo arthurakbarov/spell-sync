@@ -78,6 +78,11 @@ Runtime settings are resolved explicitly via `RuntimeResolver` (Phase 3). There 
 production `ContextVar` scope and no module-level config cache; mutating commands resolve
 fresh runtime under the operation lock.
 
+Mutating operations emit typed **technical events** (`EventId`, `TechnicalEvent`) through a
+single `EventEmitter` path. Presentation copy is produced at CLI/TUI boundaries only
+(`event_presenter.py`); the rotating technical log stores privacy-safe JSON Lines records
+(`schemaVersion: 1`). See ADR `docs/decisions/0004-structured-technical-events.md`.
+
 ## Core modules
 
 | Module | Role |

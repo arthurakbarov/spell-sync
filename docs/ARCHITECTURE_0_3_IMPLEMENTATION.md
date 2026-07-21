@@ -10,8 +10,9 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 5: structured technical events and diagnostics — **not started**. Phase 4
-(focused application services and thin facade) is **complete** and owner-approved.
+Phase 5: structured technical events and diagnostics — **in progress** (implementation
+finalized; **awaiting owner approval**). Phase 4 (focused application services and thin facade)
+is **complete** and owner-approved.
 
 [architecture-status:start]
 current: phase-5
@@ -23,20 +24,23 @@ phase-2d: complete
 phase-2e: complete
 phase-3: complete
 phase-4: complete
-phase-5: not-started
+phase-5: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `0a69064` test: cover operation screen unmount mutation cleanup | yes |
+| spell-sync | `9bbdccc` docs: complete phase 4 and open phase 5 | no (Phase 5 WIP) |
 | spell-sync-dev | `7bb8ecf` test: cover snapshot git timeout | yes |
 | spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
 
 Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
+
+Phase 5 final CI evidence: **pending** — run full `scripts/ci.sh` on committed clean HEAD after
+owner approval.
 
 ## Current dependency graph
 
@@ -127,16 +131,25 @@ state for review/target settings/recovery flows.
 
 ## Logging gap analysis
 
-Today:
+Resolved in Phase 5:
 
-- `OperationEvent` uses free-form `stage: str`; sink is UI-only (`events.py`).
-- File technical log (`technical_logging.py`) uses stdlib logging + safe formatter;
-  few warning lines on setup/history failure.
-- No structured JSON Lines lifecycle per operation ID.
-- History is compact user summary via `history_store`.
+- ~~Free-form `OperationEvent.stage: str`~~ → typed `EventId` enum and `TechnicalEvent`
+  dataclass (`application/events.py`).
+- ~~UI-only event sink with duplicated messages~~ → `EventEmitter` splits technical file log
+  and `PresentedEvent` via `event_presenter.py`; CLI/TUI receive presentation only.
+- ~~Ad-hoc warning lines only~~ → JSON Lines per event with `schemaVersion: 1`
+  (`diagnostics/technical_event_log.py`).
+- ~~No operation continuity in technical log~~ → `correlationId` binds preview plan IDs,
+  setup/update identifiers, and history record IDs on diagnostic failures.
+- ~~No per-target structured metadata~~ → optional `targetId` on target-scoped events.
+- ~~Plain-text-only tail display~~ → structured lines parsed for display; legacy lines fall
+  back to `sanitize_log_message`.
 
-Gaps: no enum stages, no operation_id continuity in technical log, no per-target
-structured events, legacy plain-text only.
+Unchanged:
+
+- Operation history remains compact user summaries via `history_store` (not a full event stream).
+- Support report exposes redacted summaries and privacy manifest; no raw event payloads.
+- Logging failure is fail-open and never blocks mutation paths.
 
 ## Safety invariants
 
@@ -336,7 +349,7 @@ installed-wheel smoke
 
 ## Phase 5 — Structured technical events and diagnostics
 
-**Status:** not started
+**Status:** awaiting approval
 
 ### Goal
 
@@ -344,62 +357,78 @@ Replace scattered free-form stage strings and ad-hoc technical logging with type
 structured technical events while keeping presentation-neutral application and core
 boundaries.
 
-### Scope
+### Delivered
 
-Minimum:
+- `spell_sync/application/events.py` — `EventId`, `TechnicalEvent`, `EventEmitter`,
+  `operation_emitter`, typed enums (`OperationKind`, `EventCategory`, `EventSeverity`,
+  `EventPhase`); removed free-form `OperationEvent.stage`
+- `spell_sync/application/event_presenter.py` — `present_event`, fixed message catalog,
+  contextual overrides for `target_id` and `reason_code`
+- `spell_sync/diagnostics/technical_event_log.py` — JSON Lines serialization
+  (`schemaVersion: 1`), privacy field allowlist, `write_technical_event`,
+  `parse_technical_log_line`, `format_log_line_for_display` for backward-compatible tail reading
+- Focused services (`sync`, `recovery`, `setup`, `target_settings`) and
+  `project_setup/execute.py`, `project_setup/target_settings.py` emit typed events with
+  `correlation_id` from preview/plan identifiers
+- `DiagnosticsService.finalize_report` emits `diagnostics.history_write_failed` on history
+  append failure; `SpellSyncService` emits `diagnostics.logging_setup_failed` when file logging
+  cannot start
+- TUI `operation_screen.py` drives progress from `EventId` / `PresentedEvent` (replacing
+  free-form stage strings)
+- `safe_log.format_safe_log_record` bypasses sanitization for structured JSON lines;
+  legacy plain-text lines remain redacted
+- `read_technical_log_tail` displays structured events via presenter-friendly summaries
+- ADR `docs/decisions/0004-structured-technical-events.md`
+- `docs/PROJECT_MAP.md` and `tests/test-impact.toml` diagnostics/events cluster updated
 
-```text
-spell_sync/application/events.py
-spell_sync/diagnostics/*
-application focused services
-CLI/TUI event adapters
-operation history/report integration
-support report
-architecture tests
-ADR
-```
+### Required outcomes (delivered)
 
-### Required outcomes
+- typed event identifiers instead of arbitrary stage strings
+- stable severity/category/operation metadata
+- safe structured payload without user words (serialize-time forbidden keys)
+- one canonical emission path via `operation_emitter` / `emit_technical`
+- CLI/TUI convert events to presentation only (`EventSink` → `PresentedEvent`)
+- technical file logging receives structured JSON Lines events
+- history diagnostics and support workflows remain privacy-safe (no event stream in history)
+- no parallel old/new event pipeline after migration
+- internal JSON Lines boundary with `schemaVersion: 1` and backward tail reading for legacy lines
 
-- typed event identifiers instead of arbitrary stage strings;
-- stable severity/category/operation metadata;
-- safe structured payload without user words;
-- one canonical emission path;
-- CLI/TUI convert events to presentation only;
-- technical file logging receives sanitized structured events;
-- history and support report use safe event summaries;
-- no parallel old/new event pipeline after migration;
-- stable JSON compatibility or explicit internal-only boundary;
-- architecture tests forbid new free-form event stages.
+### Safety and privacy (preserved)
 
-### Safety and privacy
-
-- do not record user dictionary words;
-- do not record raw config;
-- do not record credential-like environment values;
-- do not record absolute private HOME paths without redaction policy;
-- do not copy Recovery/journal contents into logs;
-- logging failure must not block Pull/Push/Recovery;
-- events must not change product semantics.
+- no user dictionary words in events or technical log payloads
+- no raw config, credentials, or journal contents in events
+- HOME paths redacted on legacy log lines; structured events omit path fields
+- logging failure does not block Pull/Push/Recovery
+- product semantics, CLI JSON, and exit codes unchanged
 
 ### Deferred
 
-- version `0.3.0`;
-- CLI redesign;
-- TUI redesign;
-- telemetry/network transport;
-- remote logging;
-- release/tag/publication.
+- version `0.3.0`
+- CLI redesign
+- TUI redesign
+- telemetry/network transport and remote logging (rejected — see ADR 0004)
+- release/tag/publication
 
-### Completion criteria
+### Phase-specific validation (pending final CI)
 
-- one structured event contract;
-- no duplicate event pipeline;
-- CLI/TUI adapters green;
-- privacy tests;
-- application services use typed events;
-- full CI on committed clean HEAD;
-- status `awaiting-approval`.
+```text
+tests/test_technical_logging.py
+tests/test_diagnostic_redaction.py
+Pull/Push/Recovery safety suites
+TUI architecture and mutation safety
+privacy redaction on technical log tail
+full final CI on committed clean HEAD
+```
+
+### Completion criteria (met pending approval)
+
+- one structured event contract
+- no duplicate event pipeline
+- CLI/TUI adapters use presentation sinks
+- privacy tests on logging and redaction paths
+- application services emit typed events
+- final CI on committed clean HEAD (pending)
+- status `awaiting-approval`
 
 ## Phase 2B: complete application boundary
 

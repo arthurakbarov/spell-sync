@@ -1,6 +1,7 @@
 # Project map (application layer)
 
-Canonical module responsibilities after Phase 4 service decomposition.
+Canonical module responsibilities after Phase 4 service decomposition and Phase 5 structured
+events.
 
 ## Facade
 
@@ -25,8 +26,18 @@ Canonical module responsibilities after Phase 4 service decomposition.
 | Module | Role |
 |--------|------|
 | `application/builders.py` | UI-neutral snapshot and preview builders |
+| `application/events.py` | Typed technical events (`EventId`, `TechnicalEvent`, `EventEmitter`) |
+| `application/event_presenter.py` | Map `TechnicalEvent` → `PresentedEvent` for CLI/TUI |
 | `application/reports.py` | Report and execution dataclasses |
 | `application/runtime_resolver.py` | Explicit runtime resolution |
+
+## Diagnostics (Phase 5)
+
+| Module | Role |
+|--------|------|
+| `diagnostics/technical_event_log.py` | JSON Lines serialization, parse, and tail display for structured events |
+| `diagnostics/technical_logging.py` | Rotating file handler; tail reads via structured line formatter |
+| `diagnostics/safe_log.py` | Redaction for legacy plain-text log lines; structured JSON bypass |
 
 ## Dependency direction
 
@@ -44,4 +55,5 @@ Rules:
 - Core modules must not import `spell_sync.application.services`.
 - Mutation paths resolve fresh runtime under the operation lock via `RuntimeResolver`.
 
-See also `docs/ARCHITECTURE.md` and `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
+See also `docs/ARCHITECTURE.md` and `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`. ADR:
+`docs/decisions/0004-structured-technical-events.md`.
