@@ -45,12 +45,18 @@ def test_fsync_path_helper_exists_and_calls_os_fsync(tmp_path: Path) -> None:
 
 def test_should_skip_path_excludes_dot_venv_from_archive_walk(tmp_path: Path) -> None:
     snapshot = _load_snapshot_module()
+    policy = snapshot._load_policy()
     workspace = tmp_path / "code"
     venv_entry = workspace / "spell-sync-dev" / ".venv" / "pyvenv.cfg"
     venv_entry.parent.mkdir(parents=True)
     venv_entry.write_text("home = /tmp/venv\n", encoding="utf-8")
     exclude = snapshot._archive_exclude_paths(output=tmp_path / "code.zip")
-    assert snapshot._should_skip_path(venv_entry, exclude_paths=exclude, root=workspace)
+    assert snapshot._should_skip_path(
+        venv_entry,
+        exclude_paths=exclude,
+        root=workspace,
+        policy=policy,
+    )
 
 
 def test_create_snapshot_uses_beside_output_candidate_name() -> None:

@@ -32,19 +32,30 @@ def _load_snapshot_module():
     return module
 
 
+def _policy(snapshot):
+    return snapshot._load_policy()
+
+
 def test_should_skip_path_excludes_dot_venv(tmp_path: Path) -> None:
     snapshot = _load_snapshot_module()
+    policy = _policy(snapshot)
     workspace = tmp_path / "code"
     tool = workspace / "spell-words" / "spell-sync"
     venv_python = tool / ".venv" / "bin" / "python"
     venv_python.parent.mkdir(parents=True)
     venv_python.write_text("stub\n", encoding="utf-8")
     exclude = snapshot._archive_exclude_paths(output=tmp_path / "code.zip")
-    assert snapshot._should_skip_path(venv_python, exclude_paths=exclude, root=workspace)
+    assert snapshot._should_skip_path(
+        venv_python,
+        exclude_paths=exclude,
+        root=workspace,
+        policy=policy,
+    )
 
 
 def test_iter_entries_omits_dot_venv_tree(tmp_path: Path) -> None:
     snapshot = _load_snapshot_module()
+    policy = _policy(snapshot)
     workspace = tmp_path / "code"
     tool = workspace / "spell-words" / "spell-sync"
     (tool / "src").mkdir(parents=True)
@@ -54,12 +65,18 @@ def test_iter_entries_omits_dot_venv_tree(tmp_path: Path) -> None:
     venv_file.write_text("secret\n", encoding="utf-8")
     exclude = snapshot._archive_exclude_paths(output=tmp_path / "code.zip")
     archived = {
-        arcname for _path, arcname in snapshot._iter_entries(workspace, exclude_paths=exclude)
+        arcname
+        for _path, arcname in snapshot._iter_entries(
+            workspace,
+            exclude_paths=exclude,
+            policy=policy,
+        )
     }
     assert any(arcname.endswith("src/module.py") for arcname in archived)
     assert not any(".venv/" in arcname for arcname in archived)
 
 
-def test_snapshot_exclude_dir_names_include_dot_venv() -> None:
+def test_snapshot_policy_excludes_dot_venv() -> None:
     snapshot = _load_snapshot_module()
-    assert ".venv" in snapshot.SNAPSHOT_EXCLUDE_DIR_NAMES
+    policy = _policy(snapshot)
+    assert policy.should_skip_workspace_path("spell-words/spell-sync/.venv/bin/python")
