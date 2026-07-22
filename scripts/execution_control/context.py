@@ -61,4 +61,6 @@ def build_context(
         tui=tui,
         packaging=packaging,
         environment=environment,
+        test_file_count=test_file_count,
+        test_node_count=test_node_count,
     )

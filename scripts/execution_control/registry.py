@@ -47,8 +47,25 @@ ALLOWED_PROFILE_KEYS = frozenset(
         "parentRetries",
         "diagnosticRetries",
         "source",
+        "workloadCost",
     }
 )
+ALLOWED_WORKLOAD_COST_KEYS = frozenset(
+    {
+        "fixedSeconds",
+        "perTestFileSeconds",
+        "perTestNodeSeconds",
+        "maximumBootstrapSeconds",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class WorkloadCost:
+    fixed_seconds: float
+    per_test_file_seconds: float
+    per_test_node_seconds: float
+    maximum_bootstrap_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +87,7 @@ class Profile:
     parent_retries: int
     diagnostic_retries: int
     source: str
+    workload_cost: WorkloadCost | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +152,31 @@ def _validate_profile(profile_id: str, payload: dict[str, object]) -> list[str]:
     return errors
 
 
+def _parse_workload_cost(profile_id: str, payload: dict[str, object]) -> WorkloadCost | None:
+    raw = payload.get("workloadCost")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(f"profile {profile_id}: workloadCost must be a table")
+    unknown = set(raw) - ALLOWED_WORKLOAD_COST_KEYS
+    if unknown:
+        raise ValueError(f"profile {profile_id}: unknown workloadCost keys {sorted(unknown)}")
+    fixed = float(raw.get("fixedSeconds", 0) or 0)
+    per_file = float(raw.get("perTestFileSeconds", 0) or 0)
+    per_node = float(raw.get("perTestNodeSeconds", 0) or 0)
+    maximum = float(raw.get("maximumBootstrapSeconds", 0) or 0)
+    if fixed <= 0 and per_file <= 0 and per_node <= 0:
+        raise ValueError(f"profile {profile_id}: workloadCost requires positive unit cost")
+    if maximum <= 0:
+        raise ValueError(f"profile {profile_id}: maximumBootstrapSeconds must be > 0")
+    return WorkloadCost(
+        fixed_seconds=fixed,
+        per_test_file_seconds=per_file,
+        per_test_node_seconds=per_node,
+        maximum_bootstrap_seconds=maximum,
+    )
+
+
 def validate_registry(registry: ExecutionBudgetRegistry) -> list[str]:
     errors: list[str] = []
     if registry.global_hard_cap_seconds > 1800:
@@ -148,6 +191,7 @@ def validate_registry(registry: ExecutionBudgetRegistry) -> list[str]:
         "snapshot-tests",
         "diagnostic-pytest",
         "bounded-unknown",
+        "focused-pytest",
     }
     missing = required - set(registry.profiles)
     if missing:
@@ -209,6 +253,7 @@ def load_registry(path: Path) -> ExecutionBudgetRegistry:
             parent_retries=int(payload["parentRetries"]),
             diagnostic_retries=int(payload["diagnosticRetries"]),
             source=str(payload.get("source", "")),
+            workload_cost=_parse_workload_cost(profile_id, payload),
         )
 
     child_raw = data.get("childMappings") or {}

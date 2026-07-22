@@ -10,6 +10,14 @@ from .models import ExecutionPlan, NormalizedContext
 from .registry import ExecutionBudgetRegistry, Profile
 from .statistics import compute_stats, confidence_label
 
+WORKLOAD_SENSITIVE_EXECUTION_IDS = frozenset(
+    {
+        "focused:pytest",
+        "diagnostic:pytest",
+        "ci:pytest",
+    }
+)
+
 
 def _round_up_seconds(value: float, step: float = 5.0) -> float:
     return math.ceil(value / step) * step
@@ -32,6 +40,16 @@ def _blend_expected(initial: float, learned: float, sample_count: int) -> float:
         return _round_up_seconds(learned)
     blended = initial * (1.0 - weight) + learned * weight
     return _round_up_seconds(blended)
+
+
+def _bootstrap_expected_seconds(profile: Profile, context: NormalizedContext) -> float:
+    cost = profile.workload_cost
+    if cost is None:
+        return 0.0
+    units = max(0, context.test_file_count) * cost.per_test_file_seconds
+    units += max(0, context.test_node_count) * cost.per_test_node_seconds
+    total = cost.fixed_seconds + units
+    return min(total, cost.maximum_bootstrap_seconds)
 
 
 def predict_thresholds(
@@ -78,6 +96,16 @@ def predict_thresholds(
     else:
         expected = _round_up_seconds(profile.initial_expected_seconds)
         source = "registry-default"
+
+    if (
+        execution_id in WORKLOAD_SENSITIVE_EXECUTION_IDS
+        and sample_count == 0
+        and profile.workload_cost is not None
+    ):
+        bootstrap = _bootstrap_expected_seconds(profile, context)
+        if bootstrap > expected:
+            expected = _round_up_seconds(bootstrap)
+            source = "bootstrap-workload-cost"
 
     soft_candidates = [
         profile.initial_soft_seconds,

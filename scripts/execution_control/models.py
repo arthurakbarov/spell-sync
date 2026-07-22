@@ -39,6 +39,8 @@ class NormalizedContext:
     tui: bool = False
     packaging: bool = False
     environment: str = "unknown"
+    test_file_count: int = 0
+    test_node_count: int = 0
 
     def signature(self) -> str:
         parts = (
