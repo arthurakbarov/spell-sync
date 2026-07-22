@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
 from scripts.environment_contract.evidence import write_environment_evidence
 from scripts.environment_contract.fingerprint import resolve_project_environment_fingerprint
 from scripts.project_environment import cmd_sync
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _uv_version() -> str:
