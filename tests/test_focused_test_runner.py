@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -190,30 +191,58 @@ def _planner_payload(
     }
 
 
-def _mock_gate(open_gate, *, plan_payload: dict[str, object]):
+@contextmanager
+def _mock_gate(runner_module, open_gate, *, plan_payload: dict[str, object]):
     gate = type("Gate", (), {"stopped": False})()
     controller = open_gate.return_value
-    controller.begin_gate.return_value = (gate, "run")
     controller.check_orchestration_budget.return_value = True
 
-    def _run_child(gate_arg, *, child_execution_id, command, **kwargs):
-        del gate_arg, kwargs
-        if child_execution_id == "focused:planner":
-            output_idx = command.index("--output") + 1
-            Path(command[output_idx]).write_text(json.dumps(plan_payload), encoding="utf-8")
-            return 0, {"result": "success"}
+    def _run_bounded_planner(_controller, **kwargs):
+        del _controller
+        output_idx = kwargs["command"].index("--output") + 1
+        Path(kwargs["command"][output_idx]).write_text(
+            json.dumps(plan_payload), encoding="utf-8"
+        )
+        return 0, "run"
+
+    def _open_gate_after_previews(_controller, **kwargs):
+        del _controller, kwargs
+        child_plans = tuple(
+            type("Plan", (), {"execution_id": "focused:pytest"})()
+            for _ in plan_payload.get("steps", [])
+        )
+        return gate, "run", child_plans, None
+
+    def _run_child_with_plan(_gate, _plan, *, command, **kwargs):
+        del _gate, _plan, command, kwargs
         return 0, {"result": "success"}
 
-    controller.run_child.side_effect = _run_child
-    controller.finish_gate.return_value = {"result": "success"}
-    return controller, gate
+    with patch.object(
+        runner_module,
+        "run_bounded_planner",
+        side_effect=_run_bounded_planner,
+    ), patch.object(
+        runner_module,
+        "open_gate_after_previews",
+        side_effect=_open_gate_after_previews,
+    ), patch.object(
+        runner_module,
+        "preview_focused_child_plans",
+        return_value=tuple(
+            type("Plan", (), {"execution_id": "focused:pytest"})()
+            for _ in plan_payload.get("steps", [])
+        ),
+    ):
+        controller.run_child_with_plan.side_effect = _run_child_with_plan
+        controller.finish_gate.return_value = {"result": "success"}
+        yield controller, gate
 
 
 def test_force_reruns(runner_mod, steps_mod) -> None:
-    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        _mock_gate(open_gate, plan_payload=_planner_payload(steps_mod))
-        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=object()):
-            rc = runner_mod.main(["--target", "tests/test_core.py", "--force"])
+    with patch.object(runner_mod, "gate_controller_for") as open_gate:
+        with _mock_gate(runner_mod, open_gate, plan_payload=_planner_payload(steps_mod)):
+            with patch.object(runner_mod.TestRunLedger, "find_success", return_value=object()):
+                rc = runner_mod.main(["--target", "tests/test_core.py", "--force"])
     assert rc == 0
 
 
@@ -223,12 +252,14 @@ def test_skipped_when_already_passed(runner_mod, steps_mod, capsys) -> None:
         (),
         {"duration_seconds": 2.5, "result": "success", "exit_code": 0},
     )()
-    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        controller, _gate = _mock_gate(open_gate, plan_payload=_planner_payload(steps_mod))
-        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
-            rc = runner_mod.main(["--target", "tests/test_core.py"])
-        controller.begin_gate.assert_called_once()
-        assert controller.run_child.call_count == 1
+    with patch.object(runner_mod, "gate_controller_for") as open_gate:
+        with _mock_gate(runner_mod, open_gate, plan_payload=_planner_payload(steps_mod)) as (
+            controller,
+            _gate,
+        ):
+            with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
+                rc = runner_mod.main(["--target", "tests/test_core.py"])
+        assert controller.run_child_with_plan.call_count == 0
     assert rc == 0
     output = capsys.readouterr().out
     assert "TEST_RUN_RESULT=skipped" in output
@@ -254,11 +285,11 @@ def test_docs_only_runs_validators(runner_mod, steps_mod, capsys) -> None:
         "finalFocusedEvidence": True,
     }
     payload["testFileCount"] = 0
-    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        controller, gate = _mock_gate(open_gate, plan_payload=payload)
-        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
-            rc = runner_mod.main([])
-        assert controller.run_child.call_count >= 2
+    with patch.object(runner_mod, "gate_controller_for") as open_gate:
+        with _mock_gate(runner_mod, open_gate, plan_payload=payload) as (controller, gate):
+            with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
+                rc = runner_mod.main([])
+            assert controller.run_child_with_plan.call_count >= 1
     output = capsys.readouterr().out
     assert rc == 0
     assert "TEST_RUN_RESULT=success" in output
