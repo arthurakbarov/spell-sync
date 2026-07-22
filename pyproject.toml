@@ -24,12 +24,46 @@ dependencies = [
     "textual>=8.2.8,<9",
 ]
 
+[dependency-groups]
+test = [
+    "pytest>=7",
+    "pytest-cov>=4",
+]
+lint = [
+    "ruff>=0.4",
+]
+typing = [
+    "mypy>=1.0",
+]
+build = [
+    "build",
+    "wheel",
+    "twine",
+    "setuptools>=77",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+    { include-group = "typing" },
+    { include-group = "build" },
+]
+
 [project.urls]
 Homepage = "https://github.com/arthurakbarov/spell-sync"
 Repository = "https://github.com/arthurakbarov/spell-sync"
 Issues = "https://github.com/arthurakbarov/spell-sync/issues"
 [project.optional-dependencies]
-dev = ["ruff>=0.4", "mypy>=1.0", "pytest>=7", "pytest-cov>=4"]
+# Transitional public install path; dependency-groups dev is the maintainer SSOT.
+dev = [
+    "pytest>=7",
+    "pytest-cov>=4",
+    "ruff>=0.4",
+    "mypy>=1.0",
+    "build",
+    "wheel",
+    "twine",
+    "setuptools>=77",
+]
 
 [project.scripts]
 spell-sync = "spell_sync.cli:entry_point"
@@ -66,3 +100,8 @@ branch = true
 [tool.coverage.report]
 fail_under = 98
 skip_covered = true
+
+[tool.uv]
+required-version = "==0.11.21"
+default-groups = ["dev"]
+python-downloads = "manual"

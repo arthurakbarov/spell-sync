@@ -1,10 +1,15 @@
 # Python / tooling
+.venv/
 __pycache__/
 *.pyc
 *.egg-info/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 .coverage
+coverage.json
+coverage.xml
+htmlcov/
 dist/
 build/
 

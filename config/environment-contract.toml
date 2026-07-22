@@ -1,0 +1,49 @@
+schemaVersion = 1
+
+[product]
+pythonRequirement = ">=3.11"
+
+[maintainer]
+implementation = "cpython"
+canonicalPython = "3.12.13"
+pythonProvider = "uv-managed"
+dependencyManager = "uv"
+environmentDirectory = ".venv"
+
+[maintainer.pythonDownloads]
+normalCommands = "forbidden"
+bootstrapCommand = "allowed"
+
+[compatibility]
+blockingPython = ["3.11", "3.12"]
+experimentalPython = ["3.13"]
+
+[platforms.product]
+macos = true
+linux = true
+windows = true
+
+[platforms.posixExecutionSupervision]
+macos = true
+linux = true
+windows = false
+
+[platforms.ownerSnapshot]
+macos = true
+linux = false
+windows = false
+
+[artifactVerifier]
+pythonRequirement = ">=3.11"
+uvRequired = false
+venvRequired = false
+
+[toolchain]
+uvRequiredVersion = "0.11.21"
+canonicalMaintainerPython = "3.12.13"
+
+[commands]
+bootstrap = "python3 scripts/project_environment.py bootstrap --allow-python-download"
+sync = "python3 scripts/project_environment.py sync"
+check = "python3 scripts/project_environment.py check"
+normalUvRun = "uv run --python 3.12.13 --locked --no-sync --offline --no-python-downloads"
