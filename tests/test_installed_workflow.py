@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,20 @@ from tests.journal_test_utils import write_restore_scenario_journal
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def _build_artifacts(root: Path) -> tuple[Path, ...]:
+    return tuple(
+        path for name in ("spell_sync.egg-info", "dist") for path in (root / name,) if path.exists()
+    )
+
+
+def _remove_build_artifacts(root: Path) -> None:
+    for path in _build_artifacts(root):
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
 
 
 def _editor_dictionary(home: Path) -> Path:
@@ -33,25 +48,29 @@ def _editor_dictionary(home: Path) -> Path:
 def installed_spell_sync(tmp_path_factory):
     root = _repo_root()
     build_dir = tmp_path_factory.mktemp("wheel-build")
-    subprocess.run(
-        [sys.executable, "-m", "build", "-w", "-n", "--outdir", str(build_dir)],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    wheels = list(build_dir.glob("*.whl"))
-    assert wheels, "wheel build produced no artifact"
-    venv_dir = tmp_path_factory.mktemp("wheel-venv")
-    subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
-    venv_python = venv_dir / "bin" / "python"
-    if not venv_python.is_file():
-        venv_python = venv_dir / "Scripts" / "python.exe"
-    subprocess.run(
-        [str(venv_python), "-m", "pip", "install", "-q", str(wheels[0])],
-        check=True,
-    )
-    return venv_python
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "build", "-w", "-n", "--outdir", str(build_dir)],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        _remove_build_artifacts(root)
+        wheels = list(build_dir.glob("*.whl"))
+        assert wheels, "wheel build produced no artifact"
+        venv_dir = tmp_path_factory.mktemp("wheel-venv")
+        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+        venv_python = venv_dir / "bin" / "python"
+        if not venv_python.is_file():
+            venv_python = venv_dir / "Scripts" / "python.exe"
+        subprocess.run(
+            [str(venv_python), "-m", "pip", "install", "-q", str(wheels[0])],
+            check=True,
+        )
+        yield venv_python
+    finally:
+        _remove_build_artifacts(root)
 
 
 def _run(
