@@ -28,6 +28,8 @@ if str(ROOT) not in sys.path:
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
+from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -56,6 +58,7 @@ def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     return [
+        ("execution-budget.registry", [py, "scripts/validate_execution_budget.py"]),
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
@@ -301,6 +304,21 @@ print(f"coverage policy: 100% lines, {branch_rate:.2f}% branches")
     return run_step([py, "-c", script], cwd=root)
 
 
+def _coverage_argv(py: str) -> list[str]:
+    script = """
+import json
+totals = json.load(open("coverage.json", encoding="utf-8"))["totals"]
+if totals["missing_lines"]:
+    raise SystemExit(f"line coverage must be 100% ({totals['missing_lines']} lines missing)")
+branches = totals["num_branches"]
+branch_rate = 100.0 if not branches else 100.0 * totals["covered_branches"] / branches
+if branch_rate < 96:
+    raise SystemExit(f"branch coverage must be at least 96% ({branch_rate:.2f}%)")
+print(f"coverage policy: 100% lines, {branch_rate:.2f}% branches")
+"""
+    return [py, "-c", script]
+
+
 def _make_run_id(now: datetime) -> str:
     return now.strftime("%Y%m%dT%H%M%S") + f".{now.microsecond:06d}Z"
 
@@ -343,8 +361,10 @@ class CiRunner:
                 return _run_step(argv, cwd=cwd or root_ref, env=env)
 
             self.run_step = bound_run_step
+            self._uses_default_run_step = True
         else:
             self.run_step = run_step
+            self._uses_default_run_step = False
         self.checks: list[dict[str, object]] = []
         self.log_lines: list[str] = []
         self.cleanup_paths: list[Path] = []
@@ -364,6 +384,8 @@ class CiRunner:
         self._tree_digest_after = ""
         self._ci_input_digest_before = ""
         self._ci_input_digest_after = ""
+        self._parent_timing: dict[str, object] | None = None
+        self._child_timeout_check_id = ""
 
     def _bind_run_artifacts(self) -> RunArtifacts:
         run_id = _unique_run_id(self.artifacts, self.now())
@@ -382,18 +404,28 @@ class CiRunner:
         self._history_summary_path = artifacts.history_summary
         return artifacts
 
-    def _finish(self, exit_code: int) -> int:
-        return self.finish(exit_code)
+    def _finish(self, exit_code: int, *, failed_id: str = "") -> int:
+        return self.finish(exit_code, failed_id=failed_id)
 
-    def record(self, step_id: str, rc: int, output: str, summary: str = "") -> None:
-        self.checks.append(
-            {
-                "id": step_id,
-                "status": "passed" if rc == 0 else "failed",
-                "exitCode": rc,
-                **({"summary": summary} if summary else {}),
-            }
-        )
+    def record(
+        self,
+        step_id: str,
+        rc: int,
+        output: str,
+        summary: str = "",
+        *,
+        timing: dict[str, object] | None = None,
+    ) -> None:
+        entry: dict[str, object] = {
+            "id": step_id,
+            "status": "passed" if rc == 0 else "failed",
+            "exitCode": rc,
+        }
+        if summary:
+            entry["summary"] = summary
+        if timing is not None:
+            entry["timing"] = timing
+        self.checks.append(entry)
         self.log_lines.append(f"=== {step_id} exit={rc} ===")
         self.log_lines.append(output.rstrip())
         self.log_lines.append("")
@@ -408,6 +440,44 @@ class CiRunner:
         if output.strip():
             return output.strip().splitlines()[-1]
         return f"{step_id} failed"
+
+    def _run_check(
+        self,
+        step_id: str,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> tuple[int, str, dict[str, object] | None]:
+        if self._mode != "full" or not self._uses_default_run_step:
+            rc, out = self.run_step(argv, cwd=cwd or self.root, env=env)
+            return rc, out, None
+        execution_id = ci_check_execution_id(step_id)
+        coverage = step_id in {"tests.pytest", "coverage.policy"}
+        tui = step_id == "smoke.tui"
+        packaging = step_id.startswith("packaging.") or step_id.startswith("smoke.")
+        rc, timing = run_monitored_command(
+            self.root,
+            execution_id=execution_id,
+            command=argv,
+            mode="full-ci",
+            required=True,
+            cwd=cwd or self.root,
+            env=env,
+            coverage=coverage,
+            tui=tui,
+            packaging=packaging,
+            enforce_hard=True,
+            enforce_stall=False,
+        )
+        if timing is None:
+            return 0, "", None
+        result = str(timing.get("result", ""))
+        out = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
+        if result in {"timeout-hard", "timeout-stall"}:
+            self._child_timeout_check_id = step_id
+            return 124, out or f"{step_id}: execution timeout ({result})", timing
+        return rc, out, timing
 
     def _print_failure_block(
         self,
@@ -424,6 +494,8 @@ class CiRunner:
             print(f"CI_FAILED_CHECKS={failed_checks}")
         if failed_id:
             print(f"CI_FAILED_ID={failed_id}")
+        if self._child_timeout_check_id:
+            print(f"CI_TIMEOUT_CHECK_ID={self._child_timeout_check_id}")
         print(f"CI_SUMMARY={summary_path}")
         print(f"CI_LOG={log_path}")
 
@@ -436,9 +508,56 @@ class CiRunner:
             failed_id=INTERNAL_CHECK_ID,
         )
 
-    def finish(self, exit_code: int) -> int:
+    def _build_parent_timing(self, exit_code: int) -> dict[str, object] | None:
+        timings = [
+            check["timing"] for check in self.checks if isinstance(check.get("timing"), dict)
+        ]
+        if not timings:
+            return None
+        expected = sum(float(item.get("expectedSeconds", 0)) for item in timings)
+        overhead = max(10.0, expected * 0.1)
+        parent_expected = expected + overhead
+        soft = min(1800.0, max(parent_expected * 1.5, expected * 1.5))
+        hard = min(1800.0, max(parent_expected * 1.5, soft + 10.0))
+        actual = sum(float(item.get("actualSeconds", 0)) for item in timings)
+        sample_count = max(int(item.get("sampleCount", 0)) for item in timings)
+        confidence = next(
+            (str(item.get("confidence", "none")) for item in timings if item.get("confidence")),
+            "none",
+        )
+        source = next(
+            (
+                str(item.get("predictionSource", "registry-default"))
+                for item in timings
+                if item.get("predictionSource")
+            ),
+            "registry-default",
+        )
+        return {
+            "executionId": "gate:full-ci",
+            "profileId": "full-ci",
+            "expectedSeconds": round(parent_expected),
+            "softSeconds": round(soft),
+            "stallSeconds": None,
+            "hardSeconds": round(hard),
+            "actualSeconds": round(actual, 2),
+            "predictionSource": source,
+            "confidence": confidence,
+            "sampleCount": sample_count,
+            "result": "success" if exit_code == 0 else "failed",
+        }
+
+    def finish(self, exit_code: int, *, failed_id: str = "") -> int:
         failed = sum(1 for c in self.checks if c["status"] == "failed")
-        failed_id = next((str(c["id"]) for c in self.checks if c["status"] == "failed"), "")
+        computed_failed_id = failed_id or next(
+            (str(c["id"]) for c in self.checks if c["status"] == "failed"),
+            "",
+        )
+        if self._child_timeout_check_id and not failed_id:
+            computed_failed_id = "execution.hard-timeout"
+        failed_id = computed_failed_id
+        if self._mode == "full":
+            self._parent_timing = self._build_parent_timing(exit_code)
         self._tree_digest_after = _ci_tree_digest(self.root)
         registry = load_registry(self.root / REGISTRY_REL_PATH)
         self._ci_input_digest_after = compute_ci_input_state(self.root, registry).digest
@@ -504,6 +623,10 @@ class CiRunner:
         }
         if failed_id:
             payload["failedCheckId"] = failed_id
+        if self._child_timeout_check_id:
+            payload["timeoutCheckId"] = self._child_timeout_check_id
+        if self._parent_timing is not None:
+            payload["timing"] = self._parent_timing
         text = "\n".join(self.log_lines) + "\n"
         _atomic_write(self._log_path, text)
         _atomic_write(self._history_log_path, text)
@@ -766,19 +889,27 @@ print(importlib.metadata.version("spell-sync"))
                 )
 
             for step_id, argv in selected:
-                rc, out = self.run_step(argv, cwd=self.root)
+                rc, out, timing = self._run_check(step_id, argv, cwd=self.root)
                 summary = self._fail_summary(step_id, out) if rc != 0 else ""
-                self.record(step_id, rc, out, summary)
+                self.record(step_id, rc, out, summary, timing=timing)
                 if rc != 0:
+                    if self._child_timeout_check_id:
+                        return self._finish(rc, failed_id="execution.hard-timeout")
                     return self._finish(rc)
 
             if not run_post_pytest:
                 return self._finish(0)
 
             if only is None and (self._mode == "full" or start_from == "tests.pytest"):
-                cov_rc, cov_out = _coverage_gate(py, root=self.root, run_step=self.run_step)
-                self.record("coverage.policy", cov_rc, cov_out)
+                cov_rc, cov_out, cov_timing = self._run_check(
+                    "coverage.policy",
+                    _coverage_argv(py),
+                    cwd=self.root,
+                )
+                self.record("coverage.policy", cov_rc, cov_out, timing=cov_timing)
                 if cov_rc != 0:
+                    if self._child_timeout_check_id:
+                        return self._finish(cov_rc, failed_id="execution.hard-timeout")
                     return self._finish(cov_rc)
 
             if self._mode != "full" and only not in {None, "tests.pytest"}:
@@ -787,8 +918,12 @@ print(importlib.metadata.version("spell-sync"))
             shutil.rmtree(self.root / "build", ignore_errors=True)
             shutil.rmtree(self.root / "dist", ignore_errors=True)
             shutil.rmtree(self.root / "spell_sync.egg-info", ignore_errors=True)
-            build_rc, build_out = self.run_step([py, "-m", "build"], cwd=self.root)
-            self.record("packaging.build", build_rc, build_out)
+            build_rc, build_out, build_timing = self._run_check(
+                "packaging.build",
+                [py, "-m", "build"],
+                cwd=self.root,
+            )
+            self.record("packaging.build", build_rc, build_out, timing=build_timing)
             if build_rc != 0:
                 return self._finish(build_rc)
 
@@ -798,8 +933,12 @@ print(importlib.metadata.version("spell-sync"))
                 self.record("packaging.twine", 1, "", "no artifacts in dist/")
                 return self._finish(1)
             twine_argv = [py, "-m", "twine", "check", *[str(path) for path in dist_artifacts]]
-            twine_rc, twine_out = self.run_step(twine_argv, cwd=self.root)
-            self.record("packaging.twine", twine_rc, twine_out)
+            twine_rc, twine_out, twine_timing = self._run_check(
+                "packaging.twine",
+                twine_argv,
+                cwd=self.root,
+            )
+            self.record("packaging.twine", twine_rc, twine_out, timing=twine_timing)
             if twine_rc != 0:
                 return self._finish(twine_rc)
 
@@ -830,29 +969,32 @@ print(importlib.metadata.version("spell-sync"))
             smoke_env = _wheel_smoke_env(os.environ, home=smoke_home)
 
             wordlist = smoke_project / "wordlist.txt"
-            init_rc, init_out = self.run_step(
+            init_rc, init_out, init_timing = self._run_check(
+                "smoke.init",
                 [py, "-m", "spell_sync", "init", "-C", str(wordlist)],
                 cwd=smoke_project,
                 env=smoke_env,
             )
-            self.record("smoke.init", init_rc, init_out)
+            self.record("smoke.init", init_rc, init_out, timing=init_timing)
             if init_rc != 0:
                 return self._finish(init_rc)
 
-            lint_rc, lint_out = self.run_step(
+            lint_rc, lint_out, lint_timing = self._run_check(
+                "smoke.lint",
                 [py, "-m", "spell_sync", "lint", "--strict", "-C", str(wordlist)],
                 cwd=smoke_project,
                 env=smoke_env,
             )
-            self.record("smoke.lint", lint_rc, lint_out)
+            self.record("smoke.lint", lint_rc, lint_out, timing=lint_timing)
             if lint_rc != 0:
                 return self._finish(lint_rc)
 
-            tui_rc, tui_out = self.run_step(
+            tui_rc, tui_out, tui_timing = self._run_check(
+                "smoke.tui",
                 [py, "-m", "pytest", "tests/test_gui_smoke.py", "-q"],
                 cwd=self.root,
             )
-            self.record("smoke.tui", tui_rc, tui_out)
+            self.record("smoke.tui", tui_rc, tui_out, timing=tui_timing)
             if tui_rc != 0:
                 return self._finish(tui_rc)
 

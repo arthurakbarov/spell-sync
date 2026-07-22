@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -13,14 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.ci_history import summarize_ci_history  # noqa: E402
+from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.session import record_session_event  # noqa: E402
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.planner import build_plan  # noqa: E402
-
-
-def _run(command: list[str], *, cwd: Path) -> tuple[int, float]:
-    started = time.monotonic()
-    proc = subprocess.run(command, cwd=cwd)
-    return proc.returncode, time.monotonic() - started
 
 
 def _changed_python_files(changed: list[str]) -> list[str]:
@@ -33,7 +29,43 @@ def _changed_production_modules(changed: list[str]) -> list[str]:
     )
 
 
-from scripts.ci_history import summarize_ci_history  # noqa: E402
+def _step_execution_id(name: str) -> str:
+    if name == "registry":
+        return "pre-final:validators"
+    if name.startswith("validator:"):
+        return "pre-final:validators"
+    if name.startswith("focused-pytest") or name == "focused-pytest":
+        return "pre-final:pytest"
+    if name.startswith("ruff-check:"):
+        return "pre-final:ruff-check"
+    if name.startswith("ruff-format:"):
+        return "pre-final:ruff-format"
+    if name.startswith("mypy:"):
+        return "pre-final:mypy"
+    if name.endswith(".sh") or name.endswith(".py"):
+        return "pre-final:validators"
+    return "pre-final:validators"
+
+
+def _run(name: str, command: list[str], *, cwd: Path, py: str) -> tuple[int, float]:
+    started = time.monotonic()
+    execution_id = _step_execution_id(name)
+    rc, timing = run_monitored_command(
+        ROOT,
+        execution_id=execution_id,
+        command=command,
+        mode="pre-final",
+        required=False,
+        cwd=cwd,
+        enforce_hard=True,
+        enforce_stall=False,
+    )
+    duration = time.monotonic() - started
+    if timing is None and rc == 0:
+        record_session_event(category="pre-final", duration_seconds=0.0, reused_saved=duration)
+    else:
+        record_session_event(category="pre-final", duration_seconds=duration)
+    return rc, duration
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     py = args.python
     changed = collect_changed_files(ROOT, base=None if args.base == "HEAD" else args.base)
     plan = build_plan(ROOT, changed, level="cluster", python=py)
+    print("PRE_FINAL_GATE=gate:pre-final")
 
     steps: list[tuple[str, list[str]]] = [
         ("registry", [py, "scripts/validate_test_impact.py"]),
@@ -91,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
 
     exit_code = 0
     for name, command in steps:
-        rc, duration = _run(command, cwd=ROOT)
+        rc, duration = _run(name, command, cwd=ROOT, py=py)
         print(f"PRE_FINAL_STEP={name} exit={rc} duration={duration:.2f}s")
         if rc != 0:
             exit_code = rc

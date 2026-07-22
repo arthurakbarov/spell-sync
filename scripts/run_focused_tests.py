@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -14,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.mappings import GATE_EXECUTION_IDS  # noqa: E402
+from scripts.execution_control.session import record_session_event  # noqa: E402
 from scripts.test_plan import format_text  # noqa: E402
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.ledger import StepResult, TestRunLedger  # noqa: E402
@@ -23,6 +25,14 @@ from scripts.test_selection.plan_steps import (  # noqa: E402
     plan_metadata_signature,
 )
 from scripts.test_selection.planner import build_plan  # noqa: E402
+
+FOCUSED_STEP_EXECUTION_IDS: dict[str, str] = {
+    "validator": "focused:validators",
+    "pytest": "focused:pytest",
+    "ruff-check": "focused:static",
+    "ruff-format": "focused:static",
+    "mypy": "focused:static",
+}
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -39,17 +49,54 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_command(command: list[str], *, cwd: Path) -> tuple[int, float]:
+def _step_execution_id(step: PlannedStep) -> str:
+    return FOCUSED_STEP_EXECUTION_IDS.get(step.kind, "focused:validators")
+
+
+def run_command(
+    step: PlannedStep,
+    *,
+    cwd: Path,
+    level: str,
+    test_file_count: int,
+) -> tuple[int, float]:
     started = time.monotonic()
-    proc = subprocess.run(command, cwd=cwd)
+    execution_id = _step_execution_id(step)
+    gate_mode = "module" if level == "module" else "cluster"
+    rc, timing = run_monitored_command(
+        ROOT,
+        execution_id=execution_id,
+        command=list(step.argv),
+        mode=gate_mode,
+        required=False,
+        cwd=cwd,
+        test_file_count=test_file_count,
+        enforce_hard=True,
+        enforce_stall=False,
+    )
     duration = time.monotonic() - started
-    return proc.returncode, duration
+    if timing is None and rc == 0:
+        record_session_event(category="focused", duration_seconds=0.0, reused_saved=duration)
+    else:
+        record_session_event(category="focused", duration_seconds=duration)
+    return rc, duration
 
 
-def _execute_steps(steps: tuple[PlannedStep, ...], *, cwd: Path) -> tuple[int, list[StepResult]]:
+def _execute_steps(
+    steps: tuple[PlannedStep, ...],
+    *,
+    cwd: Path,
+    level: str,
+    test_file_count: int,
+) -> tuple[int, list[StepResult]]:
     results: list[StepResult] = []
     for step in steps:
-        exit_code, duration = run_command(list(step.argv), cwd=cwd)
+        exit_code, duration = run_command(
+            step,
+            cwd=cwd,
+            level=level,
+            test_file_count=test_file_count,
+        )
         results.append(
             StepResult(
                 kind=step.kind,
@@ -78,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         level=args.level,
         python=args.python,
     )
+    gate_id = GATE_EXECUTION_IDS["focused-module" if args.level == "module" else "focused-cluster"]
+    print(f"FOCUSED_GATE={gate_id}")
     if args.explain:
         sys.stdout.write(format_text(plan, explain=True))
 
@@ -111,7 +160,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     started_at = datetime.now(timezone.utc)
-    exit_code, step_results = _execute_steps(steps, cwd=ROOT)
+    test_file_count = len(plan.pytest_targets)
+    exit_code, step_results = _execute_steps(
+        steps,
+        cwd=ROOT,
+        level=args.level,
+        test_file_count=test_file_count,
+    )
     completed_at = datetime.now(timezone.utc)
     duration = sum(step.duration_seconds for step in step_results)
 
