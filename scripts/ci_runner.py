@@ -29,6 +29,7 @@ from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.gate_controller import ActiveGate, GateController  # noqa: E402
 from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
@@ -386,6 +387,68 @@ class CiRunner:
         self._ci_input_digest_after = ""
         self._parent_timing: dict[str, object] | None = None
         self._child_timeout_check_id = ""
+        self._gate: ActiveGate | None = None
+        self._gate_controller: GateController | None = None
+
+    def _full_gate_active(self) -> bool:
+        return self._mode == "full" and self._uses_default_run_step and self._gate is not None
+
+    def _begin_full_ci_gate(self, py: str) -> tuple[int, ActiveGate | None]:
+        self._gate_controller = GateController.open_gate_controller(self.root)
+        gate, state = self._gate_controller.begin_gate(
+            execution_id="gate:full-ci",
+            command=[py, str(self.root / "scripts" / "ci_runner.py")],
+            mode="full-ci",
+            required=True,
+            coverage=True,
+            packaging=True,
+        )
+        if gate is None:
+            return 1 if state != "reused" else 0, None
+        self._gate = gate
+        return 0, gate
+
+    def _run_bounded_step(
+        self,
+        step_id: str,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        coverage: bool = False,
+        tui: bool = False,
+        packaging: bool = False,
+    ) -> tuple[int, str, dict[str, object] | None]:
+        if (
+            self._full_gate_active()
+            and self._gate_controller is not None
+            and self._gate is not None
+        ):
+            execution_id = ci_check_execution_id(step_id)
+            rc, timing = self._gate_controller.run_child(
+                self._gate,
+                child_execution_id=execution_id,
+                command=argv,
+                mode="full-ci",
+                required=True,
+                cwd=cwd or self.root,
+                env=env,
+                coverage=coverage,
+                tui=tui,
+                packaging=packaging,
+            )
+            if timing is None:
+                return rc, "", None
+            result = str(timing.get("result", ""))
+            out = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
+            if result in {"timeout-hard", "timeout-stall"}:
+                self._child_timeout_check_id = step_id
+                return 124, out or f"{step_id}: execution timeout ({result})", timing
+            if self._gate.stopped:
+                return rc, out, timing
+            return rc, out, timing
+        rc, out = self.run_step(argv, cwd=cwd or self.root, env=env)
+        return rc, out, None
 
     def _bind_run_artifacts(self) -> RunArtifacts:
         run_id = _unique_run_id(self.artifacts, self.now())
@@ -449,13 +512,23 @@ class CiRunner:
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
     ) -> tuple[int, str, dict[str, object] | None]:
+        coverage = step_id in {"tests.pytest", "coverage.policy"}
+        tui = step_id == "smoke.tui"
+        packaging = step_id.startswith("packaging.") or step_id.startswith("smoke.")
+        if self._full_gate_active():
+            return self._run_bounded_step(
+                step_id,
+                argv,
+                cwd=cwd,
+                env=env,
+                coverage=coverage,
+                tui=tui,
+                packaging=packaging,
+            )
         if self._mode != "full" or not self._uses_default_run_step:
             rc, out = self.run_step(argv, cwd=cwd or self.root, env=env)
             return rc, out, None
         execution_id = ci_check_execution_id(step_id)
-        coverage = step_id in {"tests.pytest", "coverage.policy"}
-        tui = step_id == "smoke.tui"
-        packaging = step_id.startswith("packaging.") or step_id.startswith("smoke.")
         rc, timing = run_monitored_command(
             self.root,
             execution_id=execution_id,
@@ -509,6 +582,8 @@ class CiRunner:
         )
 
     def _build_parent_timing(self, exit_code: int) -> dict[str, object] | None:
+        if self._parent_timing is not None:
+            return self._parent_timing
         timings = [
             check["timing"] for check in self.checks if isinstance(check.get("timing"), dict)
         ]
@@ -547,6 +622,12 @@ class CiRunner:
             "result": "success" if exit_code == 0 else "failed",
         }
 
+    def _finish_with_gate(self, exit_code: int, *, failed_id: str = "") -> int:
+        if self._gate is not None and self._gate_controller is not None:
+            self._parent_timing = self._gate_controller.finish_gate(self._gate, exit_code=exit_code)
+            self._gate = None
+        return self._finish(exit_code, failed_id=failed_id)
+
     def finish(self, exit_code: int, *, failed_id: str = "") -> int:
         failed = sum(1 for c in self.checks if c["status"] == "failed")
         computed_failed_id = failed_id or next(
@@ -557,7 +638,8 @@ class CiRunner:
             computed_failed_id = "execution.hard-timeout"
         failed_id = computed_failed_id
         if self._mode == "full":
-            self._parent_timing = self._build_parent_timing(exit_code)
+            if self._parent_timing is None:
+                self._parent_timing = self._build_parent_timing(exit_code)
         self._tree_digest_after = _ci_tree_digest(self.root)
         registry = load_registry(self.root / REGISTRY_REL_PATH)
         self._ci_input_digest_after = compute_ci_input_state(self.root, registry).digest
@@ -707,7 +789,11 @@ class CiRunner:
         wheel_env = _wheel_smoke_env(os.environ, home=smoke_home)
 
         venv_dir = smoke_root / "venv"
-        venv_rc, venv_out = self.run_step([py, "-m", "venv", str(venv_dir)], cwd=self.root)
+        venv_rc, venv_out, _ = self._run_bounded_step(
+            "packaging.wheel-smoke",
+            [py, "-m", "venv", str(venv_dir)],
+            cwd=self.root,
+        )
         if venv_rc != 0:
             return venv_rc, venv_out, "venv creation failed"
 
@@ -718,10 +804,12 @@ class CiRunner:
             return 1, "venv python interpreter missing", "venv python missing"
 
         parts: list[str] = []
-        install_rc, install_out = self.run_step(
+        install_rc, install_out, _ = self._run_bounded_step(
+            "packaging.wheel-smoke",
             [str(venv_py), "-m", "pip", "install", "-q", str(wheels[0])],
             cwd=outside_checkout,
             env=wheel_env,
+            packaging=True,
         )
         parts.append(f"wheel install: exit={install_rc}")
         parts.append(install_out.rstrip())
@@ -736,10 +824,12 @@ origin = pathlib.Path(spell_sync.__file__).resolve()
 print(origin)
 print(importlib.metadata.version("spell-sync"))
 """
-        origin_rc, origin_out = self.run_step(
+        origin_rc, origin_out, _ = self._run_bounded_step(
+            "packaging.wheel-smoke",
             [str(venv_py), "-c", origin_script],
             cwd=outside_checkout,
             env=wheel_env,
+            packaging=True,
         )
         parts.append(f"import origin probe: exit={origin_rc}")
         parts.append(origin_out.rstrip())
@@ -767,7 +857,13 @@ print(importlib.metadata.version("spell-sync"))
             [str(venv_py), "-m", "spell_sync", "support-report", "--format", "json"],
         )
         for cmd in cli_commands:
-            rc, out = self.run_step(cmd, cwd=outside_checkout, env=wheel_env)
+            rc, out, _ = self._run_bounded_step(
+                "packaging.wheel-smoke",
+                cmd,
+                cwd=outside_checkout,
+                env=wheel_env,
+                packaging=True,
+            )
             parts.append(f"cli {' '.join(cmd[2:])}: exit={rc}")
             parts.append(out.rstrip())
             if rc != 0:
@@ -808,7 +904,8 @@ print(importlib.metadata.version("spell-sync"))
             self._bind_run_artifacts()
             minimum = _min_python_from_pyproject(self.root)
 
-            pyver_rc, pyver_out = self.run_step(
+            pyver_rc, pyver_out, pyver_timing = self._run_bounded_step(
+                "bootstrap.python",
                 [py, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
                 cwd=self.root,
             )
@@ -818,9 +915,17 @@ print(importlib.metadata.version("spell-sync"))
                     pyver_out.strip()
                     or f"unsupported Python {pyver!r} via {py} (need>={minimum[0]}.{minimum[1]})"
                 )
-                self.record("bootstrap.python", 1, detail)
-                return self._finish(1)
-            self.record("bootstrap.python", 0, f"python {pyver} via {py}")
+                self.record("bootstrap.python", 1, detail, timing=pyver_timing)
+                return self._finish_with_gate(1)
+            self.record("bootstrap.python", 0, f"python {pyver} via {py}", timing=pyver_timing)
+
+            gate_rc = 0
+            if self._mode == "full" and self._uses_default_run_step:
+                gate_rc, gate = self._begin_full_ci_gate(py)
+                if gate_rc != 0:
+                    return self._finish_with_gate(gate_rc)
+                if gate is None:
+                    return self._finish_with_gate(0)
 
             dirty_paths = changed_source_paths(self.root)
             if dirty_paths and self._mode == "full":
@@ -833,14 +938,25 @@ print(importlib.metadata.version("spell-sync"))
                     f"dirty source tree: {preview}",
                 )
                 self._final_evidence = False
-                return self._finish(1)
+                return self._finish_with_gate(1)
             if dirty_paths:
                 self._final_evidence = False
             elif self._mode == "full":
-                self.record("bootstrap.clean-tree", 0, "working tree clean")
+                _, clean_out, clean_timing = self._run_bounded_step(
+                    "bootstrap.clean-tree",
+                    [py, "-c", "print('clean')"],
+                    cwd=self.root,
+                )
+                self.record(
+                    "bootstrap.clean-tree",
+                    0,
+                    clean_out or "working tree clean",
+                    timing=clean_timing,
+                )
 
             if bootstrap:
-                install_rc, install_out = self.run_step(
+                install_rc, install_out, install_timing = self._run_bounded_step(
+                    "deps.install",
                     [
                         py,
                         "-m",
@@ -858,17 +974,23 @@ print(importlib.metadata.version("spell-sync"))
                     ],
                     cwd=self.root,
                 )
-                self.record("deps.install", install_rc, install_out)
+                self.record("deps.install", install_rc, install_out, timing=install_timing)
                 if install_rc != 0:
-                    return self._finish(install_rc)
+                    return self._finish_with_gate(install_rc)
 
-                install_editable_rc, install_editable_out = self.run_step(
+                install_editable_rc, install_editable_out, editable_timing = self._run_bounded_step(
+                    "deps.editable",
                     [py, "-m", "pip", "install", "-q", "-e", "."],
                     cwd=self.root,
                 )
-                self.record("deps.editable", install_editable_rc, install_editable_out)
+                self.record(
+                    "deps.editable",
+                    install_editable_rc,
+                    install_editable_out,
+                    timing=editable_timing,
+                )
                 if install_editable_rc != 0:
-                    return self._finish(install_editable_rc)
+                    return self._finish_with_gate(install_editable_rc)
 
             steps = _build_check_steps(py)
             try:
@@ -880,7 +1002,7 @@ print(importlib.metadata.version("spell-sync"))
                 )
             except ValueError as exc:
                 self.record(INTERNAL_CHECK_ID, 1, str(exc))
-                return self._finish(1)
+                return self._finish_with_gate(1)
 
             run_post_pytest = self._mode == "full" or start_from == "tests.pytest"
             if resume_failed:
@@ -894,11 +1016,11 @@ print(importlib.metadata.version("spell-sync"))
                 self.record(step_id, rc, out, summary, timing=timing)
                 if rc != 0:
                     if self._child_timeout_check_id:
-                        return self._finish(rc, failed_id="execution.hard-timeout")
-                    return self._finish(rc)
+                        return self._finish_with_gate(rc, failed_id="execution.hard-timeout")
+                    return self._finish_with_gate(rc)
 
             if not run_post_pytest:
-                return self._finish(0)
+                return self._finish_with_gate(0)
 
             if only is None and (self._mode == "full" or start_from == "tests.pytest"):
                 cov_rc, cov_out, cov_timing = self._run_check(
@@ -909,11 +1031,11 @@ print(importlib.metadata.version("spell-sync"))
                 self.record("coverage.policy", cov_rc, cov_out, timing=cov_timing)
                 if cov_rc != 0:
                     if self._child_timeout_check_id:
-                        return self._finish(cov_rc, failed_id="execution.hard-timeout")
-                    return self._finish(cov_rc)
+                        return self._finish_with_gate(cov_rc, failed_id="execution.hard-timeout")
+                    return self._finish_with_gate(cov_rc)
 
             if self._mode != "full" and only not in {None, "tests.pytest"}:
-                return self._finish(0)
+                return self._finish_with_gate(0)
 
             shutil.rmtree(self.root / "build", ignore_errors=True)
             shutil.rmtree(self.root / "dist", ignore_errors=True)
@@ -925,13 +1047,13 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("packaging.build", build_rc, build_out, timing=build_timing)
             if build_rc != 0:
-                return self._finish(build_rc)
+                return self._finish_with_gate(build_rc)
 
             dist = self.root / "dist"
             dist_artifacts = sorted(dist.glob("*"))
             if not dist_artifacts:
                 self.record("packaging.twine", 1, "", "no artifacts in dist/")
-                return self._finish(1)
+                return self._finish_with_gate(1)
             twine_argv = [py, "-m", "twine", "check", *[str(path) for path in dist_artifacts]]
             twine_rc, twine_out, twine_timing = self._run_check(
                 "packaging.twine",
@@ -940,7 +1062,7 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("packaging.twine", twine_rc, twine_out, timing=twine_timing)
             if twine_rc != 0:
-                return self._finish(twine_rc)
+                return self._finish_with_gate(twine_rc)
 
             version = _package_version(self.root)
             wheels = sorted(dist.glob(f"spell_sync-{version}-*.whl"))
@@ -951,7 +1073,7 @@ print(importlib.metadata.version("spell-sync"))
                     f"found wheels={len(wheels)} sdists={len(sdists)}"
                 )
                 self.record("packaging.wheel-smoke", 1, detail)
-                return self._finish(1)
+                return self._finish_with_gate(1)
 
             smoke_rc, smoke_out, smoke_summary = self._run_wheel_smoke(
                 py,
@@ -960,7 +1082,7 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("packaging.wheel-smoke", smoke_rc, smoke_out, smoke_summary)
             if smoke_rc != 0:
-                return self._finish(smoke_rc)
+                return self._finish_with_gate(smoke_rc)
 
             assert self._wheel_smoke_root is not None
             smoke_root = self._wheel_smoke_root
@@ -977,7 +1099,7 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("smoke.init", init_rc, init_out, timing=init_timing)
             if init_rc != 0:
-                return self._finish(init_rc)
+                return self._finish_with_gate(init_rc)
 
             lint_rc, lint_out, lint_timing = self._run_check(
                 "smoke.lint",
@@ -987,7 +1109,7 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("smoke.lint", lint_rc, lint_out, timing=lint_timing)
             if lint_rc != 0:
-                return self._finish(lint_rc)
+                return self._finish_with_gate(lint_rc)
 
             tui_rc, tui_out, tui_timing = self._run_check(
                 "smoke.tui",
@@ -996,14 +1118,14 @@ print(importlib.metadata.version("spell-sync"))
             )
             self.record("smoke.tui", tui_rc, tui_out, timing=tui_timing)
             if tui_rc != 0:
-                return self._finish(tui_rc)
+                return self._finish_with_gate(tui_rc)
 
             passed_prefixes = ("docs.", "tests.", "coverage.")
             for check in self.checks:
                 check_id = str(check["id"])
                 if check["status"] == "passed" and check_id.startswith(passed_prefixes):
                     print(f"{check_id}: passed")
-            return self._finish(0)
+            return self._finish_with_gate(0)
         except KeyboardInterrupt:
             raise
         except BaseException as exc:
