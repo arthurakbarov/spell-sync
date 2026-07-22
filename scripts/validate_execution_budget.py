@@ -407,8 +407,8 @@ def _check_snapshot_output_flag() -> list[str]:
 def _check_bootstrap_timeout() -> list[str]:
     errors: list[str] = []
     ci = _read(ROOT / "scripts/ci_runner.py")
-    bootstrap_body = ci.split("_run_bootstrap_python", 1)[-1][:400]
-    if "_run_bootstrap_python" not in ci or "timeout=" not in bootstrap_body:
+    bootstrap_body = ci.split("def _run_bootstrap_python", 1)[-1].split("\n    def ", 1)[0]
+    if "_run_bootstrap_python" not in ci or "BOOTSTRAP_PYTHON_HARD_SECONDS" not in bootstrap_body:
         errors.append(
             "[EXECUTION-CONTROL-BOOTSTRAP-001] bootstrap.python must use bounded subprocess timeout"
         )
