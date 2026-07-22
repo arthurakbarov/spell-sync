@@ -38,6 +38,8 @@ def test_check_passes_after_synced_repository() -> None:
     metadata = venv_dir / ".spell-sync-environment.json"
     if not venv_dir.is_dir() or not metadata.is_file():
         pytest.skip("maintainer .venv with environment metadata required for lifecycle check")
+    sync = cmd_sync(ROOT, allow_python_download=False)
+    assert sync.exit_code == 0, f"{sync.failed_id}: {sync.message}"
     result = cmd_check(ROOT)
     assert result.exit_code == 0, f"{result.failed_id}: {result.message}"
 

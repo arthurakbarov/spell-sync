@@ -1087,6 +1087,29 @@ class TestPhase2BCliCoverage(unittest.TestCase):
                 self.assertEqual(code, int(ExitCode.OK))
                 self.assertEqual(json.loads(buf.getvalue()).get("journal"), {})
 
+    def test_discovery_macos_family_and_unknown_selectable(self):
+        from spell_sync.dictionaries import Dictionary, DictionaryFormat
+        from spell_sync.project_setup import discovery as discovery_module
+        from spell_sync.read_outcome import ReadStatus
+
+        macos_dict = Dictionary(
+            name="macos-en",
+            path="/tmp/macos-en",
+            format=DictionaryFormat.TEXT,
+        )
+        self.assertEqual(discovery_module._family_id(macos_dict), "macos_spelling")
+        self.assertFalse(
+            discovery_module._target_selectable(
+                identifier="sublime",
+                detected=True,
+                available=True,
+                readable=True,
+                supported=True,
+                status=ReadStatus.OK,
+                ambiguous=False,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

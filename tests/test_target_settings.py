@@ -384,6 +384,16 @@ def test_execute_pending_recovery_blocks(
     assert prepared.can_execute is False
 
 
+def test_resolve_enabled_skips_non_config_target_ids() -> None:
+    unknown = _target("sublime", selectable=True)
+    enabled = resolve_enabled_targets(
+        (unknown,),
+        selected_target_ids=frozenset({"sublime"}),
+        previous_target_ids=frozenset(),
+    )
+    assert enabled == frozenset()
+
+
 def test_resolve_enabled_preserves_corrupt_enabled(
     tmp_path: Path,
     mock_targets,

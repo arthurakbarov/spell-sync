@@ -478,16 +478,25 @@ class TestCiContract(unittest.TestCase):
         self.assertEqual(minimum, self.mod.MIN_PYTHON, msg="[CI-CONTRACT-015] metadata minimum")
 
     def test_custom_root_isolation(self) -> None:
-        seen_cwd: list[Path | None] = []
+        coverage_json = ROOT / "coverage.json"
+        previous_coverage = coverage_json.read_bytes() if coverage_json.is_file() else None
+        coverage_json.unlink(missing_ok=True)
+        try:
+            seen_cwd: list[Path | None] = []
 
-        def fake_run(argv: list[str], *, cwd=None, env=None):
-            seen_cwd.append(cwd)
-            return _success_run(self.root, argv, cwd=cwd or self.root, env=env)
+            def fake_run(argv: list[str], *, cwd=None, env=None):
+                seen_cwd.append(cwd)
+                return _success_run(self.root, argv, cwd=cwd or self.root, env=env)
 
-        self._runner(run_step=fake_run).run(bootstrap=False)
-        self.assertEqual(self.mod._package_version(self.root), "1.2.3")
-        self.assertTrue(all(path == self.root or path is not None for path in seen_cwd))
-        self.assertFalse((ROOT / "coverage.json").exists())
+            self._runner(run_step=fake_run).run(bootstrap=False)
+            self.assertEqual(self.mod._package_version(self.root), "1.2.3")
+            self.assertTrue(all(path == self.root or path is not None for path in seen_cwd))
+            self.assertFalse(coverage_json.exists())
+        finally:
+            if previous_coverage is not None:
+                coverage_json.write_bytes(previous_coverage)
+            else:
+                coverage_json.unlink(missing_ok=True)
 
     def test_internal_failure_records_ci_internal(self) -> None:
         def fake_run(argv: list[str], *, cwd=None, env=None):
