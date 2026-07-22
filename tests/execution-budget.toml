@@ -1,0 +1,181 @@
+schemaVersion = 1
+
+[meta]
+registryPath = "tests/execution-budget.toml"
+globalHardCapSeconds = 1800
+editLoopBudgetSeconds = 900
+sessionWindowSeconds = 1800
+sessionTestTimeShareWarn = 0.6
+historyWindow = 30
+historyMaxRaw = 500
+normalLearningWindow = 30
+
+[profiles.focused-module]
+kind = "gate"
+executionId = "gate:focused-module"
+initialExpectedSeconds = 45
+initialSoftSeconds = 90
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 180
+hardCapSeconds = 600
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "focused-test-ledger-estimate"
+
+[profiles.focused-cluster]
+kind = "gate"
+executionId = "gate:focused-cluster"
+initialExpectedSeconds = 120
+initialSoftSeconds = 240
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 480
+hardCapSeconds = 900
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "focused-test-ledger-estimate"
+
+[profiles.pre-final]
+kind = "gate"
+executionId = "gate:pre-final"
+initialExpectedSeconds = 180
+initialSoftSeconds = 360
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 600
+hardCapSeconds = 1200
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "pre-final-runner-estimate"
+
+[profiles.full-ci]
+kind = "gate"
+executionId = "gate:full-ci"
+initialExpectedSeconds = 420
+initialSoftSeconds = 630
+stallFloorSeconds = 30
+stallCapSeconds = 180
+initialHardSeconds = 1200
+hardCapSeconds = 1800
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 10
+progressContract = "structured-phase-transition"
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "ci-summary-20260721T230438-duration-397s"
+
+[profiles.ci-child]
+kind = "child"
+executionId = "ci:child"
+initialExpectedSeconds = 60
+initialSoftSeconds = 120
+stallFloorSeconds = 30
+stallCapSeconds = 180
+initialHardSeconds = 300
+hardCapSeconds = 900
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = "ci-child-transition"
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "ci-check-step-estimate"
+
+[profiles.snapshot-tests]
+kind = "gate"
+executionId = "gate:snapshot-tests"
+initialExpectedSeconds = 30
+initialSoftSeconds = 60
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 120
+hardCapSeconds = 300
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "snapshot-tooling-estimate"
+
+[profiles.diagnostic-pytest]
+kind = "child"
+executionId = "diagnostic:pytest"
+initialExpectedSeconds = 90
+initialSoftSeconds = 180
+stallFloorSeconds = 15
+stallCapSeconds = 120
+initialHardSeconds = 300
+hardCapSeconds = 600
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = "pytest-node-transition"
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "diagnostic-pytest-estimate"
+
+[profiles.bounded-unknown]
+kind = "fallback"
+executionId = "gate:unknown"
+initialExpectedSeconds = 120
+initialSoftSeconds = 240
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 600
+hardCapSeconds = 1800
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 0
+source = "conservative-fallback"
+
+[childMappings]
+"ci:validators" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:ruff-check" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:ruff-format" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:mypy" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:pytest" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:coverage" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:package-build" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:twine-check" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-install" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:cli-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:tui-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
+"focused:planner" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"focused:validators" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"focused:static" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"focused:pytest" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"pre-final:validators" = { profile = "ci-child", parent = "gate:pre-final" }
+"pre-final:ruff-check" = { profile = "ci-child", parent = "gate:pre-final" }
+"pre-final:ruff-format" = { profile = "ci-child", parent = "gate:pre-final" }
+"pre-final:mypy" = { profile = "ci-child", parent = "gate:pre-final" }
+"pre-final:pytest" = { profile = "ci-child", parent = "gate:pre-final" }
+"snapshot-tests:pytest" = { profile = "ci-child", parent = "gate:snapshot-tests" }
+"snapshot-tests:git" = { profile = "ci-child", parent = "gate:snapshot-tests" }
+"snapshot-tests:archive-create" = { profile = "ci-child", parent = "gate:snapshot-tests" }
+"snapshot-tests:archive-check" = { profile = "ci-child", parent = "gate:snapshot-tests" }
