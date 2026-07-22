@@ -119,13 +119,18 @@ Admission decisions are enforced before subprocess launch:
 |----------|----------|
 | `run` | Acquire lease, persist plan, execute |
 | `reuse` | Skip subprocess; no duration sample |
-| `narrow` | Block broad command; no subprocess (`edit-loop-budget-exceeded`) |
+| `narrow` | Block broad command; emit replacement plan; no subprocess |
 | `defer-to-pre-final` | Block until pre-final gate |
 | `reject-duplicate` | Block duplicate active lease |
 | `block-controller-error` | Block on controller error |
 
 Each immutable plan stores `contextSignature` used for exact-history learning at span write time.
 Child spans never rebuild context from `profile_id` alone.
+
+Parent hard limits are enforced at runtime: each child receives
+`min(child hard, parent remaining)` and the owned-process supervisor terminates the active tree
+when the parent deadline elapses. `finish_gate()` is exactly-once; failed children mark gate
+state but do not finalize the parent span.
 
 Progress contracts mark progress only on semantic transitions (pytest node results, CI child
 events, structured phases, artifact state). Arbitrary stdout growth is not progress.
