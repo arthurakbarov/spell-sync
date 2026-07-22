@@ -5,13 +5,21 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from scripts.environment_contract.evidence import write_environment_evidence
+from scripts.environment_contract.fingerprint import resolve_project_environment_fingerprint
+from scripts.project_environment import cmd_sync
+
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _load_module():
@@ -33,6 +41,55 @@ def evidence_mod():
     return _load_module()
 
 
+def _uv_version() -> str:
+    proc = subprocess.run(["uv", "--version"], capture_output=True, text=True, check=False)
+    match = re.search(r"uv\s+(\d+\.\d+\.\d+)", proc.stdout)
+    return match.group(1) if match else ""
+
+
+def _bootstrap_environment(repo: Path) -> None:
+    if shutil.which("uv") is None:
+        pytest.skip("uv required for CI evidence tests")
+    for name in (".python-version", "pyproject.toml", "uv.lock"):
+        shutil.copy2(ROOT / name, repo / name)
+    shutil.copytree(ROOT / "config", repo / "config")
+    sync = cmd_sync(repo, allow_python_download=False)
+    if sync.exit_code != 0 and sync.failed_id == "environment.sync-required":
+        pytest.skip(f"uv sync unavailable: {sync.message}")
+    assert sync.exit_code == 0
+
+
+def _write_environment_evidence_for_head(repo: Path) -> None:
+    head = _git_head(repo)
+    fingerprint = resolve_project_environment_fingerprint(repo, uv_version=_uv_version())
+    if fingerprint is None:
+        pytest.fail("environment fingerprint unavailable for CI evidence test repo")
+    write_environment_evidence(
+        repo,
+        fingerprint=fingerprint,
+        repository_head=head,
+        check_exit=0,
+        lock_exit=0,
+    )
+
+
+def _environment_fields(repo: Path) -> dict[str, str]:
+    fingerprint = resolve_project_environment_fingerprint(repo, uv_version=_uv_version())
+    if fingerprint is None:
+        pytest.fail("environment fingerprint unavailable for CI evidence test repo")
+    return {
+        "environmentFingerprint": fingerprint.signature(),
+        "environmentContractDigest": fingerprint.environment_contract_digest,
+        "pyprojectDigest": fingerprint.pyproject_digest,
+        "uvLockDigest": fingerprint.uv_lock_digest,
+        "installedEnvironmentDigest": fingerprint.installed_environment_digest,
+        "pythonVersion": fingerprint.python_version,
+        "pythonImplementation": fingerprint.python_implementation,
+        "pythonCacheTag": fingerprint.python_cache_tag,
+        "uvVersion": fingerprint.uv_version,
+    }
+
+
 def _git_head(root: Path) -> str:
     return subprocess.check_output(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -51,6 +108,7 @@ def _write_success_summary(
 ) -> None:
     history = history or {"fullCiAttempts": 1, "fullCiFailures": 0, "fullCiSuccesses": 1}
     run_id = path.stem.removeprefix("ci-summary-") or "test-run"
+    environment = _environment_fields(repo) if repo is not None else {}
     payload = {
         "schemaVersion": 4,
         "runId": run_id,
@@ -76,6 +134,7 @@ def _write_success_summary(
         "fullCiFailures": history["fullCiFailures"],
         "fullCiSuccesses": history["fullCiSuccesses"],
         "checks": [{"id": "tests.pytest", "status": "passed", "exitCode": 0}],
+        **environment,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -101,6 +160,7 @@ def test_stale_head_rejected(evidence_mod, tmp_path: Path) -> None:
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    _bootstrap_environment(repo)
     subprocess.run(["git", "-C", str(repo), "init", "-b", "main"], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
@@ -114,11 +174,7 @@ def test_stale_head_rejected(evidence_mod, tmp_path: Path) -> None:
     )
     (repo / "tracked.txt").write_text("clean\n", encoding="utf-8")
     _install_registry(repo)
-    subprocess.run(
-        ["git", "-C", str(repo), "add", "tracked.txt", "ci/ci-impact.toml"],
-        check=True,
-        capture_output=True,
-    )
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo), "commit", "-m", "init"], check=True, capture_output=True
     )
@@ -137,6 +193,7 @@ def test_stale_head_rejected(evidence_mod, tmp_path: Path) -> None:
         ci_input_digest=ci_input_digest,
         repo=repo,
     )
+    _write_environment_evidence_for_head(repo)
     code, payload = evidence_mod.verify_ci_evidence(
         repo,
         summary,
@@ -168,6 +225,7 @@ def test_forged_success_summary_rejected_on_dirty_tree(evidence_mod, tmp_path: P
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    _bootstrap_environment(repo)
     subprocess.run(["git", "-C", str(repo), "init", "-b", "main"], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
@@ -183,11 +241,7 @@ def test_forged_success_summary_rejected_on_dirty_tree(evidence_mod, tmp_path: P
     (repo / "docs").mkdir()
     (repo / "docs" / "note.md").write_text("clean\n", encoding="utf-8")
     _install_registry(repo)
-    subprocess.run(
-        ["git", "-C", str(repo), "add", "tracked.txt", "docs/note.md", "ci/ci-impact.toml"],
-        check=True,
-        capture_output=True,
-    )
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo), "commit", "-m", "init"], check=True, capture_output=True
     )
@@ -209,6 +263,7 @@ def test_forged_success_summary_rejected_on_dirty_tree(evidence_mod, tmp_path: P
         ci_input_digest=ci_input_digest,
         repo=repo,
     )
+    _write_environment_evidence_for_head(repo)
     (repo / "docs" / "note.md").write_text("dirty\n", encoding="utf-8")
     code, payload = evidence_mod.verify_ci_evidence(repo, summary, format_json=True)
     assert code == 1
