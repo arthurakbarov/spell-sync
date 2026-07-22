@@ -63,6 +63,7 @@ patterns = [
   "scripts/run_pre_final_checks.py",
   "scripts/run_focused_tests.py",
   "scripts/run_snapshot_tests.py",
+  "scripts/snapshot_dev_paths.py",
   "scripts/test_plan.py",
   "scripts/test_selection/**",
   "scripts/lib/**",
