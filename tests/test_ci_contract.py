@@ -58,7 +58,9 @@ def _is_coverage_gate(argv: list[str]) -> bool:
 
 
 def _is_wheel_origin_probe(argv: list[str]) -> bool:
-    return len(argv) >= 3 and argv[1] == "-c" and "spell_sync.__file__" in argv[2]
+    return (
+        len(argv) >= 4 and argv[1] == "-c" and "json.dumps" in argv[2] and "spell_sync" in argv[2]
+    )
 
 
 def _seed_execution_control(root: Path) -> None:
@@ -185,7 +187,16 @@ def _success_run(
         origin = wheel_origin or str(default_origin)
         mod = _load_ci_runner()
         version_text = mod._package_version(root)
-        return 0, f"{origin}\n{version_text}\n"
+        payload = {
+            "origin": origin,
+            "metadataVersion": version_text,
+            "sysPrefix": str(Path(argv[0]).resolve().parent.parent.parent),
+            "basePrefix": str(Path(argv[0]).resolve().parent.parent.parent),
+            "sysExecutable": str(argv[0]),
+        }
+        result_path = Path(argv[3])
+        result_path.write_text(json.dumps(payload), encoding="utf-8")
+        return 0, ""
     tail = command_tail(argv)
     if tail[:2] == ("-m", "spell_sync"):
         sub = tail[2:]

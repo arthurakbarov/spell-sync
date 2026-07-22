@@ -136,6 +136,30 @@ parentRetries = 0
 diagnosticRetries = 1
 source = "fast-validator-estimate"
 
+[profiles.focused-pytest]
+kind = "child"
+executionId = "focused:pytest"
+initialExpectedSeconds = 60
+initialSoftSeconds = 120
+stallFloorSeconds = 30
+stallCapSeconds = 180
+initialHardSeconds = 300
+hardCapSeconds = 900
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = "pytest-node-transition"
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "focused-pytest-bootstrap-estimate"
+
+[profiles.focused-pytest.workloadCost]
+fixedSeconds = 20
+perTestFileSeconds = 0.75
+perTestNodeSeconds = 0
+maximumBootstrapSeconds = 900
+
 [profiles.focused-planner]
 kind = "child"
 executionId = "focused:planner"
@@ -258,6 +282,13 @@ source = "bootstrap-readonly-estimate"
 "ci:deps-install" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:deps-editable" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:wheel-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-venv" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-install" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-origin" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-version" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-cli-version" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-cli-help" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:wheel-smoke-support-report" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ruff-check" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ruff-format" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:mypy" = { profile = "ci-child", parent = "gate:full-ci" }
@@ -271,7 +302,7 @@ source = "bootstrap-readonly-estimate"
 "focused:planner" = { profile = "focused-planner", parent = "gate:focused-cluster" }
 "focused:validators" = { profile = "ci-child", parent = "gate:focused-cluster" }
 "focused:static" = { profile = "ci-child", parent = "gate:focused-cluster" }
-"focused:pytest" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"focused:pytest" = { profile = "focused-pytest", parent = "gate:focused-cluster" }
 "pre-final:validators" = { profile = "ci-child", parent = "gate:pre-final" }
 "pre-final:ruff-check" = { profile = "ci-child", parent = "gate:pre-final" }
 "pre-final:ruff-format" = { profile = "ci-child", parent = "gate:pre-final" }

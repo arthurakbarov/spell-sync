@@ -133,25 +133,42 @@ BOOTSTRAP_PYTHON_HARD_SECONDS = 30.0
 
 def _wheel_smoke_preview_steps(py: str) -> list[tuple[str, list[str], bool, bool, bool]]:
     return [
-        ("packaging.wheel-smoke", [py, "-m", "venv", "placeholder"], False, False, True),
+        ("packaging.wheel-smoke.venv", [py, "-m", "venv", "placeholder"], False, False, True),
         (
-            "packaging.wheel-smoke",
+            "packaging.wheel-smoke.install",
             [py, "-m", "pip", "install", "-q", "placeholder.whl"],
             False,
             False,
             True,
         ),
         (
-            "packaging.wheel-smoke",
-            [py, "-c", "import spell_sync; print('origin')"],
+            "packaging.wheel-smoke.origin",
+            [py, "-c", "import spell_sync", "placeholder-result.json"],
             False,
             False,
             True,
         ),
-        ("packaging.wheel-smoke", [py, "-m", "spell_sync", "version"], False, False, True),
-        ("packaging.wheel-smoke", [py, "-m", "spell_sync", "--help"], False, False, True),
         (
-            "packaging.wheel-smoke",
+            "packaging.wheel-smoke.version",
+            [
+                py,
+                "-c",
+                "import importlib.metadata; print(importlib.metadata.version('spell-sync'))",
+            ],
+            False,
+            False,
+            True,
+        ),
+        (
+            "packaging.wheel-smoke.cli-version",
+            [py, "-m", "spell_sync", "version"],
+            False,
+            False,
+            True,
+        ),
+        ("packaging.wheel-smoke.cli-help", [py, "-m", "spell_sync", "--help"], False, False, True),
+        (
+            "packaging.wheel-smoke.support-report",
             [py, "-m", "spell_sync", "support-report", "--format", "json"],
             False,
             False,
@@ -358,13 +375,78 @@ def _package_version(root: Path) -> str:
     return version
 
 
-def _wheel_smoke_env(base: dict[str, str], *, home: Path) -> dict[str, str]:
-    env = {key: value for key, value in base.items() if key != "PYTHONPATH"}
+def _wheel_smoke_env(
+    base: dict[str, str], *, home: Path, venv_dir: Path | None = None
+) -> dict[str, str]:
+    strip_keys = {
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONSTARTUP",
+        "PYTHONUSERBASE",
+        "VIRTUAL_ENV",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONSAFEPATH",
+    }
+    env = {
+        key: value
+        for key, value in base.items()
+        if key not in strip_keys and not key.startswith("SPELL_SYNC")
+    }
     env["HOME"] = str(home)
-    for key in list(env):
-        if key.startswith("SPELL_SYNC") or key == "PYTHONSAFEPATH":
-            del env[key]
+    env["PYTHONNOUSERSITE"] = "1"
+    if venv_dir is not None:
+        env["VIRTUAL_ENV"] = str(venv_dir)
     return env
+
+
+_WHEEL_ORIGIN_PROBE_SCRIPT = """
+import importlib.metadata
+import json
+import pathlib
+import spell_sync
+import sys
+
+payload = {
+    "origin": str(pathlib.Path(spell_sync.__file__).resolve()),
+    "metadataVersion": importlib.metadata.version("spell-sync"),
+    "sysPrefix": sys.prefix,
+    "basePrefix": sys.base_prefix,
+    "sysExecutable": sys.executable,
+}
+pathlib.Path(sys.argv[1]).write_text(json.dumps(payload), encoding="utf-8")
+"""
+
+
+def _read_wheel_origin_result(result_path: Path) -> tuple[Path, str, dict[str, str]]:
+    import json
+
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    origin = Path(str(payload["origin"]))
+    metadata_version = str(payload["metadataVersion"])
+    diagnostics = {
+        "sysPrefix": str(payload.get("sysPrefix", "")),
+        "basePrefix": str(payload.get("basePrefix", "")),
+        "sysExecutable": str(payload.get("sysExecutable", "")),
+    }
+    return origin, metadata_version, diagnostics
+
+
+def _wheel_smoke_composite_timing(
+    substeps: list[dict[str, object]],
+    total_seconds: float,
+    *,
+    result: str = "failed",
+    failed_substep: str | None = None,
+) -> dict[str, object]:
+    timing: dict[str, object] = {
+        "executionId": "ci:wheel-smoke",
+        "actualSeconds": round(total_seconds, 2),
+        "result": result,
+        "substeps": list(substeps),
+    }
+    if failed_substep is not None:
+        timing["failedSubstep"] = failed_substep
+    return timing
 
 
 def _verify_wheel_origin(origin: Path, *, venv_dir: Path, root: Path) -> tuple[bool, str]:
@@ -578,7 +660,7 @@ class CiRunner:
             and self._gate is not None
         ):
             execution_id = ci_check_execution_id(step_id)
-            rc, timing = self._gate_controller.run_child(
+            rc, execution = self._gate_controller.run_child(
                 self._gate,
                 child_execution_id=execution_id,
                 command=argv,
@@ -590,16 +672,17 @@ class CiRunner:
                 tui=tui,
                 packaging=packaging,
             )
-            if timing is None:
+            if execution is None:
                 return rc, "", None
+            raw_out = execution.raw_output
+            timing = execution.timing
             result = str(timing.get("result", ""))
-            out = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
             if result in {"timeout-hard", "timeout-stall"}:
                 self._child_timeout_check_id = step_id
-                return 124, out or f"{step_id}: execution timeout ({result})", timing
+                return 124, raw_out or f"{step_id}: execution timeout ({result})", timing
             if self._gate.stopped:
-                return rc, out, timing
-            return rc, out, timing
+                return rc, raw_out, timing
+            return execution.exit_code, raw_out, timing
         rc, out = self.run_step(argv, cwd=cwd or self.root, env=env)
         return rc, out, None
 
@@ -699,11 +782,12 @@ class CiRunner:
         if timing is None:
             return 0, "", None
         result = str(timing.get("result", ""))
-        out = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
         if result in {"timeout-hard", "timeout-stall"}:
             self._child_timeout_check_id = step_id
-            return 124, out or f"{step_id}: execution timeout ({result})", timing
-        return rc, out, timing
+            sanitized = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
+            return 124, sanitized or f"{step_id}: execution timeout ({result})", timing
+        sanitized = str(timing.get("stdoutTail", "")) + str(timing.get("stderrTail", ""))
+        return rc, sanitized, timing
 
     def _print_failure_block(
         self,
@@ -931,7 +1015,7 @@ class CiRunner:
         *,
         wheels: list[Path],
         version: str,
-    ) -> tuple[int, str, str]:
+    ) -> tuple[int, str, str, dict[str, object] | None]:
         smoke_root = Path(tempfile.mkdtemp(prefix="spell-sync-smoke."))
         self.cleanup_paths.append(smoke_root)
         self._wheel_smoke_root = smoke_root
@@ -939,96 +1023,193 @@ class CiRunner:
         smoke_home.mkdir()
         outside_checkout = smoke_root / "outside-checkout"
         outside_checkout.mkdir()
-        smoke_project = smoke_root / "project"
-        smoke_project.mkdir()
-        wheel_env = _wheel_smoke_env(os.environ, home=smoke_home)
+
+        substeps: list[dict[str, object]] = []
+        parts: list[str] = []
+        failed_substep: str | None = None
+        total_seconds = 0.0
+
+        def _record_substep(
+            step_id: str,
+            rc: int,
+            out: str,
+            timing: dict[str, object] | None,
+            *,
+            summary_line: str,
+        ) -> int:
+            nonlocal failed_substep, total_seconds
+            parts.append(summary_line)
+            parts.append(out.rstrip())
+            entry: dict[str, object] = {
+                "stepId": step_id,
+                "executionId": ci_check_execution_id(step_id),
+                "exitCode": rc,
+            }
+            if timing is not None:
+                entry["timing"] = timing
+                total_seconds += float(timing.get("actualSeconds", 0.0))
+                substeps.append(entry)
+            if rc != 0 and failed_substep is None:
+                failed_substep = ci_check_execution_id(step_id)
+            return rc
 
         venv_dir = smoke_root / "venv"
-        venv_rc, venv_out, _ = self._run_bounded_step(
-            "packaging.wheel-smoke",
+        venv_rc, venv_out, venv_timing = self._run_bounded_step(
+            "packaging.wheel-smoke.venv",
             [py, "-m", "venv", str(venv_dir)],
             cwd=self.root,
         )
-        if venv_rc != 0:
-            return venv_rc, venv_out, "venv creation failed"
+        if _record_substep(
+            "packaging.wheel-smoke.venv",
+            venv_rc,
+            venv_out,
+            venv_timing,
+            summary_line=f"venv create: exit={venv_rc}",
+        ):
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep=failed_substep
+            )
+            return venv_rc, "\n".join(parts), "venv creation failed", composite
 
         venv_py = venv_dir / "bin" / "python"
         if not venv_py.is_file():
             venv_py = venv_dir / "Scripts" / "python.exe"
         if not venv_py.is_file():
-            return 1, "venv python interpreter missing", "venv python missing"
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep="ci:wheel-smoke-venv"
+            )
+            return 1, "venv python interpreter missing", "venv python missing", composite
 
-        parts: list[str] = []
-        install_rc, install_out, _ = self._run_bounded_step(
-            "packaging.wheel-smoke",
+        isolated_env = _wheel_smoke_env(os.environ, home=smoke_home, venv_dir=venv_dir)
+        install_rc, install_out, install_timing = self._run_bounded_step(
+            "packaging.wheel-smoke.install",
             [str(venv_py), "-m", "pip", "install", "-q", str(wheels[0])],
             cwd=outside_checkout,
-            env=wheel_env,
-            packaging=True,
+            env=isolated_env,
         )
-        parts.append(f"wheel install: exit={install_rc}")
-        parts.append(install_out.rstrip())
-        if install_rc != 0:
-            return install_rc, "\n".join(parts), "wheel install failed"
+        if _record_substep(
+            "packaging.wheel-smoke.install",
+            install_rc,
+            install_out,
+            install_timing,
+            summary_line=f"wheel install: exit={install_rc}",
+        ):
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep=failed_substep
+            )
+            return install_rc, "\n".join(parts), "wheel install failed", composite
 
-        origin_script = """
-import pathlib
-import spell_sync
-import importlib.metadata
-origin = pathlib.Path(spell_sync.__file__).resolve()
-print(origin)
-print(importlib.metadata.version("spell-sync"))
-"""
-        origin_rc, origin_out, _ = self._run_bounded_step(
-            "packaging.wheel-smoke",
-            [str(venv_py), "-c", origin_script],
+        origin_result_path = smoke_root / "wheel-origin.json"
+        origin_rc, origin_out, origin_timing = self._run_bounded_step(
+            "packaging.wheel-smoke.origin",
+            [str(venv_py), "-c", _WHEEL_ORIGIN_PROBE_SCRIPT, str(origin_result_path)],
             cwd=outside_checkout,
-            env=wheel_env,
-            packaging=True,
+            env=isolated_env,
         )
-        parts.append(f"import origin probe: exit={origin_rc}")
-        parts.append(origin_out.rstrip())
-        if origin_rc != 0:
-            return origin_rc, "\n".join(parts), "import origin probe failed"
+        if _record_substep(
+            "packaging.wheel-smoke.origin",
+            origin_rc,
+            origin_out,
+            origin_timing,
+            summary_line=f"import origin probe: exit={origin_rc}",
+        ):
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep=failed_substep
+            )
+            return origin_rc, "\n".join(parts), "import origin probe failed", composite
 
-        origin_lines = [line.strip() for line in origin_out.splitlines() if line.strip()]
-        if len(origin_lines) < 2:
-            return 1, "\n".join(parts), "import origin probe incomplete"
-        origin_path = Path(origin_lines[0])
-        metadata_version = origin_lines[1]
+        try:
+            origin_path, metadata_version, diagnostics = _read_wheel_origin_result(
+                origin_result_path
+            )
+        finally:
+            origin_result_path.unlink(missing_ok=True)
+
         ok, detail = _verify_wheel_origin(origin_path, venv_dir=venv_dir, root=self.root)
         parts.append(f"import origin: {detail}")
+        parts.append(
+            "runtime: "
+            f"executable={diagnostics.get('sysExecutable', '')} "
+            f"prefix={diagnostics.get('sysPrefix', '')} "
+            f"base={diagnostics.get('basePrefix', '')}"
+        )
         if not ok:
-            return 1, "\n".join(parts), detail
+            failed_substep = "ci:wheel-smoke-origin"
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep=failed_substep, result="failed"
+            )
+            return 1, "\n".join(parts), detail, composite
+
+        version_rc, version_out, version_timing = self._run_bounded_step(
+            "packaging.wheel-smoke.version",
+            [
+                str(venv_py),
+                "-c",
+                "import importlib.metadata; print(importlib.metadata.version('spell-sync'))",
+            ],
+            cwd=outside_checkout,
+            env=isolated_env,
+        )
+        _record_substep(
+            "packaging.wheel-smoke.version",
+            version_rc,
+            version_out,
+            version_timing,
+            summary_line=f"metadata version probe: exit={version_rc}",
+        )
+        metadata_version = (
+            version_out.strip().splitlines()[-1] if version_out.strip() else metadata_version
+        )
         parts.append(f"metadata version: {metadata_version}")
+        if version_rc != 0:
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep="ci:wheel-smoke-version", result="failed"
+            )
+            return version_rc, "\n".join(parts), "metadata version probe failed", composite
         if metadata_version != version:
             detail = f"metadata version {metadata_version!r} != pyproject {version!r}"
             parts.append(detail)
-            return 1, "\n".join(parts), detail
+            composite = _wheel_smoke_composite_timing(
+                substeps, total_seconds, failed_substep="ci:wheel-smoke-version", result="failed"
+            )
+            return 1, "\n".join(parts), detail, composite
 
-        cli_commands = (
-            [str(venv_py), "-m", "spell_sync", "version"],
-            [str(venv_py), "-m", "spell_sync", "--help"],
-            [str(venv_py), "-m", "spell_sync", "support-report", "--format", "json"],
+        cli_steps = (
+            ("packaging.wheel-smoke.cli-version", [str(venv_py), "-m", "spell_sync", "version"]),
+            ("packaging.wheel-smoke.cli-help", [str(venv_py), "-m", "spell_sync", "--help"]),
+            (
+                "packaging.wheel-smoke.support-report",
+                [str(venv_py), "-m", "spell_sync", "support-report", "--format", "json"],
+            ),
         )
-        for cmd in cli_commands:
-            rc, out, _ = self._run_bounded_step(
-                "packaging.wheel-smoke",
+        for step_id, cmd in cli_steps:
+            rc, out, timing = self._run_bounded_step(
+                step_id,
                 cmd,
                 cwd=outside_checkout,
-                env=wheel_env,
-                packaging=True,
+                env=isolated_env,
             )
-            parts.append(f"cli {' '.join(cmd[2:])}: exit={rc}")
-            parts.append(out.rstrip())
-            if rc != 0:
-                return rc, "\n".join(parts), f"cli failed: {' '.join(cmd[2:])}"
+            if _record_substep(
+                step_id,
+                rc,
+                out,
+                timing,
+                summary_line=f"cli {' '.join(cmd[2:])}: exit={rc}",
+            ):
+                composite = _wheel_smoke_composite_timing(
+                    substeps,
+                    total_seconds,
+                    failed_substep=failed_substep,
+                    result="failed",
+                )
+                return rc, "\n".join(parts), f"cli failed: {' '.join(cmd[2:])}", composite
 
         summary = (
             f"wheel install ok; metadata {metadata_version}; "
             f"origin {detail}; cli version/help/support-report ok"
         )
-        return 0, "\n".join(parts), summary
+        composite = _wheel_smoke_composite_timing(substeps, total_seconds, result="success")
+        return 0, "\n".join(parts), summary, composite
 
     def run(
         self,
@@ -1228,12 +1409,18 @@ print(importlib.metadata.version("spell-sync"))
                 self.record("packaging.wheel-smoke", 1, detail)
                 return self._finish_with_gate(1)
 
-            smoke_rc, smoke_out, smoke_summary = self._run_wheel_smoke(
+            smoke_rc, smoke_out, smoke_summary, smoke_timing = self._run_wheel_smoke(
                 py,
                 wheels=wheels,
                 version=version,
             )
-            self.record("packaging.wheel-smoke", smoke_rc, smoke_out, smoke_summary)
+            self.record(
+                "packaging.wheel-smoke",
+                smoke_rc,
+                smoke_out,
+                smoke_summary,
+                timing=smoke_timing,
+            )
             if smoke_rc != 0:
                 return self._finish_with_gate(smoke_rc)
 
@@ -1241,6 +1428,7 @@ print(importlib.metadata.version("spell-sync"))
             smoke_root = self._wheel_smoke_root
             smoke_home = smoke_root / "home"
             smoke_project = smoke_root / "project"
+            smoke_project.mkdir(exist_ok=True)
             smoke_env = _wheel_smoke_env(os.environ, home=smoke_home)
 
             wordlist = smoke_project / "wordlist.txt"
