@@ -66,8 +66,20 @@ def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
     return counts.to_json_dict()
 
 
+def _project_python(root: Path, fallback: str) -> str:
+    for name in ("python", "python3", "python3.12"):
+        candidate = root / ".venv" / "bin" / name
+        if candidate.is_file():
+            return str(candidate)
+    windows = root / ".venv" / "Scripts" / "python.exe"
+    if windows.is_file():
+        return str(windows)
+    return fallback
+
+
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     return [
+        ("environment.contract", [py, "scripts/validate_environment_contract.py"]),
         ("execution-budget.registry", [py, "scripts/validate_execution_budget.py"]),
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
@@ -1301,42 +1313,24 @@ class CiRunner:
                 )
 
             if bootstrap:
-                install_rc, install_out, install_timing = self._run_bounded_step(
-                    "deps.install",
-                    [
-                        py,
-                        "-m",
-                        "pip",
-                        "install",
-                        "-q",
-                        "ruff",
-                        "mypy",
-                        "pytest",
-                        "pytest-cov",
-                        "build",
-                        "wheel",
-                        "twine",
-                        "setuptools>=77",
-                    ],
+                lock_rc, lock_out, lock_timing = self._run_bounded_step(
+                    "environment.lock",
+                    ["uv", "lock", "--check"],
                     cwd=self.root,
                 )
-                self.record("deps.install", install_rc, install_out, timing=install_timing)
-                if install_rc != 0:
-                    return self._finish_with_gate(install_rc)
+                self.record("environment.lock", lock_rc, lock_out, timing=lock_timing)
+                if lock_rc != 0:
+                    return self._finish_with_gate(lock_rc)
 
-                install_editable_rc, install_editable_out, editable_timing = self._run_bounded_step(
-                    "deps.editable",
-                    [py, "-m", "pip", "install", "-q", "-e", "."],
+                check_rc, check_out, check_timing = self._run_bounded_step(
+                    "environment.check",
+                    [py, "scripts/project_environment.py", "check"],
                     cwd=self.root,
                 )
-                self.record(
-                    "deps.editable",
-                    install_editable_rc,
-                    install_editable_out,
-                    timing=editable_timing,
-                )
-                if install_editable_rc != 0:
-                    return self._finish_with_gate(install_editable_rc)
+                self.record("environment.check", check_rc, check_out, timing=check_timing)
+                if check_rc != 0:
+                    return self._finish_with_gate(check_rc)
+                py = _project_python(self.root, py)
 
             steps = _build_check_steps(py)
             try:

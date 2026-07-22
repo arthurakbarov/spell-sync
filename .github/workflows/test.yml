@@ -7,19 +7,103 @@ on:
 permissions:
   contents: read
 
+env:
+  UV_VERSION: "0.11.21"
+  CANONICAL_PYTHON: "3.12.13"
+
 jobs:
-  test:
-    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.11", "3.12"]
+  full-ci:
+    name: full-ci (ubuntu, py3.12)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Run CI script
-        run: bash scripts/ci.sh
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
+        with:
+          version: "0.11.21"
+      - name: Sync environment from uv.lock
+        run: |
+          uv lock --check
+          uv sync --python "${CANONICAL_PYTHON}" --locked --no-python-downloads
+          uv run --python "${CANONICAL_PYTHON}" --locked --no-sync --offline --no-python-downloads \
+            python scripts/project_environment.py check
+      - name: Full CI
+        run: |
+          uv run --python "${CANONICAL_PYTHON}" --locked --no-sync --offline --no-python-downloads \
+            python scripts/ci_runner.py
+
+  compatibility-linux-py311:
+    name: compatibility (ubuntu, py3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
+        with:
+          version: "0.11.21"
+      - name: Compatibility checks
+        run: |
+          uv lock --check
+          uv sync --python 3.11 --locked --no-python-downloads
+          uv run --python 3.11 --locked --no-sync --offline --no-python-downloads \
+            python scripts/run_compatibility_checks.py --platform linux --python-version 3.11
+
+  compatibility-macos-py312:
+    name: compatibility (macos, py3.12)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
+        with:
+          version: "0.11.21"
+      - name: Compatibility checks
+        run: |
+          uv lock --check
+          uv sync --python 3.12 --locked --no-python-downloads
+          uv run --python 3.12 --locked --no-sync --offline --no-python-downloads \
+            python scripts/run_compatibility_checks.py --platform macos --python-version 3.12
+
+  compatibility-windows-py312:
+    name: compatibility (windows, py3.12)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
+        with:
+          version: "0.11.21"
+      - name: Compatibility checks
+        shell: bash
+        run: |
+          uv lock --check
+          uv sync --python 3.12 --locked --no-python-downloads
+          uv run --python 3.12 --locked --no-sync --offline --no-python-downloads \
+            python scripts/run_compatibility_checks.py --platform windows --python-version 3.12
+
+  compatibility-linux-py313-experimental:
+    name: compatibility experimental (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
+        with:
+          version: "0.11.21"
+      - name: Experimental compatibility
+        run: |
+          uv lock --check
+          uv sync --python 3.13 --locked --no-python-downloads
+          uv run --python 3.13 --locked --no-sync --offline --no-python-downloads \
+            python scripts/run_compatibility_checks.py --platform linux --python-version 3.13 --experimental

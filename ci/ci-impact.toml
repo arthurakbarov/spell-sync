@@ -7,11 +7,13 @@ impactModule = "scripts/ci_impact"
 [excluded]
 patterns = [
   ".artifacts/**",
+  ".venv/**",
   "build/**",
   "dist/**",
   "spell_sync.egg-info/**",
   ".pytest_cache/**",
   ".mypy_cache/**",
+  ".ruff_cache/**",
   ".coverage",
   "coverage.json",
   "htmlcov/**",
@@ -38,6 +40,9 @@ patterns = [
 [classes.build]
 patterns = [
   "pyproject.toml",
+  "uv.lock",
+  ".python-version",
+  "config/environment-contract.toml",
   "MANIFEST.in",
   "scripts/build*.py",
 ]
@@ -46,6 +51,12 @@ patterns = [
 patterns = [
   "scripts/ci.sh",
   "scripts/ci_runner.py",
+  "scripts/project_environment.py",
+  "scripts/environment_contract/**",
+  "scripts/validate_environment_contract.py",
+  "scripts/validate_snapshot_policy.py",
+  "scripts/validate_support_matrix.py",
+  "scripts/run_compatibility_checks.py",
   "scripts/ci_history.py",
   "scripts/check-ci-evidence.py",
   "scripts/check-ci-necessity.py",
