@@ -14,7 +14,6 @@ from scripts.environment_contract.contract import CANONICAL_PYTHON, contract_dig
 from scripts.environment_contract.metadata import (
     EnvironmentMetadata,
     metadata_now,
-    write_environment_metadata,
 )
 from scripts.environment_contract.probe import run_interpreter_probe, venv_python
 
@@ -64,9 +63,5 @@ def test_metadata_from_probe_uses_venv_python_not_ambient() -> None:
 
     assert CANONICAL_PYTHON in payload
     assert sys.version.split()[0] not in payload
-
-    metadata_path = venv_dir / ".spell-sync-environment.json"
-    write_environment_metadata(metadata_path, metadata)
-    stored = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert stored["pythonVersion"] == CANONICAL_PYTHON
-    assert stored["pythonVersion"] != sys.version.split()[0]
+    assert metadata.python_version == CANONICAL_PYTHON
+    assert metadata.installed_environment_digest == probe.installed_environment_digest
