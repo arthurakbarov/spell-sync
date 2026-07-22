@@ -97,7 +97,7 @@ def test_snapshot_gate_requires_explicit_workspace_layout(isolated_state_dir, tm
 
 
 @pytest.mark.skipif(
-    os.environ.get("SPELL_SNAPSHOT_GATE_SLOW") == "1",
+    os.environ.get("SPELL_SNAPSHOT_GATE_SLOW") != "1",
     reason="slow full snapshot gate; set SPELL_SNAPSHOT_GATE_SLOW=1 explicitly",
 )
 def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
