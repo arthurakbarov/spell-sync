@@ -278,6 +278,28 @@ def _check_gitignore() -> list[str]:
     return errors
 
 
+def _check_project_environment_probe() -> list[str]:
+    errors: list[str] = []
+    probe_path = ROOT / "scripts/environment_contract/probe.py"
+    project_env = ROOT / "scripts/project_environment.py"
+    if probe_path.is_file():
+        text = _read(probe_path)
+        if "importlib.metadata.distributions()" not in text:
+            errors.append("[ENVIRONMENT-PROBE-006] probe must interrogate .venv installed manifest")
+    else:
+        errors.append("[ENVIRONMENT-PROBE-006] missing scripts/environment_contract/probe.py")
+    if project_env.is_file():
+        text = _read(project_env)
+        if "run_interpreter_probe" not in text:
+            errors.append(
+                "[ENVIRONMENT-PROBE-006] project_environment must use run_interpreter_probe"
+            )
+    skill = ROOT / ".cursor/skills/project-environment/SKILL.md"
+    if not skill.is_file():
+        errors.append("[ENVIRONMENT-SKILL-007] missing .cursor/skills/project-environment/SKILL.md")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     contract_data: dict[str, object] | None = None
@@ -292,6 +314,7 @@ def main() -> int:
     errors.extend(_check_pyproject(contract_data))
     errors.extend(_check_uv_lock())
     errors.extend(_check_gitignore())
+    errors.extend(_check_project_environment_probe())
 
     if errors:
         for item in errors:

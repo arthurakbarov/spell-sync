@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import re
 import subprocess
 import sys
@@ -22,18 +21,19 @@ from scripts.environment_contract.contract import (  # noqa: E402
     file_digest,
     load_contract,
 )
-from scripts.environment_contract.fingerprint import build_environment_fingerprint  # noqa: E402
-from scripts.environment_contract.manifest import (  # noqa: E402
-    build_installed_manifest,
-    current_python_cache_tag,
-    manifest_digest,
+from scripts.environment_contract.evidence import write_environment_evidence  # noqa: E402
+from scripts.environment_contract.fingerprint import (  # noqa: E402
+    build_environment_fingerprint_from_probe,
+    resolve_project_environment_fingerprint,
 )
+from scripts.environment_contract.manifest import manifest_digest  # noqa: E402
 from scripts.environment_contract.metadata import (  # noqa: E402
     EnvironmentMetadata,
     metadata_now,
     read_environment_metadata,
     write_environment_metadata,
 )
+from scripts.environment_contract.probe import run_interpreter_probe, venv_python  # noqa: E402
 
 DEFAULT_GROUPS = ("dev",)
 UV_VERSION_PATTERN = re.compile(r"uv\s+(\d+\.\d+\.\d+)")
@@ -73,41 +73,6 @@ def _uv_version() -> str:
     return match.group(1) if match else ""
 
 
-def _venv_python(venv_dir: Path) -> Path | None:
-    for name in ("python", "python3", "python3.12"):
-        candidate = venv_dir / "bin" / name
-        if candidate.is_file():
-            return candidate
-    candidate = venv_dir / "Scripts" / "python.exe"
-    if candidate.is_file():
-        return candidate
-    return None
-
-
-def _interpreter_identity(python: Path) -> str:
-    code, output = _run(
-        [
-            str(python),
-            "-c",
-            "import hashlib, platform, sys; "
-            "payload=("
-            "f'{sys.executable}|{platform.python_version()}|{sys.implementation.cache_tag}'"
-            "); "
-            "print(hashlib.sha256(payload.encode()).hexdigest())",
-        ]
-    )
-    if code != 0:
-        return ""
-    return output.splitlines()[-1].strip()
-
-
-def _python_version(python: Path) -> str:
-    code, output = _run([str(python), "-c", "import platform; print(platform.python_version())"])
-    if code != 0:
-        return ""
-    return output.strip()
-
-
 def _sync_command(*, allow_python_download: bool) -> list[str]:
     command = [
         "uv",
@@ -123,29 +88,6 @@ def _sync_command(*, allow_python_download: bool) -> list[str]:
     return command
 
 
-def _write_environment_evidence(root: Path, *, check_exit: int, lock_exit: int) -> None:
-    fingerprint = build_environment_fingerprint(root, uv_version=_uv_version())
-    payload = {
-        "schemaVersion": 1,
-        "repositoryHead": _git_head(root),
-        "environmentContractDigest": fingerprint.environment_contract_digest,
-        "pyprojectDigest": fingerprint.pyproject_digest,
-        "uvLockDigest": fingerprint.uv_lock_digest,
-        "pythonImplementation": fingerprint.python_implementation,
-        "pythonVersion": fingerprint.python_version,
-        "pythonCacheTag": fingerprint.python_cache_tag,
-        "uvVersion": fingerprint.uv_version,
-        "pytestVersion": fingerprint.pytest_version,
-        "selectedDependencyGroups": list(fingerprint.selected_dependency_groups),
-        "installedEnvironmentDigest": fingerprint.installed_environment_digest,
-        "environmentCheckExit": check_exit,
-        "lockCheckExit": lock_exit,
-    }
-    out = root / ".artifacts" / "environment" / "environment.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def _git_head(root: Path) -> str:
     proc = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -156,24 +98,44 @@ def _git_head(root: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
-def _write_metadata(root: Path, venv_dir: Path) -> None:
-    python = _venv_python(venv_dir)
-    if python is None:
-        raise RuntimeError("environment.venv-missing")
-    manifest = build_installed_manifest(project_root=root, python=python)
-    metadata = EnvironmentMetadata(
+def _expected_metadata(root: Path, probe, *, uv_version: str) -> EnvironmentMetadata:
+    fingerprint = build_environment_fingerprint_from_probe(
+        root,
+        probe,
+        uv_version=uv_version,
+        selected_groups=DEFAULT_GROUPS,
+    )
+    return EnvironmentMetadata(
         schema_version=1,
-        created_at=metadata_now(),
-        python_implementation=platform.python_implementation().lower(),
-        python_version=_python_version(python),
-        python_cache_tag=current_python_cache_tag(),
-        base_interpreter_identity=_interpreter_identity(python),
-        uv_version=_uv_version(),
-        environment_contract_digest=contract_digest(root),
-        pyproject_digest=file_digest(root / "pyproject.toml"),
-        uv_lock_digest=file_digest(root / "uv.lock"),
+        created_at="",
+        python_implementation=probe.python_implementation,
+        python_version=probe.python_version,
+        python_cache_tag=probe.python_cache_tag,
+        base_interpreter_identity=probe.base_prefix_identity,
+        uv_version=uv_version,
+        environment_contract_digest=fingerprint.environment_contract_digest,
+        pyproject_digest=fingerprint.pyproject_digest,
+        uv_lock_digest=fingerprint.uv_lock_digest,
         selected_dependency_groups=DEFAULT_GROUPS,
-        installed_environment_digest=manifest_digest(manifest),
+        installed_environment_digest=probe.installed_environment_digest,
+    )
+
+
+def _write_metadata(root: Path, venv_dir: Path, probe) -> None:
+    metadata = _expected_metadata(root, probe, uv_version=_uv_version())
+    metadata = EnvironmentMetadata(
+        schema_version=metadata.schema_version,
+        created_at=metadata_now(),
+        python_implementation=metadata.python_implementation,
+        python_version=metadata.python_version,
+        python_cache_tag=metadata.python_cache_tag,
+        base_interpreter_identity=metadata.base_interpreter_identity,
+        uv_version=metadata.uv_version,
+        environment_contract_digest=metadata.environment_contract_digest,
+        pyproject_digest=metadata.pyproject_digest,
+        uv_lock_digest=metadata.uv_lock_digest,
+        selected_dependency_groups=metadata.selected_dependency_groups,
+        installed_environment_digest=metadata.installed_environment_digest,
     )
     write_environment_metadata(venv_dir / ".spell-sync-environment.json", metadata)
 
@@ -182,6 +144,7 @@ def cmd_info(root: Path, *, json_output: bool) -> int:
     contract = load_contract(root)
     venv_dir = root / contract.environment_directory
     metadata = read_environment_metadata(venv_dir / ".spell-sync-environment.json")
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
     payload = {
         "environmentContractDigest": contract_digest(root),
         "pyprojectDigest": file_digest(root / "pyproject.toml"),
@@ -189,12 +152,11 @@ def cmd_info(root: Path, *, json_output: bool) -> int:
         "pythonVersionFile": CANONICAL_PYTHON,
         "uvVersion": _uv_version(),
         "venvPresent": venv_dir.is_dir(),
-        "venvPythonVersion": _python_version(_venv_python(venv_dir))
-        if _venv_python(venv_dir)
-        else "",
+        "venvPythonVersion": fingerprint.python_version if fingerprint else "",
         "metadataPresent": metadata is not None,
         "installedEnvironmentDigest": metadata.installed_environment_digest if metadata else "",
         "selectedDependencyGroups": list(DEFAULT_GROUPS),
+        "environmentFingerprint": fingerprint.signature() if fingerprint else "",
     }
     if json_output:
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -224,40 +186,96 @@ def cmd_check(root: Path) -> CommandResult:
     venv_dir = root / contract.environment_directory
     if not venv_dir.is_dir():
         return CommandResult(1, "environment.venv-missing", ".venv missing")
-    venv_python = _venv_python(venv_dir)
-    if venv_python is None:
+    venv_py = venv_python(venv_dir)
+    if venv_py is None:
         return CommandResult(1, "environment.venv-missing", ".venv python missing")
-    if _python_version(venv_python) != CANONICAL_PYTHON:
+    try:
+        probe = run_interpreter_probe(venv_py, project_root=root)
+    except RuntimeError:
+        return CommandResult(1, "environment.venv-stale", "interpreter probe failed")
+    if probe.python_version != CANONICAL_PYTHON:
         return CommandResult(1, "environment.venv-python-mismatch", "venv python version mismatch")
     metadata_path = venv_dir / ".spell-sync-environment.json"
     metadata = read_environment_metadata(metadata_path)
     if metadata is None:
         return CommandResult(1, "environment.venv-stale", "environment metadata missing")
-    if metadata.uv_lock_digest != file_digest(lock_path):
-        return CommandResult(1, "environment.venv-stale", "lock digest mismatch")
-    if metadata.environment_contract_digest != contract_digest(root):
-        return CommandResult(1, "environment.venv-stale", "contract digest mismatch")
-    manifest = build_installed_manifest(project_root=root, python=venv_python)
-    if manifest_digest(manifest) != metadata.installed_environment_digest:
-        return CommandResult(1, "environment.dependencies-mismatch", "installed manifest mismatch")
-    code, _ = _run([str(venv_python), "-m", "pytest", "--version"])
+    expected = _expected_metadata(root, probe, uv_version=actual_uv)
+    declaration_fields = (
+        ("schemaVersion", metadata.schema_version, expected.schema_version),
+        (
+            "environmentContractDigest",
+            metadata.environment_contract_digest,
+            expected.environment_contract_digest,
+        ),
+        ("pyprojectDigest", metadata.pyproject_digest, expected.pyproject_digest),
+        ("uvLockDigest", metadata.uv_lock_digest, expected.uv_lock_digest),
+        ("uvVersion", metadata.uv_version, expected.uv_version),
+        (
+            "selectedDependencyGroups",
+            metadata.selected_dependency_groups,
+            expected.selected_dependency_groups,
+        ),
+        (
+            "pythonImplementation",
+            metadata.python_implementation,
+            expected.python_implementation,
+        ),
+        ("pythonVersion", metadata.python_version, expected.python_version),
+        ("pythonCacheTag", metadata.python_cache_tag, expected.python_cache_tag),
+        (
+            "baseInterpreterIdentity",
+            metadata.base_interpreter_identity,
+            expected.base_interpreter_identity,
+        ),
+    )
+    for name, actual, wanted in declaration_fields:
+        if actual != wanted:
+            return CommandResult(1, "environment.venv-stale", f"{name} mismatch")
+    if metadata.installed_environment_digest != expected.installed_environment_digest:
+        return CommandResult(
+            1,
+            "environment.manual-mutation-detected",
+            "installed manifest mismatch",
+        )
+    if manifest_digest(probe.installed_manifest) != metadata.installed_environment_digest:
+        return CommandResult(
+            1,
+            "environment.manual-mutation-detected",
+            "installed manifest mismatch",
+        )
+    code, _ = _run([str(venv_py), "-m", "pytest", "--version"])
     if code != 0:
         return CommandResult(1, "environment.dependencies-mismatch", "pytest unavailable")
     return CommandResult(0)
 
 
 def cmd_sync(root: Path, *, allow_python_download: bool = False) -> CommandResult:
+    lock_code, lock_out = _run(["uv", "lock", "--check"], cwd=root)
+    if lock_code != 0:
+        return CommandResult(lock_code, "environment.lock-stale", lock_out)
     code, output = _run(_sync_command(allow_python_download=allow_python_download), cwd=root)
     if code != 0:
         return CommandResult(code, "environment.sync-required", output)
     contract = load_contract(root)
     venv_dir = root / contract.environment_directory
+    venv_py = venv_python(venv_dir)
+    if venv_py is None:
+        return CommandResult(1, "environment.venv-missing", ".venv python missing after sync")
     try:
-        _write_metadata(root, venv_dir)
+        probe = run_interpreter_probe(venv_py, project_root=root)
+        _write_metadata(root, venv_dir, probe)
     except RuntimeError as exc:
-        return CommandResult(1, str(exc), str(exc))
+        return CommandResult(1, "environment.venv-stale", str(exc))
     check = cmd_check(root)
-    _write_environment_evidence(root, check_exit=check.exit_code, lock_exit=0)
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
+    if fingerprint is not None:
+        write_environment_evidence(
+            root,
+            fingerprint=fingerprint,
+            repository_head=_git_head(root),
+            check_exit=check.exit_code,
+            lock_exit=lock_code,
+        )
     if check.exit_code != 0:
         return check
     return CommandResult(0)
@@ -335,13 +353,26 @@ def main(argv: list[str] | None = None) -> int:
     elif command == "clean":
         result = cmd_clean(ROOT)
     elif command == "installed-manifest":
-        manifest = build_installed_manifest(project_root=ROOT)
-        print(json.dumps(manifest.to_json_dict(), indent=2, sort_keys=True))
+        contract = load_contract(ROOT)
+        venv_py = venv_python(ROOT / contract.environment_directory)
+        if venv_py is None:
+            print("ENVIRONMENT_RESULT=failed")
+            print("ENVIRONMENT_FAILED_ID=environment.venv-missing")
+            return 1
+        probe = run_interpreter_probe(venv_py, project_root=ROOT)
+        print(json.dumps(probe.installed_manifest.to_json_dict(), indent=2, sort_keys=True))
         print("ENVIRONMENT_RESULT=success")
         return 0
     elif command == "write-metadata":
         contract = load_contract(ROOT)
-        _write_metadata(ROOT, ROOT / contract.environment_directory)
+        venv_dir = ROOT / contract.environment_directory
+        venv_py = venv_python(venv_dir)
+        if venv_py is None:
+            print("ENVIRONMENT_RESULT=failed")
+            print("ENVIRONMENT_FAILED_ID=environment.venv-missing")
+            return 1
+        probe = run_interpreter_probe(venv_py, project_root=ROOT)
+        _write_metadata(ROOT, venv_dir, probe)
         print("ENVIRONMENT_RESULT=success")
         return 0
     elif command == "doctor":
