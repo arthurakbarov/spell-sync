@@ -8,9 +8,14 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .progress import ProgressTracker
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +28,10 @@ class ProcessResult:
     stderr_tail: str
     progress_event_count: int
     maximum_progress_gap: float
+    start_time_iso: str
+    end_time_iso: str
+    interrupted: bool = False
+    owned_pgid: int | None = None
 
 
 def _read_stream(
@@ -74,6 +83,13 @@ def _terminate_owned_group(
         return
 
 
+def _join_reader_threads(*threads: threading.Thread, timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    for thread in threads:
+        remaining = max(0.0, deadline - time.monotonic())
+        thread.join(timeout=remaining)
+
+
 def run_owned_command(
     command: list[str],
     *,
@@ -87,68 +103,95 @@ def run_owned_command(
     enforce_hard: bool = True,
     enforce_stall: bool = False,
 ) -> ProcessResult:
-    started = time.monotonic()
+    started_monotonic = time.monotonic()
+    start_time_iso = _utc_now()
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
-    proc = subprocess.Popen(
-        command,
-        cwd=cwd,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        start_new_session=True,
-    )
-    assert proc.stdout is not None
-    assert proc.stderr is not None
-    pgid = proc.pid
-    stdout_thread = threading.Thread(
-        target=_read_stream,
-        args=(proc.stdout, tracker, stdout_lines),
-        daemon=True,
-    )
-    stderr_thread = threading.Thread(
-        target=_read_stream,
-        args=(proc.stderr, tracker, stderr_lines),
-        daemon=True,
-    )
-    stdout_thread.start()
-    stderr_thread.start()
-
+    proc: subprocess.Popen[bytes] | None = None
+    pgid: int | None = None
+    stdout_thread: threading.Thread | None = None
+    stderr_thread: threading.Thread | None = None
     timed_out = False
     timeout_kind: str | None = None
     exit_code = 1
+    interrupted = False
 
-    while True:
-        now = time.monotonic()
-        elapsed = now - started
-        if proc.poll() is not None:
-            exit_code = proc.returncode if proc.returncode is not None else 1
-            break
-        if enforce_hard and elapsed >= hard_seconds:
-            timed_out = True
-            timeout_kind = "hard"
-            _terminate_owned_group(pgid, grace=termination_grace_seconds, proc=proc)
-            proc.wait(timeout=termination_grace_seconds + 1)
-            exit_code = 124
-            break
-        if (
-            enforce_stall
-            and stall_seconds is not None
-            and tracker is not None
-            and tracker.progress_age() >= stall_seconds
-            and elapsed >= soft_seconds
-        ):
-            timed_out = True
-            timeout_kind = "stall"
-            _terminate_owned_group(pgid, grace=termination_grace_seconds, proc=proc)
-            proc.wait(timeout=termination_grace_seconds + 1)
-            exit_code = 124
-            break
-        time.sleep(0.05)
+    try:
+        proc = subprocess.Popen(
+            command,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+        pgid = proc.pid
+        stdout_thread = threading.Thread(
+            target=_read_stream,
+            args=(proc.stdout, tracker, stdout_lines),
+            daemon=True,
+        )
+        stderr_thread = threading.Thread(
+            target=_read_stream,
+            args=(proc.stderr, tracker, stderr_lines),
+            daemon=True,
+        )
+        stdout_thread.start()
+        stderr_thread.start()
 
-    stdout_thread.join(timeout=1)
-    stderr_thread.join(timeout=1)
-    duration = time.monotonic() - started
+        while True:
+            now = time.monotonic()
+            elapsed = now - started_monotonic
+            if proc.poll() is not None:
+                exit_code = proc.returncode if proc.returncode is not None else 1
+                break
+            if enforce_hard and elapsed >= hard_seconds:
+                timed_out = True
+                timeout_kind = "hard"
+                _terminate_owned_group(pgid, grace=termination_grace_seconds, proc=proc)
+                proc.wait(timeout=termination_grace_seconds + 1)
+                exit_code = 124
+                break
+            if (
+                enforce_stall
+                and stall_seconds is not None
+                and tracker is not None
+                and tracker.progress_age() >= stall_seconds
+                and elapsed >= soft_seconds
+            ):
+                timed_out = True
+                timeout_kind = "stall"
+                _terminate_owned_group(pgid, grace=termination_grace_seconds, proc=proc)
+                proc.wait(timeout=termination_grace_seconds + 1)
+                exit_code = 124
+                break
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        interrupted = True
+        exit_code = 130
+        if pgid is not None:
+            _terminate_owned_group(pgid, grace=termination_grace_seconds, proc=proc)
+        if proc is not None:
+            try:
+                proc.wait(timeout=termination_grace_seconds + 1)
+            except subprocess.TimeoutExpired:
+                if pgid is not None:
+                    _terminate_owned_group(pgid, grace=0.0, proc=proc)
+        raise
+    finally:
+        if stdout_thread is not None and stderr_thread is not None:
+            _join_reader_threads(stdout_thread, stderr_thread, timeout=1.0)
+        elif stdout_thread is not None:
+            stdout_thread.join(timeout=1.0)
+        elif stderr_thread is not None:
+            stderr_thread.join(timeout=1.0)
+        if interrupted and pgid is not None:
+            _terminate_owned_group(pgid, grace=0.0, proc=proc)
+
+    duration = time.monotonic() - started_monotonic
+    end_time_iso = _utc_now()
     return ProcessResult(
         exit_code=exit_code,
         duration_seconds=duration,
@@ -158,4 +201,8 @@ def run_owned_command(
         stderr_tail="".join(stderr_lines[-50:]),
         progress_event_count=tracker.event_count if tracker else 0,
         maximum_progress_gap=tracker.maximum_gap if tracker else 0.0,
+        start_time_iso=start_time_iso,
+        end_time_iso=end_time_iso,
+        interrupted=interrupted,
+        owned_pgid=pgid,
     )

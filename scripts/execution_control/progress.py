@@ -6,49 +6,82 @@ import re
 import time
 from dataclasses import dataclass, field
 
+_PYTEST_NODE_RE = re.compile(
+    r"^(?P<path>tests/\S+::\S+)\s+(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)"
+)
+_PYTEST_COLLECT_RE = re.compile(r"^tests/\S+::\S+\s")
+_CI_CHILD_RE = re.compile(
+    r"(?P<child>[a-z0-9._:-]+)\s*:\s*(passed|failed|started|completed|exit=)",
+    re.I,
+)
+_PHASE_RE = re.compile(r"^(===|---)\s+.+")
+_ARTIFACT_RE = re.compile(r"(SNAPSHOT_|CI_RESULT=|TEST_RUN_RESULT=|EXECUTION_GATE=|archive-check=)")
+
 
 @dataclass
 class ProgressTracker:
     contract_id: str
     last_progress_at: float = field(default_factory=time.monotonic)
     last_sequence: int = -1
-    last_line_hash: str = ""
-    repeated_line_count: int = 0
+    last_node_id: str = ""
+    last_child_id: str = ""
+    last_phase_id: str = ""
+    last_artifact_state: str = ""
     event_count: int = 0
     maximum_gap: float = 0.0
-    _last_gap_start: float = field(default_factory=time.monotonic)
 
     def observe_line(self, line: str) -> None:
         now = time.monotonic()
-        line_hash = str(hash(line.strip()))
         if self.contract_id == "pytest-node-transition":
-            if " PASSED" in line or " FAILED" in line or " ERROR" in line:
-                self._mark_progress(now)
-            elif line.startswith("tests/") or "::test_" in line:
-                self._mark_progress(now)
-        elif self.contract_id == "ci-child-transition":
-            if re.search(r":\s*(passed|failed|exit=)", line, re.I):
-                self._mark_progress(now)
-        elif self.contract_id == "structured-phase-transition":
-            if line.startswith("===") or line.startswith("---") or " passed" in line.lower():
-                self._mark_progress(now)
-        elif self.contract_id == "artifact-state-transition":
-            if "SNAPSHOT_" in line or "CI_RESULT=" in line or "TEST_RUN_RESULT=" in line:
-                self._mark_progress(now)
-
-        if line_hash == self.last_line_hash:
-            self.repeated_line_count += 1
-        else:
-            self.repeated_line_count = 0
-            self.last_line_hash = line_hash
-        if self.repeated_line_count >= 50:
+            match = _PYTEST_NODE_RE.match(line.strip())
+            if match:
+                node_id = match.group("path")
+                if node_id != self.last_node_id:
+                    self.last_node_id = node_id
+                    self._mark_progress(now)
+                return
+            if _PYTEST_COLLECT_RE.match(line.strip()):
+                node_id = line.strip().split()[0]
+                if node_id != self.last_node_id:
+                    self.last_node_id = node_id
+                    self._mark_progress(now)
             return
-        if line.strip():
-            self._mark_progress(now)
+
+        if self.contract_id == "ci-child-transition":
+            match = _CI_CHILD_RE.search(line)
+            if match:
+                child_id = match.group("child")
+                if child_id != self.last_child_id:
+                    self.last_child_id = child_id
+                    self._mark_progress(now)
+            return
+
+        if self.contract_id == "structured-phase-transition":
+            match = _PHASE_RE.match(line.strip())
+            if match:
+                phase_id = line.strip()
+                if phase_id != self.last_phase_id:
+                    self.last_phase_id = phase_id
+                    self._mark_progress(now)
+            if re.search(r"\bpassed\b", line, re.I) and "===" in line:
+                phase_id = line.strip()
+                if phase_id != self.last_phase_id:
+                    self.last_phase_id = phase_id
+                    self._mark_progress(now)
+            return
+
+        if self.contract_id == "artifact-state-transition":
+            match = _ARTIFACT_RE.search(line)
+            if match:
+                state = match.group(0)
+                if state != self.last_artifact_state:
+                    self.last_artifact_state = state
+                    self._mark_progress(now)
 
     def observe_child_event(self, child_id: str) -> None:
-        self._mark_progress(time.monotonic())
-        _ = child_id
+        if child_id != self.last_child_id:
+            self.last_child_id = child_id
+            self._mark_progress(time.monotonic())
 
     def observe_sequence(self, sequence: int) -> None:
         if sequence > self.last_sequence:
