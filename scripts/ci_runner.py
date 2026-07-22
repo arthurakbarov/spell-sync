@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import traceback
 from collections.abc import Callable
@@ -30,6 +31,12 @@ from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa:
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.execution_control.controller import run_monitored_command  # noqa: E402
 from scripts.execution_control.gate_controller import ActiveGate, GateController  # noqa: E402
+from scripts.execution_control.gate_flow import (  # noqa: E402
+    gate_controller_for,
+    open_gate_after_previews,
+    preview_ci_child_plans,
+    registry_for,
+)
 from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
 from scripts.execution_control.models import ExecutionStatus  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
@@ -119,6 +126,93 @@ def _select_steps(
         index = ids.index(start_from)
         return steps[index:]
     return steps
+
+
+BOOTSTRAP_PYTHON_HARD_SECONDS = 30.0
+
+
+def _wheel_smoke_preview_steps(py: str) -> list[tuple[str, list[str], bool, bool, bool]]:
+    return [
+        ("packaging.wheel-smoke", [py, "-m", "venv", "placeholder"], False, False, True),
+        (
+            "packaging.wheel-smoke",
+            [py, "-m", "pip", "install", "-q", "placeholder.whl"],
+            False,
+            False,
+            True,
+        ),
+        (
+            "packaging.wheel-smoke",
+            [py, "-c", "import spell_sync; print('origin')"],
+            False,
+            False,
+            True,
+        ),
+        ("packaging.wheel-smoke", [py, "-m", "spell_sync", "version"], False, False, True),
+        ("packaging.wheel-smoke", [py, "-m", "spell_sync", "--help"], False, False, True),
+        (
+            "packaging.wheel-smoke",
+            [py, "-m", "spell_sync", "support-report", "--format", "json"],
+            False,
+            False,
+            True,
+        ),
+    ]
+
+
+def _full_ci_preview_steps(py: str) -> tuple[tuple[str, list[str], bool, bool, bool], ...]:
+    steps: list[tuple[str, list[str], bool, bool, bool]] = []
+    for step_id, argv in _build_check_steps(py):
+        coverage = step_id in {"tests.pytest", "coverage.policy"}
+        steps.append((step_id, argv, coverage, False, False))
+    steps.append(
+        (
+            "coverage.policy",
+            _coverage_argv(py),
+            True,
+            False,
+            False,
+        )
+    )
+    steps.extend(
+        [
+            ("packaging.build", [py, "-m", "build"], False, False, False),
+            (
+                "packaging.twine",
+                [py, "-m", "twine", "check", "placeholder.whl"],
+                False,
+                False,
+                False,
+            ),
+        ]
+    )
+    steps.extend(_wheel_smoke_preview_steps(py))
+    steps.extend(
+        [
+            (
+                "smoke.init",
+                [py, "-m", "spell_sync", "init", "-C", "wordlist.txt"],
+                False,
+                False,
+                True,
+            ),
+            (
+                "smoke.lint",
+                [py, "-m", "spell_sync", "lint", "--strict", "-C", "wordlist.txt"],
+                False,
+                False,
+                True,
+            ),
+            (
+                "smoke.tui",
+                [py, "-m", "pytest", "tests/test_gui_smoke.py", "-q"],
+                False,
+                True,
+                False,
+            ),
+        ]
+    )
+    return tuple(steps)
 
 
 def _ci_mode(*, only: str | None, start_from: str | None, resume_failed: bool) -> str:
@@ -394,12 +488,61 @@ class CiRunner:
     def _full_gate_active(self) -> bool:
         return self._mode == "full" and self._uses_default_run_step and self._gate is not None
 
+    def _run_bootstrap_python(self, py: str) -> tuple[int, str, dict[str, object] | None]:
+        started = time.monotonic()
+        argv = [py, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"]
+        try:
+            proc = subprocess.run(
+                argv,
+                cwd=self.root,
+                capture_output=True,
+                text=True,
+                timeout=BOOTSTRAP_PYTHON_HARD_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            elapsed = time.monotonic() - started
+            timing: dict[str, object] = {
+                "executionId": "bootstrap:python",
+                "actualSeconds": round(elapsed, 2),
+                "expectedSeconds": BOOTSTRAP_PYTHON_HARD_SECONDS,
+                "hardSeconds": BOOTSTRAP_PYTHON_HARD_SECONDS,
+                "result": "timeout-hard",
+            }
+            message = (
+                f"bootstrap.python timed out after {BOOTSTRAP_PYTHON_HARD_SECONDS:.0f}s"
+            )
+            return 124, message, timing
+        chunk = proc.stdout
+        if proc.stderr:
+            if chunk and not chunk.endswith("\n"):
+                chunk += "\n"
+            chunk += proc.stderr
+        elapsed = time.monotonic() - started
+        timing = {
+            "executionId": "bootstrap:python",
+            "actualSeconds": round(elapsed, 2),
+            "expectedSeconds": 5.0,
+            "hardSeconds": BOOTSTRAP_PYTHON_HARD_SECONDS,
+            "result": "success" if proc.returncode == 0 else "failed",
+        }
+        return proc.returncode, chunk, timing
+
     def _begin_full_ci_gate(self, py: str) -> tuple[int, ActiveGate | None]:
-        self._gate_controller = GateController.open_gate_controller(self.root)
-        gate, state = self._gate_controller.begin_gate(
+        self._gate_controller = gate_controller_for(self.root)
+        registry = registry_for(self.root)
+        preview_steps = _full_ci_preview_steps(py)
+        child_plans = preview_ci_child_plans(
+            self.root,
+            registry,
+            steps=preview_steps,
+            mode="full-ci",
+        )
+        gate, state, _child_plans, _parent_plan = open_gate_after_previews(
+            self._gate_controller,
             execution_id="gate:full-ci",
             command=[py, str(self.root / "scripts" / "ci_runner.py")],
             mode="full-ci",
+            child_plans=child_plans,
             required=True,
             coverage=True,
             packaging=True,
@@ -590,10 +733,10 @@ class CiRunner:
         ]
         if not timings:
             return None
-        expected = sum(float(item.get("expectedSeconds", 0)) for item in timings)
-        overhead = max(10.0, expected * 0.1)
-        parent_expected = expected + overhead
-        soft = min(1800.0, max(parent_expected * 1.5, expected * 1.5))
+        child_expected = sum(float(item.get("expectedSeconds", 0)) for item in timings)
+        overhead = max(10.0, child_expected * 0.1)
+        parent_expected = child_expected + overhead
+        soft = min(1800.0, max(parent_expected * 1.5, child_expected * 1.5))
         hard = min(1800.0, max(parent_expected * 1.5, soft + 10.0))
         actual = sum(float(item.get("actualSeconds", 0)) for item in timings)
         sample_count = max(int(item.get("sampleCount", 0)) for item in timings)
@@ -613,6 +756,8 @@ class CiRunner:
             "executionId": "gate:full-ci",
             "profileId": "full-ci",
             "expectedSeconds": round(parent_expected),
+            "plannedChildExpectedSum": round(child_expected, 2),
+            "plannedOrchestrationOverhead": round(overhead, 2),
             "softSeconds": round(soft),
             "stallSeconds": None,
             "hardSeconds": round(hard),
@@ -907,11 +1052,7 @@ print(importlib.metadata.version("spell-sync"))
             self._bind_run_artifacts()
             minimum = _min_python_from_pyproject(self.root)
 
-            pyver_rc, pyver_out, pyver_timing = self._run_bounded_step(
-                "bootstrap.python",
-                [py, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
-                cwd=self.root,
-            )
+            pyver_rc, pyver_out, pyver_timing = self._run_bootstrap_python(py)
             pyver = pyver_out.strip().splitlines()[-1] if pyver_out.strip() else ""
             if pyver_rc != 0 or not _python_version_ok(pyver, minimum):
                 detail = (

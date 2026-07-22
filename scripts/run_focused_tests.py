@@ -15,20 +15,18 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.execution_control.gate_controller import GateController  # noqa: E402
+from scripts.execution_control.gate_flow import (  # noqa: E402
+    gate_controller_for,
+    open_gate_after_previews,
+    preview_focused_child_plans,
+    registry_for,
+    run_bounded_planner,
+)
 from scripts.execution_control.mappings import GATE_EXECUTION_IDS  # noqa: E402
 from scripts.execution_control.models import ExecutionStatus  # noqa: E402
 from scripts.execution_control.session import record_session_event  # noqa: E402
 from scripts.test_selection.ledger import StepResult, TestRunLedger  # noqa: E402
 from scripts.test_selection.plan_steps import PlannedStep  # noqa: E402
-
-FOCUSED_STEP_EXECUTION_IDS: dict[str, str] = {
-    "validator": "focused:validators",
-    "pytest": "focused:pytest",
-    "ruff-check": "focused:static",
-    "ruff-format": "focused:static",
-    "mypy": "focused:static",
-}
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -45,10 +43,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _step_execution_id(step: PlannedStep) -> str:
-    return FOCUSED_STEP_EXECUTION_IDS.get(step.kind, "focused:validators")
-
-
 def _load_planned_payload(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -58,18 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     gate_mode = "module" if args.level == "module" else "cluster"
     gate_id = GATE_EXECUTION_IDS["focused-module" if args.level == "module" else "focused-cluster"]
+    gate_command = [args.python, str(ROOT / "scripts" / "run_focused_tests.py")]
 
-    gate_controller = GateController.open_gate_controller(ROOT)
-    gate, state = gate_controller.begin_gate(
-        execution_id=gate_id,
-        command=[args.python, str(ROOT / "scripts" / "run_focused_tests.py")],
-        mode=gate_mode,
-        required=False,
-        test_file_count=0,
-    )
-    if gate is None:
-        return 0 if state == "reused" else 1
-
+    gate_controller = gate_controller_for(ROOT)
+    registry = registry_for(ROOT)
     exit_code = 0
     terminal_status: ExecutionStatus | None = None
     started_at = datetime.now(timezone.utc)
@@ -79,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
     metadata: tuple[str, ...] = ()
     steps: tuple[PlannedStep, ...] = ()
     plan_path = Path()
+    gate = None
+    child_plans: tuple = ()
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as handle:
@@ -99,105 +87,109 @@ def main(argv: list[str] | None = None) -> int:
             planner_argv.extend(["--cluster", args.cluster])
         if args.target:
             planner_argv.extend(["--target", args.target])
-        if not gate_controller.check_orchestration_budget(gate):
-            exit_code = 124
-        else:
-            planner_rc, _ = gate_controller.run_child(
+
+        planner_rc, planner_state = run_bounded_planner(
+            gate_controller,
+            planner_execution_id="focused:planner",
+            command=planner_argv,
+            mode=gate_mode,
+            cwd=ROOT,
+        )
+        if planner_rc != 0:
+            return planner_rc if planner_state != "reused" else 0
+
+        plan_payload = _load_planned_payload(plan_path)
+        if args.explain:
+            sys.stdout.write(json.dumps(plan_payload.get("plan", {}), indent=2) + "\n")
+        metadata = tuple(str(item) for item in plan_payload.get("metadata", ()))
+        run_key = str(plan_payload.get("runKey", ""))
+        test_file_count = int(plan_payload.get("testFileCount", 0))
+        steps = tuple(
+            PlannedStep(kind=str(item["kind"]), argv=tuple(str(part) for part in item["argv"]))
+            for item in plan_payload.get("steps", [])
+        )
+        if not steps and not plan_payload.get("plan", {}).get("validators"):
+            print("TEST_RUN_RESULT=skipped")
+            print("TEST_RUN_REASON=no-focused-targets")
+            return 0
+
+        ledger = TestRunLedger(ROOT)
+        if not args.force:
+            existing = ledger.find_success(run_key=run_key, steps=steps, metadata=metadata)
+            if existing is not None:
+                print("TEST_RUN_RESULT=skipped")
+                print("TEST_RUN_REASON=already-passed-for-current-state")
+                print(f"TEST_RUN_KEY={run_key}")
+                print(f"TEST_RUN_DURATION_SECONDS={existing.duration_seconds:.2f}")
+                return 0
+
+        preview_steps = tuple((step.kind, list(step.argv)) for step in steps)
+        child_plans = preview_focused_child_plans(
+            ROOT,
+            registry,
+            steps=preview_steps,
+            mode=gate_mode,
+            test_file_count=test_file_count,
+        )
+        gate, state, child_plans, _parent_plan = open_gate_after_previews(
+            gate_controller,
+            execution_id=gate_id,
+            command=gate_command,
+            mode=gate_mode,
+            child_plans=child_plans,
+            required=False,
+            test_file_count=test_file_count,
+        )
+        if gate is None:
+            return 0 if state == "reused" else 1
+
+        for step, child_plan in zip(steps, child_plans, strict=True):
+            if not gate_controller.check_orchestration_budget(gate):
+                exit_code = 124
+                break
+            started = time.monotonic()
+            rc, timing = gate_controller.run_child_with_plan(
                 gate,
-                child_execution_id="focused:planner",
-                command=planner_argv,
-                mode=gate_mode,
-                required=False,
+                child_plan,
+                command=list(step.argv),
                 cwd=ROOT,
             )
-            if planner_rc != 0 or gate.stopped:
-                exit_code = planner_rc or 1
-            elif not gate_controller.check_orchestration_budget(gate):
-                exit_code = 124
-            else:
-                plan_payload = _load_planned_payload(plan_path)
-                if args.explain:
-                    sys.stdout.write(json.dumps(plan_payload.get("plan", {}), indent=2) + "\n")
-                metadata = tuple(str(item) for item in plan_payload.get("metadata", ()))
-                run_key = str(plan_payload.get("runKey", ""))
-                test_file_count = int(plan_payload.get("testFileCount", 0))
-                steps = tuple(
-                    PlannedStep(
-                        kind=str(item["kind"]), argv=tuple(str(part) for part in item["argv"])
-                    )
-                    for item in plan_payload.get("steps", [])
+            duration = time.monotonic() - started
+            if timing is None and rc == 0:
+                record_session_event(
+                    category="focused",
+                    duration_seconds=0.0,
+                    reused_saved=duration,
                 )
-                if not steps and not plan_payload.get("plan", {}).get("validators"):
-                    print("TEST_RUN_RESULT=skipped")
-                    print("TEST_RUN_REASON=no-focused-targets")
-                    exit_code = 0
-                else:
-                    ledger = TestRunLedger(ROOT)
-                    if not args.force:
-                        existing = ledger.find_success(
-                            run_key=run_key, steps=steps, metadata=metadata
-                        )
-                        if existing is not None:
-                            print("TEST_RUN_RESULT=skipped")
-                            print("TEST_RUN_REASON=already-passed-for-current-state")
-                            print(f"TEST_RUN_KEY={run_key}")
-                            print(f"TEST_RUN_DURATION_SECONDS={existing.duration_seconds:.2f}")
-                            exit_code = 0
-                            steps = ()
-                    if steps:
-                        for step in steps:
-                            if not gate_controller.check_orchestration_budget(gate):
-                                exit_code = 124
-                                break
-                            started = time.monotonic()
-                            execution_id = _step_execution_id(step)
-                            rc, timing = gate_controller.run_child(
-                                gate,
-                                child_execution_id=execution_id,
-                                command=list(step.argv),
-                                mode=gate_mode,
-                                required=False,
-                                cwd=ROOT,
-                                test_file_count=test_file_count,
-                            )
-                            duration = time.monotonic() - started
-                            if timing is None and rc == 0:
-                                record_session_event(
-                                    category="focused",
-                                    duration_seconds=0.0,
-                                    reused_saved=duration,
-                                )
-                            else:
-                                record_session_event(category="focused", duration_seconds=duration)
-                            step_results.append(
-                                StepResult(
-                                    kind=step.kind,
-                                    command=list(step.argv),
-                                    exit_code=rc,
-                                    duration_seconds=duration,
-                                )
-                            )
-                            if rc != 0 or gate.stopped:
-                                exit_code = rc
-                                break
-                        if exit_code == 0 and plan_payload is not None:
-                            completed_at = datetime.now(timezone.utc)
-                            duration = sum(step.duration_seconds for step in step_results)
-                            plan = plan_payload["plan"]
-                            ledger = TestRunLedger(ROOT)
-                            ledger.record_success(
-                                run_key=run_key,
-                                steps=steps,
-                                metadata=metadata,
-                                started_at=started_at,
-                                completed_at=completed_at,
-                                duration_seconds=duration,
-                                validation_level=int(plan.get("validationLevel", 0)),
-                                final_focused_evidence=bool(
-                                    plan.get("finalFocusedEvidence", False)
-                                ),
-                                step_results=step_results,
-                            )
+            else:
+                record_session_event(category="focused", duration_seconds=duration)
+            step_results.append(
+                StepResult(
+                    kind=step.kind,
+                    command=list(step.argv),
+                    exit_code=rc,
+                    duration_seconds=duration,
+                )
+            )
+            if rc != 0 or gate.stopped:
+                exit_code = rc
+                break
+
+        if exit_code == 0 and plan_payload is not None:
+            completed_at = datetime.now(timezone.utc)
+            duration = sum(step.duration_seconds for step in step_results)
+            plan = plan_payload["plan"]
+            ledger.record_success(
+                run_key=run_key,
+                steps=steps,
+                metadata=metadata,
+                started_at=started_at,
+                completed_at=completed_at,
+                duration_seconds=duration,
+                validation_level=int(plan.get("validationLevel", 0)),
+                final_focused_evidence=bool(plan.get("finalFocusedEvidence", False)),
+                step_results=step_results,
+            )
     except KeyboardInterrupt:
         exit_code = 130
         terminal_status = ExecutionStatus.INTERRUPTED
@@ -205,7 +197,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if plan_path:
             plan_path.unlink(missing_ok=True)
-        gate_controller.finish_gate(gate, exit_code=exit_code, status=terminal_status)
+        if gate is not None:
+            gate_controller.finish_gate(gate, exit_code=exit_code, status=terminal_status)
 
     if step_results:
         duration = sum(step.duration_seconds for step in step_results)

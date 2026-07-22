@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .controller import ExecutionController
+from .gate_admission import assess_gate_admission, emit_narrow_replacement
 from .history import HistoryStore
-from .models import ExecutionPlan, ExecutionStatus, SpanRecord
+from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
+from .preview import preview_execution_plan
 from .registry import (
     REGISTRY_REL_PATH,
     load_registry,
+    profile_for_execution_id,
 )
-from .reporting import print_result
+from .reporting import print_plan, print_result
 from .session import record_session_event
 
 
@@ -38,6 +42,7 @@ class ActiveGate:
     terminal_status: str | None = None
     terminal_exit_code: int | None = None
     terminal_timing: dict[str, object] | None = None
+    child_plans: tuple[ExecutionPlan, ...] = ()
 
 
 @dataclass
@@ -74,6 +79,97 @@ class GateController(ExecutionController):
             return False
         return True
 
+    def prepare_gate_from_children(
+        self,
+        *,
+        execution_id: str,
+        command: list[str],
+        mode: str,
+        child_plans: tuple[ExecutionPlan, ...],
+        required: bool = False,
+        test_file_count: int = 0,
+        coverage: bool = False,
+        tui: bool = False,
+        packaging: bool = False,
+    ) -> tuple[ExecutionPlan | None, str]:
+        profile = profile_for_execution_id(self.registry, execution_id)
+        admission, parent_plan = assess_gate_admission(
+            self.root,
+            execution_id=execution_id,
+            profile=profile,
+            registry=self.registry,
+            history=self.history,
+            child_plans=child_plans,
+            command=command,
+            mode=mode,
+            required=required,
+            test_file_count=test_file_count,
+            coverage=coverage,
+            tui=tui,
+            packaging=packaging,
+        )
+        if admission.decision == AdmissionDecision.NARROW:
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.narrow-admission")
+            print(f"EXECUTION_ADMISSION_REASON={admission.reason}")
+            emit_narrow_replacement(
+                execution_id=execution_id,
+                mode=mode,
+                admission=admission,
+                plan=parent_plan,
+            )
+            if parent_plan is not None:
+                self._persist_plan(parent_plan)
+                print_plan(parent_plan)
+            return None, ExecutionStatus.BLOCKED_ADMISSION.value
+        assert parent_plan is not None
+        acquired, owner = self.history.acquire_lease(
+            normalized_signature=parent_plan.normalized_signature,
+            run_id=parent_plan.run_id,
+            execution_id=parent_plan.execution_id,
+            owner_pid=os.getpid(),
+        )
+        if not acquired:
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.duplicate-active")
+            if owner:
+                print(f"EXECUTION_OWNER_PID={owner.get('owner_pid', '')}")
+            return None, ExecutionStatus.BLOCKED_DUPLICATE.value
+        self._persist_plan(parent_plan)
+        print_plan(parent_plan)
+        return parent_plan, "run"
+
+    def begin_gate_with_plan(
+        self,
+        plan: ExecutionPlan,
+        *,
+        child_plans: tuple[ExecutionPlan, ...] = (),
+    ) -> tuple[ActiveGate, str]:
+        started_monotonic = time.monotonic()
+        parent_span_id = self.history.new_span_id()
+        gate = ActiveGate(
+            parent_plan=plan,
+            parent_span_id=parent_span_id,
+            started_monotonic=started_monotonic,
+            started_at=_utc_now(),
+            parent_hard_deadline=started_monotonic + plan.hard_seconds,
+            child_plans=child_plans,
+        )
+        self._active_gate = gate
+        print(f"EXECUTION_GATE={plan.execution_id}")
+        print(f"EXECUTION_GATE_RUN_ID={plan.run_id}")
+        print(f"EXECUTION_GATE_SPAN_ID={gate.parent_span_id}")
+        print(f"EXECUTION_GATE_HARD_SECONDS={plan.hard_seconds}")
+        print("EXECUTION_PARENT_HARD_SUPERVISION=active")
+        if plan.planned_child_expected_sum:
+            print(f"EXECUTION_PLANNED_CHILD_EXPECTED_SUM={plan.planned_child_expected_sum:.2f}")
+        if plan.planned_orchestration_overhead:
+            print(
+                "EXECUTION_PLANNED_ORCHESTRATION_OVERHEAD="
+                f"{plan.planned_orchestration_overhead:.2f}"
+            )
+        return gate, "run"
+
     def begin_gate(
         self,
         *,
@@ -92,23 +188,72 @@ class GateController(ExecutionController):
         )
         if plan is None:
             return None, state
-        started_monotonic = time.monotonic()
-        parent_span_id = self.history.new_span_id()
-        gate = ActiveGate(
-            parent_plan=plan,
-            parent_span_id=parent_span_id,
-            started_monotonic=started_monotonic,
-            started_at=_utc_now(),
-            parent_hard_deadline=started_monotonic + plan.hard_seconds,
+        gate, gate_state = self.begin_gate_with_plan(plan)
+        return gate, gate_state
+
+    def run_child_with_plan(
+        self,
+        gate: ActiveGate,
+        child_plan: ExecutionPlan,
+        *,
+        command: list[str],
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, object] | None]:
+        if gate.finalized or gate.stopped:
+            return gate.terminal_exit_code or 1, gate.terminal_timing
+        if self._parent_expired(gate):
+            gate.stopped = True
+            gate.failure_child = child_plan.execution_id
+            return 124, None
+        gate.active_child = child_plan.execution_id
+        self.history.update_active_child(
+            gate.parent_plan.normalized_signature,
+            child_plan.execution_id,
         )
-        self._active_gate = gate
-        self._persist_plan(plan)
-        print(f"EXECUTION_GATE={execution_id}")
-        print(f"EXECUTION_GATE_RUN_ID={plan.run_id}")
-        print(f"EXECUTION_GATE_SPAN_ID={gate.parent_span_id}")
-        print(f"EXECUTION_GATE_HARD_SECONDS={plan.hard_seconds}")
-        print("EXECUTION_PARENT_HARD_SUPERVISION=active")
-        return gate, "run"
+        bound = replace(child_plan, run_id=gate.parent_plan.run_id, admission_decision="run")
+        acquired, owner = self.history.acquire_lease(
+            normalized_signature=bound.normalized_signature,
+            run_id=bound.run_id,
+            execution_id=bound.execution_id,
+            owner_pid=os.getpid(),
+        )
+        if not acquired:
+            gate.stopped = True
+            gate.failure_child = bound.execution_id
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.duplicate-active")
+            if owner:
+                print(f"EXECUTION_OWNER_PID={owner.get('owner_pid', '')}")
+            return 1, None
+        parent_remaining = self._parent_remaining(gate)
+        effective_hard = min(bound.hard_seconds, parent_remaining)
+        exit_code, timing = self.run(
+            bound,
+            command,
+            cwd=cwd,
+            env=env,
+            active_child=bound.execution_id,
+            parent_span_id=gate.parent_span_id,
+            parent_run_id=gate.parent_plan.run_id,
+            release_lease=True,
+            parent_deadline_monotonic=gate.parent_hard_deadline,
+            hard_seconds_override=max(0.001, effective_hard),
+        )
+        if timing is not None:
+            gate.child_duration_sum += float(timing.get("actualSeconds", 0.0))
+            result = str(timing.get("result", ""))
+            if result in {"timeout-hard", "timeout-stall", "failed"} and exit_code != 0:
+                gate.stopped = True
+                gate.failure_child = bound.execution_id
+            elif exit_code in {130, 124} or exit_code != 0:
+                gate.stopped = True
+                gate.failure_child = bound.execution_id
+        elif exit_code != 0:
+            gate.stopped = True
+            gate.failure_child = bound.execution_id
+        gate.active_child = None
+        return exit_code, timing
 
     def run_child(
         self,
@@ -133,51 +278,24 @@ class GateController(ExecutionController):
             gate.parent_plan.normalized_signature,
             child_execution_id,
         )
-        child_plan, state = self.prepare_plan(
+        child_plan = preview_execution_plan(
+            self.root,
+            self.registry,
             execution_id=child_execution_id,
             command=command,
             mode=mode,
-            required=required,
-            run_id_override=gate.parent_plan.run_id,
+            run_id=gate.parent_plan.run_id,
+            admission_decision="run",
             **kwargs,
         )
-        if child_plan is None:
-            if state == ExecutionStatus.REUSED.value:
-                return 0, {
-                    "result": ExecutionStatus.REUSED.value,
-                    "executionId": child_execution_id,
-                }
-            gate.stopped = True
-            gate.failure_child = child_execution_id
-            return 1, None
-        parent_remaining = self._parent_remaining(gate)
-        effective_hard = min(child_plan.hard_seconds, parent_remaining)
-        exit_code, timing = self.run(
+        child_plan = replace(child_plan, run_id=gate.parent_plan.run_id)
+        return self.run_child_with_plan(
+            gate,
             child_plan,
-            command,
+            command=command,
             cwd=cwd,
             env=env,
-            active_child=child_execution_id,
-            parent_span_id=gate.parent_span_id,
-            parent_run_id=gate.parent_plan.run_id,
-            release_lease=True,
-            parent_deadline_monotonic=gate.parent_hard_deadline,
-            hard_seconds_override=max(0.001, effective_hard),
         )
-        if timing is not None:
-            gate.child_duration_sum += float(timing.get("actualSeconds", 0.0))
-            result = str(timing.get("result", ""))
-            if result in {"timeout-hard", "timeout-stall", "failed"} and exit_code != 0:
-                gate.stopped = True
-                gate.failure_child = child_execution_id
-            elif exit_code in {130, 124} or exit_code != 0:
-                gate.stopped = True
-                gate.failure_child = child_execution_id
-        elif exit_code != 0:
-            gate.stopped = True
-            gate.failure_child = child_execution_id
-        gate.active_child = None
-        return exit_code, timing
 
     def finish_gate(
         self,

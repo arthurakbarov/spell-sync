@@ -45,6 +45,18 @@ def load_session() -> tuple[SessionTotals, float, float]:
     return totals, window_started, last_updated
 
 
+def current_session_test_share(*, window_seconds: float = 1800.0) -> float | None:
+    totals, window_started, _last_updated = load_session()
+    now = time.monotonic()
+    if now - window_started > window_seconds:
+        return None
+    session_seconds = max(1.0, totals.edit_seconds)
+    test_seconds = totals.focused_seconds + totals.pre_final_seconds + totals.full_ci_seconds
+    if test_seconds <= 0:
+        return None
+    return test_seconds / session_seconds
+
+
 def record_session_event(
     *,
     category: str,

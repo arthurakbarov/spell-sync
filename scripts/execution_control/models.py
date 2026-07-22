@@ -75,9 +75,16 @@ class ExecutionPlan:
     sample_count: int
     admission_decision: str
     context_signature: str
+    child_plan_digest: str | None = None
+    planned_child_count: int = 0
+    planned_expected_sum: float = 0.0
+    planned_soft_sum: float = 0.0
+    orchestration_overhead_estimate: float = 0.0
+    planned_child_expected_sum: float = 0.0
+    planned_orchestration_overhead: float = 0.0
 
     def to_json_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "runId": self.run_id,
             "executionId": self.execution_id,
             "profileId": self.profile_id,
@@ -98,6 +105,21 @@ class ExecutionPlan:
             "admissionDecision": self.admission_decision,
             "contextSignature": self.context_signature,
         }
+        if self.child_plan_digest is not None:
+            payload["childPlanDigest"] = self.child_plan_digest
+        if self.planned_child_count:
+            payload["plannedChildCount"] = self.planned_child_count
+        if self.planned_expected_sum:
+            payload["plannedExpectedSum"] = self.planned_expected_sum
+        if self.planned_soft_sum:
+            payload["plannedSoftSum"] = self.planned_soft_sum
+        if self.orchestration_overhead_estimate:
+            payload["orchestrationOverheadEstimate"] = self.orchestration_overhead_estimate
+        if self.planned_child_expected_sum:
+            payload["plannedChildExpectedSum"] = self.planned_child_expected_sum
+        if self.planned_orchestration_overhead:
+            payload["plannedOrchestrationOverhead"] = self.planned_orchestration_overhead
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
