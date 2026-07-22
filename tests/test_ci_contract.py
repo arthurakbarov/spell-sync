@@ -61,6 +61,43 @@ def _is_wheel_origin_probe(argv: list[str]) -> bool:
     return len(argv) >= 3 and argv[1] == "-c" and "spell_sync.__file__" in argv[2]
 
 
+def _seed_execution_control(root: Path) -> None:
+    import shutil
+
+    tests_dir = root / "tests"
+    tests_dir.mkdir(exist_ok=True)
+    budget = ROOT / "tests" / "execution-budget.toml"
+    if budget.is_file():
+        (tests_dir / "execution-budget.toml").write_text(
+            budget.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    execution_control_src = ROOT / "scripts" / "execution_control"
+    if execution_control_src.is_dir():
+        dest = root / "scripts" / "execution_control"
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(execution_control_src, dest)
+    for script in (
+        "validate_execution_budget.py",
+        "check-ci-necessity.py",
+        "check-ci-evidence.py",
+        "ci_input_state.py",
+        "documentation_state.py",
+    ):
+        source = ROOT / "scripts" / script
+        if source.is_file():
+            (root / "scripts" / script).write_text(
+                source.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+    ci_impact_src = ROOT / "scripts" / "ci_impact"
+    if ci_impact_src.is_dir():
+        dest = root / "scripts" / "ci_impact"
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(ci_impact_src, dest)
+
+
 def _make_test_root(tmp: Path) -> tuple[Path, Path]:
     root = tmp / "repo"
     root.mkdir()
@@ -75,8 +112,10 @@ def _make_test_root(tmp: Path) -> tuple[Path, Path]:
         "check-target-capabilities.py",
         "validate_test_impact.py",
         "validate_ci_impact.py",
+        "validate_execution_budget.py",
     ):
         (root / "scripts" / name).write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    _seed_execution_control(root)
     ci_dir = root / "ci"
     ci_dir.mkdir()
     source_registry = ROOT / "ci" / "ci-impact.toml"
@@ -106,6 +145,7 @@ def _is_validator_script(argv: list[str]) -> bool:
             "check-target-capabilities.py",
             "validate_test_impact.py",
             "validate_ci_impact.py",
+            "validate_execution_budget.py",
         )
     )
 
@@ -411,6 +451,7 @@ class TestCiContract(unittest.TestCase):
                 target.chmod(0o755)
             else:
                 target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        _seed_execution_control(pip_root)
         artifacts = pip_root / ".artifacts" / "ci"
         rc = self.mod.CiRunner(
             root=pip_root,

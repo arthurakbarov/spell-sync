@@ -7,6 +7,8 @@ from pathlib import Path
 
 from spell_sync.cli_options import CliOptions
 
+pytest_plugins = ["conftest_execution"]
+
 _ROOT = Path(__file__).resolve().parent.parent
 _TESTS = Path(__file__).resolve().parent
 if str(_ROOT) not in sys.path:
