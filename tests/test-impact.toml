@@ -278,6 +278,72 @@ clusterTests = [
 ]
 validators = []
 
+[clusters.execution-control]
+production = [
+  "scripts/execution_control/**",
+  "scripts/run_with_budget.py",
+  "scripts/run_pre_final_checks.py",
+  "scripts/run_snapshot_tests.py",
+  "scripts/build_focused_plan.py",
+  "scripts/build_pre_final_plan.py",
+  "scripts/validate_execution_budget.py",
+  "tests/execution-budget.toml",
+]
+moduleTests = [
+  "tests/test_execution_controller.py",
+  "tests/test_execution_admission.py",
+  "tests/test_execution_process_tree.py",
+  "tests/test_execution_planner_supervision.py",
+  "tests/test_execution_parent_interrupt_status.py",
+]
+clusterTests = [
+  "tests/test_execution_admission.py",
+  "tests/test_execution_admission_narrow.py",
+  "tests/test_execution_aggregate_plan.py",
+  "tests/test_execution_bootstrap_timeout.py",
+  "tests/test_execution_context_learning.py",
+  "tests/test_execution_controller.py",
+  "tests/test_execution_descendant_cleanup.py",
+  "tests/test_execution_diagnostic_absolute_deadline.py",
+  "tests/test_execution_diagnostic_deadline.py",
+  "tests/test_execution_diagnostic_no_fallback.py",
+  "tests/test_execution_diagnostics.py",
+  "tests/test_execution_dynamic_privacy.py",
+  "tests/test_execution_fingerprints.py",
+  "tests/test_execution_gate_finalization.py",
+  "tests/test_execution_hard_timeout_detached.py",
+  "tests/test_execution_history.py",
+  "tests/test_execution_integration.py",
+  "tests/test_execution_interrupt.py",
+  "tests/test_execution_opaque_token_privacy.py",
+  "tests/test_execution_parent_deadline.py",
+  "tests/test_execution_parent_interrupt.py",
+  "tests/test_execution_parent_interrupt_status.py",
+  "tests/test_execution_parent_spans.py",
+  "tests/test_execution_plan.py",
+  "tests/test_execution_planner_supervision.py",
+  "tests/test_execution_prediction.py",
+  "tests/test_execution_process_fixture_cleanup.py",
+  "tests/test_execution_process_tree.py",
+  "tests/test_execution_profile_specificity.py",
+  "tests/test_execution_progress.py",
+  "tests/test_execution_real_admission.py",
+  "tests/test_execution_registry.py",
+  "tests/test_execution_session.py",
+  "tests/test_execution_snapshot_hermetic.py",
+  "tests/test_execution_snapshot_integration.py",
+  "tests/test_execution_snapshot_output_isolation.py",
+  "tests/test_execution_snapshot_private.py",
+  "tests/test_execution_soft_reporting.py",
+  "tests/test_execution_statistics.py",
+  "tests/test_execution_token_privacy.py",
+  "tests/test_execution_wheel_origin_output.py",
+  "tests/test_execution_workload_prediction.py",
+]
+validators = [
+  "scripts/validate_execution_budget.py",
+]
+
 [clusters.test-selection]
 production = [
   "scripts/test_plan.py",

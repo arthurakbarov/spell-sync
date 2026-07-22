@@ -21,6 +21,7 @@ ALL_PYTEST_CLUSTERS = frozenset(
         "cli-json",
         "packaging",
         "agent-workflow",
+        "execution-control",
         "test-selection",
     }
 )

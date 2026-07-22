@@ -194,6 +194,16 @@ def test_unknown_production_file_conservative_fallback(planner_mod, registry) ->
     assert any("conservative" in reason or "packaging" in reason for reason in plan.reasons)
 
 
+def test_execution_control_maps_to_execution_cluster(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["scripts/execution_control/controller.py"],
+        registry=registry,
+    )
+    assert plan.clusters == ("execution-control",)
+    assert "tests/test_execution_controller.py" in plan.pytest_targets
+
+
 def test_cluster_override(planner_mod, registry) -> None:
     plan = planner_mod.build_plan(
         ROOT,

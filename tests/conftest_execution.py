@@ -6,6 +6,8 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -16,6 +18,31 @@ if str(ROOT) not in sys.path:
 from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.models import SpanRecord  # noqa: E402
 from scripts.execution_control.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
+
+
+def _full_required_ci_necessity_module():
+    return SimpleNamespace(
+        assess_ci_necessity=lambda _root: SimpleNamespace(
+            result="full-required",
+            reusable_run_head="",
+        )
+    )
+
+
+@pytest.fixture(autouse=True)
+def _force_execution_admission_for_unit_tests(request):
+    """Keep gate unit tests from short-circuiting via CI no-action reuse."""
+    node_path = Path(str(getattr(request.node, "path", "")))
+    if node_path.name.startswith("test_execution_") and not request.node.get_closest_marker(
+        "execution_allow_reuse"
+    ):
+        with patch(
+            "scripts.execution_control.admission._load_ci_necessity",
+            return_value=_full_required_ci_necessity_module(),
+        ):
+            yield
+    else:
+        yield
 
 
 @pytest.fixture(autouse=True)
