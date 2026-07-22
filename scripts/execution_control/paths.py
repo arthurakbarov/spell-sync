@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 CONTROLLER_SCHEMA_VERSION = 1
-HISTORY_SCHEMA_VERSION = 1
+HISTORY_SCHEMA_VERSION = 2
 
 
 def state_root() -> Path:

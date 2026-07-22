@@ -26,6 +26,13 @@ from scripts.ci_impact.registry import (  # noqa: E402
 )
 from scripts.ci_input_state import changed_ci_input_paths, compute_ci_input_state  # noqa: E402
 from scripts.documentation_state import compute_documentation_state  # noqa: E402
+from scripts.environment_contract.fingerprint import (  # noqa: E402
+    resolve_project_environment_fingerprint,
+)
+from scripts.environment_contract.paths import (  # noqa: E402
+    EnvironmentPaths,
+    production_environment_paths,
+)
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -36,7 +43,7 @@ from scripts.test_selection.tree_state import (  # noqa: E402
     is_working_tree_clean,
 )
 
-SUPPORTED_SCHEMAS = frozenset({3, 4})
+SUPPORTED_SCHEMAS = frozenset({3, 4, 5})
 RECEIPT_REL_PATH = Path(".artifacts") / "lightweight-validation" / "current.json"
 
 
@@ -145,8 +152,63 @@ def _committed_diff_paths(root: Path, base: str, head: str) -> list[str]:
     ]
 
 
-def _validate_lightweight_receipt(root: Path, head: str) -> str | None:
-    receipt_path = root / RECEIPT_REL_PATH
+def _uv_version() -> str:
+    import re
+
+    proc = subprocess.run(["uv", "--version"], check=False, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return ""
+    match = re.search(r"uv\s+(\d+\.\d+\.\d+)", proc.stdout)
+    return match.group(1) if match else ""
+
+
+def _current_environment_fingerprint(root: Path) -> str:
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
+    if fingerprint is None:
+        return ""
+    return fingerprint.signature()
+
+
+def _validate_environment_identity(
+    root: Path,
+    payload: dict[str, object],
+) -> str | None:
+    summary_fp = payload.get("environmentFingerprint")
+    if not isinstance(summary_fp, str) or not summary_fp:
+        if payload.get("schemaVersion", 0) >= 5:
+            return "ci-evidence.environment-mismatch"
+        return None
+    current_fp = _current_environment_fingerprint(root)
+    if not current_fp or current_fp != summary_fp:
+        return "ci-evidence.environment-mismatch"
+    before_fp = payload.get("environmentFingerprintBefore")
+    after_fp = payload.get("environmentFingerprintAfter")
+    if isinstance(before_fp, str) and isinstance(after_fp, str) and before_fp != after_fp:
+        return "ci-evidence.environment-mismatch"
+    if payload.get("environmentStable") is False:
+        return "ci-evidence.environment-mismatch"
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
+    if fingerprint is None:
+        return "ci-evidence.environment-mismatch"
+    digest_checks = (
+        ("environmentContractDigest", fingerprint.environment_contract_digest),
+        ("pyprojectDigest", fingerprint.pyproject_digest),
+        ("uvLockDigest", fingerprint.uv_lock_digest),
+        ("installedEnvironmentDigest", fingerprint.installed_environment_digest),
+        ("pythonVersion", fingerprint.python_version),
+        ("pythonImplementation", fingerprint.python_implementation),
+        ("pythonCacheTag", fingerprint.python_cache_tag),
+        ("uvVersion", fingerprint.uv_version),
+    )
+    for key, expected in digest_checks:
+        value = payload.get(key)
+        if isinstance(value, str) and value and value != expected:
+            return "ci-evidence.environment-mismatch"
+    return None
+
+
+def _validate_lightweight_receipt(root: Path, head: str, *, paths: EnvironmentPaths) -> str | None:
+    receipt_path = paths.lightweight_receipt_root / "current.json"
     if not receipt_path.is_file():
         return "ci-evidence.lightweight-evidence-missing"
     try:
@@ -322,11 +384,14 @@ def _validate_common_payload(
 
 def verify_ci_evidence(
     root: Path,
-    summary_path: Path,
+    summary_path: Path | None = None,
     *,
     format_json: bool = False,
     release: bool = False,
+    paths: EnvironmentPaths | None = None,
 ) -> tuple[int, dict[str, object]]:
+    env_paths = paths or production_environment_paths(root)
+    summary = summary_path or env_paths.ci_summary_path
     head = git_head(root)
     digest = content_tree_digest(root)
     registry = load_registry(root / REGISTRY_REL_PATH)
@@ -356,7 +421,7 @@ def verify_ci_evidence(
             format_json=format_json,
         )
 
-    if not summary_path.is_file():
+    if not summary.is_file():
         return _reject(
             "ci-evidence.missing",
             head=head,
@@ -365,7 +430,7 @@ def verify_ci_evidence(
         )
 
     try:
-        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        payload = json.loads(summary.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return _reject(
             "ci-evidence.schema",
@@ -402,6 +467,16 @@ def verify_ci_evidence(
     )
     if common_failure is not None:
         return common_failure
+
+    environment_failure = _validate_environment_identity(root, payload)
+    if environment_failure:
+        return _reject(
+            environment_failure,
+            head=head,
+            digest=digest,
+            run_id=run_id,
+            format_json=format_json,
+        )
 
     run_head = _summary_run_head(payload)
     if release and run_head != head:
@@ -519,7 +594,7 @@ def verify_ci_evidence(
                 format_json=format_json,
             )
 
-    lightweight_failure = _validate_lightweight_receipt(root, head)
+    lightweight_failure = _validate_lightweight_receipt(root, head, paths=env_paths)
     if lightweight_failure:
         return _reject(
             lightweight_failure,
@@ -566,11 +641,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Require exact Git HEAD match (release/publication workflows).",
     )
     args = parser.parse_args(argv)
+    env_paths = production_environment_paths(ROOT)
     code, payload = verify_ci_evidence(
         ROOT,
         args.summary,
         format_json=args.format == "json",
         release=args.release,
+        paths=env_paths,
     )
     if args.format == "json":
         print(json.dumps(payload, indent=2, sort_keys=True))

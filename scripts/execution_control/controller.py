@@ -241,6 +241,7 @@ class ExecutionController:
             accepted_for_learning=accepted,
             quarantine_reason=quarantine,
             diagnostic_bundle=diagnostic_bundle,
+            environment_signature=plan.environment_signature,
         )
         self.history.insert_span(record, context_signature=plan.context_signature)
         if release_lease:
@@ -338,6 +339,7 @@ class ExecutionController:
             accepted_for_learning=False,
             quarantine_reason="interrupted",
             diagnostic_bundle=None,
+            environment_signature=plan.environment_signature,
         )
         self.history.insert_span(record, context_signature=plan.context_signature)
         print_result(

@@ -60,6 +60,7 @@ def predict_thresholds(
     execution_id: str,
     workload_fingerprint_value: str,
     context: NormalizedContext,
+    environment_signature: str = "",
 ) -> PredictionResult:
     exact = history.fetch_learning_durations(
         execution_id=execution_id,
@@ -96,6 +97,9 @@ def predict_thresholds(
     else:
         expected = _round_up_seconds(profile.initial_expected_seconds)
         source = "registry-default"
+
+    if source in {"profile-history", "registry-default"} and environment_signature:
+        source = "legacy-environment"
 
     if (
         execution_id in WORKLOAD_SENSITIVE_EXECUTION_IDS
@@ -135,13 +139,17 @@ def predict_thresholds(
     hard = min(profile.hard_cap_seconds, registry.global_hard_cap_seconds)
     hard = min(hard, _round_up_seconds(max(hard_candidates)))
 
+    confidence = confidence_label(sample_count)
+    if source == "legacy-environment":
+        confidence = "low"
+
     return PredictionResult(
         expected_seconds=expected,
         soft_seconds=soft,
         stall_seconds=stall_seconds,
         hard_seconds=hard,
         prediction_source=source,
-        confidence=confidence_label(sample_count),
+        confidence=confidence,
         sample_count=sample_count,
     )
 
@@ -158,6 +166,7 @@ def build_execution_plan(
     normalized_signature_value: str,
     context: NormalizedContext,
     admission_decision: str,
+    environment_signature: str = "",
 ) -> ExecutionPlan:
     prediction = predict_thresholds(
         profile=profile,
@@ -166,6 +175,7 @@ def build_execution_plan(
         execution_id=execution_id,
         workload_fingerprint_value=workload_fingerprint_value,
         context=context,
+        environment_signature=environment_signature,
     )
     return ExecutionPlan(
         run_id=run_id,
@@ -187,4 +197,5 @@ def build_execution_plan(
         sample_count=prediction.sample_count,
         admission_decision=admission_decision,
         context_signature=context.signature(),
+        environment_signature=environment_signature,
     )

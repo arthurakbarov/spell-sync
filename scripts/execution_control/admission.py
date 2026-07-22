@@ -127,12 +127,14 @@ def assess_admission(
         tui=tui,
         packaging=packaging,
     )
+    environment_signature = str(workload_payload.get("environmentSignature", "") or "")
     workload_fp = workload_fingerprint(execution_id=execution_id, workload=workload_payload)
     policy_fp = policy_fingerprint(registry, profile.profile_id)
     signature = normalized_signature(
         execution_id=execution_id,
         workload_fingerprint_value=workload_fp,
         context_signature=context.signature(),
+        environment_signature=environment_signature,
     )
     run_id = history.new_run_id()
     if necessity.result == "no-action" and not required:
@@ -175,6 +177,7 @@ def assess_admission(
         normalized_signature_value=signature,
         context=context,
         admission_decision=AdmissionDecision.RUN.value,
+        environment_signature=environment_signature,
     )
     total_expected = plan.expected_seconds
     total_soft = plan.soft_seconds
@@ -194,6 +197,7 @@ def assess_admission(
             normalized_signature_value=signature,
             context=context,
             admission_decision=AdmissionDecision.NARROW.value,
+            environment_signature=environment_signature,
         )
         return (
             AdmissionPlan(

@@ -370,6 +370,7 @@ class GateController(ExecutionController):
             accepted_for_learning=accepted,
             quarantine_reason="soft-overrun" if status == ExecutionStatus.SUCCESS_SLOW else None,
             diagnostic_bundle=None,
+            environment_signature=plan.environment_signature,
         )
         self.history.insert_span(record, context_signature=plan.context_signature)
         self.history.release_lease(plan.normalized_signature)

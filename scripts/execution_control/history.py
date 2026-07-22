@@ -119,6 +119,11 @@ class HistoryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(SCHEMA_SQL)
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(spans)").fetchall()}
+            if "environment_signature" not in columns:
+                connection.execute(
+                    "ALTER TABLE spans ADD COLUMN environment_signature TEXT NOT NULL DEFAULT ''"
+                )
             connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key, value) VALUES (?, ?)",
                 ("schemaVersion", str(HISTORY_SCHEMA_VERSION)),
@@ -140,14 +145,15 @@ class HistoryStore:
                     INSERT INTO spans (
                         run_id, span_id, parent_span_id, execution_id, profile_id,
                         normalized_signature, workload_fingerprint, policy_fingerprint,
-                        context_signature, start_time, end_time, duration_seconds,
+                        context_signature, environment_signature, start_time, end_time,
+                        duration_seconds,
                         exit_code, status, expected_seconds, soft_seconds, stall_seconds,
                         hard_seconds, prediction_source, confidence, sample_count,
                         progress_event_count, maximum_progress_gap, active_child_at_end,
                         accepted_for_learning, quarantine_reason, diagnostic_bundle
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
@@ -160,6 +166,7 @@ class HistoryStore:
                         record.workload_fingerprint,
                         record.policy_fingerprint,
                         context_signature,
+                        record.environment_signature,
                         record.start_time,
                         record.end_time,
                         record.duration_seconds,

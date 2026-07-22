@@ -135,13 +135,44 @@ def normalized_signature(
     execution_id: str,
     workload_fingerprint_value: str,
     context_signature: str,
+    environment_signature: str = "",
 ) -> str:
     payload = {
         "executionId": execution_id,
         "workloadFingerprint": workload_fingerprint_value,
         "contextSignature": context_signature,
+        "environmentSignature": environment_signature,
     }
     return _hash_payload(payload)[:32]
+
+
+def resolve_environment_signature(root: Path) -> str:
+    try:
+        from scripts.environment_contract.fingerprint import resolve_project_environment_fingerprint
+
+        uv_version = _resolve_uv_version()
+        fingerprint = resolve_project_environment_fingerprint(root, uv_version=uv_version)
+    except Exception:
+        return ""
+    if fingerprint is None:
+        return ""
+    return fingerprint.signature()
+
+
+def _resolve_uv_version() -> str:
+    import re
+    import subprocess
+
+    proc = subprocess.run(
+        ["uv", "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return ""
+    match = re.search(r"uv\s+(\d+\.\d+\.\d+)", proc.stdout)
+    return match.group(1) if match else ""
 
 
 def build_workload_payload(
@@ -156,13 +187,21 @@ def build_workload_payload(
     coverage: bool = False,
     tui: bool = False,
     packaging: bool = False,
+    environment_signature: str | None = None,
 ) -> dict[str, Any]:
     major, minor = sys.version_info.major, sys.version_info.minor
     command_identity = _command_identity(command)
+    env_signature = (
+        environment_signature
+        if environment_signature is not None
+        else resolve_environment_signature(root)
+    )
     config_digests: dict[str, str] = {}
     for rel in (
         "tests/execution-budget.toml",
         "pyproject.toml",
+        "uv.lock",
+        "config/environment-contract.toml",
     ):
         path = root / rel
         digest = _file_content_digest(path)
@@ -181,5 +220,6 @@ def build_workload_payload(
         "packaging": packaging,
         "pythonVersion": f"{major}.{minor}",
         "configDigests": config_digests,
+        "environmentSignature": env_signature,
         "rootMarker": "spell-sync",
     }

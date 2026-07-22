@@ -29,6 +29,13 @@ if str(ROOT) not in sys.path:
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
+from scripts.environment_contract.fingerprint import (  # noqa: E402
+    resolve_project_environment_fingerprint,
+)
+from scripts.environment_contract.paths import (  # noqa: E402
+    EnvironmentPaths,
+    production_environment_paths,
+)
 from scripts.execution_control.controller import run_monitored_command  # noqa: E402
 from scripts.execution_control.gate_controller import ActiveGate, GateController  # noqa: E402
 from scripts.execution_control.gate_flow import (  # noqa: E402
@@ -48,13 +55,39 @@ from scripts.test_selection.tree_state import (  # noqa: E402
     git_head,
 )
 
+_UV_VERSION_PATTERN = re.compile(r"uv\s+(\d+\.\d+\.\d+)")
+
 ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
-SUMMARY_SCHEMA = 4
+SUMMARY_SCHEMA = 5
 MIN_PYTHON = (3, 11)
 INTERNAL_CHECK_ID = "ci.internal"
 
 RunStep = Callable[..., tuple[int, str]]
+
+
+def _uv_version() -> str:
+    proc = subprocess.run(["uv", "--version"], check=False, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return ""
+    match = _UV_VERSION_PATTERN.search(proc.stdout)
+    return match.group(1) if match else ""
+
+
+def _capture_environment_identity(root: Path) -> dict[str, object]:
+    try:
+        fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
+    except (OSError, RuntimeError, ValueError):
+        fingerprint = None
+    if fingerprint is None:
+        return {
+            "environmentFingerprint": "",
+            "environmentStable": False,
+            "selectedDependencyGroups": [],
+        }
+    payload = fingerprint.to_summary_dict()
+    payload["environmentStable"] = True
+    return payload
 
 
 def _ci_tree_digest(root: Path) -> str:
@@ -537,9 +570,13 @@ class CiRunner:
         run_step: RunStep | None = None,
         now: Callable[[], datetime] | None = None,
         python_bin: str | None = None,
+        environment_paths: EnvironmentPaths | None = None,
     ) -> None:
         self.root = root
-        self.artifacts = artifacts if artifacts is not None else root / ".artifacts" / "ci"
+        self._environment_paths = environment_paths or production_environment_paths(root)
+        self.artifacts = (
+            artifacts if artifacts is not None else self._environment_paths.evidence_root
+        )
         self.now = now or (lambda: datetime.now(timezone.utc))
         self.python_bin = python_bin or sys.executable
         if run_step is None:
@@ -581,6 +618,8 @@ class CiRunner:
         self._child_timeout_check_id = ""
         self._gate: ActiveGate | None = None
         self._gate_controller: GateController | None = None
+        self._environment_before: dict[str, object] = {}
+        self._environment_after: dict[str, object] = {}
 
     def _full_gate_active(self) -> bool:
         return self._mode == "full" and self._uses_default_run_step and self._gate is not None
@@ -899,6 +938,27 @@ class CiRunner:
         self._ci_input_digest_after = compute_ci_input_state(self.root, registry).digest
         tree_stable = self._tree_digest_before == self._tree_digest_after
         ci_input_stable = self._ci_input_digest_before == self._ci_input_digest_after
+        if self._mode == "full":
+            self._environment_after = _capture_environment_identity(self.root)
+        environment_stable = True
+        if self._mode == "full" and self._environment_before and self._environment_after:
+            before_fp = str(self._environment_before.get("environmentFingerprint", ""))
+            after_fp = str(self._environment_after.get("environmentFingerprint", ""))
+            if before_fp:
+                environment_stable = before_fp == after_fp
+                if not environment_stable and exit_code == 0:
+                    exit_code = 1
+                    failed = max(failed, 1)
+                    failed_id = "ci.environment-changed"
+                    self._final_evidence = False
+                    self.checks.append(
+                        {
+                            "id": "ci.environment-changed",
+                            "status": "failed",
+                            "exitCode": 1,
+                            "summary": "environment identity changed during CI",
+                        }
+                    )
         if self._mode == "full" and not tree_stable and exit_code == 0:
             exit_code = 1
             failed = max(failed, 1)
@@ -957,6 +1017,22 @@ class CiRunner:
             "historyLogPath": str(self._history_log_path),
             "historySummaryPath": str(self._history_summary_path),
         }
+        if self._environment_before:
+            payload["environmentFingerprintBefore"] = self._environment_before.get(
+                "environmentFingerprint", ""
+            )
+            payload.update(
+                {
+                    key: value
+                    for key, value in self._environment_before.items()
+                    if key != "environmentStable"
+                }
+            )
+        if self._environment_after:
+            payload["environmentFingerprintAfter"] = self._environment_after.get(
+                "environmentFingerprint", ""
+            )
+        payload["environmentStable"] = environment_stable
         if failed_id:
             payload["failedCheckId"] = failed_id
         if self._child_timeout_check_id:
@@ -1311,6 +1387,7 @@ class CiRunner:
                     clean_out or "working tree clean",
                     timing=clean_timing,
                 )
+                self._environment_before = _capture_environment_identity(self.root)
 
             if bootstrap:
                 lock_rc, lock_out, lock_timing = self._run_bounded_step(

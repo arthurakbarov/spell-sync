@@ -325,7 +325,7 @@ class TestCiContract(unittest.TestCase):
             "historySummaryPath",
         ):
             self.assertIn(key, summary, msg=f"[CI-CONTRACT-005] missing {key}")
-        self.assertEqual(summary["schemaVersion"], 4)
+        self.assertEqual(summary["schemaVersion"], 5)
 
     def test_success_final_output(self) -> None:
         buf = io.StringIO()

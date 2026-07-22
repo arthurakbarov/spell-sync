@@ -77,6 +77,7 @@ class ExecutionPlan:
     sample_count: int
     admission_decision: str
     context_signature: str
+    environment_signature: str = ""
     child_plan_digest: str | None = None
     planned_child_count: int = 0
     planned_expected_sum: float = 0.0
@@ -107,6 +108,8 @@ class ExecutionPlan:
             "admissionDecision": self.admission_decision,
             "contextSignature": self.context_signature,
         }
+        if self.environment_signature:
+            payload["environmentSignature"] = self.environment_signature
         if self.child_plan_digest is not None:
             payload["childPlanDigest"] = self.child_plan_digest
         if self.planned_child_count:
@@ -152,3 +155,4 @@ class SpanRecord:
     accepted_for_learning: bool
     quarantine_reason: str | None
     diagnostic_bundle: str | None
+    environment_signature: str = ""
