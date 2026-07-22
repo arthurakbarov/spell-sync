@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,9 +13,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 from scripts.execution_control.controller import ExecutionController  # noqa: E402
+from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.models import ExecutionPlan, ExecutionStatus  # noqa: E402
 from scripts.execution_control.process_tree import ProcessResult  # noqa: E402
-from tests.conftest_execution import echo_command, sleep_command  # noqa: E402
+from tests.conftest_execution import sleep_command  # noqa: E402
 
 
 def _fake_necessity(result: str = "full-required"):
@@ -47,6 +48,7 @@ def _sample_plan(**overrides) -> ExecutionPlan:
         "confidence": "none",
         "sample_count": 0,
         "admission_decision": "run",
+        "context_signature": "macos|3.11|cluster|1|cov0|tui0|pkg0|unknown",
     }
     defaults.update(overrides)
     return ExecutionPlan(**defaults)
@@ -74,6 +76,8 @@ def test_classify_success_accepted_for_learning(controller):
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
+        start_time_iso="2026-01-01T00:00:00Z",
+        end_time_iso="2026-01-01T00:00:01Z",
     )
     status, accepted, quarantine = controller._classify_result(plan, result)
     assert status == ExecutionStatus.SUCCESS
@@ -92,6 +96,8 @@ def test_classify_success_slow_quarantined(controller):
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
+        start_time_iso="2026-01-01T00:00:00Z",
+        end_time_iso="2026-01-01T00:00:01Z",
     )
     status, accepted, quarantine = controller._classify_result(plan, result)
     assert status == ExecutionStatus.SUCCESS_SLOW
@@ -110,6 +116,8 @@ def test_classify_timeout_not_learned(controller):
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
+        start_time_iso="2026-01-01T00:00:00Z",
+        end_time_iso="2026-01-01T00:00:01Z",
     )
     status, accepted, quarantine = controller._classify_result(plan, result)
     assert status == ExecutionStatus.TIMEOUT_HARD
@@ -206,21 +214,37 @@ def test_prepare_plan_blocks_duplicate_active(controller):
     assert second_state == ExecutionStatus.BLOCKED_DUPLICATE.value
 
 
-def test_controller_overhead_bounded(registry, history, isolated_state_dir):
+def test_controller_overhead_differential_bounded(registry, history, isolated_state_dir):
     del isolated_state_dir
+    import time as time_module
+
+    direct_cmd = [sys.executable, "-c", "import time; time.sleep(1.0)"]
+    direct_start = time_module.monotonic()
+    subprocess.run(direct_cmd, cwd=ROOT, check=False)
+    direct_duration = time_module.monotonic() - direct_start
+
     controller = ExecutionController(
         root=ROOT,
         registry=registry,
-        history=history,
+        history=HistoryStore.open(),
         enforce_hard=True,
         enforce_stall=False,
     )
-    plan = _sample_plan(hard_seconds=2.0, soft_seconds=1.0)
-    controller.history.acquire_lease(
-        normalized_signature=plan.normalized_signature,
-        run_id=plan.run_id,
-        execution_id=plan.execution_id,
-        owner_pid=os.getpid(),
-    )
-    _, timing = controller.run(plan, echo_command("fast"), cwd=ROOT)
-    assert timing["actualSeconds"] < 0.5
+    with patch(
+        "scripts.execution_control.admission._load_ci_necessity",
+        return_value=_fake_necessity(),
+    ):
+        plan, state = controller.prepare_plan(
+            execution_id="focused:pytest",
+            command=direct_cmd,
+            mode="cluster",
+            required=True,
+            test_file_count=1,
+        )
+    assert plan is not None and state == "run"
+    controlled_start = time_module.monotonic()
+    controller.run(plan, direct_cmd, cwd=ROOT)
+    controlled_duration = time_module.monotonic() - controlled_start
+    overhead = controlled_duration - direct_duration
+    tolerance = max(0.1, direct_duration * 0.02)
+    assert overhead <= tolerance + 0.15

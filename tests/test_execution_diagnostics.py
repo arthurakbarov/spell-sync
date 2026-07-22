@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from scripts.execution_control.diagnostics import _redact, collect_timeout_bundle
@@ -31,8 +32,8 @@ def _plan(**overrides) -> ExecutionPlan:
         confidence="none",
         sample_count=0,
         admission_decision="run",
+        context_signature="macos|3.11|full-ci|501+|cov1|tui0|pkg0|unknown",
     )
-    defaults.update(overrides)
     return ExecutionPlan(**defaults)
 
 
@@ -63,6 +64,8 @@ def test_timeout_bundle_redacts_private_sentinels(isolated_state_dir):
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
+        start_time_iso="2026-01-01T00:00:00Z",
+        end_time_iso="2026-01-01T00:00:01Z",
     )
     path = collect_timeout_bundle(
         plan=_plan(),
@@ -78,8 +81,19 @@ def test_timeout_bundle_redacts_private_sentinels(isolated_state_dir):
     assert timeout_bundle_dir("diag-run").is_dir()
 
 
-def test_diagnostic_collection_respects_budget(isolated_state_dir):
+def test_diagnostic_collector_respects_short_budget(isolated_state_dir, monkeypatch):
     del isolated_state_dir
+    import scripts.execution_control.diagnostics as diagnostics
+
+    original_bounded = diagnostics._run_bounded
+
+    def _inject_failure(**kwargs):
+        if kwargs.get("name") == "owned-process-group":
+            kwargs["failures"].append("owned-process-group:timeout")
+            return None
+        return original_bounded(**kwargs)
+
+    monkeypatch.setattr(diagnostics, "_run_bounded", _inject_failure)
     result = ProcessResult(
         exit_code=124,
         duration_seconds=1.0,
@@ -89,12 +103,17 @@ def test_diagnostic_collection_respects_budget(isolated_state_dir):
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
+        start_time_iso="2026-01-01T00:00:00Z",
+        end_time_iso="2026-01-01T00:00:01Z",
     )
+    started = time.monotonic()
     path = collect_timeout_bundle(
-        plan=_plan(diagnostic_hard_seconds=10.0),
+        plan=_plan(diagnostic_hard_seconds=0.05),
         result=result,
         active_child=None,
         timeout_kind="hard",
     )
+    elapsed = time.monotonic() - started
+    assert elapsed < 0.35
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    assert isinstance(payload["collectorFailures"], list)
+    assert payload["collectorFailures"]

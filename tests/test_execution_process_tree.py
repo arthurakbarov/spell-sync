@@ -124,7 +124,7 @@ def test_unrelated_process_untouched_on_hard_timeout(isolated_state_dir):
 def test_progress_output_captured_in_tail(isolated_state_dir):
     del isolated_state_dir
     result = run_owned_command(
-        echo_command("hello-execution-control"),
+        echo_command("tests/demo.py::test_demo PASSED"),
         cwd=ROOT,
         env=None,
         hard_seconds=2.0,
@@ -133,7 +133,7 @@ def test_progress_output_captured_in_tail(isolated_state_dir):
         termination_grace_seconds=0.3,
         tracker=create_tracker("pytest-node-transition"),
     )
-    assert "hello-execution-control" in result.stdout_tail
+    assert "tests/demo.py::test_demo PASSED" in result.stdout_tail
     assert result.progress_event_count >= 1
 
 

@@ -40,6 +40,7 @@ def _sample_plan(**overrides) -> ExecutionPlan:
         confidence="none",
         sample_count=0,
         admission_decision="run",
+        context_signature="macos|3.11|exact|1|cov0|tui0|pkg0|unknown",
     )
     base.update(overrides)
     return ExecutionPlan(**base)

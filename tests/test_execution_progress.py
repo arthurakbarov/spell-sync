@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -23,13 +24,37 @@ def test_pytest_progress_renews_lease():
 
 
 def test_repeated_noise_does_not_renew_indefinitely():
-    tracker = ProgressTracker(contract_id="artifact-state-transition")
-    for _ in range(100):
-        tracker.observe_line("same-line")
-    before = tracker.event_count
-    for _ in range(100):
-        tracker.observe_line("same-line")
-    assert tracker.event_count == before
+    tracker = ProgressTracker(contract_id="pytest-node-transition")
+    for index in range(100):
+        tracker.observe_line(f"noise-{index}")
+    assert tracker.event_count == 0
+
+
+def test_unique_noise_triggers_stall_under_stall_sensitive_contract(isolated_state_dir):
+    del isolated_state_dir
+    tracker = create_tracker("pytest-node-transition")
+    result = run_owned_command(
+        [
+            sys.executable,
+            "-c",
+            "import time\ni=0\n"
+            "while True:\n"
+            "    print(f'noise-{{i}}', flush=True)\n"
+            "    i += 1\n"
+            "    time.sleep(0.01)\n",
+        ],
+        cwd=ROOT,
+        env=None,
+        hard_seconds=2.0,
+        soft_seconds=0.05,
+        stall_seconds=0.15,
+        termination_grace_seconds=0.05,
+        tracker=tracker,
+        enforce_hard=True,
+        enforce_stall=True,
+    )
+    assert result.timed_out is True
+    assert result.timeout_kind == "stall"
 
 
 def test_quiet_command_not_stall_killed(isolated_state_dir):
