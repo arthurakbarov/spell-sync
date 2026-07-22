@@ -203,13 +203,16 @@ class ExecutionController:
         status, accepted, quarantine = self._classify_result(plan, result)
         diagnostic_bundle = None
         if result.timed_out:
-            diagnostic_bundle = collect_timeout_bundle(
+            bundle = collect_timeout_bundle(
                 plan=plan,
                 result=result,
                 active_child=active_child or plan.execution_id,
                 timeout_kind=result.timeout_kind or "hard",
                 public_root=self.root,
             )
+            diagnostic_bundle = bundle.path
+            if bundle.incomplete and diagnostic_bundle is None:
+                diagnostic_bundle = "diagnostic-incomplete"
         run_id = parent_run_id or plan.run_id
         record = SpanRecord(
             run_id=run_id,

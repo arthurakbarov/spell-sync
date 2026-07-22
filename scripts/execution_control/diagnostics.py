@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import multiprocessing
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,13 @@ from .models import ExecutionPlan
 from .paths import timeout_bundle_dir
 from .privacy import sanitize_text, workspace_roots
 from .process_tree import ProcessResult, collect_descendants
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnosticBundleResult:
+    path: str | None
+    incomplete: bool
+    collector_failures: tuple[str, ...]
 
 
 def _collector_worker(name: str, payload: dict[str, Any], queue: multiprocessing.Queue) -> None:
@@ -25,12 +33,27 @@ def _collector_worker(name: str, payload: dict[str, Any], queue: multiprocessing
             queue.put(("ok", result))
         elif name == "bundle-write":
             path = Path(str(payload["path"]))
+            delay = float(payload.get("delaySeconds", 0.0))
+            if delay > 0:
+                time.sleep(delay)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(
                 json.dumps(payload["body"], indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
             queue.put(("ok", {"written": True, "path": str(path)}))
+        elif name == "slow-mkdir":
+            path = Path(str(payload["path"]))
+            time.sleep(float(payload.get("seconds", 0.25)))
+            path.mkdir(parents=True, exist_ok=True)
+            queue.put(("ok", {"mkdir": True}))
+        elif name == "slow-ps":
+            time.sleep(float(payload.get("seconds", 0.25)))
+            root_pid = payload.get("ownedRootPid")
+            result: dict[str, Any] = {"ownedRootPid": root_pid}
+            if root_pid:
+                result["descendantPids"] = sorted(collect_descendants(int(root_pid)))
+            queue.put(("ok", result))
         elif name == "slow-sleep":
             time.sleep(float(payload.get("seconds", 0.25)))
             queue.put(("ok", {"slow": True}))
@@ -92,19 +115,20 @@ def collect_timeout_bundle(
     timeout_kind: str,
     progress_timeline: list[dict[str, object]] | None = None,
     public_root: Path | None = None,
-) -> str:
+) -> DiagnosticBundleResult:
     started = time.monotonic()
     deadline = started + plan.diagnostic_hard_seconds
     failures: list[str] = []
     roots = workspace_roots(public_root=public_root) if public_root is not None else ()
 
+    owned_budget = max(0.0, deadline - time.monotonic()) * 0.4
     owned_snapshot = _run_collector_process(
         name="owned-process-group",
         payload={
             "ownedPgid": result.owned_pgid,
             "ownedRootPid": result.owned_root_pid,
         },
-        budget_seconds=max(0.0, deadline - time.monotonic()) * 0.4,
+        budget_seconds=owned_budget,
         failures=failures,
     )
     if owned_snapshot is None:
@@ -130,9 +154,10 @@ def collect_timeout_bundle(
         "progressEventCount": result.progress_event_count,
         "maximumProgressGap": result.maximum_progress_gap,
         "recommendedDiagnostic": "python3 -m pytest <target> -vv --durations=20",
-        "collectorFailures": failures,
+        "collectorFailures": list(failures),
         "diagnosticBudgetSeconds": plan.diagnostic_hard_seconds,
         "elapsedSeconds": 0.0,
+        "incomplete": False,
     }
 
     bundle_path = timeout_bundle_dir(plan.run_id) / "bundle.json"
@@ -148,20 +173,15 @@ def collect_timeout_bundle(
         if isinstance(write_result, dict):
             path = str(write_result.get("path", bundle_path))
 
+    incomplete = path is None or time.monotonic() > deadline
     payload["collectorFailures"] = failures
     payload["elapsedSeconds"] = round(time.monotonic() - started, 3)
-    if path is None:
-        try:
-            bundle_path.parent.mkdir(parents=True, exist_ok=True)
-            bundle_path.write_text(
-                json.dumps(payload, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            path = str(bundle_path)
-        except OSError:
-            failures.append("bundle-write:OSError")
-            path = str(bundle_path)
-    return path
+    payload["incomplete"] = incomplete
+    return DiagnosticBundleResult(
+        path=path,
+        incomplete=incomplete,
+        collector_failures=tuple(failures),
+    )
 
 
 def _redact(text: str, *, public_root: Path | None = None) -> str:

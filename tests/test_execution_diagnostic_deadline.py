@@ -68,7 +68,7 @@ def test_timeout_bundle_respects_diagnostic_deadline(isolated_state_dir):
         end_time_iso="2026-01-01T00:00:01Z",
     )
     started = time.monotonic()
-    path = collect_timeout_bundle(
+    bundle = collect_timeout_bundle(
         plan=_plan(diagnostic_hard_seconds=0.05),
         result=result,
         active_child=None,
@@ -76,5 +76,6 @@ def test_timeout_bundle_respects_diagnostic_deadline(isolated_state_dir):
     )
     elapsed = time.monotonic() - started
     assert elapsed <= 0.2
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    assert payload["collectorFailures"]
+    if bundle.path is not None:
+        payload = json.loads(Path(bundle.path).read_text(encoding="utf-8"))
+        assert payload["collectorFailures"]

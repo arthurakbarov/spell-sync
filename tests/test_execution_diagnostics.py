@@ -67,13 +67,14 @@ def test_timeout_bundle_redacts_private_sentinels(isolated_state_dir):
         start_time_iso="2026-01-01T00:00:00Z",
         end_time_iso="2026-01-01T00:00:01Z",
     )
-    path = collect_timeout_bundle(
+    bundle = collect_timeout_bundle(
         plan=_plan(),
         result=result,
         active_child="ci:pytest",
         timeout_kind="hard",
     )
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    assert bundle.path is not None
+    payload = json.loads(Path(bundle.path).read_text(encoding="utf-8"))
     text = json.dumps(payload)
     assert "SENSITIVE_USER_WORD_7f3a" not in text
     assert "/Users/private-user" not in text
