@@ -11,6 +11,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 from scripts.execution_control.gate_controller import GateController  # noqa: E402
+from scripts.execution_control.gate_flow import (  # noqa: E402
+    open_gate_after_previews,
+    preview_focused_child_plans,
+    run_bounded_planner,
+)
 from scripts.execution_control.process_tree import ProcessResult  # noqa: E402
 from tests.conftest_execution import echo_command  # noqa: E402
 
@@ -55,51 +60,33 @@ def _child_execution_ids(history, execution_id: str) -> list[str]:
 
 
 def test_focused_planner_timeout_blocks_test_subprocesses(gate_controller, history, tmp_path):
-    gate, state = gate_controller.begin_gate(
-        execution_id="gate:focused-cluster",
-        command=["python3", "scripts/run_focused_tests.py"],
-        mode="cluster",
-        required=False,
-    )
-    assert gate is not None and state == "run"
-
     def _run(command, **kwargs):
         if any("build_focused_plan.py" in part for part in command):
             return _timeout_result()
         raise AssertionError(f"unexpected child command after planner timeout: {command}")
 
     with patch("scripts.execution_control.controller.run_owned_command", side_effect=_run):
-        rc, _ = gate_controller.run_child(
-            gate,
-            child_execution_id="focused:planner",
+        rc, state = run_bounded_planner(
+            gate_controller,
+            planner_execution_id="focused:planner",
             command=_planner_command(tmp_path),
             mode="cluster",
-            required=False,
         )
     assert rc == 124
-    assert gate.stopped
+    assert state == "run"
     assert _child_execution_ids(history, "focused:pytest") == []
-    gate_controller.finish_gate(gate, exit_code=rc)
 
 
 def test_pre_final_planner_timeout_blocks_checks(gate_controller, history, tmp_path):
-    gate, state = gate_controller.begin_gate(
-        execution_id="gate:pre-final",
-        command=["python3", "scripts/run_pre_final_checks.py"],
-        mode="pre-final",
-        required=False,
-    )
-    assert gate is not None and state == "run"
-
     def _run(command, **kwargs):
         if any("build_pre_final_plan.py" in part for part in command):
             return _timeout_result()
         raise AssertionError(f"unexpected child command after planner timeout: {command}")
 
     with patch("scripts.execution_control.controller.run_owned_command", side_effect=_run):
-        rc, _ = gate_controller.run_child(
-            gate,
-            child_execution_id="pre-final:planner",
+        rc, state = run_bounded_planner(
+            gate_controller,
+            planner_execution_id="pre-final:planner",
             command=[
                 "python3",
                 str(ROOT / "scripts" / "build_pre_final_plan.py"),
@@ -107,22 +94,19 @@ def test_pre_final_planner_timeout_blocks_checks(gate_controller, history, tmp_p
                 str(tmp_path / "plan.json"),
             ],
             mode="pre-final",
-            required=False,
         )
     assert rc == 124
-    assert gate.stopped
     assert _child_execution_ids(history, "pre-final:validators") == []
-    gate_controller.finish_gate(gate, exit_code=rc)
 
 
-def test_focused_runner_uses_planner_before_steps(isolated_state_dir, tmp_path):
+def test_focused_runner_uses_planner_before_gate(isolated_state_dir, registry, tmp_path):
     del isolated_state_dir
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(
         json.dumps(
             {
                 "plan": {"validators": [], "pytest_targets": [], "command": []},
-                "steps": [],
+                "steps": [{"kind": "validator", "argv": echo_command("step")}],
                 "metadata": [],
                 "runKey": "test",
                 "testFileCount": 0,
@@ -130,19 +114,25 @@ def test_focused_runner_uses_planner_before_steps(isolated_state_dir, tmp_path):
         ),
         encoding="utf-8",
     )
-    gate, _ = GateController.open_gate_controller(ROOT).begin_gate(
-        execution_id="gate:focused-cluster",
-        command=["python3", "scripts/run_focused_tests.py"],
-        mode="cluster",
-        required=False,
-    )
-    assert gate is not None
+    gate_controller = GateController.open_gate_controller(ROOT)
     calls: list[str] = []
 
     def _run(command, **kwargs):
         joined = " ".join(command)
         calls.append(joined)
         if "build_focused_plan.py" in joined:
+            plan_path.write_text(
+                json.dumps(
+                    {
+                        "plan": {"validators": [], "pytest_targets": [], "command": []},
+                        "steps": [{"kind": "validator", "argv": echo_command("step")}],
+                        "metadata": [],
+                        "runKey": "test",
+                        "testFileCount": 0,
+                    }
+                ),
+                encoding="utf-8",
+            )
             return ProcessResult(
                 exit_code=0,
                 duration_seconds=0.1,
@@ -168,22 +158,33 @@ def test_focused_runner_uses_planner_before_steps(isolated_state_dir, tmp_path):
             end_time_iso="2026-01-01T00:00:01Z",
         )
 
-    controller = GateController.open_gate_controller(ROOT)
-    controller._active_gate = gate
     with patch("scripts.execution_control.controller.run_owned_command", side_effect=_run):
-        controller.run_child(
-            gate,
-            child_execution_id="focused:planner",
-            command=_planner_command(tmp_path),
+        planner_rc, _ = run_bounded_planner(
+            gate_controller,
+            planner_execution_id="focused:planner",
+            command=_planner_command(plan_path),
             mode="cluster",
+        )
+        assert planner_rc == 0
+        child_plans = preview_focused_child_plans(
+            ROOT,
+            registry,
+            steps=(("validator", echo_command("step")),),
+            mode="cluster",
+        )
+        gate, state, _, _ = open_gate_after_previews(
+            gate_controller,
+            execution_id="gate:focused-cluster",
+            command=["python3", "scripts/run_focused_tests.py"],
+            mode="cluster",
+            child_plans=child_plans,
             required=False,
         )
-        controller.run_child(
+        assert gate is not None and state == "run"
+        gate_controller.run_child_with_plan(
             gate,
-            child_execution_id="focused:validators",
+            child_plans[0],
             command=echo_command("step"),
-            mode="cluster",
-            required=False,
         )
     assert any("build_focused_plan.py" in call for call in calls)
-    controller.finish_gate(gate, exit_code=0)
+    gate_controller.finish_gate(gate, exit_code=0)

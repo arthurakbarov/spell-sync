@@ -62,9 +62,11 @@ def _read(path: Path) -> str:
 
 def _check_gate_controller(text: str) -> list[str]:
     errors: list[str] = []
-    if "GateController" not in text or "begin_gate" not in text:
+    if "GateController" not in text or (
+        "begin_gate" not in text and "open_gate_after_previews" not in text
+    ):
         errors.append(
-            "[EXECUTION-CONTROL-GATE-001] scripts/ci_runner.py must use GateController.begin_gate; "
+            "[EXECUTION-CONTROL-GATE-001] scripts/ci_runner.py must use GateController parent gate; "
             "remediation: integrate gate_controller for full-ci parent spans"
         )
     if "_finish_with_gate" not in text:
@@ -214,10 +216,15 @@ def _check_focused_pre_final_gates() -> list[str]:
     errors: list[str] = []
     for rel in ("scripts/run_focused_tests.py", "scripts/run_pre_final_checks.py"):
         text = _read(ROOT / rel)
-        if "GateController" not in text or "begin_gate" not in text or "finish_gate" not in text:
+        gate_markers = (
+            "gate_controller_for",
+            "open_gate_after_previews",
+            "finish_gate",
+        )
+        if not all(marker in text for marker in gate_markers):
             errors.append(
                 f"[EXECUTION-CONTROL-GATE-003] {rel} must use real GateController parent gate; "
-                "remediation: wrap child steps in begin_gate/finish_gate"
+                "remediation: wrap child steps in open_gate_after_previews/finish_gate"
             )
         if "run_monitored_command" in text:
             errors.append(
@@ -329,9 +336,138 @@ def _check_no_sync_diagnostic_fallback() -> list[str]:
             errors.append(
                 "[EXECUTION-CONTROL-DIAGNOSTICS-003] sync bundle write after deadline forbidden"
             )
+    if "_owned_process_snapshot" in diagnostics:
+        errors.append(
+            "[EXECUTION-CONTROL-DIAGNOSTICS-003] synchronous owned-process fallback forbidden"
+        )
     if "DiagnosticBundleResult" not in diagnostics:
         errors.append(
             "[EXECUTION-CONTROL-DIAGNOSTICS-003] diagnostics must return incomplete bundle results"
+        )
+    return errors
+
+
+def _check_aggregate_admission() -> list[str]:
+    errors: list[str] = []
+    for rel in (
+        "scripts/execution_control/gate_admission.py",
+        "scripts/execution_control/aggregate_plan.py",
+        "scripts/execution_control/preview.py",
+        "scripts/execution_control/gate_flow.py",
+    ):
+        if not (ROOT / rel).is_file():
+            errors.append(f"[EXECUTION-CONTROL-ADMISSION-003] missing aggregate module {rel}")
+    gate = _read(ROOT / "scripts/execution_control/gate_controller.py")
+    if "prepare_gate_from_children" not in gate or "begin_gate_with_plan" not in gate:
+        errors.append(
+            "[EXECUTION-CONTROL-ADMISSION-003] gate controller must open gate after child previews"
+        )
+    focused = _read(ROOT / "scripts/run_focused_tests.py")
+    if "open_gate_after_previews" not in focused or "run_bounded_planner" not in focused:
+        errors.append(
+            "[EXECUTION-CONTROL-ADMISSION-003] focused runner must plan before aggregate admission"
+        )
+    if focused.split("run_bounded_planner", 1)[0].count("begin_gate("):
+        errors.append(
+            "[EXECUTION-CONTROL-ADMISSION-003] focused runner must not begin_gate before planner"
+        )
+    return errors
+
+
+def _check_parent_aggregate_timing() -> list[str]:
+    errors: list[str] = []
+    models = _read(ROOT / "scripts/execution_control/models.py")
+    for field in (
+        "planned_child_expected_sum",
+        "planned_orchestration_overhead",
+        "child_plan_digest",
+    ):
+        if field not in models:
+            errors.append(f"[EXECUTION-CONTROL-AGGREGATE-001] ExecutionPlan missing {field}")
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    if "plannedChildExpectedSum" not in ci and "preview_ci_child_plans" not in ci:
+        errors.append(
+            "[EXECUTION-CONTROL-AGGREGATE-001] full CI must preview child plans before gate"
+        )
+    return errors
+
+
+def _check_snapshot_output_flag() -> list[str]:
+    errors: list[str] = []
+    runner = _read(ROOT / "scripts/run_snapshot_tests.py")
+    if "--output" not in runner:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-005] run_snapshot_tests.py must accept --output"
+        )
+    if '"--output"' not in runner and "'--output'" not in runner:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-005] snapshot runner must pass --output to create script"
+        )
+    return errors
+
+
+def _check_bootstrap_timeout() -> list[str]:
+    errors: list[str] = []
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    if "_run_bootstrap_python" not in ci or "timeout=" not in ci.split("_run_bootstrap_python", 1)[-1][:400]:
+        errors.append(
+            "[EXECUTION-CONTROL-BOOTSTRAP-001] bootstrap.python must use bounded subprocess timeout"
+        )
+    test_path = ROOT / "tests/test_execution_bootstrap_timeout.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-BOOTSTRAP-001] missing bootstrap timeout regression test")
+    return errors
+
+
+def _check_opaque_token_privacy() -> list[str]:
+    errors: list[str] = []
+    privacy = _read(ROOT / "scripts/execution_control/privacy.py")
+    if "ADVERSARIAL_OPAQUE_TOKENS" not in privacy or "_ALL_LETTER_TOKEN_RE" not in privacy:
+        errors.append(
+            "[EXECUTION-CONTROL-PRIVACY-008] privacy must redact opaque all-letter/base64 tokens"
+        )
+    test_path = ROOT / "tests/test_execution_opaque_token_privacy.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-PRIVACY-008] missing opaque token privacy tests")
+    return errors
+
+
+def _check_round4_execution_tests() -> list[str]:
+    errors: list[str] = []
+    required = (
+        "tests/test_execution_aggregate_plan.py",
+        "tests/test_execution_real_admission.py",
+        "tests/test_execution_diagnostic_no_fallback.py",
+        "tests/test_execution_snapshot_output_isolation.py",
+        "tests/test_execution_bootstrap_timeout.py",
+        "tests/test_execution_process_fixture_cleanup.py",
+        "tests/test_execution_opaque_token_privacy.py",
+    )
+    for rel in required:
+        if not (ROOT / rel).is_file():
+            errors.append(f"[EXECUTION-CONTROL-TESTS-002] missing Round 4 test file {rel}")
+    return errors
+
+
+def _check_planner_supervision() -> list[str]:
+    errors: list[str] = []
+    focused = _read(ROOT / "scripts/run_focused_tests.py")
+    pre_final = _read(ROOT / "scripts/run_pre_final_checks.py")
+    if "run_bounded_planner" not in focused or "build_focused_plan.py" not in focused:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] focused gate must run supervised planner child"
+        )
+    if "run_bounded_planner" not in pre_final or "build_pre_final_plan.py" not in pre_final:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] pre-final gate must run supervised planner child"
+        )
+    if "begin_gate(" in focused.split("run_bounded_planner", 1)[0]:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] focused planning before begin_gate forbidden"
+        )
+    if "open_gate_after_previews" not in focused:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] focused runner must aggregate child previews before gate"
         )
     return errors
 
@@ -376,25 +512,6 @@ def _check_planner_scripts_exist() -> list[str]:
     for rel in PLANNER_SCRIPT_FILES:
         if not (ROOT / rel).is_file():
             errors.append(f"[EXECUTION-CONTROL-PLANNER-002] missing planner script {rel}")
-    return errors
-
-
-def _check_planner_supervision() -> list[str]:
-    errors: list[str] = []
-    focused = _read(ROOT / "scripts/run_focused_tests.py")
-    pre_final = _read(ROOT / "scripts/run_pre_final_checks.py")
-    if "focused:planner" not in focused or "build_focused_plan.py" not in focused:
-        errors.append(
-            "[EXECUTION-CONTROL-PLANNER-001] focused gate must run supervised planner child"
-        )
-    if "pre-final:planner" not in pre_final or "build_pre_final_plan.py" not in pre_final:
-        errors.append(
-            "[EXECUTION-CONTROL-PLANNER-001] pre-final gate must run supervised planner child"
-        )
-    if "build_plan(" in focused.split("begin_gate", 1)[0]:
-        errors.append(
-            "[EXECUTION-CONTROL-PLANNER-001] focused planning before begin_gate forbidden"
-        )
     return errors
 
 
@@ -549,9 +666,11 @@ def _check_snapshot_integration() -> list[str]:
                 "remediation: wire workspace-aware snapshot workflow"
             )
     if "snapshot-tests:pytest" not in text and "snapshot_step_execution_id" not in text:
-        errors.append(
-            "[EXECUTION-CONTROL-SNAPSHOT-001] snapshot gate must map pytest step execution id"
-        )
+        gate_flow = _read(ROOT / "scripts/execution_control/gate_flow.py")
+        if "snapshot-tests:pytest" not in gate_flow and "snapshot_step_execution_id" not in gate_flow:
+            errors.append(
+                "[EXECUTION-CONTROL-SNAPSHOT-001] snapshot gate must map pytest step execution id"
+            )
     if "tarfile.open" in text:
         errors.append(
             "[EXECUTION-CONTROL-SNAPSHOT-002] snapshot gate must not use fake tar fallback"
@@ -622,6 +741,8 @@ def main() -> int:
                 "ExecutionController",
                 "assess_admission",
                 "GateController",
+                "gate_controller_for",
+                "open_gate_after_previews",
             )
             if not any(marker in text for marker in markers):
                 errors.append(
@@ -650,6 +771,12 @@ def main() -> int:
     errors.extend(_check_process_group_cleanup())
     errors.extend(_check_parent_interrupt_runners())
     errors.extend(_check_no_sync_diagnostic_fallback())
+    errors.extend(_check_aggregate_admission())
+    errors.extend(_check_parent_aggregate_timing())
+    errors.extend(_check_snapshot_output_flag())
+    errors.extend(_check_bootstrap_timeout())
+    errors.extend(_check_opaque_token_privacy())
+    errors.extend(_check_round4_execution_tests())
     errors.extend(_check_hermetic_snapshot_tests())
     errors.extend(_check_snapshot_workspace_root_flag())
     errors.extend(_check_planner_supervision())

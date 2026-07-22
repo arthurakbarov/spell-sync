@@ -34,6 +34,7 @@ def test_hard_timeout_removes_detached_descendants_via_run_owned_command(
     )
     child_pid_file = tmp_path / "child.pid"
     grandchild_pid_file = tmp_path / "grandchild.pid"
+    ready_file = tmp_path / "ready"
     script = textwrap.dedent(
         f"""
         import subprocess, sys, time
@@ -48,31 +49,36 @@ def test_hard_timeout_removes_detached_descendants_via_run_owned_command(
             start_new_session=True,
         )
         Path({str(child_pid_file)!r}).write_text(str(child.pid))
+        Path({str(ready_file)!r}).write_text("READY")
+        print("READY", flush=True)
         time.sleep(60)
         """
     )
-    result = run_owned_command(
-        [sys.executable, "-c", script],
-        cwd=ROOT,
-        env=None,
-        hard_seconds=0.35,
-        soft_seconds=0.2,
-        stall_seconds=None,
-        termination_grace_seconds=0.25,
-        tracker=None,
-        enforce_hard=True,
-        enforce_stall=False,
-    )
+    try:
+        result = run_owned_command(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            env=None,
+            hard_seconds=2.0,
+            soft_seconds=0.5,
+            stall_seconds=None,
+            termination_grace_seconds=0.25,
+            tracker=None,
+            enforce_hard=True,
+            enforce_stall=False,
+        )
 
-    assert result.exit_code == 124
-    assert child_pid_file.is_file()
-    assert grandchild_pid_file.is_file()
-    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
-    grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
-    assert result.timed_out is True
-    assert result.detached_pids == ()
-    assert not _pid_alive(child_pid)
-    assert not _pid_alive(grandchild_pid)
-    assert _pid_alive(unrelated.pid)
-    unrelated.send_signal(signal.SIGTERM)
-    unrelated.wait(timeout=5)
+        assert ready_file.is_file(), "fixture never reached READY before timeout"
+        assert result.exit_code == 124
+        assert child_pid_file.is_file()
+        assert grandchild_pid_file.is_file()
+        child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+        grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
+        assert result.timed_out is True
+        assert result.detached_pids == ()
+        assert not _pid_alive(child_pid)
+        assert not _pid_alive(grandchild_pid)
+    finally:
+        if _pid_alive(unrelated.pid):
+            unrelated.send_signal(signal.SIGTERM)
+            unrelated.wait(timeout=5)

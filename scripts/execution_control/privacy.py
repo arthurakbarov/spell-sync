@@ -12,8 +12,19 @@ _BEARER_RE = re.compile(r"Bearer\s+[A-Za-z0-9_\-\.=]+", re.IGNORECASE)
 _BASIC_RE = re.compile(r"Basic\s+[A-Za-z0-9+/=]+", re.IGNORECASE)
 _PREFIX_TOKEN_RE = re.compile(r"\b(?:sk|ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_\-]{8,}\b")
 _TOKEN_LIKE_RE = re.compile(r"\b[A-Za-z0-9_\-]{32,}\b")
+_ALL_LETTER_TOKEN_RE = re.compile(r"\b[A-Za-z]{32,}\b")
+_BASE64_RE = re.compile(r"\b[A-Za-z0-9+/]{20,}={0,2}\b")
+_BASE64URL_RE = re.compile(r"\b[A-Za-z0-9_\-]{24,}={0,2}\b")
+_BASE32_RE = re.compile(r"\b[A-Z2-7]{20,}={0,6}\b")
+_QUOTED_SECRET_RE = re.compile(r"""['"][A-Za-z0-9+/=_\-]{16,}['"]""")
 _API_KEY_ASSIGN_RE = re.compile(
     r"(?i)(api[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*[^\s]+"
+)
+
+ADVERSARIAL_OPAQUE_TOKENS = (
+    "AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEf",
+    "QWxhZGRpbjpvcGVuIHNlc2FtZQ==",
+    "abcdefghijklmnopqrstuvwxyzABCDEFGH",
 )
 
 
@@ -41,6 +52,11 @@ def _redact_token_like(text: str) -> str:
     redacted = _BASIC_RE.sub("Basic [REDACTED]", redacted)
     redacted = _PREFIX_TOKEN_RE.sub("[REDACTED]", redacted)
     redacted = _API_KEY_ASSIGN_RE.sub(r"\1 [REDACTED]", redacted)
+    redacted = _QUOTED_SECRET_RE.sub('" [REDACTED]"', redacted)
+    redacted = _ALL_LETTER_TOKEN_RE.sub("[REDACTED]", redacted)
+    redacted = _BASE64_RE.sub("[REDACTED]", redacted)
+    redacted = _BASE64URL_RE.sub("[REDACTED]", redacted)
+    redacted = _BASE32_RE.sub("[REDACTED]", redacted)
 
     def _replace_long_match(match: re.Match[str]) -> str:
         value = match.group(0)
@@ -50,9 +66,13 @@ def _redact_token_like(text: str) -> str:
         has_digit = any(char.isdigit() for char in value)
         if has_alpha and has_digit:
             return "[REDACTED]"
+        if len(value) >= 32 and has_alpha:
+            return "[REDACTED]"
         return value
 
     redacted = _TOKEN_LIKE_RE.sub(_replace_long_match, redacted)
+    for token in ADVERSARIAL_OPAQUE_TOKENS:
+        redacted = redacted.replace(token, "[REDACTED]")
     return redacted
 
 
