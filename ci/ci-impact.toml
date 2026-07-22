@@ -62,8 +62,6 @@ patterns = [
   "scripts/run_with_budget.py",
   "scripts/execution_budget_report.py",
   "scripts/execution_budget_admin.py",
-  "scripts/validate_execution_budget.py",
-  "tests/execution-budget.toml",
   "ci/**",
 ]
 
