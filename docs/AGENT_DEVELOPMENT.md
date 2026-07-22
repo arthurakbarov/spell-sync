@@ -128,10 +128,17 @@ Do not ask the owner to diagnose failures or read raw logs.
 - Necessity planner: `python3 scripts/check-ci-necessity.py`.
 - Lightweight validation: `python3 scripts/run_lightweight_validation.py`.
 - Evidence verifier: `python3 scripts/check-ci-evidence.py` (`--release` requires exact HEAD).
-- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 4).
+- Machine-readable summary: `.artifacts/ci/ci-summary.json` (schema version 5).
 - Lightweight receipt: `.artifacts/lightweight-validation/current.json`.
 - Full log: `.artifacts/ci/ci.log` (rotated; retention keeps five completed run pairs).
 - Final stdout block prints `CI_RESULT`, `CI_EXIT`, optional `CI_FAILED_ID`, `CI_SUMMARY`, `CI_LOG`.
+
+Schema version 5 adds environment identity fields: `environmentFingerprint`,
+`environmentFingerprintBefore`, `environmentFingerprintAfter`, `environmentStable`,
+`environmentContractDigest`, `pyprojectDigest`, `uvLockDigest`, `installedEnvironmentDigest`,
+`pythonImplementation`, `pythonVersion`, `pythonCacheTag`, `uvVersion`, and
+`selectedDependencyGroups`. Full CI must keep environment identity stable for the run; drift fails
+with `CI_FAILED_ID=ci.environment-changed`.
 
 Schema version 4 adds `gitHeadAtRun`, `repositoryTreeDigest`, `ciInputDigest`, `ciInputDigestBefore`,
 `ciInputDigestAfter`, `ciInputStable`, `ciImpactSchemaVersion`, `evidenceScope`,

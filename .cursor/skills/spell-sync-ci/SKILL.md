@@ -24,6 +24,15 @@ description: >-
 
 ## Workflow
 
+0. Ensure project environment is valid **before** Python work:
+
+```bash
+python3 scripts/project_environment.py check
+```
+
+If missing `.venv` or metadata, run `python3 scripts/project_environment.py sync` (not raw `uv sync`).
+See skill `project-environment`.
+
 1. During development use skill `select-and-run-tests` (Levels 0–2).
 2. Commit all tracked changes; verify clean working tree.
 3. Assess necessity:
