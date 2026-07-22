@@ -96,17 +96,6 @@ def _run_collector_process(
     return value
 
 
-def _owned_process_snapshot(result: ProcessResult) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "ownedPgid": result.owned_pgid,
-        "ownedRootPid": result.owned_root_pid,
-        "survivingOwnedPids": list(result.detached_pids),
-    }
-    if result.owned_root_pid is not None:
-        payload["descendantPids"] = sorted(collect_descendants(result.owned_root_pid))
-    return payload
-
-
 def collect_timeout_bundle(
     *,
     plan: ExecutionPlan,
@@ -132,7 +121,12 @@ def collect_timeout_bundle(
         failures=failures,
     )
     if owned_snapshot is None:
-        owned_snapshot = _owned_process_snapshot(result)
+        owned_snapshot = {
+            "ownedPgid": result.owned_pgid,
+            "ownedRootPid": result.owned_root_pid,
+            "survivingOwnedPids": list(result.detached_pids),
+            "incomplete": True,
+        }
 
     bounded_output = {
         "stdoutTail": sanitize_text(result.stdout_tail, workspace_roots=roots),
