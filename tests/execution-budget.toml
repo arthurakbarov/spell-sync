@@ -279,8 +279,9 @@ source = "bootstrap-readonly-estimate"
 "ci:unknown-check" = { profile = "bounded-unknown", parent = "gate:full-ci" }
 "bootstrap:python" = { profile = "bootstrap", parent = "gate:full-ci" }
 "bootstrap:clean-tree" = { profile = "bootstrap", parent = "gate:full-ci" }
-"ci:deps-install" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:deps-editable" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:environment-contract" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:environment-lock" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:environment-check" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:wheel-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:wheel-smoke-venv" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:wheel-smoke-install" = { profile = "ci-child", parent = "gate:full-ci" }

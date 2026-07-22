@@ -1322,15 +1322,16 @@ class CiRunner:
                 if lock_rc != 0:
                     return self._finish_with_gate(lock_rc)
 
+                check_py = _project_python(self.root, py)
                 check_rc, check_out, check_timing = self._run_bounded_step(
                     "environment.check",
-                    [py, "scripts/project_environment.py", "check"],
+                    [check_py, str(self.root / "scripts" / "project_environment.py"), "check"],
                     cwd=self.root,
                 )
                 self.record("environment.check", check_rc, check_out, timing=check_timing)
                 if check_rc != 0:
                     return self._finish_with_gate(check_rc)
-                py = _project_python(self.root, py)
+                py = check_py
 
             steps = _build_check_steps(py)
             try:

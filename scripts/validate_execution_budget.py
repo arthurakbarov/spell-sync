@@ -48,8 +48,8 @@ ATOMIC_CI_IDS = (
 )
 
 LONG_CI_STEP_MARKERS = (
-    "deps.install",
-    "deps.editable",
+    "environment.lock",
+    "environment.check",
     "packaging.wheel-smoke",
     "tests.pytest",
     "gate:full-ci",
@@ -86,7 +86,7 @@ def _check_long_steps_bounded(text: str) -> list[str]:
     )
     if pip_marker in text:
         errors.append(
-            "[EXECUTION-CONTROL-GATE-002] deps.install must use bounded execution in full gate; "
+            "[EXECUTION-CONTROL-GATE-002] pip install steps must use bounded execution in full gate; "
             "remediation: route through _run_bounded_step"
         )
     wheel_section = text.split("def _run_wheel_smoke", 1)

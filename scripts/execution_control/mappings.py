@@ -32,8 +32,9 @@ CI_CHECK_EXECUTION_IDS: dict[str, str] = {
     "smoke.tui": "ci:tui-smoke",
     "bootstrap.python": "bootstrap:python",
     "bootstrap.clean-tree": "bootstrap:clean-tree",
-    "deps.install": "ci:deps-install",
-    "deps.editable": "ci:deps-editable",
+    "environment.contract": "ci:environment-contract",
+    "environment.lock": "ci:environment-lock",
+    "environment.check": "ci:environment-check",
 }
 
 GATE_EXECUTION_IDS: dict[str, str] = {
