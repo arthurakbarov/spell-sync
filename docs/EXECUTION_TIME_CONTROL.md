@@ -91,6 +91,11 @@ Stdlib-only package under `scripts/execution_control/`:
 | `diagnostics.py` | Bounded timeout investigation bundles |
 | `controller.py` | Immutable plan, run, classify, persist span |
 | `gate_controller.py` | Parent gate lifecycle, linked child spans, wall duration |
+| `preview.py` | Pure child `ExecutionPlan` preview without subprocess or lease |
+| `aggregate_plan.py` | Parent expected/soft/hard from concrete child plan sums |
+| `gate_admission.py` | Aggregate admission after child previews |
+| `gate_flow.py` | Bounded planner → previews → aggregate gate open |
+| `planning_supervisor.py` | Bounded planner execution without parent gate lease |
 | `reporting.py` | Machine-readable `EXECUTION_*` stdout lines |
 | `session.py` | Edit-loop test-time share and regression warnings |
 | `mappings.py` | Stable execution IDs for CI checks and gates |
@@ -109,9 +114,23 @@ Registry: `tests/execution-budget.toml`.
 
 ## Parent gates and admission
 
-Parent gates (`gate:full-ci`, `gate:pre-final`, `gate:focused-*`, `gate:snapshot-tests`) open an
-immutable parent `ExecutionPlan` at start, record parent wall duration at finish, and link each
-child span via shared `run_id` and `parent_span_id`.
+Parent gates open only after a **two-stage lifecycle**:
+
+1. **Bounded planning supervisor** (`focused:planner`, `pre-final:planner`, or CI child preview
+   list) produces a concrete child plan without acquiring the final parent gate lease.
+2. **Pure child previews** (`preview_execution_plan`) build immutable child `ExecutionPlan`
+   values without subprocess, lease, history observation, or artifact mutation.
+3. **Aggregate parent plan** derives `expectedSeconds`, soft, and hard from
+   `sum(child expected) + max(10s, 10% orchestration overhead)` and stores
+   `childPlanDigest`, `plannedChildCount`, `plannedExpectedSum`, and related fields.
+4. **Admission** (`assess_gate_admission`) evaluates aggregate cost, edit-loop budget, session
+   test-time share, and functional evidence reuse — then acquires the parent gate lease.
+5. **Execution** runs immutable child plans via `run_child_with_plan`.
+
+Parent gates (`gate:full-ci`, `gate:pre-final`, `gate:focused-*`, `gate:snapshot-tests`) record
+parent wall duration at finish and link each child span via shared `run_id` and `parent_span_id`.
+Final CI parent timing must satisfy
+`expectedSeconds ≈ plannedChildExpectedSum + plannedOrchestrationOverhead` (rounded, capped).
 
 Admission decisions are enforced before subprocess launch:
 
@@ -142,12 +161,13 @@ owned group and captured detached descendants. PID-only reuse is not trusted.
 gates never finish as `success` after an interrupted child.
 
 Timeout diagnostics run entirely inside killable collector processes under one monotonic
-deadline. The controller never performs synchronous bundle writes after the deadline; incomplete
-results are reported explicitly.
+deadline. After collector timeout the controller never performs synchronous `ps`, descendant
+scan, mkdir, serialization, or file write; incomplete results are reported explicitly.
 
 Focused and pre-final gates run bounded planner children (`focused:planner`, `pre-final:planner`)
-before test/check children. Snapshot gates require an explicit `--workspace-root`; public pytest
-must not mutate owner `$HOME/code.zip`.
+**before** parent gate admission. Snapshot gates require explicit `--workspace-root` and
+`--output`; public pytest must not mutate owner `$HOME/code.zip`. Pre-gate `bootstrap.python`
+uses a committed 30s subprocess timeout before full CI gate children start.
 
 `ci:pytest` uses the dedicated `ci-pytest` profile (measured full-suite evidence). Fast CI
 validators use `ci-validator`; generic `ci-child` hard remains 300 seconds.
