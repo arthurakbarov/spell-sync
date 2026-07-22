@@ -39,6 +39,7 @@ from scripts.execution_control.gate_flow import (  # noqa: E402
 )
 from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
 from scripts.execution_control.models import ExecutionStatus  # noqa: E402
+from scripts.execution_control.privacy import sanitize_text, workspace_roots  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -418,8 +419,6 @@ pathlib.Path(sys.argv[1]).write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _read_wheel_origin_result(result_path: Path) -> tuple[Path, str, dict[str, str]]:
-    import json
-
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     origin = Path(str(payload["origin"]))
     metadata_version = str(payload["metadataVersion"])
@@ -429,6 +428,10 @@ def _read_wheel_origin_result(result_path: Path) -> tuple[Path, str, dict[str, s
         "sysExecutable": str(payload.get("sysExecutable", "")),
     }
     return origin, metadata_version, diagnostics
+
+
+def _sanitize_retained_output(text: str, *, root: Path) -> str:
+    return sanitize_text(text, workspace_roots=workspace_roots(public_root=root))
 
 
 def _wheel_smoke_composite_timing(
@@ -1029,6 +1032,15 @@ class CiRunner:
         failed_substep: str | None = None
         total_seconds = 0.0
 
+        def _finish(
+            rc: int,
+            summary: str,
+            composite: dict[str, object] | None,
+        ) -> tuple[int, str, str, dict[str, object] | None]:
+            retained_output = _sanitize_retained_output("\n".join(parts), root=self.root)
+            retained_summary = _sanitize_retained_output(summary, root=self.root)
+            return rc, retained_output, retained_summary, composite
+
         def _record_substep(
             step_id: str,
             rc: int,
@@ -1069,7 +1081,7 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep=failed_substep
             )
-            return venv_rc, "\n".join(parts), "venv creation failed", composite
+            return _finish(venv_rc, "venv creation failed", composite)
 
         venv_py = venv_dir / "bin" / "python"
         if not venv_py.is_file():
@@ -1078,7 +1090,7 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep="ci:wheel-smoke-venv"
             )
-            return 1, "venv python interpreter missing", "venv python missing", composite
+            return _finish(1, "venv python missing", composite)
 
         isolated_env = _wheel_smoke_env(os.environ, home=smoke_home, venv_dir=venv_dir)
         install_rc, install_out, install_timing = self._run_bounded_step(
@@ -1097,7 +1109,7 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep=failed_substep
             )
-            return install_rc, "\n".join(parts), "wheel install failed", composite
+            return _finish(install_rc, "wheel install failed", composite)
 
         origin_result_path = smoke_root / "wheel-origin.json"
         origin_rc, origin_out, origin_timing = self._run_bounded_step(
@@ -1116,7 +1128,7 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep=failed_substep
             )
-            return origin_rc, "\n".join(parts), "import origin probe failed", composite
+            return _finish(origin_rc, "import origin probe failed", composite)
 
         try:
             origin_path, metadata_version, diagnostics = _read_wheel_origin_result(
@@ -1138,7 +1150,7 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep=failed_substep, result="failed"
             )
-            return 1, "\n".join(parts), detail, composite
+            return _finish(1, detail, composite)
 
         version_rc, version_out, version_timing = self._run_bounded_step(
             "packaging.wheel-smoke.version",
@@ -1165,14 +1177,14 @@ class CiRunner:
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep="ci:wheel-smoke-version", result="failed"
             )
-            return version_rc, "\n".join(parts), "metadata version probe failed", composite
+            return _finish(version_rc, "metadata version probe failed", composite)
         if metadata_version != version:
             detail = f"metadata version {metadata_version!r} != pyproject {version!r}"
             parts.append(detail)
             composite = _wheel_smoke_composite_timing(
                 substeps, total_seconds, failed_substep="ci:wheel-smoke-version", result="failed"
             )
-            return 1, "\n".join(parts), detail, composite
+            return _finish(1, detail, composite)
 
         cli_steps = (
             ("packaging.wheel-smoke.cli-version", [str(venv_py), "-m", "spell_sync", "version"]),
@@ -1202,14 +1214,14 @@ class CiRunner:
                     failed_substep=failed_substep,
                     result="failed",
                 )
-                return rc, "\n".join(parts), f"cli failed: {' '.join(cmd[2:])}", composite
+                return _finish(rc, f"cli failed: {' '.join(cmd[2:])}", composite)
 
         summary = (
             f"wheel install ok; metadata {metadata_version}; "
             f"origin {detail}; cli version/help/support-report ok"
         )
         composite = _wheel_smoke_composite_timing(substeps, total_seconds, result="success")
-        return 0, "\n".join(parts), summary, composite
+        return _finish(0, summary, composite)
 
     def run(
         self,
