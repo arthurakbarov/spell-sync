@@ -129,8 +129,28 @@ Child spans never rebuild context from `profile_id` alone.
 
 Parent hard limits are enforced at runtime: each child receives
 `min(child hard, parent remaining)` and the owned-process supervisor terminates the active tree
-when the parent deadline elapses. `finish_gate()` is exactly-once; failed children mark gate
+when the parent deadline elapses. Orchestration between children (planner execution, result
+serialization, terminal summary) is bounded by the same parent deadline via
+`check_orchestration_budget()`. `finish_gate()` is exactly-once; failed children mark gate
 state but do not finalize the parent span.
+
+Hard timeout termination captures an immutable ownership snapshot (root PID, owned process group,
+descendant identities with start markers) **before** the first signal, then terminates the
+owned group and captured detached descendants. PID-only reuse is not trusted.
+
+`KeyboardInterrupt` marks the active child and parent as `interrupted` with exit `130`; parent
+gates never finish as `success` after an interrupted child.
+
+Timeout diagnostics run entirely inside killable collector processes under one monotonic
+deadline. The controller never performs synchronous bundle writes after the deadline; incomplete
+results are reported explicitly.
+
+Focused and pre-final gates run bounded planner children (`focused:planner`, `pre-final:planner`)
+before test/check children. Snapshot gates require an explicit `--workspace-root`; public pytest
+must not mutate owner `$HOME/code.zip`.
+
+`ci:pytest` uses the dedicated `ci-pytest` profile (measured full-suite evidence). Fast CI
+validators use `ci-validator`; generic `ci-child` hard remains 300 seconds.
 
 Progress contracts mark progress only on semantic transitions (pytest node results, CI child
 events, structured phases, artifact state). Arbitrary stdout growth is not progress.
