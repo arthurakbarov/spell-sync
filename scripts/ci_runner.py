@@ -491,6 +491,17 @@ class CiRunner:
     def _run_bootstrap_python(self, py: str) -> tuple[int, str, dict[str, object] | None]:
         started = time.monotonic()
         argv = [py, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"]
+        if not self._uses_default_run_step:
+            rc, out = self.run_step(argv, cwd=self.root)
+            elapsed = time.monotonic() - started
+            timing = {
+                "executionId": "bootstrap:python",
+                "actualSeconds": round(elapsed, 2),
+                "expectedSeconds": 5.0,
+                "hardSeconds": BOOTSTRAP_PYTHON_HARD_SECONDS,
+                "result": "success" if rc == 0 else "failed",
+            }
+            return rc, out, timing
         try:
             proc = subprocess.run(
                 argv,
@@ -508,9 +519,7 @@ class CiRunner:
                 "hardSeconds": BOOTSTRAP_PYTHON_HARD_SECONDS,
                 "result": "timeout-hard",
             }
-            message = (
-                f"bootstrap.python timed out after {BOOTSTRAP_PYTHON_HARD_SECONDS:.0f}s"
-            )
+            message = f"bootstrap.python timed out after {BOOTSTRAP_PYTHON_HARD_SECONDS:.0f}s"
             return 124, message, timing
         chunk = proc.stdout
         if proc.stderr:

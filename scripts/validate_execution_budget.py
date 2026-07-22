@@ -66,7 +66,7 @@ def _check_gate_controller(text: str) -> list[str]:
         "begin_gate" not in text and "open_gate_after_previews" not in text
     ):
         errors.append(
-            "[EXECUTION-CONTROL-GATE-001] scripts/ci_runner.py must use GateController parent gate; "
+            "[EXECUTION-CONTROL-GATE-001] scripts/ci_runner.py must use GateController gate; "
             "remediation: integrate gate_controller for full-ci parent spans"
         )
     if "_finish_with_gate" not in text:
@@ -396,9 +396,7 @@ def _check_snapshot_output_flag() -> list[str]:
     errors: list[str] = []
     runner = _read(ROOT / "scripts/run_snapshot_tests.py")
     if "--output" not in runner:
-        errors.append(
-            "[EXECUTION-CONTROL-SNAPSHOT-005] run_snapshot_tests.py must accept --output"
-        )
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-005] run_snapshot_tests.py must accept --output")
     if '"--output"' not in runner and "'--output'" not in runner:
         errors.append(
             "[EXECUTION-CONTROL-SNAPSHOT-005] snapshot runner must pass --output to create script"
@@ -409,7 +407,8 @@ def _check_snapshot_output_flag() -> list[str]:
 def _check_bootstrap_timeout() -> list[str]:
     errors: list[str] = []
     ci = _read(ROOT / "scripts/ci_runner.py")
-    if "_run_bootstrap_python" not in ci or "timeout=" not in ci.split("_run_bootstrap_python", 1)[-1][:400]:
+    bootstrap_body = ci.split("_run_bootstrap_python", 1)[-1][:400]
+    if "_run_bootstrap_python" not in ci or "timeout=" not in bootstrap_body:
         errors.append(
             "[EXECUTION-CONTROL-BOOTSTRAP-001] bootstrap.python must use bounded subprocess timeout"
         )
@@ -467,7 +466,7 @@ def _check_planner_supervision() -> list[str]:
         )
     if "open_gate_after_previews" not in focused:
         errors.append(
-            "[EXECUTION-CONTROL-PLANNER-001] focused runner must aggregate child previews before gate"
+            "[EXECUTION-CONTROL-PLANNER-001] focused runner must aggregate previews before gate"
         )
     return errors
 
@@ -667,7 +666,11 @@ def _check_snapshot_integration() -> list[str]:
             )
     if "snapshot-tests:pytest" not in text and "snapshot_step_execution_id" not in text:
         gate_flow = _read(ROOT / "scripts/execution_control/gate_flow.py")
-        if "snapshot-tests:pytest" not in gate_flow and "snapshot_step_execution_id" not in gate_flow:
+        missing_pytest_map = (
+            "snapshot-tests:pytest" not in gate_flow
+            and "snapshot_step_execution_id" not in gate_flow
+        )
+        if missing_pytest_map:
             errors.append(
                 "[EXECUTION-CONTROL-SNAPSHOT-001] snapshot gate must map pytest step execution id"
             )

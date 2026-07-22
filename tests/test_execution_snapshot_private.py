@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +10,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("SPELL_SNAPSHOT_GATE_TEST") != "1",
+    reason="full snapshot gate subprocess runs via scripts/run_snapshot_tests.py",
+)
+
 
 from tests.test_execution_snapshot_output_isolation import (  # noqa: E402
     _build_hermetic_workspace,

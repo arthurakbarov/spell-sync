@@ -9,7 +9,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+
+SUBPROCESS_GATE = pytest.mark.skipif(
+    os.environ.get("SPELL_SNAPSHOT_GATE_TEST") != "1",
+    reason="full snapshot gate subprocess runs via scripts/run_snapshot_tests.py",
+)
 
 from scripts.execution_control.workspace_paths import resolve_spell_sync_dev_root  # noqa: E402
 
@@ -67,6 +74,7 @@ def _build_hermetic_workspace(tmp_path: Path) -> tuple[Path, Path]:
     return workspace, output
 
 
+@SUBPROCESS_GATE
 def test_snapshot_runner_accepts_explicit_output(isolated_state_dir, tmp_path):
     del isolated_state_dir
     workspace, output = _build_hermetic_workspace(tmp_path)
@@ -92,6 +100,7 @@ def test_snapshot_runner_accepts_explicit_output(isolated_state_dir, tmp_path):
     assert output.is_file() or "SNAPSHOT_STEP=archive-create" in proc.stdout
 
 
+@SUBPROCESS_GATE
 def test_full_snapshot_group_leaves_owner_archive_unchanged(isolated_state_dir):
     del isolated_state_dir
     owner_archive = Path.home() / "code.zip"

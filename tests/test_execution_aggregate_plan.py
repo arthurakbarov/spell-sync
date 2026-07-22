@@ -50,10 +50,13 @@ def test_child_plan_sum_drives_parent_expected(registry):
     assert parent.planned_child_expected_sum == multi_summary.planned_expected_sum
     assert parent.planned_orchestration_overhead == overhead
     assert parent.expected_seconds == round(multi_summary.planned_expected_sum + overhead)
-    assert abs(
-        parent.expected_seconds
-        - (parent.planned_child_expected_sum + parent.planned_orchestration_overhead)
-    ) <= 1.0
+    assert (
+        abs(
+            parent.expected_seconds
+            - (parent.planned_child_expected_sum + parent.planned_orchestration_overhead)
+        )
+        <= 1.0
+    )
 
 
 def test_single_child_aggregate_differs_from_empty(registry):
