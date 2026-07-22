@@ -158,4 +158,5 @@ def build_execution_plan(
         confidence=prediction.confidence,
         sample_count=prediction.sample_count,
         admission_decision=admission_decision,
+        context_signature=context.signature(),
     )

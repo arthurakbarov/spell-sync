@@ -138,6 +138,18 @@ def assess_admission(
         and total_expected > registry.edit_loop_budget_seconds
         and execution_id.startswith("gate:focused")
     ):
+        narrow_plan = build_execution_plan(
+            run_id=run_id,
+            execution_id=execution_id,
+            profile=profile,
+            registry=registry,
+            history=history,
+            workload_fingerprint_value=workload_fp,
+            policy_fingerprint_value=policy_fp,
+            normalized_signature_value=signature,
+            context=context,
+            admission_decision=AdmissionDecision.NARROW.value,
+        )
         return (
             AdmissionPlan(
                 decision=AdmissionDecision.NARROW,
@@ -147,7 +159,7 @@ def assess_admission(
                 total_expected_seconds=total_expected,
                 total_soft_seconds=total_soft,
             ),
-            plan,
+            narrow_plan,
         )
     return (
         AdmissionPlan(

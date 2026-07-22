@@ -25,10 +25,11 @@ def _session_path() -> Path:
     return state_root() / "session.json"
 
 
-def load_session() -> tuple[SessionTotals, float]:
+def load_session() -> tuple[SessionTotals, float, float]:
     path = _session_path()
+    now = time.monotonic()
     if not path.is_file():
-        return SessionTotals(), time.monotonic()
+        return SessionTotals(), now, now
     payload = json.loads(path.read_text(encoding="utf-8"))
     totals = SessionTotals(
         edit_seconds=float(payload.get("editSeconds", 0)),
@@ -39,8 +40,9 @@ def load_session() -> tuple[SessionTotals, float]:
         waiting_seconds=float(payload.get("waitingSeconds", 0)),
         reused_seconds_saved=float(payload.get("reusedSecondsSaved", 0)),
     )
-    started = float(payload.get("monotonicStarted", time.monotonic()))
-    return totals, started
+    window_started = float(payload.get("windowStartedMonotonic", now))
+    last_updated = float(payload.get("lastUpdatedMonotonic", window_started))
+    return totals, window_started, last_updated
 
 
 def record_session_event(
@@ -51,13 +53,15 @@ def record_session_event(
     window_seconds: float = 1800.0,
     warn_share: float = 0.6,
 ) -> None:
-    totals, started = load_session()
+    totals, window_started, last_updated = load_session()
     now = time.monotonic()
-    if now - started > window_seconds:
+    if now - window_started > window_seconds:
         totals = SessionTotals()
-        started = now
+        window_started = now
+        last_updated = now
+    edit_delta = max(0.0, now - last_updated)
     updated = SessionTotals(
-        edit_seconds=totals.edit_seconds + max(0.0, now - started),
+        edit_seconds=totals.edit_seconds + edit_delta,
         focused_seconds=totals.focused_seconds
         + (duration_seconds if category == "focused" else 0.0),
         pre_final_seconds=totals.pre_final_seconds
@@ -85,7 +89,8 @@ def record_session_event(
         "diagnosticSeconds": updated.diagnostic_seconds,
         "waitingSeconds": updated.waiting_seconds,
         "reusedSecondsSaved": updated.reused_seconds_saved,
-        "monotonicStarted": started,
+        "windowStartedMonotonic": window_started,
+        "lastUpdatedMonotonic": now,
     }
     _session_path().write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"

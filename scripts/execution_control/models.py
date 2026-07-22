@@ -74,6 +74,7 @@ class ExecutionPlan:
     confidence: str
     sample_count: int
     admission_decision: str
+    context_signature: str
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -95,6 +96,7 @@ class ExecutionPlan:
             "confidence": self.confidence,
             "sampleCount": self.sample_count,
             "admissionDecision": self.admission_decision,
+            "contextSignature": self.context_signature,
         }
 
 

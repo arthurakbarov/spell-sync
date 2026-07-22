@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from .admission import assess_admission
-from .context import build_context
 from .diagnostics import collect_timeout_bundle
 from .history import HistoryStore
-from .models import ExecutionPlan, ExecutionStatus, SpanRecord
+from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
 from .paths import plan_artifact_path
 from .process_tree import ProcessResult, run_owned_command
 from .progress import create_tracker
@@ -62,6 +60,7 @@ class ExecutionController:
         coverage: bool = False,
         tui: bool = False,
         packaging: bool = False,
+        run_id_override: str | None = None,
     ) -> tuple[ExecutionPlan | None, str]:
         profile = profile_for_execution_id(self.registry, execution_id)
         admission, plan = assess_admission(
@@ -80,7 +79,7 @@ class ExecutionController:
             tui=tui,
             packaging=packaging,
         )
-        if admission.decision.value == "reuse":
+        if admission.decision == AdmissionDecision.REUSE:
             print_result(
                 result=ExecutionStatus.REUSED.value,
                 exit_code=0,
@@ -90,9 +89,27 @@ class ExecutionController:
                 learning_accepted=False,
             )
             return None, ExecutionStatus.REUSED.value
-        if admission.decision.value == "reject-duplicate":
+        if admission.decision == AdmissionDecision.REJECT_DUPLICATE:
             return None, ExecutionStatus.BLOCKED_DUPLICATE.value
+        if admission.decision == AdmissionDecision.NARROW:
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.narrow-admission")
+            print(f"EXECUTION_ADMISSION_REASON={admission.reason}")
+            if plan is not None:
+                self._persist_plan(plan)
+                print_plan(plan)
+            return None, ExecutionStatus.BLOCKED_ADMISSION.value
+        if admission.decision == AdmissionDecision.DEFER_TO_PRE_FINAL:
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.defer-to-pre-final")
+            return None, ExecutionStatus.BLOCKED_ADMISSION.value
+        if admission.decision == AdmissionDecision.BLOCK_CONTROLLER_ERROR:
+            print("EXECUTION_RESULT=blocked")
+            print("EXECUTION_FAILED_ID=execution.controller-error")
+            return None, ExecutionStatus.BLOCKED_ADMISSION.value
         assert plan is not None
+        if run_id_override is not None:
+            plan = replace(plan, run_id=run_id_override)
         acquired, owner = self.history.acquire_lease(
             normalized_signature=plan.normalized_signature,
             run_id=plan.run_id,
@@ -117,20 +134,34 @@ class ExecutionController:
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
         active_child: str | None = None,
+        parent_span_id: str | None = None,
+        parent_run_id: str | None = None,
+        release_lease: bool = True,
     ) -> tuple[int, dict[str, Any]]:
         tracker = create_tracker(plan.progress_contract_id)
-        result = run_owned_command(
-            command,
-            cwd=cwd or self.root,
-            env=env,
-            hard_seconds=plan.hard_seconds,
-            soft_seconds=plan.soft_seconds,
-            stall_seconds=plan.stall_seconds,
-            termination_grace_seconds=plan.termination_grace_seconds,
-            tracker=tracker,
-            enforce_hard=self.enforce_hard,
-            enforce_stall=self.enforce_stall,
-        )
+        try:
+            result = run_owned_command(
+                command,
+                cwd=cwd or self.root,
+                env=env,
+                hard_seconds=plan.hard_seconds,
+                soft_seconds=plan.soft_seconds,
+                stall_seconds=plan.stall_seconds,
+                termination_grace_seconds=plan.termination_grace_seconds,
+                tracker=tracker,
+                enforce_hard=self.enforce_hard,
+                enforce_stall=self.enforce_stall,
+            )
+        except KeyboardInterrupt:
+            self._record_interrupt_span(
+                plan,
+                parent_span_id=parent_span_id,
+                parent_run_id=parent_run_id,
+                active_child=active_child,
+            )
+            if release_lease:
+                self.history.release_lease(plan.normalized_signature)
+            raise
         status, accepted, quarantine = self._classify_result(plan, result)
         diagnostic_bundle = None
         if result.timed_out:
@@ -140,18 +171,18 @@ class ExecutionController:
                 active_child=active_child or plan.execution_id,
                 timeout_kind=result.timeout_kind or "hard",
             )
-        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        run_id = parent_run_id or plan.run_id
         record = SpanRecord(
-            run_id=plan.run_id,
+            run_id=run_id,
             span_id=self.history.new_span_id(),
-            parent_span_id=None,
+            parent_span_id=parent_span_id,
             execution_id=plan.execution_id,
             profile_id=plan.profile_id,
             normalized_signature=plan.normalized_signature,
             workload_fingerprint=plan.workload_fingerprint,
             policy_fingerprint=plan.policy_fingerprint,
-            start_time=now,
-            end_time=now,
+            start_time=result.start_time_iso,
+            end_time=result.end_time_iso,
             duration_seconds=result.duration_seconds,
             exit_code=result.exit_code,
             status=status.value,
@@ -169,9 +200,9 @@ class ExecutionController:
             quarantine_reason=quarantine,
             diagnostic_bundle=diagnostic_bundle,
         )
-        context = build_context(execution_mode=plan.profile_id)
-        self.history.insert_span(record, context_signature=context.signature())
-        self.history.release_lease(plan.normalized_signature)
+        self.history.insert_span(record, context_signature=plan.context_signature)
+        if release_lease:
+            self.history.release_lease(plan.normalized_signature)
         category = "full-ci" if plan.profile_id == "full-ci" else plan.profile_id
         if status == ExecutionStatus.REUSED:
             record_session_event(
@@ -213,14 +244,67 @@ class ExecutionController:
             "result": status.value,
             "stdoutTail": result.stdout_tail,
             "stderrTail": result.stderr_tail,
+            "spanId": record.span_id,
+            "parentSpanId": parent_span_id,
         }
         return result.exit_code, timing
+
+    def _record_interrupt_span(
+        self,
+        plan: ExecutionPlan,
+        *,
+        parent_span_id: str | None,
+        parent_run_id: str | None,
+        active_child: str | None,
+    ) -> None:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        record = SpanRecord(
+            run_id=parent_run_id or plan.run_id,
+            span_id=self.history.new_span_id(),
+            parent_span_id=parent_span_id,
+            execution_id=plan.execution_id,
+            profile_id=plan.profile_id,
+            normalized_signature=plan.normalized_signature,
+            workload_fingerprint=plan.workload_fingerprint,
+            policy_fingerprint=plan.policy_fingerprint,
+            start_time=now,
+            end_time=now,
+            duration_seconds=0.0,
+            exit_code=130,
+            status=ExecutionStatus.INTERRUPTED.value,
+            expected_seconds=plan.expected_seconds,
+            soft_seconds=plan.soft_seconds,
+            stall_seconds=plan.stall_seconds,
+            hard_seconds=plan.hard_seconds,
+            prediction_source=plan.prediction_source,
+            confidence=plan.confidence,
+            sample_count=plan.sample_count,
+            progress_event_count=0,
+            maximum_progress_gap=0.0,
+            active_child_at_end=active_child,
+            accepted_for_learning=False,
+            quarantine_reason="interrupted",
+            diagnostic_bundle=None,
+        )
+        self.history.insert_span(record, context_signature=plan.context_signature)
+        print_result(
+            result=ExecutionStatus.INTERRUPTED.value,
+            exit_code=130,
+            duration=0.0,
+            active_child=active_child,
+            history_updated=not self.history.degraded,
+            learning_accepted=False,
+        )
 
     def _classify_result(
         self,
         plan: ExecutionPlan,
         result: ProcessResult,
     ) -> tuple[ExecutionStatus, bool, str | None]:
+        if result.interrupted:
+            return ExecutionStatus.INTERRUPTED, False, "interrupted"
         if result.timed_out:
             if result.timeout_kind == "stall":
                 return ExecutionStatus.TIMEOUT_STALL, False, "timeout-stall"
@@ -258,6 +342,9 @@ def run_monitored_command(
     packaging: bool = False,
     enforce_hard: bool = True,
     enforce_stall: bool = False,
+    parent_span_id: str | None = None,
+    parent_run_id: str | None = None,
+    run_id_override: str | None = None,
 ) -> tuple[int, dict[str, object] | None]:
     controller = ExecutionController.open(
         root, enforce_hard=enforce_hard, enforce_stall=enforce_stall
@@ -273,8 +360,24 @@ def run_monitored_command(
         coverage=coverage,
         tui=tui,
         packaging=packaging,
+        run_id_override=run_id_override,
     )
     if plan is None:
-        return 0 if state == ExecutionStatus.REUSED.value else 1, None
-    exit_code, timing = controller.run(plan, command, cwd=cwd, env=env, active_child=execution_id)
+        if state == ExecutionStatus.REUSED.value:
+            return 0, None
+        if state == ExecutionStatus.BLOCKED_ADMISSION.value:
+            return 1, {
+                "result": ExecutionStatus.BLOCKED_ADMISSION.value,
+                "executionId": execution_id,
+            }
+        return 1, None
+    exit_code, timing = controller.run(
+        plan,
+        command,
+        cwd=cwd,
+        env=env,
+        active_child=execution_id,
+        parent_span_id=parent_span_id,
+        parent_run_id=parent_run_id,
+    )
     return exit_code, timing
