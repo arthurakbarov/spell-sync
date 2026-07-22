@@ -64,9 +64,15 @@ def test_edit_loop_budget_exceeded_subprocess_count_zero(
         registry=tight,
         history=HistoryStore.open(),
     )
-    with patch(
-        "scripts.execution_control.admission._load_ci_necessity",
-        return_value=_fake_necessity(),
+    with (
+        patch(
+            "scripts.execution_control.admission._load_ci_necessity",
+            return_value=_fake_necessity(),
+        ),
+        patch(
+            "scripts.execution_control.identity.resolve_environment_signature",
+            return_value="test-environment-signature",
+        ),
     ):
         plan, state = controller.prepare_plan(
             execution_id="gate:focused-cluster",

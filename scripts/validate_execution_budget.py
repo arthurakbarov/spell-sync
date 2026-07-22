@@ -836,6 +836,75 @@ def _check_ci_evidence_on_failure() -> list[str]:
     return errors
 
 
+def _check_environment_integration() -> list[str]:
+    errors: list[str] = []
+    identity = _read(ROOT / "scripts/execution_control/identity.py")
+    if "environmentSignature" not in identity or "resolve_environment_signature" not in identity:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-001] execution identity must include environment signature; "
+            "remediation: wire resolve_environment_signature into workload payload"
+        )
+    models = _read(ROOT / "scripts/execution_control/models.py")
+    if "environment_signature" not in models:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-001] ExecutionPlan and SpanRecord must carry "
+            "environment_signature"
+        )
+    ci_runner = _read(ROOT / "scripts/ci_runner.py")
+    for token in (
+        "environmentFingerprintBefore",
+        "environmentFingerprintAfter",
+        "environmentStable",
+        "ci.environment-changed",
+    ):
+        if token not in ci_runner:
+            errors.append(
+                f"[EXECUTION-ENVIRONMENT-002] ci_runner.py must record {token} in CI summary"
+            )
+    evidence = _read(ROOT / "scripts/check-ci-evidence.py")
+    if "ci-evidence.environment-mismatch" not in evidence:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-002] check-ci-evidence.py must reject environment mismatch"
+        )
+    probe = _read(ROOT / "scripts/environment_contract/probe.py")
+    if "run_interpreter_probe" not in probe:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-003] environment metadata must use .venv interpreter probe"
+        )
+    project_env = _read(ROOT / "scripts/project_environment.py")
+    if "run_interpreter_probe" not in project_env:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-003] project_environment must build metadata from probe result"
+        )
+    for consumer in (
+        "scripts/check-ci-evidence.py",
+        "scripts/check-ci-necessity.py",
+        "scripts/run_lightweight_validation.py",
+        "scripts/ci_runner.py",
+    ):
+        text = _read(ROOT / consumer)
+        if "EnvironmentPaths" not in text and "production_environment_paths" not in text:
+            errors.append(
+                f"[EXECUTION-ENVIRONMENT-004] {consumer} must accept or use EnvironmentPaths"
+            )
+    conftest = _read(ROOT / "tests/conftest_execution.py")
+    if "_force_execution_admission_for_unit_tests" in conftest:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-005] remove filename-based execution admission monkeypatch"
+        )
+    if "test_environment_paths" not in conftest:
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-005] execution tests must isolate CI evidence "
+            "via EnvironmentPaths"
+        )
+    skill = ROOT / ".cursor/skills/project-environment/SKILL.md"
+    if not skill.is_file():
+        errors.append(
+            "[EXECUTION-ENVIRONMENT-006] missing .cursor/skills/project-environment/SKILL.md"
+        )
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     try:
@@ -927,6 +996,7 @@ def main() -> int:
     errors.extend(_check_descendant_readiness_tests())
     errors.extend(_check_non_vacuous_snapshot_tests())
     errors.extend(_check_ci_evidence_on_failure())
+    errors.extend(_check_environment_integration())
 
     product_paths = (
         "spell_sync/application/services/pull.py",

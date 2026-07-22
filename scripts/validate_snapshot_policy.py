@@ -140,6 +140,16 @@ def _check_snapshot_script(script_path: Path) -> list[str]:
             "[SNAPSHOT-ATOMIC-009] create-code-snapshot.py must use beside-output candidate names; "
             "remediation: create .code.zip.tmp-<token> next to final output"
         )
+    if '"environment"' not in text or "environmentEvidenceSha256" not in text:
+        errors.append(
+            "[SNAPSHOT-ENVIRONMENT-010] create-code-snapshot.py manifest must bind "
+            "environment digests"
+        )
+    if "SCHEMA_VERSION = 2" not in text and 'schemaVersion": 2' not in text:
+        errors.append(
+            "[SNAPSHOT-ENVIRONMENT-010] snapshot manifest schema must be version 2 "
+            "with environment block"
+        )
     return errors
 
 

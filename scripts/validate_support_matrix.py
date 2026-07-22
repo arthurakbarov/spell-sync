@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_DOC = ROOT / "docs" / "SUPPORTED_ENVIRONMENTS.md"
 CONTRACT_PATH = ROOT / "config" / "environment-contract.toml"
+PYTHON_VERSION_PATH = ROOT / ".python-version"
 WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 
 REQUIRED_DOC_SECTIONS = (
@@ -21,8 +22,8 @@ REQUIRED_DOC_SECTIONS = (
 
 CANONICAL_JOB_MARKERS = (
     "ubuntu-latest",
-    "3.12",
-    "scripts/ci.sh",
+    "3.12.13",
+    "scripts/ci_runner.py",
 )
 
 COMPATIBILITY_EXPECTATIONS = (
@@ -183,14 +184,33 @@ def _check_workflows() -> list[str]:
         for key, (_, block) in all_jobs.items()
         if _job_runs_full_ci(block)
         and "ubuntu-latest" in _job_runs_on(block)
-        and "3.12" in _job_python_versions(block)
+        and "3.12.13" in _job_python_versions(block)
         and "matrix:" not in block.split("runs-on:", 1)[0]
     ]
     if len(canonical_jobs) != 1:
         errors.append(
-            "[CI-ENVIRONMENT-011] expected exactly one canonical Ubuntu Python 3.12 full CI job; "
+            "[CI-ENVIRONMENT-011] expected exactly one canonical Ubuntu Python "
+            "3.12.13 full CI job; "
             f"found {len(canonical_jobs)}; remediation: split canonical full gate from matrix jobs"
         )
+
+    for key, (_, block) in all_jobs.items():
+        if _job_runs_full_ci(block) and "ubuntu-latest" in _job_runs_on(block):
+            if "project_environment.py sync" not in block:
+                errors.append(
+                    "[CI-ENVIRONMENT-012] canonical full CI must run project_environment.py sync; "
+                    f"job {key} missing canonical environment sync"
+                )
+            if re.search(r'python-version:\s*"3\.12"\s*$', block, flags=re.MULTILINE):
+                errors.append(
+                    "[CI-ENVIRONMENT-012] canonical full CI must pin exact Python patch 3.12.13; "
+                    f"job {key} uses floating 3.12"
+                )
+            if "uv sync" in block and "project_environment.py sync" not in block:
+                errors.append(
+                    "[CI-ENVIRONMENT-012] canonical full CI must not use raw uv sync without "
+                    "project_environment metadata; remediation: call project_environment.py sync"
+                )
 
     matrix_full_ci_jobs = [
         key
@@ -271,6 +291,25 @@ def _check_workflows() -> list[str]:
         errors.append(
             "[CI-ENVIRONMENT-011] workflows must pass --no-python-downloads to uv commands; "
             "remediation: forbid implicit Python downloads in CI"
+        )
+    contract = tomllib.loads(_read(CONTRACT_PATH)) if CONTRACT_PATH.is_file() else {}
+    maintainer = contract.get("maintainer", {}) if isinstance(contract, dict) else {}
+    canonical_python = (
+        str(maintainer.get("canonicalPython", "")).strip() if isinstance(maintainer, dict) else ""
+    )
+    python_version_file = (
+        PYTHON_VERSION_PATH.read_text(encoding="utf-8").strip()
+        if PYTHON_VERSION_PATH.is_file()
+        else ""
+    )
+    if canonical_python and python_version_file and canonical_python != python_version_file:
+        errors.append(
+            "[CI-ENVIRONMENT-012] .python-version must match environment contract canonicalPython"
+        )
+    if canonical_python and canonical_python not in combined:
+        errors.append(
+            "[CI-ENVIRONMENT-012] workflows must reference exact canonical Python patch "
+            f"{canonical_python}"
         )
     return errors
 
