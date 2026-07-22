@@ -160,8 +160,18 @@ def test_same_pytest_different_static_targets_changes_run_key(
     assert key_a != key_b
 
 
+def _mock_gate(open_gate):
+    gate = type("Gate", (), {"stopped": False})()
+    controller = open_gate.return_value
+    controller.begin_gate.return_value = (gate, "run")
+    controller.run_child.return_value = (0, {"result": "success"})
+    controller.finish_gate.return_value = {"result": "success"}
+    return controller, gate
+
+
 def test_force_reruns(runner_mod) -> None:
-    with patch.object(runner_mod, "run_command", return_value=(0, 0.1)):
+    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
+        _mock_gate(open_gate)
         with patch.object(runner_mod.TestRunLedger, "find_success", return_value=object()):
             rc = runner_mod.main(["--target", "tests/test_core.py", "--force"])
     assert rc == 0
@@ -173,10 +183,11 @@ def test_skipped_when_already_passed(runner_mod, capsys) -> None:
         (),
         {"duration_seconds": 2.5, "result": "success", "exit_code": 0},
     )()
-    with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
-        with patch.object(runner_mod, "run_command") as run_command:
+    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
+        controller = open_gate.return_value
+        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
             rc = runner_mod.main(["--target", "tests/test_core.py"])
-    run_command.assert_not_called()
+        controller.begin_gate.assert_not_called()
     assert rc == 0
     output = capsys.readouterr().out
     assert "TEST_RUN_RESULT=skipped" in output
@@ -184,10 +195,14 @@ def test_skipped_when_already_passed(runner_mod, capsys) -> None:
 
 
 def test_docs_only_runs_validators(runner_mod, capsys) -> None:
-    with patch.object(runner_mod, "collect_changed_files", return_value=["docs/ARCHITECTURE.md"]):
-        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
-            with patch.object(runner_mod, "run_command", return_value=(0, 0.1)):
+    with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
+        controller, gate = _mock_gate(open_gate)
+        with patch.object(
+            runner_mod, "collect_changed_files", return_value=["docs/ARCHITECTURE.md"]
+        ):
+            with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
                 rc = runner_mod.main([])
+        assert controller.run_child.called
     output = capsys.readouterr().out
     assert rc == 0
     assert "TEST_RUN_RESULT=success" in output

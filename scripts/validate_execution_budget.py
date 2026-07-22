@@ -192,10 +192,141 @@ def _check_interrupt_cleanup() -> list[str]:
 def _check_diagnostics_deadline() -> list[str]:
     errors: list[str] = []
     diagnostics = _read(ROOT / "scripts/execution_control/diagnostics.py")
-    if "_run_bounded" not in diagnostics or "FuturesTimeout" not in diagnostics:
+    if "_run_collector_process" not in diagnostics or "multiprocessing" not in diagnostics:
         errors.append(
             "[EXECUTION-CONTROL-DIAGNOSTICS-001] diagnostics must enforce per-collector deadline; "
-            "remediation: use bounded worker in collect_timeout_bundle"
+            "remediation: use bounded subprocess collector in collect_timeout_bundle"
+        )
+    if "ThreadPoolExecutor" in diagnostics:
+        errors.append(
+            "[EXECUTION-CONTROL-DIAGNOSTICS-002] diagnostics must not wait on timed-out threads; "
+            "remediation: remove ThreadPoolExecutor shutdown wait"
+        )
+    return errors
+
+
+def _check_focused_pre_final_gates() -> list[str]:
+    errors: list[str] = []
+    for rel in ("scripts/run_focused_tests.py", "scripts/run_pre_final_checks.py"):
+        text = _read(ROOT / rel)
+        if "GateController" not in text or "begin_gate" not in text or "finish_gate" not in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-GATE-003] {rel} must use real GateController parent gate; "
+                "remediation: wrap child steps in begin_gate/finish_gate"
+            )
+        if "run_monitored_command" in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-GATE-003] {rel} must not bypass parent gate "
+                "via run_monitored_command"
+            )
+    return errors
+
+
+def _check_parent_deadline_enforced() -> list[str]:
+    errors: list[str] = []
+    gate = _read(ROOT / "scripts/execution_control/gate_controller.py")
+    process_tree = _read(ROOT / "scripts/execution_control/process_tree.py")
+    controller = _read(ROOT / "scripts/execution_control/controller.py")
+    if "parent_hard_deadline" not in gate or "parent_deadline_monotonic" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-DEADLINE-001] parent hard deadline must be enforced at runtime"
+        )
+    if "hard_seconds_override" not in controller:
+        errors.append(
+            "[EXECUTION-CONTROL-DEADLINE-001] controller must propagate parent remaining budget"
+        )
+    tests = ROOT / "tests/test_execution_parent_deadline.py"
+    if not tests.is_file():
+        errors.append("[EXECUTION-CONTROL-DEADLINE-001] missing parent deadline regression test")
+    return errors
+
+
+def _check_single_gate_finalization() -> list[str]:
+    errors: list[str] = []
+    gate = _read(ROOT / "scripts/execution_control/gate_controller.py")
+    if "finish_gate" in gate.split("def run_child", 1)[1].split("def finish_gate", 1)[0]:
+        errors.append("[EXECUTION-CONTROL-FINALIZE-001] run_child must not call finish_gate")
+    if "finalized" not in gate or "terminal_timing" not in gate:
+        errors.append("[EXECUTION-CONTROL-FINALIZE-001] gate must track finalized terminal state")
+    return errors
+
+
+def _check_soft_reporting_wired() -> list[str]:
+    errors: list[str] = []
+    process_tree = _read(ROOT / "scripts/execution_control/process_tree.py")
+    if "print_soft_overrun" not in process_tree or "soft_report_plan" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-SOFT-001] soft-overrun reporter must be wired in execution loop"
+        )
+    return errors
+
+
+def _check_process_group_cleanup() -> list[str]:
+    errors: list[str] = []
+    process_tree = _read(ROOT / "scripts/execution_control/process_tree.py")
+    terminate = process_tree.split("def _terminate_owned_group", 1)[-1].split("def ", 1)[0]
+    if "proc.poll()" in terminate and "return" in terminate:
+        errors.append("[EXECUTION-CONTROL-TERM-001] leader exit must not skip group cleanup")
+    if "_process_group_exists" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-TERM-001] owned group existence must be checked before return"
+        )
+    return errors
+
+
+def _check_interrupt_handshake() -> list[str]:
+    errors: list[str] = []
+    test_path = ROOT / "tests/test_execution_parent_interrupt.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-INTERRUPT-002] missing interrupt readiness test")
+        return errors
+    text = _read(test_path)
+    if "RUNNER_READY" not in text:
+        errors.append("[EXECUTION-CONTROL-INTERRUPT-002] interrupt test must wait for RUNNER_READY")
+    if "child_pid_file" not in text or "grandchild_pid_file" not in text:
+        errors.append(
+            "[EXECUTION-CONTROL-INTERRUPT-002] interrupt test must verify child/grandchild PIDs"
+        )
+    if "time.sleep(0.4)" in text:
+        errors.append(
+            "[EXECUTION-CONTROL-INTERRUPT-002] interrupt test must not guess timing with sleep"
+        )
+    return errors
+
+
+def _check_dynamic_privacy_tests() -> list[str]:
+    errors: list[str] = []
+    test_path = ROOT / "tests/test_execution_dynamic_privacy.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-PRIVACY-006] missing dynamic privacy tests")
+        return errors
+    text = _read(test_path)
+    if "Path.home()" not in text or "secrets." not in text:
+        errors.append(
+            "[EXECUTION-CONTROL-PRIVACY-006] privacy tests must use dynamic HOME/token values"
+        )
+    return errors
+
+
+def _check_active_child_lease() -> list[str]:
+    errors: list[str] = []
+    history = _read(ROOT / "scripts/execution_control/history.py")
+    gate = _read(ROOT / "scripts/execution_control/gate_controller.py")
+    if "update_active_child" not in history:
+        errors.append("[EXECUTION-CONTROL-LEASE-001] history must update active child on lease")
+    if "update_active_child" not in gate:
+        errors.append(
+            "[EXECUTION-CONTROL-LEASE-001] gate controller must update active child lease"
+        )
+    return errors
+
+
+def _check_narrow_replacement_plan() -> list[str]:
+    errors: list[str] = []
+    controller = _read(ROOT / "scripts/execution_control/controller.py")
+    if "EXECUTION_REPLACEMENT_EXECUTION_ID" not in controller:
+        errors.append(
+            "[EXECUTION-CONTROL-ADMISSION-002] NARROW admission must emit replacement plan"
         )
     return errors
 
@@ -215,13 +346,19 @@ def _check_snapshot_integration() -> list[str]:
         "snapshot-tests:pytest",
         "archive-create",
         "archive-check",
+        "resolve_spell_sync_dev_root",
+        "SNAPSHOT_GATE_RESULT=blocked",
     )
     for token in tokens:
         if token not in text:
             errors.append(
                 f"[EXECUTION-CONTROL-SNAPSHOT-001] run_snapshot_tests.py must reference {token}; "
-                "remediation: wire snapshot child execution IDs"
+                "remediation: wire private snapshot workflow"
             )
+    if "tarfile.open" in text:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-002] snapshot gate must not use fake tar fallback"
+        )
     return errors
 
 
@@ -309,6 +446,15 @@ def main() -> int:
     errors.extend(_check_progress_contracts())
     errors.extend(_check_interrupt_cleanup())
     errors.extend(_check_diagnostics_deadline())
+    errors.extend(_check_focused_pre_final_gates())
+    errors.extend(_check_parent_deadline_enforced())
+    errors.extend(_check_single_gate_finalization())
+    errors.extend(_check_soft_reporting_wired())
+    errors.extend(_check_process_group_cleanup())
+    errors.extend(_check_interrupt_handshake())
+    errors.extend(_check_dynamic_privacy_tests())
+    errors.extend(_check_active_child_lease())
+    errors.extend(_check_narrow_replacement_plan())
     errors.extend(_check_snapshot_integration())
     errors.extend(_check_atomic_ids(registry))
     errors.extend(_check_session_deltas())

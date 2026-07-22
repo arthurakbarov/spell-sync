@@ -47,7 +47,9 @@ def test_narrow_plan_has_narrow_admission_decision(registry, history_store):
     assert execution_plan.admission_decision == AdmissionDecision.NARROW.value
 
 
-def test_edit_loop_budget_exceeded_subprocess_count_zero(isolated_state_dir, registry, monkeypatch):
+def test_edit_loop_budget_exceeded_subprocess_count_zero(
+    isolated_state_dir, registry, monkeypatch, capsys
+):
     del isolated_state_dir
     calls: list[list[str]] = []
 
@@ -67,12 +69,15 @@ def test_edit_loop_budget_exceeded_subprocess_count_zero(isolated_state_dir, reg
         return_value=_fake_necessity(),
     ):
         plan, state = controller.prepare_plan(
-            execution_id="gate:focused-module",
+            execution_id="gate:focused-cluster",
             command=[sys.executable, "-c", "print('blocked')"],
-            mode="exact",
+            mode="cluster",
             required=False,
             test_file_count=10,
         )
     assert plan is None
     assert state == ExecutionStatus.BLOCKED_ADMISSION.value
     assert calls == []
+    output = capsys.readouterr().out
+    assert "EXECUTION_REPLACEMENT_EXECUTION_ID=gate:focused-module" in output
+    assert "EXECUTION_REPLACEMENT_COMMAND_KEY=focused-module" in output

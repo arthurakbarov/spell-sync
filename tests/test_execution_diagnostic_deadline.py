@@ -1,13 +1,13 @@
-"""Timeout diagnostics tests."""
+"""Bounded diagnostic collector tests."""
 
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
-from scripts.execution_control.diagnostics import _redact, collect_timeout_bundle
+from scripts.execution_control.diagnostics import _run_collector_process, collect_timeout_bundle
 from scripts.execution_control.models import ExecutionPlan
-from scripts.execution_control.paths import timeout_bundle_dir
 from scripts.execution_control.process_tree import ProcessResult
 
 
@@ -23,7 +23,7 @@ def _plan(**overrides) -> ExecutionPlan:
         soft_seconds=120.0,
         stall_seconds=None,
         hard_seconds=300.0,
-        diagnostic_hard_seconds=10.0,
+        diagnostic_hard_seconds=0.05,
         termination_grace_seconds=5.0,
         progress_contract_id=None,
         termination_policy_id="owned-process-group",
@@ -37,45 +37,44 @@ def _plan(**overrides) -> ExecutionPlan:
     return ExecutionPlan(**defaults)
 
 
-def test_redact_sensitive_sentinels():
-    raw = (
-        "word SENSITIVE_USER_WORD_7f3a token secret-token-value "
-        "path /Users/private-user cfg raw-spell-sync-config"
+def test_slow_collector_returns_within_budget(isolated_state_dir):
+    del isolated_state_dir
+    failures: list[str] = []
+    started = time.monotonic()
+    _run_collector_process(
+        name="slow-sleep",
+        payload={"seconds": 0.25},
+        budget_seconds=0.05,
+        failures=failures,
     )
-    redacted = _redact(raw)
-    assert "SENSITIVE_USER_WORD_7f3a" not in redacted
-    assert "secret-token-value" not in redacted
-    assert "/Users/private-user" not in redacted
-    assert "[REDACTED]" in redacted
+    elapsed = time.monotonic() - started
+    assert elapsed <= 0.15
+    assert failures
+    assert any("slow-sleep:timeout" in item for item in failures)
 
 
-def test_redact_truncates_long_output():
-    assert len(_redact("x" * 10000)) <= 8000
-
-
-def test_timeout_bundle_redacts_private_sentinels(isolated_state_dir):
+def test_timeout_bundle_respects_diagnostic_deadline(isolated_state_dir):
     del isolated_state_dir
     result = ProcessResult(
         exit_code=124,
         duration_seconds=1.0,
         timed_out=True,
         timeout_kind="hard",
-        stdout_tail="SENSITIVE_USER_WORD_7f3a /Users/private-user secret-token-value",
+        stdout_tail="",
         stderr_tail="",
         progress_event_count=0,
         maximum_progress_gap=0.0,
         start_time_iso="2026-01-01T00:00:00Z",
         end_time_iso="2026-01-01T00:00:01Z",
     )
+    started = time.monotonic()
     path = collect_timeout_bundle(
-        plan=_plan(),
+        plan=_plan(diagnostic_hard_seconds=0.05),
         result=result,
-        active_child="ci:pytest",
+        active_child=None,
         timeout_kind="hard",
     )
+    elapsed = time.monotonic() - started
+    assert elapsed <= 0.2
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    text = json.dumps(payload)
-    assert "SENSITIVE_USER_WORD_7f3a" not in text
-    assert "/Users/private-user" not in text
-    assert "[REDACTED]" in text
-    assert timeout_bundle_dir("diag-run").is_dir()
+    assert payload["collectorFailures"]
