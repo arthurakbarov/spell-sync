@@ -89,7 +89,7 @@ initialExpectedSeconds = 60
 initialSoftSeconds = 120
 stallFloorSeconds = 30
 stallCapSeconds = 180
-initialHardSeconds = 420
+initialHardSeconds = 300
 hardCapSeconds = 900
 diagnosticHardSeconds = 10
 terminationGraceSeconds = 5
@@ -99,6 +99,78 @@ minimumSamples = 3
 parentRetries = 0
 diagnosticRetries = 1
 source = "ci-check-step-estimate"
+
+[profiles.ci-pytest]
+kind = "child"
+executionId = "ci:pytest"
+initialExpectedSeconds = 300
+initialSoftSeconds = 360
+stallFloorSeconds = 30
+stallCapSeconds = 180
+initialHardSeconds = 420
+hardCapSeconds = 900
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = "pytest-node-transition"
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "measured-full-suite-pytest-p90-397s-sample-2"
+
+[profiles.ci-validator]
+kind = "child"
+executionId = "ci:validator"
+initialExpectedSeconds = 30
+initialSoftSeconds = 60
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 120
+hardCapSeconds = 300
+diagnosticHardSeconds = 10
+terminationGraceSeconds = 5
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 1
+source = "fast-validator-estimate"
+
+[profiles.focused-planner]
+kind = "child"
+executionId = "focused:planner"
+initialExpectedSeconds = 5
+initialSoftSeconds = 15
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 60
+hardCapSeconds = 120
+diagnosticHardSeconds = 5
+terminationGraceSeconds = 2
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 0
+source = "focused-plan-build-estimate"
+
+[profiles.pre-final-planner]
+kind = "child"
+executionId = "pre-final:planner"
+initialExpectedSeconds = 10
+initialSoftSeconds = 30
+stallFloorSeconds = 0
+stallCapSeconds = 0
+initialHardSeconds = 60
+hardCapSeconds = 120
+diagnosticHardSeconds = 5
+terminationGraceSeconds = 2
+progressContract = ""
+historyWindow = 30
+minimumSamples = 3
+parentRetries = 0
+diagnosticRetries = 0
+source = "pre-final-plan-build-estimate"
 
 [profiles.snapshot-tests]
 kind = "gate"
@@ -176,10 +248,10 @@ source = "bootstrap-readonly-estimate"
 "ci:execution-budget-registry" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ci-impact-registry" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:test-impact-registry" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:docs-style" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:docs-contract" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:agent-config" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:target-capabilities" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:docs-style" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:docs-contract" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:agent-config" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:target-capabilities" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:unknown-check" = { profile = "bounded-unknown", parent = "gate:full-ci" }
 "bootstrap:python" = { profile = "bootstrap", parent = "gate:full-ci" }
 "bootstrap:clean-tree" = { profile = "bootstrap", parent = "gate:full-ci" }
@@ -189,14 +261,14 @@ source = "bootstrap-readonly-estimate"
 "ci:ruff-check" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ruff-format" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:mypy" = { profile = "ci-child", parent = "gate:full-ci" }
-"ci:pytest" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:pytest" = { profile = "ci-pytest", parent = "gate:full-ci" }
 "ci:coverage" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:package-build" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:twine-check" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:wheel-install" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:cli-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:tui-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
-"focused:planner" = { profile = "ci-child", parent = "gate:focused-cluster" }
+"focused:planner" = { profile = "focused-planner", parent = "gate:focused-cluster" }
 "focused:validators" = { profile = "ci-child", parent = "gate:focused-cluster" }
 "focused:static" = { profile = "ci-child", parent = "gate:focused-cluster" }
 "focused:pytest" = { profile = "ci-child", parent = "gate:focused-cluster" }
@@ -204,7 +276,8 @@ source = "bootstrap-readonly-estimate"
 "pre-final:ruff-check" = { profile = "ci-child", parent = "gate:pre-final" }
 "pre-final:ruff-format" = { profile = "ci-child", parent = "gate:pre-final" }
 "pre-final:mypy" = { profile = "ci-child", parent = "gate:pre-final" }
-"pre-final:pytest" = { profile = "ci-child", parent = "gate:pre-final" }
+"pre-final:pytest" = { profile = "ci-pytest", parent = "gate:pre-final" }
+"pre-final:planner" = { profile = "pre-final-planner", parent = "gate:pre-final" }
 "snapshot-tests:pytest" = { profile = "ci-child", parent = "gate:snapshot-tests" }
 "snapshot-tests:git" = { profile = "ci-child", parent = "gate:snapshot-tests" }
 "snapshot-tests:archive-create" = { profile = "ci-child", parent = "gate:snapshot-tests" }

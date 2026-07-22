@@ -52,7 +52,8 @@ def test_stall_sensitive_profiles_have_bounds(registry):
 
 def test_profile_for_execution_id_mappings(registry):
     assert profile_for_execution_id(registry, "gate:full-ci").profile_id == "full-ci"
-    assert profile_for_execution_id(registry, "ci:pytest").profile_id == "ci-child"
+    assert profile_for_execution_id(registry, "ci:pytest").profile_id == "ci-pytest"
+    assert profile_for_execution_id(registry, "ci:docs-style").profile_id == "ci-validator"
     assert profile_for_execution_id(registry, "gate:unknown").profile_id == "bounded-unknown"
 
 

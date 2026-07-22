@@ -160,49 +160,105 @@ def test_same_pytest_different_static_targets_changes_run_key(
     assert key_a != key_b
 
 
-def _mock_gate(open_gate):
+def _planner_payload(
+    steps_mod,
+    *,
+    target: str = "tests/test_core.py",
+    validators: list[str] | None = None,
+) -> dict[str, object]:
+    steps = _sample_steps(steps_mod, target=target)
+    if validators is not None:
+        steps = tuple(
+            steps_mod.PlannedStep(
+                kind="validator",
+                argv=(sys.executable, validator),
+            )
+            for validator in validators
+        )
+    return {
+        "plan": {
+            "validators": validators or [],
+            "pytest_targets": [target] if any(step.kind == "pytest" for step in steps) else [],
+            "command": list(steps[0].argv) if steps else [],
+            "validationLevel": 2,
+            "finalFocusedEvidence": True,
+        },
+        "steps": [{"kind": step.kind, "argv": list(step.argv)} for step in steps],
+        "metadata": list(_sample_metadata()),
+        "runKey": "test-run-key",
+        "testFileCount": 1 if any(step.kind == "pytest" for step in steps) else 0,
+    }
+
+
+def _mock_gate(open_gate, *, plan_payload: dict[str, object]):
     gate = type("Gate", (), {"stopped": False})()
     controller = open_gate.return_value
     controller.begin_gate.return_value = (gate, "run")
-    controller.run_child.return_value = (0, {"result": "success"})
+    controller.check_orchestration_budget.return_value = True
+
+    def _run_child(gate_arg, *, child_execution_id, command, **kwargs):
+        del gate_arg, kwargs
+        if child_execution_id == "focused:planner":
+            output_idx = command.index("--output") + 1
+            Path(command[output_idx]).write_text(json.dumps(plan_payload), encoding="utf-8")
+            return 0, {"result": "success"}
+        return 0, {"result": "success"}
+
+    controller.run_child.side_effect = _run_child
     controller.finish_gate.return_value = {"result": "success"}
     return controller, gate
 
 
-def test_force_reruns(runner_mod) -> None:
+def test_force_reruns(runner_mod, steps_mod) -> None:
     with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        _mock_gate(open_gate)
+        _mock_gate(open_gate, plan_payload=_planner_payload(steps_mod))
         with patch.object(runner_mod.TestRunLedger, "find_success", return_value=object()):
             rc = runner_mod.main(["--target", "tests/test_core.py", "--force"])
     assert rc == 0
 
 
-def test_skipped_when_already_passed(runner_mod, capsys) -> None:
+def test_skipped_when_already_passed(runner_mod, steps_mod, capsys) -> None:
     record = type(
         "Record",
         (),
         {"duration_seconds": 2.5, "result": "success", "exit_code": 0},
     )()
     with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        controller = open_gate.return_value
+        controller, _gate = _mock_gate(open_gate, plan_payload=_planner_payload(steps_mod))
         with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
             rc = runner_mod.main(["--target", "tests/test_core.py"])
-        controller.begin_gate.assert_not_called()
+        controller.begin_gate.assert_called_once()
+        assert controller.run_child.call_count == 1
     assert rc == 0
     output = capsys.readouterr().out
     assert "TEST_RUN_RESULT=skipped" in output
     assert "already-passed-for-current-state" in output
 
 
-def test_docs_only_runs_validators(runner_mod, capsys) -> None:
+def test_docs_only_runs_validators(runner_mod, steps_mod, capsys) -> None:
+    payload = _planner_payload(
+        steps_mod,
+        validators=["scripts/validate_test_impact.py"],
+    )
+    payload["steps"] = [
+        {
+            "kind": "validator",
+            "argv": [sys.executable, "scripts/validate_test_impact.py"],
+        }
+    ]
+    payload["plan"] = {
+        "validators": ["scripts/validate_test_impact.py"],
+        "pytest_targets": [],
+        "command": [],
+        "validationLevel": 2,
+        "finalFocusedEvidence": True,
+    }
+    payload["testFileCount"] = 0
     with patch.object(runner_mod.GateController, "open_gate_controller") as open_gate:
-        controller, gate = _mock_gate(open_gate)
-        with patch.object(
-            runner_mod, "collect_changed_files", return_value=["docs/ARCHITECTURE.md"]
-        ):
-            with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
-                rc = runner_mod.main([])
-        assert controller.run_child.called
+        controller, gate = _mock_gate(open_gate, plan_payload=payload)
+        with patch.object(runner_mod.TestRunLedger, "find_success", return_value=None):
+            rc = runner_mod.main([])
+        assert controller.run_child.call_count >= 2
     output = capsys.readouterr().out
     assert rc == 0
     assert "TEST_RUN_RESULT=success" in output
