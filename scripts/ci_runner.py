@@ -31,6 +31,7 @@ from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.execution_control.controller import run_monitored_command  # noqa: E402
 from scripts.execution_control.gate_controller import ActiveGate, GateController  # noqa: E402
 from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
+from scripts.execution_control.models import ExecutionStatus  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -896,6 +897,8 @@ print(importlib.metadata.version("spell-sync"))
         self._tree_digest_before = _ci_tree_digest(self.root)
         self._ci_input_digest_before = compute_ci_input_state(self.root, registry).digest
 
+        exit_code = 0
+        terminal_status: ExecutionStatus | None = None
         try:
             self.started_at = self.now().isoformat()
             py = self.python_bin
@@ -1127,6 +1130,8 @@ print(importlib.metadata.version("spell-sync"))
                     print(f"{check_id}: passed")
             return self._finish_with_gate(0)
         except KeyboardInterrupt:
+            exit_code = 130
+            terminal_status = ExecutionStatus.INTERRUPTED
             raise
         except BaseException as exc:
             if self._artifacts_ready:
@@ -1134,6 +1139,17 @@ print(importlib.metadata.version("spell-sync"))
             self._print_emergency_failure()
             return 1
         finally:
+            if (
+                self._gate is not None
+                and self._gate_controller is not None
+                and not self._gate.finalized
+            ):
+                self._parent_timing = self._gate_controller.finish_gate(
+                    self._gate,
+                    exit_code=exit_code,
+                    status=terminal_status,
+                )
+                self._gate = None
             self._cleanup()
 
 

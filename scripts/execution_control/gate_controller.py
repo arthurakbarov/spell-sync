@@ -66,6 +66,14 @@ class GateController(ExecutionController):
     def _parent_expired(self, gate: ActiveGate) -> bool:
         return time.monotonic() >= gate.parent_hard_deadline
 
+    def check_orchestration_budget(self, gate: ActiveGate) -> bool:
+        if gate.finalized or gate.stopped:
+            return False
+        if self._parent_expired(gate):
+            gate.stopped = True
+            return False
+        return True
+
     def begin_gate(
         self,
         *,
@@ -162,12 +170,13 @@ class GateController(ExecutionController):
             if result in {"timeout-hard", "timeout-stall", "failed"} and exit_code != 0:
                 gate.stopped = True
                 gate.failure_child = child_execution_id
-            elif exit_code != 0:
+            elif exit_code in {130, 124} or exit_code != 0:
                 gate.stopped = True
                 gate.failure_child = child_execution_id
         elif exit_code != 0:
             gate.stopped = True
             gate.failure_child = child_execution_id
+        gate.active_child = None
         return exit_code, timing
 
     def finish_gate(

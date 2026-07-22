@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -15,19 +17,8 @@ if str(ROOT) not in sys.path:
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.execution_control.gate_controller import GateController  # noqa: E402
 from scripts.execution_control.mappings import GATE_EXECUTION_IDS  # noqa: E402
+from scripts.execution_control.models import ExecutionStatus  # noqa: E402
 from scripts.execution_control.session import record_session_event  # noqa: E402
-from scripts.test_selection.changes import collect_changed_files  # noqa: E402
-from scripts.test_selection.planner import build_plan  # noqa: E402
-
-
-def _changed_python_files(changed: list[str]) -> list[str]:
-    return sorted(path for path in changed if path.endswith(".py"))
-
-
-def _changed_production_modules(changed: list[str]) -> list[str]:
-    return sorted(
-        path for path in changed if path.startswith("spell_sync/") and path.endswith(".py")
-    )
 
 
 def _step_execution_id(name: str) -> str:
@@ -54,52 +45,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", default=sys.executable)
     args = parser.parse_args(argv)
     py = args.python
-    changed = collect_changed_files(ROOT, base=None if args.base == "HEAD" else args.base)
-    plan = build_plan(ROOT, changed, level="cluster", python=py)
-
-    steps: list[tuple[str, list[str]]] = [
-        ("registry", [py, "scripts/validate_test_impact.py"]),
-    ]
-    if plan.pytest_targets:
-        steps.append(
-            (
-                "focused-pytest",
-                [
-                    py,
-                    "-m",
-                    "pytest",
-                    *plan.pytest_targets,
-                    "-q",
-                ],
-            )
-        )
-    for validator in plan.validators:
-        if validator.endswith(".sh"):
-            steps.append((f"validator:{validator}", ["bash", validator]))
-        else:
-            parts = validator.split()
-            steps.append((f"validator:{parts[0]}", [py, *parts]))
-
-    for path in _changed_python_files(changed):
-        steps.append((f"ruff-check:{path}", [py, "-m", "ruff", "check", path]))
-        steps.append((f"ruff-format:{path}", [py, "-m", "ruff", "format", "--check", path]))
-
-    for module in _changed_production_modules(changed):
-        pkg_path = str(Path(module).parent)
-        mypy_target = pkg_path if module.endswith("__init__.py") else module
-        steps.append((f"mypy:{module}", [py, "-m", "mypy", mypy_target]))
-
-    docs_validators = [
-        "scripts/check-docs-style.sh",
-        "scripts/check-docs-contract.py",
-    ]
-    if any(path.startswith(".cursor/") or "AGENT" in path.upper() for path in changed):
-        docs_validators.append("scripts/check-agent-config.py")
-    for validator in docs_validators:
-        if validator.endswith(".sh"):
-            steps.append((validator, ["bash", validator]))
-        else:
-            steps.append((validator, [py, validator]))
 
     gate_controller = GateController.open_gate_controller(ROOT)
     gate, state = gate_controller.begin_gate(
@@ -112,31 +57,73 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if state == "reused" else 1
 
     exit_code = 0
+    terminal_status: ExecutionStatus | None = None
+    plan_path = Path()
     try:
-        for name, command in steps:
-            started = time.monotonic()
-            execution_id = _step_execution_id(name)
-            rc, timing = gate_controller.run_child(
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as handle:
+            plan_path = Path(handle.name)
+        planner_argv = [
+            py,
+            str(ROOT / "scripts" / "build_pre_final_plan.py"),
+            "--base",
+            args.base,
+            "--python",
+            py,
+            "--output",
+            str(plan_path),
+        ]
+        if not gate_controller.check_orchestration_budget(gate):
+            exit_code = 124
+        else:
+            planner_rc, _ = gate_controller.run_child(
                 gate,
-                child_execution_id=execution_id,
-                command=command,
+                child_execution_id="pre-final:planner",
+                command=planner_argv,
                 mode="pre-final",
                 required=False,
                 cwd=ROOT,
             )
-            duration = time.monotonic() - started
-            if timing is None and rc == 0:
-                record_session_event(
-                    category="pre-final", duration_seconds=0.0, reused_saved=duration
-                )
+            if planner_rc != 0 or gate.stopped:
+                exit_code = planner_rc or 1
+            elif not gate_controller.check_orchestration_budget(gate):
+                exit_code = 124
             else:
-                record_session_event(category="pre-final", duration_seconds=duration)
-            print(f"PRE_FINAL_STEP={name} exit={rc} duration={duration:.2f}s")
-            if rc != 0 or gate.stopped:
-                exit_code = rc
-                break
+                payload = json.loads(plan_path.read_text(encoding="utf-8"))
+                for item in payload.get("steps", []):
+                    if not gate_controller.check_orchestration_budget(gate):
+                        exit_code = 124
+                        break
+                    name = str(item["name"])
+                    command = [str(part) for part in item["command"]]
+                    started = time.monotonic()
+                    execution_id = _step_execution_id(name)
+                    rc, timing = gate_controller.run_child(
+                        gate,
+                        child_execution_id=execution_id,
+                        command=command,
+                        mode="pre-final",
+                        required=False,
+                        cwd=ROOT,
+                    )
+                    duration = time.monotonic() - started
+                    if timing is None and rc == 0:
+                        record_session_event(
+                            category="pre-final", duration_seconds=0.0, reused_saved=duration
+                        )
+                    else:
+                        record_session_event(category="pre-final", duration_seconds=duration)
+                    print(f"PRE_FINAL_STEP={name} exit={rc} duration={duration:.2f}s")
+                    if rc != 0 or gate.stopped:
+                        exit_code = rc
+                        break
+    except KeyboardInterrupt:
+        exit_code = 130
+        terminal_status = ExecutionStatus.INTERRUPTED
+        raise
     finally:
-        gate_controller.finish_gate(gate, exit_code=exit_code)
+        if plan_path:
+            plan_path.unlink(missing_ok=True)
+        gate_controller.finish_gate(gate, exit_code=exit_code, status=terminal_status)
 
     counts = summarize_ci_history(ROOT / ".artifacts" / "ci").to_json_dict()
     print(f"PRE_FINAL_RESULT={'success' if exit_code == 0 else 'failed'}")
