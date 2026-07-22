@@ -8,7 +8,13 @@ from pathlib import Path
 
 _URL_CRED_RE = re.compile(r"(\w+://)([^/\s:@]+):([^@\s/]+)@")
 _ENV_ASSIGN_RE = re.compile(r"(?i)([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*)=([^\s]+)")
-_TOKEN_LIKE_RE = re.compile(r"\b[A-Za-z0-9_\-]{20,}\b")
+_BEARER_RE = re.compile(r"Bearer\s+[A-Za-z0-9_\-\.=]+", re.IGNORECASE)
+_BASIC_RE = re.compile(r"Basic\s+[A-Za-z0-9+/=]+", re.IGNORECASE)
+_PREFIX_TOKEN_RE = re.compile(r"\b(?:sk|ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_\-]{8,}\b")
+_TOKEN_LIKE_RE = re.compile(r"\b[A-Za-z0-9_\-]{32,}\b")
+_API_KEY_ASSIGN_RE = re.compile(
+    r"(?i)(api[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*[^\s]+"
+)
 
 
 def workspace_roots(*, public_root: Path) -> tuple[Path, ...]:
@@ -27,6 +33,27 @@ def workspace_roots(*, public_root: Path) -> tuple[Path, ...]:
     if dev_sibling.is_dir():
         roots.add(dev_sibling.resolve())
     return tuple(sorted(roots, key=lambda item: len(str(item)), reverse=True))
+
+
+def _redact_token_like(text: str) -> str:
+    redacted = text
+    redacted = _BEARER_RE.sub("Bearer [REDACTED]", redacted)
+    redacted = _BASIC_RE.sub("Basic [REDACTED]", redacted)
+    redacted = _PREFIX_TOKEN_RE.sub("[REDACTED]", redacted)
+    redacted = _API_KEY_ASSIGN_RE.sub(r"\1 [REDACTED]", redacted)
+
+    def _replace_long_match(match: re.Match[str]) -> str:
+        value = match.group(0)
+        if value.startswith("[") or value in {"REDACTED", "success", "failed", "interrupted"}:
+            return value
+        has_alpha = any(char.isalpha() for char in value)
+        has_digit = any(char.isdigit() for char in value)
+        if has_alpha and has_digit:
+            return "[REDACTED]"
+        return value
+
+    redacted = _TOKEN_LIKE_RE.sub(_replace_long_match, redacted)
+    return redacted
 
 
 def sanitize_text(
@@ -49,6 +76,7 @@ def sanitize_text(
         redacted = redacted.replace(f"/home/{user}", "[HOME]")
     redacted = _URL_CRED_RE.sub(r"\1[REDACTED]:[REDACTED]@", redacted)
     redacted = _ENV_ASSIGN_RE.sub(r"\1=[REDACTED]", redacted)
+    redacted = _redact_token_like(redacted)
     for key, value in os.environ.items():
         if not value or len(value) < 8:
             continue

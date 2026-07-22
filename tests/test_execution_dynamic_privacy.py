@@ -64,14 +64,17 @@ def test_timeout_bundle_excludes_dynamic_home(isolated_state_dir, monkeypatch):
         admission_decision="run",
         context_signature="test",
     )
-    path = collect_timeout_bundle(
+    bundle = collect_timeout_bundle(
         plan=plan,
         result=result,
         active_child="ci:pytest",
         timeout_kind="hard",
         public_root=ROOT,
     )
-    text = Path(path).read_text(encoding="utf-8")
+    if bundle.path is None:
+        assert bundle.incomplete
+        return
+    text = Path(bundle.path).read_text(encoding="utf-8")
     assert dynamic not in text
     assert str(Path.home()) not in text
 

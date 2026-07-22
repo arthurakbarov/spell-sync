@@ -27,6 +27,11 @@ MONITORED_FILES = (
     "scripts/run_snapshot_tests.py",
 )
 
+PLANNER_SCRIPT_FILES = (
+    "scripts/build_focused_plan.py",
+    "scripts/build_pre_final_plan.py",
+)
+
 FORBIDDEN_PATTERNS = (
     (re.compile(r"\|\s*tail\b"), "[EXECUTION-CONTROL-BOUNDARY-003] tail pipeline forbidden"),
     (re.compile(r"\|\s*tee\b"), "[EXECUTION-CONTROL-BOUNDARY-003] tee pipeline forbidden"),
@@ -264,13 +269,200 @@ def _check_soft_reporting_wired() -> list[str]:
 def _check_process_group_cleanup() -> list[str]:
     errors: list[str] = []
     process_tree = _read(ROOT / "scripts/execution_control/process_tree.py")
-    terminate = process_tree.split("def _terminate_owned_group", 1)[-1].split("def ", 1)[0]
-    if "proc.poll()" in terminate and "return" in terminate:
-        errors.append("[EXECUTION-CONTROL-TERM-001] leader exit must not skip group cleanup")
+    if "capture_ownership_snapshot" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-TERM-002] hard-timeout path must capture ownership before signals; "
+            "remediation: add capture_ownership_snapshot in process_tree.py"
+        )
+    if "terminate_ownership_snapshot" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-TERM-002] termination must use captured ownership snapshot"
+        )
+    if "ProcessIdentity" not in process_tree or "start_marker" not in process_tree:
+        errors.append(
+            "[EXECUTION-CONTROL-TERM-002] descendant cleanup must guard against PID reuse"
+        )
+    terminate = process_tree.split("def terminate_ownership_snapshot", 1)[-1].split("def ", 1)[0]
+    if "collect_descendants(" in terminate:
+        errors.append(
+            "[EXECUTION-CONTROL-TERM-002] late-only descendant scan forbidden after signals"
+        )
     if "_process_group_exists" not in process_tree:
         errors.append(
             "[EXECUTION-CONTROL-TERM-001] owned group existence must be checked before return"
         )
+    return errors
+
+
+def _check_parent_interrupt_runners() -> list[str]:
+    errors: list[str] = []
+    for rel in (
+        "scripts/run_focused_tests.py",
+        "scripts/run_pre_final_checks.py",
+        "scripts/run_snapshot_tests.py",
+        "scripts/ci_runner.py",
+    ):
+        text = _read(ROOT / rel)
+        if "except KeyboardInterrupt" not in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-INTERRUPT-003] {rel} must handle KeyboardInterrupt explicitly"
+            )
+        if "exit_code = 130" not in text or "ExecutionStatus.INTERRUPTED" not in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-INTERRUPT-003] {rel} must set parent interrupted exit 130"
+            )
+        if "finally:" not in text or "finish_gate" not in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-INTERRUPT-003] {rel} must finish gate exactly once in finally"
+            )
+    return errors
+
+
+def _check_no_sync_diagnostic_fallback() -> list[str]:
+    errors: list[str] = []
+    diagnostics = _read(ROOT / "scripts/execution_control/diagnostics.py")
+    if (
+        "bundle_path.write_text" in diagnostics
+        or "Path.write_text" in diagnostics.split("def collect_timeout_bundle", 1)[-1]
+    ):
+        if "bundle_path.write_text" in diagnostics:
+            errors.append(
+                "[EXECUTION-CONTROL-DIAGNOSTICS-003] sync bundle write after deadline forbidden"
+            )
+    if "DiagnosticBundleResult" not in diagnostics:
+        errors.append(
+            "[EXECUTION-CONTROL-DIAGNOSTICS-003] diagnostics must return incomplete bundle results"
+        )
+    return errors
+
+
+def _check_hermetic_snapshot_tests() -> list[str]:
+    errors: list[str] = []
+    path = ROOT / "tests/test_execution_snapshot_hermetic.py"
+    if not path.is_file():
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-003] missing hermetic snapshot tests")
+        return errors
+    text = _read(path)
+    if "snapshot.workspace-layout-invalid" not in text:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-003] hermetic tests must cover invalid workspace layout"
+        )
+    if "code.zip" not in text:
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-003] hermetic tests must guard owner code.zip")
+    if "--workspace-root" not in text:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-003] hermetic tests must use explicit workspace root"
+        )
+    return errors
+
+
+def _check_snapshot_workspace_root_flag() -> list[str]:
+    errors: list[str] = []
+    runner = _read(ROOT / "scripts/run_snapshot_tests.py")
+    workspace_paths = _read(ROOT / "scripts/execution_control/workspace_paths.py")
+    if "--workspace-root" not in runner:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-004] run_snapshot_tests.py must accept --workspace-root"
+        )
+    if "snapshot.workspace-layout-invalid" not in workspace_paths:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-004] invalid layout must emit workspace-layout-invalid"
+        )
+    return errors
+
+
+def _check_planner_scripts_exist() -> list[str]:
+    errors: list[str] = []
+    for rel in PLANNER_SCRIPT_FILES:
+        if not (ROOT / rel).is_file():
+            errors.append(f"[EXECUTION-CONTROL-PLANNER-002] missing planner script {rel}")
+    return errors
+
+
+def _check_planner_supervision() -> list[str]:
+    errors: list[str] = []
+    focused = _read(ROOT / "scripts/run_focused_tests.py")
+    pre_final = _read(ROOT / "scripts/run_pre_final_checks.py")
+    if "focused:planner" not in focused or "build_focused_plan.py" not in focused:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] focused gate must run supervised planner child"
+        )
+    if "pre-final:planner" not in pre_final or "build_pre_final_plan.py" not in pre_final:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] pre-final gate must run supervised planner child"
+        )
+    if "build_plan(" in focused.split("begin_gate", 1)[0]:
+        errors.append(
+            "[EXECUTION-CONTROL-PLANNER-001] focused planning before begin_gate forbidden"
+        )
+    return errors
+
+
+def _check_profile_specificity(registry) -> list[str]:
+    errors: list[str] = []
+    pytest_mapping = registry.child_mappings.get("ci:pytest")
+    docs_mapping = registry.child_mappings.get("ci:docs-style")
+    if pytest_mapping is None or pytest_mapping.profile_id != "ci-pytest":
+        errors.append("[EXECUTION-CONTROL-PROFILE-001] ci:pytest must map to ci-pytest profile")
+    if docs_mapping is None or docs_mapping.profile_id != "ci-validator":
+        errors.append(
+            "[EXECUTION-CONTROL-PROFILE-001] docs validators must map to ci-validator profile"
+        )
+    pytest_profile = registry.profiles.get("ci-pytest")
+    validator_profile = registry.profiles.get("ci-validator")
+    child_profile = registry.profiles.get("ci-child")
+    if (
+        pytest_profile
+        and validator_profile
+        and pytest_profile.initial_hard_seconds <= validator_profile.initial_hard_seconds
+    ):
+        errors.append("[EXECUTION-CONTROL-PROFILE-001] pytest hard must exceed validator hard")
+    if (
+        child_profile
+        and pytest_profile
+        and child_profile.initial_hard_seconds >= pytest_profile.initial_hard_seconds
+    ):
+        errors.append(
+            "[EXECUTION-CONTROL-PROFILE-001] generic ci-child must not inherit pytest hard budget"
+        )
+    if child_profile and child_profile.initial_hard_seconds > 300:
+        errors.append("[EXECUTION-CONTROL-PROFILE-001] generic ci-child hard must remain 300")
+    return errors
+
+
+def _check_token_privacy_policy() -> list[str]:
+    errors: list[str] = []
+    privacy = _read(ROOT / "scripts/execution_control/privacy.py")
+    if "_TOKEN_LIKE_RE" not in privacy or "_redact_token_like" not in privacy:
+        errors.append(
+            "[EXECUTION-CONTROL-PRIVACY-007] token-like regex policy must be applied in privacy.py"
+        )
+    token_test = ROOT / "tests/test_execution_token_privacy.py"
+    if not token_test.is_file():
+        errors.append("[EXECUTION-CONTROL-PRIVACY-007] missing token privacy tests")
+    else:
+        text = _read(token_test)
+        if "secrets.token_urlsafe" not in text or "Bearer" not in text:
+            errors.append(
+                "[EXECUTION-CONTROL-PRIVACY-007] token privacy tests must use runtime secrets"
+            )
+    return errors
+
+
+def _check_required_execution_tests() -> list[str]:
+    errors: list[str] = []
+    required = (
+        "tests/test_execution_hard_timeout_detached.py",
+        "tests/test_execution_parent_interrupt_status.py",
+        "tests/test_execution_diagnostic_absolute_deadline.py",
+        "tests/test_execution_snapshot_hermetic.py",
+        "tests/test_execution_planner_supervision.py",
+        "tests/test_execution_profile_specificity.py",
+        "tests/test_execution_token_privacy.py",
+    )
+    for rel in required:
+        if not (ROOT / rel).is_file():
+            errors.append(f"[EXECUTION-CONTROL-TESTS-001] missing required test file {rel}")
     return errors
 
 
@@ -341,20 +533,25 @@ def _check_snapshot_integration() -> list[str]:
         )
         return errors
     text = _read(runner)
+    workspace_paths = _read(ROOT / "scripts/execution_control/workspace_paths.py")
     tokens = (
         "gate:snapshot-tests",
-        "snapshot-tests:pytest",
         "archive-create",
         "archive-check",
-        "resolve_spell_sync_dev_root",
+        "validate_snapshot_workspace",
         "SNAPSHOT_GATE_RESULT=blocked",
+        "--workspace-root",
     )
     for token in tokens:
-        if token not in text:
+        if token not in text and token not in workspace_paths:
             errors.append(
-                f"[EXECUTION-CONTROL-SNAPSHOT-001] run_snapshot_tests.py must reference {token}; "
-                "remediation: wire private snapshot workflow"
+                f"[EXECUTION-CONTROL-SNAPSHOT-001] snapshot gate must reference {token}; "
+                "remediation: wire workspace-aware snapshot workflow"
             )
+    if "snapshot-tests:pytest" not in text and "snapshot_step_execution_id" not in text:
+        errors.append(
+            "[EXECUTION-CONTROL-SNAPSHOT-001] snapshot gate must map pytest step execution id"
+        )
     if "tarfile.open" in text:
         errors.append(
             "[EXECUTION-CONTROL-SNAPSHOT-002] snapshot gate must not use fake tar fallback"
@@ -451,6 +648,15 @@ def main() -> int:
     errors.extend(_check_single_gate_finalization())
     errors.extend(_check_soft_reporting_wired())
     errors.extend(_check_process_group_cleanup())
+    errors.extend(_check_parent_interrupt_runners())
+    errors.extend(_check_no_sync_diagnostic_fallback())
+    errors.extend(_check_hermetic_snapshot_tests())
+    errors.extend(_check_snapshot_workspace_root_flag())
+    errors.extend(_check_planner_supervision())
+    errors.extend(_check_planner_scripts_exist())
+    errors.extend(_check_profile_specificity(registry))
+    errors.extend(_check_token_privacy_policy())
+    errors.extend(_check_required_execution_tests())
     errors.extend(_check_interrupt_handshake())
     errors.extend(_check_dynamic_privacy_tests())
     errors.extend(_check_active_child_lease())
