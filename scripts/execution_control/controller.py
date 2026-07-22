@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .admission import assess_admission
+from .admission import assess_admission, narrow_replacement_plan
 from .diagnostics import collect_timeout_bundle
 from .history import HistoryStore
 from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
 from .paths import plan_artifact_path
+from .privacy import sanitize_text, workspace_roots
 from .process_tree import ProcessResult, run_owned_command
 from .progress import create_tracker
 from .registry import (
@@ -95,6 +98,19 @@ class ExecutionController:
             print("EXECUTION_RESULT=blocked")
             print("EXECUTION_FAILED_ID=execution.narrow-admission")
             print(f"EXECUTION_ADMISSION_REASON={admission.reason}")
+            replacement = narrow_replacement_plan(
+                execution_id=execution_id,
+                mode=mode,
+                admission=admission,
+                plan=plan,
+            )
+            print(f"EXECUTION_REPLACEMENT_REQUIRED_CHECKS={','.join(replacement.required_checks)}")
+            print(f"EXECUTION_REPLACEMENT_DEFERRED_CHECKS={','.join(replacement.deferred_checks)}")
+            print(f"EXECUTION_REPLACEMENT_EXECUTION_ID={replacement.suggested_execution_id}")
+            print(f"EXECUTION_REPLACEMENT_COMMAND_KEY={replacement.suggested_command_key}")
+            print(
+                f"EXECUTION_REPLACEMENT_PREDICTED_COST={replacement.predicted_replacement_cost:.2f}"
+            )
             if plan is not None:
                 self._persist_plan(plan)
                 print_plan(plan)
@@ -121,6 +137,16 @@ class ExecutionController:
             print("EXECUTION_FAILED_ID=execution.duplicate-active")
             if owner:
                 print(f"EXECUTION_OWNER_PID={owner.get('owner_pid', '')}")
+                print(f"EXECUTION_PARENT_RUN_ID={owner.get('run_id', '')}")
+                print(f"EXECUTION_ACTIVE_CHILD={owner.get('active_child', '')}")
+                started_at = str(owner.get("started_at", ""))
+                if started_at:
+                    try:
+                        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+                        print(f"EXECUTION_PARENT_ELAPSED_SECONDS={elapsed:.2f}")
+                    except ValueError:
+                        pass
             return None, ExecutionStatus.BLOCKED_DUPLICATE.value
         self._persist_plan(plan)
         print_plan(plan)
@@ -137,20 +163,32 @@ class ExecutionController:
         parent_span_id: str | None = None,
         parent_run_id: str | None = None,
         release_lease: bool = True,
+        parent_deadline_monotonic: float | None = None,
+        hard_seconds_override: float | None = None,
     ) -> tuple[int, dict[str, Any]]:
         tracker = create_tracker(plan.progress_contract_id)
+        effective_hard = (
+            hard_seconds_override if hard_seconds_override is not None else plan.hard_seconds
+        )
+        if parent_deadline_monotonic is not None:
+            parent_remaining = max(0.0, parent_deadline_monotonic - time.monotonic())
+            effective_hard = min(effective_hard, parent_remaining)
+        roots = workspace_roots(public_root=self.root)
         try:
             result = run_owned_command(
                 command,
                 cwd=cwd or self.root,
                 env=env,
-                hard_seconds=plan.hard_seconds,
+                hard_seconds=max(0.001, effective_hard),
                 soft_seconds=plan.soft_seconds,
                 stall_seconds=plan.stall_seconds,
                 termination_grace_seconds=plan.termination_grace_seconds,
                 tracker=tracker,
                 enforce_hard=self.enforce_hard,
                 enforce_stall=self.enforce_stall,
+                parent_deadline_monotonic=parent_deadline_monotonic,
+                soft_report_plan=plan,
+                active_child=active_child or plan.execution_id,
             )
         except KeyboardInterrupt:
             self._record_interrupt_span(
@@ -170,6 +208,7 @@ class ExecutionController:
                 result=result,
                 active_child=active_child or plan.execution_id,
                 timeout_kind=result.timeout_kind or "hard",
+                public_root=self.root,
             )
         run_id = parent_run_id or plan.run_id
         record = SpanRecord(
@@ -242,8 +281,8 @@ class ExecutionController:
             **plan.to_json_dict(),
             "actualSeconds": result.duration_seconds,
             "result": status.value,
-            "stdoutTail": result.stdout_tail,
-            "stderrTail": result.stderr_tail,
+            "stdoutTail": sanitize_text(result.stdout_tail, workspace_roots=roots),
+            "stderrTail": sanitize_text(result.stderr_tail, workspace_roots=roots),
             "spanId": record.span_id,
             "parentSpanId": parent_span_id,
         }

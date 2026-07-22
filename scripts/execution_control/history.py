@@ -286,6 +286,21 @@ class HistoryStore:
         except sqlite3.Error:
             self.degraded = True
 
+    def update_active_child(self, normalized_signature: str, active_child: str) -> None:
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    UPDATE active_leases
+                    SET active_child = ?
+                    WHERE normalized_signature = ?
+                    """,
+                    (active_child, normalized_signature),
+                )
+                connection.commit()
+        except sqlite3.Error:
+            self.degraded = True
+
     def new_span_id(self) -> str:
         return uuid.uuid4().hex
 

@@ -21,6 +21,51 @@ from .registry import ExecutionBudgetRegistry, Profile
 
 
 @dataclass(frozen=True, slots=True)
+class NarrowReplacementPlan:
+    required_checks: tuple[str, ...]
+    deferred_checks: tuple[str, ...]
+    suggested_execution_id: str
+    suggested_command_key: str
+    predicted_replacement_cost: float
+
+
+def narrow_replacement_plan(
+    *,
+    execution_id: str,
+    mode: str,
+    admission: AdmissionPlan,
+    plan: object | None,
+) -> NarrowReplacementPlan:
+    del mode
+    predicted = admission.total_expected_seconds
+    if execution_id == "gate:focused-cluster":
+        return NarrowReplacementPlan(
+            required_checks=("gate:focused-module", "focused:pytest"),
+            deferred_checks=("gate:focused-cluster", "focused:static"),
+            suggested_execution_id="gate:focused-module",
+            suggested_command_key="focused-module",
+            predicted_replacement_cost=max(1.0, predicted * 0.4),
+        )
+    if execution_id == "gate:focused-module":
+        return NarrowReplacementPlan(
+            required_checks=("focused:validators",),
+            deferred_checks=(execution_id, "focused:pytest", "focused:static"),
+            suggested_execution_id="focused:validators",
+            suggested_command_key="focused-validators",
+            predicted_replacement_cost=max(1.0, predicted * 0.2),
+        )
+    if plan is not None and hasattr(plan, "expected_seconds"):
+        predicted = float(getattr(plan, "expected_seconds", predicted))
+    return NarrowReplacementPlan(
+        required_checks=admission.required_checks,
+        deferred_checks=admission.optional_checks,
+        suggested_execution_id=execution_id,
+        suggested_command_key=execution_id.split(":")[-1],
+        predicted_replacement_cost=predicted,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class AdmissionPlan:
     decision: AdmissionDecision
     reason: str

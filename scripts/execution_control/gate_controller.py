@@ -29,10 +29,15 @@ class ActiveGate:
     parent_span_id: str
     started_monotonic: float
     started_at: str
+    parent_hard_deadline: float
     child_duration_sum: float = 0.0
     active_child: str | None = None
     stopped: bool = False
     failure_child: str | None = None
+    finalized: bool = False
+    terminal_status: str | None = None
+    terminal_exit_code: int | None = None
+    terminal_timing: dict[str, object] | None = None
 
 
 @dataclass
@@ -55,6 +60,12 @@ class GateController(ExecutionController):
             enforce_stall=enforce_stall,
         )
 
+    def _parent_remaining(self, gate: ActiveGate) -> float:
+        return max(0.0, gate.parent_hard_deadline - time.monotonic())
+
+    def _parent_expired(self, gate: ActiveGate) -> bool:
+        return time.monotonic() >= gate.parent_hard_deadline
+
     def begin_gate(
         self,
         *,
@@ -73,12 +84,14 @@ class GateController(ExecutionController):
         )
         if plan is None:
             return None, state
+        started_monotonic = time.monotonic()
         parent_span_id = self.history.new_span_id()
         gate = ActiveGate(
             parent_plan=plan,
             parent_span_id=parent_span_id,
-            started_monotonic=time.monotonic(),
+            started_monotonic=started_monotonic,
             started_at=_utc_now(),
+            parent_hard_deadline=started_monotonic + plan.hard_seconds,
         )
         self._active_gate = gate
         self._persist_plan(plan)
@@ -86,6 +99,7 @@ class GateController(ExecutionController):
         print(f"EXECUTION_GATE_RUN_ID={plan.run_id}")
         print(f"EXECUTION_GATE_SPAN_ID={gate.parent_span_id}")
         print(f"EXECUTION_GATE_HARD_SECONDS={plan.hard_seconds}")
+        print("EXECUTION_PARENT_HARD_SUPERVISION=active")
         return gate, "run"
 
     def run_child(
@@ -100,9 +114,17 @@ class GateController(ExecutionController):
         env: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> tuple[int, dict[str, object] | None]:
-        if gate.stopped:
-            return 1, None
+        if gate.finalized or gate.stopped:
+            return gate.terminal_exit_code or 1, gate.terminal_timing
+        if self._parent_expired(gate):
+            gate.stopped = True
+            gate.failure_child = child_execution_id
+            return 124, None
         gate.active_child = child_execution_id
+        self.history.update_active_child(
+            gate.parent_plan.normalized_signature,
+            child_execution_id,
+        )
         child_plan, state = self.prepare_plan(
             execution_id=child_execution_id,
             command=command,
@@ -120,6 +142,8 @@ class GateController(ExecutionController):
             gate.stopped = True
             gate.failure_child = child_execution_id
             return 1, None
+        parent_remaining = self._parent_remaining(gate)
+        effective_hard = min(child_plan.hard_seconds, parent_remaining)
         exit_code, timing = self.run(
             child_plan,
             command,
@@ -129,6 +153,8 @@ class GateController(ExecutionController):
             parent_span_id=gate.parent_span_id,
             parent_run_id=gate.parent_plan.run_id,
             release_lease=True,
+            parent_deadline_monotonic=gate.parent_hard_deadline,
+            hard_seconds_override=max(0.001, effective_hard),
         )
         if timing is not None:
             gate.child_duration_sum += float(timing.get("actualSeconds", 0.0))
@@ -136,7 +162,12 @@ class GateController(ExecutionController):
             if result in {"timeout-hard", "timeout-stall", "failed"} and exit_code != 0:
                 gate.stopped = True
                 gate.failure_child = child_execution_id
-                self.finish_gate(gate, exit_code=exit_code, status=ExecutionStatus.FAILED)
+            elif exit_code != 0:
+                gate.stopped = True
+                gate.failure_child = child_execution_id
+        elif exit_code != 0:
+            gate.stopped = True
+            gate.failure_child = child_execution_id
         return exit_code, timing
 
     def finish_gate(
@@ -146,12 +177,23 @@ class GateController(ExecutionController):
         exit_code: int,
         status: ExecutionStatus | None = None,
     ) -> dict[str, object]:
+        if gate.finalized:
+            if gate.terminal_timing is None:
+                raise RuntimeError("gate finalized without terminal timing")
+            return gate.terminal_timing
+
         ended_monotonic = time.monotonic()
         wall_seconds = ended_monotonic - gate.started_monotonic
         ended_at = _utc_now()
         plan = gate.parent_plan
         if status is None:
-            if exit_code == 0:
+            if exit_code == 130:
+                status = ExecutionStatus.INTERRUPTED
+            elif exit_code == 124 or (
+                self._parent_expired(gate) and gate.failure_child is not None
+            ):
+                status = ExecutionStatus.TIMEOUT_HARD
+            elif exit_code == 0:
                 status = (
                     ExecutionStatus.SUCCESS_SLOW
                     if wall_seconds > plan.soft_seconds
@@ -208,7 +250,7 @@ class GateController(ExecutionController):
         self.history.release_lease(plan.normalized_signature)
         category = "full-ci" if plan.profile_id == "full-ci" else plan.profile_id
         record_session_event(category=category, duration_seconds=wall_seconds)
-        timing = {
+        timing: dict[str, object] = {
             **plan.to_json_dict(),
             "actualSeconds": round(wall_seconds, 2),
             "childDurationSum": round(gate.child_duration_sum, 2),
@@ -226,5 +268,9 @@ class GateController(ExecutionController):
             history_updated=not self.history.degraded,
             learning_accepted=accepted,
         )
+        gate.finalized = True
+        gate.terminal_status = status.value
+        gate.terminal_exit_code = exit_code
+        gate.terminal_timing = timing
         self._active_gate = None
         return timing
