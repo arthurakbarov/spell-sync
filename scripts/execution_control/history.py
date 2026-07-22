@@ -6,9 +6,11 @@ import os
 import shutil
 import sqlite3
 import uuid
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 from .models import SpanRecord
 from .paths import HISTORY_SCHEMA_VERSION, history_database_path
@@ -77,6 +79,18 @@ CREATE INDEX IF NOT EXISTS idx_spans_run_id ON spans(run_id);
 class HistoryStore:
     path: Path
     degraded: bool = False
+    _held_connection: sqlite3.Connection | None = field(default=None, init=False, repr=False)
+
+    def close(self) -> None:
+        if self._held_connection is not None:
+            self._held_connection.close()
+            self._held_connection = None
+
+    def __enter__(self) -> HistoryStore:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     @classmethod
     def open(cls, path: Path | None = None) -> HistoryStore:
@@ -90,12 +104,16 @@ class HistoryStore:
             store._quarantine_and_recreate()
         return store
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=5)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=5000")
         connection.execute("PRAGMA journal_mode=WAL")
-        return connection
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
