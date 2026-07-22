@@ -27,6 +27,15 @@ def _pid_alive(pid: int) -> bool:
     return ident.is_running()
 
 
+def _wait_for_file(path: Path, *, timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.is_file():
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"missing readiness file: {path}")
+
+
 def test_ownership_snapshot_captured_before_signals(isolated_state_dir):
     del isolated_state_dir
     proc = subprocess.Popen(
@@ -73,6 +82,7 @@ def test_detached_descendants_terminated(isolated_state_dir, tmp_path):
         marker_sleep_command("EXEC_UNRELATED_MARKER", 60.0),
         start_new_session=True,
     )
+    ready_file = tmp_path / "ready"
     child_pid_file = tmp_path / "child.pid"
     grandchild_pid_file = tmp_path / "grandchild.pid"
     script = textwrap.dedent(
@@ -89,30 +99,34 @@ def test_detached_descendants_terminated(isolated_state_dir, tmp_path):
             start_new_session=True,
         )
         Path({str(child_pid_file)!r}).write_text(str(child.pid))
+        Path({str(ready_file)!r}).write_text("READY")
         time.sleep(60)
         """
     )
-    result = run_owned_command(
-        [sys.executable, "-c", script],
-        cwd=ROOT,
-        env=None,
-        hard_seconds=0.35,
-        soft_seconds=0.2,
-        stall_seconds=None,
-        termination_grace_seconds=0.25,
-        tracker=None,
-        enforce_hard=True,
-        enforce_stall=False,
-    )
-
-    assert result.exit_code == 124
-    assert child_pid_file.is_file()
-    assert grandchild_pid_file.is_file()
-    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
-    grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
-    assert result.detached_pids == ()
-    assert not _pid_alive(child_pid)
-    assert not _pid_alive(grandchild_pid)
-    assert _pid_alive(unrelated.pid)
-    unrelated.send_signal(signal.SIGTERM)
-    unrelated.wait(timeout=5)
+    try:
+        result = run_owned_command(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            env=None,
+            hard_seconds=2.0,
+            soft_seconds=0.5,
+            stall_seconds=None,
+            termination_grace_seconds=0.25,
+            tracker=None,
+            enforce_hard=True,
+            enforce_stall=False,
+        )
+        _wait_for_file(ready_file, timeout=5.0)
+        assert result.exit_code == 124
+        assert child_pid_file.is_file()
+        assert grandchild_pid_file.is_file()
+        child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+        grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
+        assert result.detached_pids == ()
+        assert not _pid_alive(child_pid)
+        assert not _pid_alive(grandchild_pid)
+    finally:
+        if _pid_alive(unrelated.pid):
+            unrelated.send_signal(signal.SIGTERM)
+            unrelated.wait(timeout=5)
+    assert not _pid_alive(unrelated.pid)

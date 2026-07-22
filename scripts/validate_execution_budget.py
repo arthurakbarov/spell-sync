@@ -709,6 +709,133 @@ def _check_session_deltas() -> list[str]:
     return errors
 
 
+def _check_functional_output_separation() -> list[str]:
+    errors: list[str] = []
+    controller = _read(ROOT / "scripts/execution_control/controller.py")
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    if "ControlledExecutionResult" not in controller:
+        errors.append(
+            "[EXECUTION-CONTROL-OUTPUT-001] controller must return ControlledExecutionResult"
+        )
+    if "raw_stdout_tail" not in controller:
+        errors.append("[EXECUTION-CONTROL-OUTPUT-001] controller must retain raw stdout in-process")
+    if (
+        'timing.get("stdoutTail"'
+        in ci.split("def _run_bounded_step", 1)[-1].split("def _run_check", 1)[0]
+    ):
+        errors.append(
+            "[EXECUTION-CONTROL-OUTPUT-001] bounded steps must not parse sanitized stdoutTail"
+        )
+    test_path = ROOT / "tests/test_execution_wheel_origin_output.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-OUTPUT-001] missing wheel origin output separation tests")
+    return errors
+
+
+def _check_wheel_smoke_composite() -> list[str]:
+    errors: list[str] = []
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    mappings = _read(ROOT / "scripts/execution_control/mappings.py")
+    toml = _read(ROOT / "tests/execution-budget.toml")
+    required_ids = (
+        "ci:wheel-smoke-venv",
+        "ci:wheel-smoke-install",
+        "ci:wheel-smoke-origin",
+        "ci:wheel-smoke-version",
+        "ci:wheel-smoke-cli-version",
+        "ci:wheel-smoke-cli-help",
+        "ci:wheel-smoke-support-report",
+    )
+    for execution_id in required_ids:
+        if f'"{execution_id}"' not in toml:
+            errors.append(f"[EXECUTION-CONTROL-WHEEL-001] missing child mapping {execution_id}")
+        if execution_id not in mappings:
+            errors.append(
+                f"[EXECUTION-CONTROL-WHEEL-001] missing stable ID mapping for {execution_id}"
+            )
+    if "_wheel_smoke_composite_timing" not in ci:
+        errors.append("[EXECUTION-CONTROL-WHEEL-001] wheel-smoke must emit composite timing")
+    if "packaging.wheel-smoke.venv" not in ci:
+        errors.append("[EXECUTION-CONTROL-WHEEL-001] wheel-smoke preview must list substeps")
+    if "json.dumps(payload)" not in ci and "_WHEEL_ORIGIN_PROBE_SCRIPT" not in ci:
+        errors.append("[EXECUTION-CONTROL-WHEEL-001] wheel origin must use structured JSON probe")
+    if "PYTHONNOUSERSITE" not in ci:
+        errors.append("[EXECUTION-CONTROL-WHEEL-002] wheel-smoke env must set PYTHONNOUSERSITE=1")
+    return errors
+
+
+def _check_workload_bootstrap_cost(registry) -> list[str]:
+    errors: list[str] = []
+    profile = registry.profiles.get("focused-pytest")
+    if profile is None or profile.workload_cost is None:
+        errors.append(
+            "[EXECUTION-CONTROL-WORKLOAD-001] focused-pytest profile requires workloadCost"
+        )
+    prediction = _read(ROOT / "scripts/execution_control/prediction.py")
+    if (
+        "bootstrap-workload-cost" not in prediction
+        or "WORKLOAD_SENSITIVE_EXECUTION_IDS" not in prediction
+    ):
+        errors.append(
+            "[EXECUTION-CONTROL-WORKLOAD-001] prediction must apply bootstrap workload cost"
+        )
+    test_path = ROOT / "tests/test_execution_workload_prediction.py"
+    if not test_path.is_file():
+        errors.append("[EXECUTION-CONTROL-WORKLOAD-001] missing workload prediction tests")
+    else:
+        text = _read(test_path)
+        if "edit_loop_budget_seconds=1" in text:
+            errors.append(
+                "[EXECUTION-CONTROL-WORKLOAD-002] admission proof must use normal committed budget"
+            )
+        if "test_normal_budget_large_focused_plan_narrows" not in text:
+            errors.append("[EXECUTION-CONTROL-WORKLOAD-002] missing normal-budget admission proof")
+    return errors
+
+
+def _check_descendant_readiness_tests() -> list[str]:
+    errors: list[str] = []
+    path = ROOT / "tests/test_execution_descendant_cleanup.py"
+    if not path.is_file():
+        errors.append("[EXECUTION-CONTROL-PROCESS-001] missing descendant cleanup tests")
+        return errors
+    text = _read(path)
+    if "hard_seconds=0.35" in text:
+        errors.append(
+            "[EXECUTION-CONTROL-PROCESS-001] descendant test must not use hard_seconds=0.35"
+        )
+    if "finally:" not in text:
+        errors.append("[EXECUTION-CONTROL-PROCESS-001] descendant test must cleanup in finally")
+    if "READY" not in text:
+        errors.append("[EXECUTION-CONTROL-PROCESS-001] descendant test must use readiness protocol")
+    return errors
+
+
+def _check_non_vacuous_snapshot_tests() -> list[str]:
+    errors: list[str] = []
+    path = ROOT / "tests/test_execution_snapshot_hermetic.py"
+    if not path.is_file():
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-006] missing hermetic snapshot tests")
+        return errors
+    text = _read(path)
+    if "test_hermetic_snapshot_gate_parent_child_preview" not in text:
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-006] missing in-process hermetic snapshot test")
+    if "code.zip" not in text:
+        errors.append("[EXECUTION-CONTROL-SNAPSHOT-006] owner archive isolation proof required")
+    return errors
+
+
+def _check_ci_evidence_on_failure() -> list[str]:
+    errors: list[str] = []
+    evidence = _read(ROOT / "scripts/check-ci-evidence.py")
+    if "CI_EVIDENCE_RESULT=success" not in evidence:
+        errors.append("[EXECUTION-CONTROL-EVIDENCE-001] check-ci-evidence must emit success marker")
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    if "_final_evidence" not in ci:
+        errors.append("[EXECUTION-CONTROL-EVIDENCE-001] ci_runner must track final evidence mode")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     try:
@@ -794,6 +921,12 @@ def main() -> int:
     errors.extend(_check_snapshot_integration())
     errors.extend(_check_atomic_ids(registry))
     errors.extend(_check_session_deltas())
+    errors.extend(_check_functional_output_separation())
+    errors.extend(_check_wheel_smoke_composite())
+    errors.extend(_check_workload_bootstrap_cost(registry))
+    errors.extend(_check_descendant_readiness_tests())
+    errors.extend(_check_non_vacuous_snapshot_tests())
+    errors.extend(_check_ci_evidence_on_failure())
 
     product_paths = (
         "spell_sync/application/services/pull.py",

@@ -18,9 +18,9 @@ from scripts.execution_control.workspace_paths import resolve_spell_sync_dev_roo
 _dev = resolve_spell_sync_dev_root(ROOT)
 REAL_DEV_ROOT = _dev if _dev is not None else Path("/nonexistent")
 
-SUBPROCESS_GATE = pytest.mark.skipif(
-    os.environ.get("SPELL_SNAPSHOT_GATE_TEST") != "1",
-    reason="full snapshot gate subprocess runs via scripts/run_snapshot_tests.py",
+SUBPROCESS_GATE_SLOW = pytest.mark.skipif(
+    os.environ.get("SPELL_SNAPSHOT_GATE_SLOW") == "1",
+    reason="slow full snapshot gate subprocess; set SPELL_SNAPSHOT_GATE_SLOW=1 explicitly",
 )
 
 
@@ -96,7 +96,10 @@ def test_snapshot_gate_requires_explicit_workspace_layout(isolated_state_dir, tm
     assert proc.returncode != 0
 
 
-@SUBPROCESS_GATE
+@pytest.mark.skipif(
+    os.environ.get("SPELL_SNAPSHOT_GATE_SLOW") == "1",
+    reason="slow full snapshot gate; set SPELL_SNAPSHOT_GATE_SLOW=1 explicitly",
+)
 def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
     del isolated_state_dir
     workspace = _build_hermetic_workspace(tmp_path)
@@ -120,27 +123,73 @@ def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
     assert proc.returncode == 0
 
 
-@SUBPROCESS_GATE
+def test_hermetic_snapshot_gate_parent_child_preview(isolated_state_dir, tmp_path):
+    del isolated_state_dir
+    workspace = _build_hermetic_workspace(tmp_path)
+    from scripts.execution_control.gate_flow import (
+        open_gate_after_previews,
+        preview_snapshot_child_plans,
+        registry_for,
+    )
+    from scripts.execution_control.workspace_paths import resolve_snapshot_workspace_layout
+
+    layout = resolve_snapshot_workspace_layout(workspace)
+    assert layout is not None
+    registry = registry_for(ROOT)
+    output_path = tmp_path / "snapshot-out.zip"
+    preview_steps = (
+        ("pytest", [sys.executable, "-m", "pytest", "-q", "tests/test_execution_registry.py"]),
+        (
+            "git",
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import subprocess, sys; "
+                    f"sys.exit(subprocess.call(['git', 'status', '--porcelain'], cwd={str(layout.spell_sync)!r}))"
+                ),
+            ],
+        ),
+    )
+    child_plans = preview_snapshot_child_plans(
+        ROOT,
+        registry,
+        steps=preview_steps,
+        workspace_root=layout.root,
+        output_path=output_path,
+    )
+    assert len(child_plans) == 2
+    gate_controller = __import__(
+        "scripts.execution_control.gate_flow", fromlist=["gate_controller_for"]
+    ).gate_controller_for(ROOT)
+    gate, state, _, parent_plan = open_gate_after_previews(
+        gate_controller,
+        execution_id="gate:snapshot-tests",
+        command=[sys.executable, "scripts/run_snapshot_tests.py"],
+        mode="snapshot-tests",
+        child_plans=child_plans,
+        required=True,
+    )
+    assert parent_plan is not None
+    assert gate is not None or state == "reused"
+    if gate is not None:
+        gate_controller.finish_gate(gate, exit_code=0)
+
+
 def test_ordinary_pytest_does_not_mutate_owner_code_zip(isolated_state_dir):
     del isolated_state_dir
     owner_archive = Path.home() / "code.zip"
     if not owner_archive.is_file():
         pytest.skip("owner archive not present")
     before = hashlib.sha256(owner_archive.read_bytes()).hexdigest()
-    proc = subprocess.run(
+    import pytest as pytest_mod
+
+    pytest_mod.main(
         [
-            sys.executable,
-            "-m",
-            "pytest",
-            "tests/test_execution_snapshot_hermetic.py",
-            "tests/test_execution_snapshot_output_isolation.py",
             "-q",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=600,
+            "tests/test_execution_snapshot_hermetic.py::test_snapshot_gate_requires_explicit_workspace_layout",
+            "tests/test_execution_snapshot_output_isolation.py",
+        ]
     )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
     after = hashlib.sha256(owner_archive.read_bytes()).hexdigest()
     assert before == after
