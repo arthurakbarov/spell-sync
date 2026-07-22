@@ -314,11 +314,40 @@ def _check_workflows() -> list[str]:
     return errors
 
 
+def _check_compatibility_runner() -> list[str]:
+    errors: list[str] = []
+    script = ROOT / "scripts/run_compatibility_checks.py"
+    if not script.is_file():
+        return errors
+    text = _read(script)
+    for marker in (
+        "compatibility.wheel-build",
+        "compatibility.wheel-venv",
+        "compatibility.wheel-install",
+        "compatibility.wheel-origin",
+        "compatibility.wheel-version",
+        "compatibility.wheel-cli",
+    ):
+        if marker not in text:
+            errors.append(
+                f"[COMPATIBILITY-WHEEL-013] run_compatibility_checks.py must include {marker} step"
+            )
+    if "installed-wheel-import" in text:
+        errors.append(
+            "[COMPATIBILITY-WHEEL-013] run_compatibility_checks.py must not use misleading "
+            "installed-wheel-import against editable checkout"
+        )
+    if "PYTHONPATH" not in text:
+        errors.append("[COMPATIBILITY-WHEEL-013] compatibility wheel install must clear PYTHONPATH")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     errors.extend(_check_support_doc())
     errors.extend(_check_contract_doc_alignment())
     errors.extend(_check_workflows())
+    errors.extend(_check_compatibility_runner())
 
     if errors:
         for item in errors:

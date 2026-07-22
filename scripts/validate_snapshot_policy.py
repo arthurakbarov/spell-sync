@@ -119,6 +119,26 @@ def _check_snapshot_script(script_path: Path) -> list[str]:
         )
         return errors
     text = _read(script_path)
+    if "snapshot_policy" not in text and "_load_policy" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] create-code-snapshot.py must load shared snapshot_policy parser"
+        )
+    if "should_skip_workspace_path" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] create-code-snapshot.py must apply policy matcher "
+            "during archive creation"
+        )
+    if "snapshotPolicySha256" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] snapshot manifest must include snapshotPolicySha256 digest"
+        )
+    if "_require_environment_evidence" not in text:
+        errors.append(
+            "[SNAPSHOT-ENVIRONMENT-010] create-code-snapshot.py must require environment evidence"
+        )
+    policy_file = script_path.parent.parent / "snapshot-policy.toml"
+    if policy_file.is_file() and ".spell-sync.lock" not in _read(policy_file):
+        errors.append("[SNAPSHOT-POLICY-012] snapshot-policy.toml must exclude .spell-sync.lock")
     if ".venv" not in text:
         errors.append(
             "[SNAPSHOT-POLICY-008] create-code-snapshot.py must exclude .venv entries; "
@@ -161,8 +181,9 @@ def _check_docs_home_snapshot_path() -> list[str]:
     text = _read(agent_dev)
     if "$HOME/code.zip" not in text:
         errors.append(
-            "[SNAPSHOT-PATH-011] AGENT_DEVELOPMENT.md must require canonical $HOME/code.zip output; "
-            "remediation: document home-directory snapshot path in § Workspace snapshot"
+            "[SNAPSHOT-PATH-011] AGENT_DEVELOPMENT.md must require canonical "
+            "$HOME/code.zip output; remediation: document home-directory snapshot path "
+            "in § Workspace snapshot"
         )
     forbidden_markers = (
         "$SPELL_SYNC_WORKSPACE/code.zip",

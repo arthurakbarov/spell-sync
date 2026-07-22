@@ -26,6 +26,9 @@ from scripts.ci_impact.registry import (  # noqa: E402
 )
 from scripts.ci_input_state import changed_ci_input_paths, compute_ci_input_state  # noqa: E402
 from scripts.documentation_state import compute_documentation_state  # noqa: E402
+from scripts.environment_contract.evidence import (  # noqa: E402
+    read_environment_evidence,
+)
 from scripts.environment_contract.fingerprint import (  # noqa: E402
     resolve_project_environment_fingerprint,
 )
@@ -203,6 +206,63 @@ def _validate_environment_identity(
     for key, expected in digest_checks:
         value = payload.get(key)
         if isinstance(value, str) and value and value != expected:
+            return "ci-evidence.environment-mismatch"
+    return None
+
+
+def _validate_environment_evidence(
+    root: Path,
+    payload: dict[str, object],
+    *,
+    head: str,
+    env_paths: EnvironmentPaths,
+) -> str | None:
+    evidence = read_environment_evidence(root, paths=env_paths)
+    if evidence is None:
+        return "ci-evidence.environment-mismatch"
+    if evidence.schema_version < 1:
+        return "ci-evidence.environment-mismatch"
+    if evidence.environment_check_exit != 0 or evidence.lock_check_exit != 0:
+        return "ci-evidence.environment-mismatch"
+    if evidence.repository_head and evidence.repository_head != head:
+        return "ci-evidence.environment-mismatch"
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
+    if fingerprint is None:
+        return "ci-evidence.environment-mismatch"
+    if evidence.environment_fingerprint != fingerprint.signature():
+        return "ci-evidence.environment-mismatch"
+    summary_fp = payload.get("environmentFingerprint")
+    if (
+        isinstance(summary_fp, str)
+        and summary_fp
+        and summary_fp != evidence.environment_fingerprint
+    ):
+        return "ci-evidence.environment-mismatch"
+    live_checks = {
+        "environmentContractDigest": fingerprint.environment_contract_digest,
+        "pyprojectDigest": fingerprint.pyproject_digest,
+        "uvLockDigest": fingerprint.uv_lock_digest,
+        "installedEnvironmentDigest": fingerprint.installed_environment_digest,
+        "pythonVersion": fingerprint.python_version,
+        "pythonImplementation": fingerprint.python_implementation,
+        "pythonCacheTag": fingerprint.python_cache_tag,
+        "uvVersion": fingerprint.uv_version,
+    }
+    evidence_checks = {
+        "environmentContractDigest": evidence.environment_contract_digest,
+        "pyprojectDigest": evidence.pyproject_digest,
+        "uvLockDigest": evidence.uv_lock_digest,
+        "installedEnvironmentDigest": evidence.installed_environment_digest,
+        "pythonVersion": evidence.python_version,
+        "pythonImplementation": evidence.python_implementation,
+        "pythonCacheTag": evidence.python_cache_tag,
+        "uvVersion": evidence.uv_version,
+    }
+    for key, live in live_checks.items():
+        if evidence_checks[key] != live:
+            return "ci-evidence.environment-mismatch"
+        summary_value = payload.get(key)
+        if isinstance(summary_value, str) and summary_value and summary_value != live:
             return "ci-evidence.environment-mismatch"
     return None
 
@@ -467,6 +527,18 @@ def verify_ci_evidence(
     )
     if common_failure is not None:
         return common_failure
+
+    environment_failure = _validate_environment_evidence(
+        root, payload, head=head, env_paths=env_paths
+    )
+    if environment_failure:
+        return _reject(
+            environment_failure,
+            head=head,
+            digest=digest,
+            run_id=run_id,
+            format_json=format_json,
+        )
 
     environment_failure = _validate_environment_identity(root, payload)
     if environment_failure:

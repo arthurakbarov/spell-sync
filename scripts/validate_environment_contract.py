@@ -304,6 +304,36 @@ def _check_project_environment_probe() -> list[str]:
     return errors
 
 
+def _check_ci_evidence_environment() -> list[str]:
+    errors: list[str] = []
+    evidence_script = ROOT / "scripts/check-ci-evidence.py"
+    conftest = ROOT / "tests/conftest_execution.py"
+    if evidence_script.is_file():
+        text = _read(evidence_script)
+        if "read_environment_evidence" not in text:
+            errors.append(
+                "[ENVIRONMENT-EVIDENCE-008] check-ci-evidence must read environment evidence path"
+            )
+        if "_validate_environment_evidence" not in text:
+            errors.append(
+                "[ENVIRONMENT-EVIDENCE-008] check-ci-evidence must validate environment evidence"
+            )
+    if conftest.is_file():
+        text = _read(conftest)
+        if 'startswith("test_execution_")' in text:
+            errors.append(
+                "[ENVIRONMENT-PATHS-009] filename-based CI evidence isolation is forbidden"
+            )
+    missing_evidence_test = ROOT / "tests/test_environment_evidence_required.py"
+    if missing_evidence_test.is_file():
+        text = _read(missing_evidence_test)
+        if "evidence_path.unlink()" not in text:
+            errors.append(
+                "[ENVIRONMENT-EVIDENCE-008] missing-evidence test must delete only environment.json"
+            )
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     contract_data: dict[str, object] | None = None
@@ -319,6 +349,7 @@ def main() -> int:
     errors.extend(_check_uv_lock())
     errors.extend(_check_gitignore())
     errors.extend(_check_project_environment_probe())
+    errors.extend(_check_ci_evidence_environment())
 
     if errors:
         for item in errors:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import os
 import shutil
 import sys
 import zipfile
@@ -13,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
+from scripts.snapshot_dev_paths import resolve_spell_sync_dev_root
+
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DEV_ROOT = Path("/Users/arthurakbarov/code/spell-sync-dev")
 
 
-def _resolve_dev_root() -> Path:
-    raw = os.environ.get("SPELL_SYNC_DEV_ROOT", "").strip()
-    return Path(raw).expanduser().resolve() if raw else DEFAULT_DEV_ROOT
+def _resolve_dev_root() -> Path | None:
+    return resolve_spell_sync_dev_root(ROOT)
 
 
 def _load_snapshot_module(dev_root: Path):
@@ -35,8 +34,11 @@ def _load_snapshot_module(dev_root: Path):
 @pytest.fixture(scope="module")
 def snapshot_mod():
     dev_root = _resolve_dev_root()
-    if not (dev_root / "scripts" / "create-code-snapshot.py").is_file():
+    if dev_root is None or not (dev_root / "scripts" / "create-code-snapshot.py").is_file():
         pytest.skip("spell-sync-dev repository missing for snapshot environment tests")
+    scripts_dir = dev_root / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
     return _load_snapshot_module(dev_root)
 
 
@@ -57,10 +59,15 @@ def _environment_binding() -> dict[str, object]:
         "venvIncluded": False,
         "cacheEntryCount": 0,
         "timingDatabaseEntryCount": 0,
+        "excludedEntryCount": 0,
+        "disallowedArtifactEntryCount": 0,
     }
 
 
 def test_compute_environment_binding_matches_repository_files(snapshot_mod) -> None:
+    evidence = ROOT / ".artifacts" / "environment" / "environment.json"
+    if not evidence.is_file():
+        pytest.skip("maintainer environment evidence required for binding test")
     binding = snapshot_mod._compute_environment_binding(ROOT)
     expected = _environment_binding()
     assert binding == expected

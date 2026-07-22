@@ -25,14 +25,9 @@ def environment_paths(tmp_path):
     return test_environment_paths(tmp_path / "home", project_root=ROOT)
 
 
-@pytest.fixture(autouse=True)
-def _isolated_execution_admission_paths(request, monkeypatch, tmp_path):
-    """Keep execution admission tests from reusing maintainer CI evidence."""
-    node_path = Path(str(getattr(request.node, "path", "")))
-    if not node_path.name.startswith("test_execution_"):
-        yield
-        return
-    paths = test_environment_paths(tmp_path / "home", project_root=ROOT)
+@pytest.fixture
+def isolated_ci_paths(environment_paths, monkeypatch):
+    """Inject temporary EnvironmentPaths into CI necessity assessment."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -46,7 +41,7 @@ def _isolated_execution_admission_paths(request, monkeypatch, tmp_path):
     original = necessity_module.assess_ci_necessity
 
     def _assess(root, **kwargs):
-        kwargs.setdefault("paths", paths)
+        kwargs.setdefault("paths", environment_paths)
         return original(root, **kwargs)
 
     monkeypatch.setattr(necessity_module, "assess_ci_necessity", _assess)
@@ -54,7 +49,7 @@ def _isolated_execution_admission_paths(request, monkeypatch, tmp_path):
         "scripts.execution_control.admission._load_ci_necessity",
         lambda _root: necessity_module,
     )
-    yield
+    return environment_paths
 
 
 @pytest.fixture(autouse=True)
