@@ -54,8 +54,7 @@ def test_iter_entries_omits_dot_venv_tree(tmp_path: Path) -> None:
     venv_file.write_text("secret\n", encoding="utf-8")
     exclude = snapshot._archive_exclude_paths(output=tmp_path / "code.zip")
     archived = {
-        arcname
-        for _path, arcname in snapshot._iter_entries(workspace, exclude_paths=exclude)
+        arcname for _path, arcname in snapshot._iter_entries(workspace, exclude_paths=exclude)
     }
     assert any(arcname.endswith("src/module.py") for arcname in archived)
     assert not any(".venv/" in arcname for arcname in archived)

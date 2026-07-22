@@ -86,7 +86,7 @@ def _check_long_steps_bounded(text: str) -> list[str]:
     )
     if pip_marker in text:
         errors.append(
-            "[EXECUTION-CONTROL-GATE-002] pip install steps must use bounded execution in full gate; "
+            "[EXECUTION-CONTROL-GATE-002] pip install steps must use bounded execution; "
             "remediation: route through _run_bounded_step"
         )
     wheel_section = text.split("def _run_wheel_smoke", 1)

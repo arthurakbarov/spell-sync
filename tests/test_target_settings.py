@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import stat
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -72,14 +73,23 @@ def _mock_discovery(enabled: frozenset[str]) -> SetupTargetDiscovery:
 
 @pytest.fixture
 def mock_targets():
+    @contextmanager
     def _factory(enabled: frozenset[str]):
         def _discover(*, selected_targets=None, enabled_targets=None):
             return _mock_discovery(enabled_targets or frozenset())
 
-        return patch(
-            "spell_sync.project_setup.target_settings.discover_setup_targets",
-            side_effect=_discover,
-        )
+        with (
+            patch(
+                "spell_sync.project_setup.target_settings.discover_setup_targets",
+                side_effect=_discover,
+            ),
+            patch(
+                "spell_sync.project_setup.discovery.discover_setup_targets",
+                side_effect=_discover,
+            ),
+            patch(f"{__name__}.discover_setup_targets", side_effect=_discover),
+        ):
+            yield
 
     return _factory
 

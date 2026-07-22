@@ -20,7 +20,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _isolated_test_environment(request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _isolated_test_environment(
+    request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """Isolate HOME, XDG roots, and uv cache for deterministic non-owner tests."""
     if request.node.get_closest_marker("owner"):
         yield None
@@ -41,6 +43,7 @@ def _isolated_test_environment(request: pytest.FixtureRequest, tmp_path: Path, m
 def isolated_test_home(_isolated_test_environment: Path | None) -> Path | None:
     """Isolated HOME directory when environment isolation is active."""
     return _isolated_test_environment
+
 
 _ROOT = Path(__file__).resolve().parent.parent
 _TESTS = Path(__file__).resolve().parent
