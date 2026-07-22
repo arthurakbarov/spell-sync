@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.gate_controller import GateController  # noqa: E402
 from scripts.execution_control.mappings import GATE_EXECUTION_IDS  # noqa: E402
 from scripts.execution_control.session import record_session_event  # noqa: E402
 from scripts.test_plan import format_text  # noqa: E402
@@ -53,63 +53,6 @@ def _step_execution_id(step: PlannedStep) -> str:
     return FOCUSED_STEP_EXECUTION_IDS.get(step.kind, "focused:validators")
 
 
-def run_command(
-    step: PlannedStep,
-    *,
-    cwd: Path,
-    level: str,
-    test_file_count: int,
-) -> tuple[int, float]:
-    started = time.monotonic()
-    execution_id = _step_execution_id(step)
-    gate_mode = "module" if level == "module" else "cluster"
-    rc, timing = run_monitored_command(
-        ROOT,
-        execution_id=execution_id,
-        command=list(step.argv),
-        mode=gate_mode,
-        required=False,
-        cwd=cwd,
-        test_file_count=test_file_count,
-        enforce_hard=True,
-        enforce_stall=False,
-    )
-    duration = time.monotonic() - started
-    if timing is None and rc == 0:
-        record_session_event(category="focused", duration_seconds=0.0, reused_saved=duration)
-    else:
-        record_session_event(category="focused", duration_seconds=duration)
-    return rc, duration
-
-
-def _execute_steps(
-    steps: tuple[PlannedStep, ...],
-    *,
-    cwd: Path,
-    level: str,
-    test_file_count: int,
-) -> tuple[int, list[StepResult]]:
-    results: list[StepResult] = []
-    for step in steps:
-        exit_code, duration = run_command(
-            step,
-            cwd=cwd,
-            level=level,
-            test_file_count=test_file_count,
-        )
-        results.append(
-            StepResult(
-                kind=step.kind,
-                command=list(step.argv),
-                exit_code=exit_code,
-                duration_seconds=duration,
-            )
-        )
-        if exit_code != 0:
-            return exit_code, results
-    return 0, results
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -125,8 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         level=args.level,
         python=args.python,
     )
+    gate_mode = "module" if args.level == "module" else "cluster"
     gate_id = GATE_EXECUTION_IDS["focused-module" if args.level == "module" else "focused-cluster"]
-    print(f"FOCUSED_GATE={gate_id}")
     if args.explain:
         sys.stdout.write(format_text(plan, explain=True))
 
@@ -159,17 +102,57 @@ def main(argv: list[str] | None = None) -> int:
             print(f"TEST_RUN_DURATION_SECONDS={existing.duration_seconds:.2f}")
             return 0
 
-    started_at = datetime.now(timezone.utc)
     test_file_count = len(plan.pytest_targets)
-    exit_code, step_results = _execute_steps(
-        steps,
-        cwd=ROOT,
-        level=args.level,
+    gate_controller = GateController.open_gate_controller(ROOT)
+    gate, state = gate_controller.begin_gate(
+        execution_id=gate_id,
+        command=[args.python, str(ROOT / "scripts" / "run_focused_tests.py")],
+        mode=gate_mode,
+        required=False,
         test_file_count=test_file_count,
     )
+    if gate is None:
+        return 0 if state == "reused" else 1
+
+    started_at = datetime.now(timezone.utc)
+    exit_code = 0
+    step_results: list[StepResult] = []
+    try:
+        for step in steps:
+            started = time.monotonic()
+            execution_id = _step_execution_id(step)
+            rc, timing = gate_controller.run_child(
+                gate,
+                child_execution_id=execution_id,
+                command=list(step.argv),
+                mode=gate_mode,
+                required=False,
+                cwd=ROOT,
+                test_file_count=test_file_count,
+            )
+            duration = time.monotonic() - started
+            if timing is None and rc == 0:
+                record_session_event(
+                    category="focused", duration_seconds=0.0, reused_saved=duration
+                )
+            else:
+                record_session_event(category="focused", duration_seconds=duration)
+            step_results.append(
+                StepResult(
+                    kind=step.kind,
+                    command=list(step.argv),
+                    exit_code=rc,
+                    duration_seconds=duration,
+                )
+            )
+            if rc != 0 or gate.stopped:
+                exit_code = rc
+                break
+    finally:
+        gate_controller.finish_gate(gate, exit_code=exit_code)
+
     completed_at = datetime.now(timezone.utc)
     duration = sum(step.duration_seconds for step in step_results)
-
     pytest_ran = any(step.kind == "pytest" for step in step_results)
     validator_count = sum(1 for step in step_results if step.kind == "validator")
 

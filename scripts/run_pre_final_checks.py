@@ -13,7 +13,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
-from scripts.execution_control.controller import run_monitored_command  # noqa: E402
+from scripts.execution_control.gate_controller import GateController  # noqa: E402
+from scripts.execution_control.mappings import GATE_EXECUTION_IDS  # noqa: E402
 from scripts.execution_control.session import record_session_event  # noqa: E402
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.planner import build_plan  # noqa: E402
@@ -47,27 +48,6 @@ def _step_execution_id(name: str) -> str:
     return "pre-final:validators"
 
 
-def _run(name: str, command: list[str], *, cwd: Path, py: str) -> tuple[int, float]:
-    started = time.monotonic()
-    execution_id = _step_execution_id(name)
-    rc, timing = run_monitored_command(
-        ROOT,
-        execution_id=execution_id,
-        command=command,
-        mode="pre-final",
-        required=False,
-        cwd=cwd,
-        enforce_hard=True,
-        enforce_stall=False,
-    )
-    duration = time.monotonic() - started
-    if timing is None and rc == 0:
-        record_session_event(category="pre-final", duration_seconds=0.0, reused_saved=duration)
-    else:
-        record_session_event(category="pre-final", duration_seconds=duration)
-    return rc, duration
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run pre-final validation gate.")
     parser.add_argument("--base", default="HEAD")
@@ -76,7 +56,6 @@ def main(argv: list[str] | None = None) -> int:
     py = args.python
     changed = collect_changed_files(ROOT, base=None if args.base == "HEAD" else args.base)
     plan = build_plan(ROOT, changed, level="cluster", python=py)
-    print("PRE_FINAL_GATE=gate:pre-final")
 
     steps: list[tuple[str, list[str]]] = [
         ("registry", [py, "scripts/validate_test_impact.py"]),
@@ -122,12 +101,42 @@ def main(argv: list[str] | None = None) -> int:
         else:
             steps.append((validator, [py, validator]))
 
+    gate_controller = GateController.open_gate_controller(ROOT)
+    gate, state = gate_controller.begin_gate(
+        execution_id=GATE_EXECUTION_IDS["pre-final"],
+        command=[py, str(ROOT / "scripts" / "run_pre_final_checks.py")],
+        mode="pre-final",
+        required=False,
+    )
+    if gate is None:
+        return 0 if state == "reused" else 1
+
     exit_code = 0
-    for name, command in steps:
-        rc, duration = _run(name, command, cwd=ROOT, py=py)
-        print(f"PRE_FINAL_STEP={name} exit={rc} duration={duration:.2f}s")
-        if rc != 0:
-            exit_code = rc
+    try:
+        for name, command in steps:
+            started = time.monotonic()
+            execution_id = _step_execution_id(name)
+            rc, timing = gate_controller.run_child(
+                gate,
+                child_execution_id=execution_id,
+                command=command,
+                mode="pre-final",
+                required=False,
+                cwd=ROOT,
+            )
+            duration = time.monotonic() - started
+            if timing is None and rc == 0:
+                record_session_event(
+                    category="pre-final", duration_seconds=0.0, reused_saved=duration
+                )
+            else:
+                record_session_event(category="pre-final", duration_seconds=duration)
+            print(f"PRE_FINAL_STEP={name} exit={rc} duration={duration:.2f}s")
+            if rc != 0 or gate.stopped:
+                exit_code = rc
+                break
+    finally:
+        gate_controller.finish_gate(gate, exit_code=exit_code)
 
     counts = summarize_ci_history(ROOT / ".artifacts" / "ci").to_json_dict()
     print(f"PRE_FINAL_RESULT={'success' if exit_code == 0 else 'failed'}")
