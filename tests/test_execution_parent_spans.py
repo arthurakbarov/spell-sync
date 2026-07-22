@@ -71,7 +71,7 @@ def test_child_span_links_parent_run_and_span(gate_controller, history):
             required=True,
         )
     assert gate is not None
-    rc, child_timing = gate_controller.run_child(
+    rc, child_execution = gate_controller.run_child(
         gate,
         child_execution_id="pre-final:pytest",
         command=sleep_command(0.05),
@@ -79,7 +79,8 @@ def test_child_span_links_parent_run_and_span(gate_controller, history):
         required=True,
     )
     assert rc == 0
-    assert child_timing is not None
+    assert child_execution is not None
+    child_timing = child_execution.timing
     assert child_timing.get("parentSpanId") == gate.parent_span_id
     with history._connect() as connection:
         row = connection.execute(

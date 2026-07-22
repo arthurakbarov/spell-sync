@@ -148,14 +148,14 @@ def main(argv: list[str] | None = None) -> int:
                 exit_code = 124
                 break
             started = time.monotonic()
-            rc, timing = gate_controller.run_child_with_plan(
+            rc, execution = gate_controller.run_child_with_plan(
                 gate,
                 child_plan,
                 command=list(step.argv),
                 cwd=ROOT,
             )
             duration = time.monotonic() - started
-            if timing is None and rc == 0:
+            if execution is None and rc == 0:
                 record_session_event(
                     category="focused",
                     duration_seconds=0.0,

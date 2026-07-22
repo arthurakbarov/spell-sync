@@ -33,14 +33,14 @@ def _run_child_with_plan(
     *,
     cwd: Path | None = None,
 ) -> int:
-    rc, timing = gate_controller.run_child_with_plan(
+    rc, execution = gate_controller.run_child_with_plan(
         gate,
         child_plan,
         command=command,
         cwd=cwd or ROOT,
     )
-    if timing is not None:
-        print(f"SNAPSHOT_STEP={step} result={timing.get('result', 'unknown')}")
+    if execution is not None:
+        print(f"SNAPSHOT_STEP={step} result={execution.timing.get('result', 'unknown')}")
     return rc
 
 

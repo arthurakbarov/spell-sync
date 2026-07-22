@@ -147,9 +147,9 @@ def test_success_learns(registry, history, isolated_state_dir):
         )
     assert state == "run"
     assert plan is not None
-    exit_code, timing = controller.run(plan, sleep_command(0.05), cwd=ROOT)
-    assert exit_code == 0
-    assert timing["result"] == ExecutionStatus.SUCCESS.value
+    execution = controller.run(plan, sleep_command(0.05), cwd=ROOT)
+    assert execution.exit_code == 0
+    assert execution.timing["result"] == ExecutionStatus.SUCCESS.value
     rows = history.fetch_learning_durations(
         execution_id="focused:pytest",
         workload_fingerprint=plan.workload_fingerprint,
@@ -179,9 +179,9 @@ def test_failure_does_not_learn(registry, history, isolated_state_dir):
             test_file_count=1,
         )
     assert plan is not None
-    exit_code, timing = controller.run(plan, failing, cwd=ROOT)
-    assert exit_code == 3
-    assert timing["result"] == ExecutionStatus.FAILED.value
+    execution = controller.run(plan, failing, cwd=ROOT)
+    assert execution.exit_code == 3
+    assert execution.timing["result"] == ExecutionStatus.FAILED.value
     assert (
         history.fetch_learning_durations(
             execution_id="focused:pytest",

@@ -94,14 +94,14 @@ def main(argv: list[str] | None = None) -> int:
             name = str(item["name"])
             command = [str(part) for part in item["command"]]
             started = time.monotonic()
-            rc, timing = gate_controller.run_child_with_plan(
+            rc, execution = gate_controller.run_child_with_plan(
                 gate,
                 child_plan,
                 command=command,
                 cwd=ROOT,
             )
             duration = time.monotonic() - started
-            if timing is None and rc == 0:
+            if execution is None and rc == 0:
                 record_session_event(
                     category="pre-final", duration_seconds=0.0, reused_saved=duration
                 )

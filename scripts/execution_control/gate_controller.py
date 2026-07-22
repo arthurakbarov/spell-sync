@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .controller import ExecutionController
+from .execution_result import ControlledExecutionResult
 from .gate_admission import assess_gate_admission, emit_narrow_replacement
 from .history import HistoryStore
 from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
@@ -199,9 +200,9 @@ class GateController(ExecutionController):
         command: list[str],
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-    ) -> tuple[int, dict[str, object] | None]:
+    ) -> tuple[int, ControlledExecutionResult | None]:
         if gate.finalized or gate.stopped:
-            return gate.terminal_exit_code or 1, gate.terminal_timing
+            return gate.terminal_exit_code or 1, None
         if self._parent_expired(gate):
             gate.stopped = True
             gate.failure_child = child_plan.execution_id
@@ -228,7 +229,7 @@ class GateController(ExecutionController):
             return 1, None
         parent_remaining = self._parent_remaining(gate)
         effective_hard = min(bound.hard_seconds, parent_remaining)
-        exit_code, timing = self.run(
+        execution = self.run(
             bound,
             command,
             cwd=cwd,
@@ -240,20 +241,17 @@ class GateController(ExecutionController):
             parent_deadline_monotonic=gate.parent_hard_deadline,
             hard_seconds_override=max(0.001, effective_hard),
         )
-        if timing is not None:
-            gate.child_duration_sum += float(timing.get("actualSeconds", 0.0))
-            result = str(timing.get("result", ""))
-            if result in {"timeout-hard", "timeout-stall", "failed"} and exit_code != 0:
-                gate.stopped = True
-                gate.failure_child = bound.execution_id
-            elif exit_code in {130, 124} or exit_code != 0:
-                gate.stopped = True
-                gate.failure_child = bound.execution_id
-        elif exit_code != 0:
+        timing = execution.timing
+        gate.child_duration_sum += float(timing.get("actualSeconds", 0.0))
+        result = str(timing.get("result", ""))
+        if result in {"timeout-hard", "timeout-stall", "failed"} and execution.exit_code != 0:
+            gate.stopped = True
+            gate.failure_child = bound.execution_id
+        elif execution.exit_code in {130, 124} or execution.exit_code != 0:
             gate.stopped = True
             gate.failure_child = bound.execution_id
         gate.active_child = None
-        return exit_code, timing
+        return execution.exit_code, execution
 
     def run_child(
         self,
@@ -266,9 +264,9 @@ class GateController(ExecutionController):
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
         **kwargs: Any,
-    ) -> tuple[int, dict[str, object] | None]:
+    ) -> tuple[int, ControlledExecutionResult | None]:
         if gate.finalized or gate.stopped:
-            return gate.terminal_exit_code or 1, gate.terminal_timing
+            return gate.terminal_exit_code or 1, None
         if self._parent_expired(gate):
             gate.stopped = True
             gate.failure_child = child_execution_id

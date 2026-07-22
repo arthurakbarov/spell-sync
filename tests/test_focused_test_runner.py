@@ -200,9 +200,7 @@ def _mock_gate(runner_module, open_gate, *, plan_payload: dict[str, object]):
     def _run_bounded_planner(_controller, **kwargs):
         del _controller
         output_idx = kwargs["command"].index("--output") + 1
-        Path(kwargs["command"][output_idx]).write_text(
-            json.dumps(plan_payload), encoding="utf-8"
-        )
+        Path(kwargs["command"][output_idx]).write_text(json.dumps(plan_payload), encoding="utf-8")
         return 0, "run"
 
     def _open_gate_after_previews(_controller, **kwargs):
@@ -217,20 +215,24 @@ def _mock_gate(runner_module, open_gate, *, plan_payload: dict[str, object]):
         del _gate, _plan, command, kwargs
         return 0, {"result": "success"}
 
-    with patch.object(
-        runner_module,
-        "run_bounded_planner",
-        side_effect=_run_bounded_planner,
-    ), patch.object(
-        runner_module,
-        "open_gate_after_previews",
-        side_effect=_open_gate_after_previews,
-    ), patch.object(
-        runner_module,
-        "preview_focused_child_plans",
-        return_value=tuple(
-            type("Plan", (), {"execution_id": "focused:pytest"})()
-            for _ in plan_payload.get("steps", [])
+    with (
+        patch.object(
+            runner_module,
+            "run_bounded_planner",
+            side_effect=_run_bounded_planner,
+        ),
+        patch.object(
+            runner_module,
+            "open_gate_after_previews",
+            side_effect=_open_gate_after_previews,
+        ),
+        patch.object(
+            runner_module,
+            "preview_focused_child_plans",
+            return_value=tuple(
+                type("Plan", (), {"execution_id": "focused:pytest"})()
+                for _ in plan_payload.get("steps", [])
+            ),
         ),
     ):
         controller.run_child_with_plan.side_effect = _run_child_with_plan

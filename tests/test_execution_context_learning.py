@@ -42,10 +42,8 @@ def test_successful_child_stores_exact_context_and_learns(registry, isolated_sta
         )
     assert plan is not None and state == "run"
     assert plan.context_signature == context.signature()
-    exit_code, timing = controller.run(
-        plan, sleep_command(0.05), cwd=ROOT, active_child="ci:pytest"
-    )
-    assert exit_code == 0
+    execution = controller.run(plan, sleep_command(0.05), cwd=ROOT, active_child="ci:pytest")
+    assert execution.exit_code == 0
 
     exact = history.fetch_learning_durations(
         execution_id="ci:pytest",

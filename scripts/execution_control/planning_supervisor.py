@@ -26,7 +26,7 @@ def run_planning_supervisor(
     if plan is None:
         return 0 if state == ExecutionStatus.REUSED.value else 1, state
     try:
-        exit_code, _timing = controller.run(
+        execution = controller.run(
             plan,
             command,
             cwd=cwd or controller.root,
@@ -35,4 +35,4 @@ def run_planning_supervisor(
         )
     finally:
         controller.history.release_lease(plan.normalized_signature)
-    return exit_code, "run"
+    return execution.exit_code, "run"

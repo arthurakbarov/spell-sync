@@ -8,10 +8,10 @@ import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from .admission import assess_admission, narrow_replacement_plan
 from .diagnostics import collect_timeout_bundle
+from .execution_result import ControlledExecutionResult
 from .history import HistoryStore
 from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
 from .paths import plan_artifact_path
@@ -165,7 +165,7 @@ class ExecutionController:
         release_lease: bool = True,
         parent_deadline_monotonic: float | None = None,
         hard_seconds_override: float | None = None,
-    ) -> tuple[int, dict[str, Any]]:
+    ) -> ControlledExecutionResult:
         tracker = create_tracker(plan.progress_contract_id)
         effective_hard = (
             hard_seconds_override if hard_seconds_override is not None else plan.hard_seconds
@@ -280,16 +280,25 @@ class ExecutionController:
             history_updated=not self.history.degraded,
             learning_accepted=accepted,
         )
+        sanitized_stdout = sanitize_text(result.stdout_tail, workspace_roots=roots)
+        sanitized_stderr = sanitize_text(result.stderr_tail, workspace_roots=roots)
         timing = {
             **plan.to_json_dict(),
             "actualSeconds": result.duration_seconds,
             "result": status.value,
-            "stdoutTail": sanitize_text(result.stdout_tail, workspace_roots=roots),
-            "stderrTail": sanitize_text(result.stderr_tail, workspace_roots=roots),
+            "stdoutTail": sanitized_stdout,
+            "stderrTail": sanitized_stderr,
             "spanId": record.span_id,
             "parentSpanId": parent_span_id,
         }
-        return result.exit_code, timing
+        return ControlledExecutionResult(
+            exit_code=result.exit_code,
+            raw_stdout_tail=result.stdout_tail,
+            raw_stderr_tail=result.stderr_tail,
+            sanitized_stdout_tail=sanitized_stdout,
+            sanitized_stderr_tail=sanitized_stderr,
+            timing=timing,
+        )
 
     def _record_interrupt_span(
         self,
@@ -413,7 +422,7 @@ def run_monitored_command(
                 "executionId": execution_id,
             }
         return 1, None
-    exit_code, timing = controller.run(
+    execution = controller.run(
         plan,
         command,
         cwd=cwd,
@@ -422,4 +431,4 @@ def run_monitored_command(
         parent_span_id=parent_span_id,
         parent_run_id=parent_run_id,
     )
-    return exit_code, timing
+    return execution.exit_code, execution.timing
