@@ -90,6 +90,7 @@ Stdlib-only package under `scripts/execution_control/`:
 | `process_tree.py` | Owned process-group execution and termination |
 | `diagnostics.py` | Bounded timeout investigation bundles |
 | `controller.py` | Immutable plan, run, classify, persist span |
+| `gate_controller.py` | Parent gate lifecycle, linked child spans, wall duration |
 | `reporting.py` | Machine-readable `EXECUTION_*` stdout lines |
 | `session.py` | Edit-loop test-time share and regression warnings |
 | `mappings.py` | Stable execution IDs for CI checks and gates |
@@ -102,8 +103,32 @@ CLI entry points:
 | `scripts/execution_budget_report.py` | Report history and registry summary |
 | `scripts/execution_budget_admin.py` | Accept or reject learning samples |
 | `scripts/validate_execution_budget.py` | Registry and integration contract validator |
+| `scripts/run_snapshot_tests.py` | Snapshot gate with parent/child execution control |
 
 Registry: `tests/execution-budget.toml`.
+
+## Parent gates and admission
+
+Parent gates (`gate:full-ci`, `gate:pre-final`, `gate:focused-*`, `gate:snapshot-tests`) open an
+immutable parent `ExecutionPlan` at start, record parent wall duration at finish, and link each
+child span via shared `run_id` and `parent_span_id`.
+
+Admission decisions are enforced before subprocess launch:
+
+| Decision | Behavior |
+|----------|----------|
+| `run` | Acquire lease, persist plan, execute |
+| `reuse` | Skip subprocess; no duration sample |
+| `narrow` | Block broad command; no subprocess (`edit-loop-budget-exceeded`) |
+| `defer-to-pre-final` | Block until pre-final gate |
+| `reject-duplicate` | Block duplicate active lease |
+| `block-controller-error` | Block on controller error |
+
+Each immutable plan stores `contextSignature` used for exact-history learning at span write time.
+Child spans never rebuild context from `profile_id` alone.
+
+Progress contracts mark progress only on semantic transitions (pytest node results, CI child
+events, structured phases, artifact state). Arbitrary stdout growth is not progress.
 
 ## Stable execution identity
 
