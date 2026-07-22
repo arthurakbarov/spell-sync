@@ -27,14 +27,16 @@ from scripts.ci_impact.registry import (  # noqa: E402
     requires_full_ci,
 )
 from scripts.ci_input_state import changed_ci_input_paths, compute_ci_input_state  # noqa: E402
+from scripts.environment_contract.paths import (  # noqa: E402
+    EnvironmentPaths,
+    production_environment_paths,
+)
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     git_head,
     is_digest_excluded,
 )
 
-SUMMARY_REL_PATH = Path(".artifacts") / "ci" / "ci-summary.json"
-RECEIPT_REL_PATH = Path(".artifacts") / "lightweight-validation" / "current.json"
 EVIDENCE_SCRIPT = Path(__file__).resolve().parent / "check-ci-evidence.py"
 
 
@@ -84,7 +86,12 @@ def _summary_run_head(summary: dict[str, object]) -> str:
     return ""
 
 
-def _current_evidence_valid(root: Path, summary: dict[str, object]) -> bool:
+def _current_evidence_valid(
+    root: Path,
+    summary: dict[str, object],
+    *,
+    paths: EnvironmentPaths,
+) -> bool:
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -95,7 +102,12 @@ def _current_evidence_valid(root: Path, summary: dict[str, object]) -> bool:
         return False
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    code, _payload = module.verify_ci_evidence(root, root / SUMMARY_REL_PATH, format_json=True)
+    code, _payload = module.verify_ci_evidence(
+        root,
+        paths.ci_summary_path,
+        format_json=True,
+        paths=paths,
+    )
     return code == 0
 
 
@@ -110,7 +122,9 @@ def assess_ci_necessity(
     *,
     base: str | None = None,
     explain: bool = False,
+    paths: EnvironmentPaths | None = None,
 ) -> NecessityResult:
+    env_paths = paths or production_environment_paths(root)
     registry = load_registry(root / REGISTRY_REL_PATH)
     head = git_head(root)
     current_input = compute_ci_input_state(root, registry)
@@ -150,7 +164,7 @@ def assess_ci_necessity(
             explanations=explanations,
         )
 
-    compare_base = base or _summary_run_head(_load_summary(root / SUMMARY_REL_PATH) or {})
+    compare_base = base or _summary_run_head(_load_summary(env_paths.ci_summary_path) or {})
     diff_paths: list[str] = []
     if compare_base and compare_base != "unknown":
         verify = subprocess.run(
@@ -201,8 +215,8 @@ def assess_ci_necessity(
                 explanations=explanations,
             )
 
-    summary = _load_summary(root / SUMMARY_REL_PATH)
-    if summary and _current_evidence_valid(root, summary):
+    summary = _load_summary(env_paths.ci_summary_path)
+    if summary and _current_evidence_valid(root, summary, paths=env_paths):
         return NecessityResult(result="no-action", reason="current-evidence-valid")
 
     if summary and summary.get("result") == "success" and summary.get("finalEvidence"):

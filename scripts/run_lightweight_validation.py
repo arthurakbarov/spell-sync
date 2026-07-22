@@ -24,6 +24,10 @@ from scripts.documentation_state import (  # noqa: E402
     DOCUMENTATION_SCHEMA_VERSION,
     compute_documentation_state,
 )
+from scripts.environment_contract.paths import (  # noqa: E402
+    EnvironmentPaths,
+    production_environment_paths,
+)
 from scripts.test_selection.tree_state import changed_source_paths, git_head  # noqa: E402
 
 RECEIPT_REL_PATH = Path(".artifacts") / "lightweight-validation" / "current.json"
@@ -74,7 +78,12 @@ def _commands_for_classes(classes: set[ChangeClass]) -> list[list[str]]:
     return deduped
 
 
-def run_lightweight_validation(root: Path) -> tuple[int, dict[str, object]]:
+def run_lightweight_validation(
+    root: Path,
+    *,
+    paths: EnvironmentPaths | None = None,
+) -> tuple[int, dict[str, object]]:
+    env_paths = paths or production_environment_paths(root)
     registry = load_registry(root / REGISTRY_REL_PATH)
     doc_state = compute_documentation_state(root, registry)
     classes = set(doc_state.change_classes)
@@ -121,7 +130,7 @@ def run_lightweight_validation(root: Path) -> tuple[int, dict[str, object]]:
             datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         ),
     }
-    receipt_path = root / RECEIPT_REL_PATH
+    receipt_path = env_paths.lightweight_receipt_root / "current.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0, receipt
@@ -132,12 +141,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=("text", "json"), default="text")
     args = parser.parse_args(argv)
     code, payload = run_lightweight_validation(ROOT)
+    receipt_path = production_environment_paths(ROOT).lightweight_receipt_root / "current.json"
     if args.format == "json":
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(f"LIGHTWEIGHT_VALIDATION_RESULT={'success' if code == 0 else 'failed'}")
         if code == 0:
-            print(f"LIGHTWEIGHT_RECEIPT={ROOT / RECEIPT_REL_PATH}")
+            print(f"LIGHTWEIGHT_RECEIPT={receipt_path}")
     return code
 
 

@@ -6,8 +6,6 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -15,34 +13,48 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.environment_contract.paths import test_environment_paths  # noqa: E402
 from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.models import SpanRecord  # noqa: E402
 from scripts.execution_control.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
 
 
-def _full_required_ci_necessity_module():
-    return SimpleNamespace(
-        assess_ci_necessity=lambda _root: SimpleNamespace(
-            result="full-required",
-            reusable_run_head="",
-        )
-    )
+@pytest.fixture
+def environment_paths(tmp_path):
+    """Isolated EnvironmentPaths with no production CI evidence."""
+    return test_environment_paths(tmp_path / "home", project_root=ROOT)
 
 
 @pytest.fixture(autouse=True)
-def _force_execution_admission_for_unit_tests(request):
-    """Keep gate unit tests from short-circuiting via CI no-action reuse."""
+def _isolated_execution_admission_paths(request, monkeypatch, tmp_path):
+    """Keep execution admission tests from reusing maintainer CI evidence."""
     node_path = Path(str(getattr(request.node, "path", "")))
-    if node_path.name.startswith("test_execution_") and not request.node.get_closest_marker(
-        "execution_allow_reuse"
-    ):
-        with patch(
-            "scripts.execution_control.admission._load_ci_necessity",
-            return_value=_full_required_ci_necessity_module(),
-        ):
-            yield
-    else:
+    if not node_path.name.startswith("test_execution_"):
         yield
+        return
+    paths = test_environment_paths(tmp_path / "home", project_root=ROOT)
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "check_ci_necessity_isolated",
+        ROOT / "scripts" / "check-ci-necessity.py",
+    )
+    assert spec and spec.loader
+    necessity_module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = necessity_module
+    spec.loader.exec_module(necessity_module)
+    original = necessity_module.assess_ci_necessity
+
+    def _assess(root, **kwargs):
+        kwargs.setdefault("paths", paths)
+        return original(root, **kwargs)
+
+    monkeypatch.setattr(necessity_module, "assess_ci_necessity", _assess)
+    monkeypatch.setattr(
+        "scripts.execution_control.admission._load_ci_necessity",
+        lambda _root: necessity_module,
+    )
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +194,7 @@ def make_span_record(**overrides) -> SpanRecord:
         "accepted_for_learning": True,
         "quarantine_reason": None,
         "diagnostic_bundle": None,
+        "environment_signature": "",
     }
     defaults.update(overrides)
     return SpanRecord(**defaults)
