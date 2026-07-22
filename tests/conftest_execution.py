@@ -18,13 +18,19 @@ from scripts.execution_control.models import SpanRecord  # noqa: E402
 from scripts.execution_control.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
 
 
-@pytest.fixture
-def isolated_state_dir(tmp_path, monkeypatch):
-    """Redirect XDG_STATE_HOME to an isolated temp directory."""
+@pytest.fixture(autouse=True)
+def _isolated_execution_state(tmp_path, monkeypatch):
+    """Keep execution-control state and session warnings out of real XDG_STATE_HOME."""
     state_home = tmp_path / "xdg-state"
-    state_home.mkdir()
+    state_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("XDG_STATE_HOME", str(state_home))
     return state_home
+
+
+@pytest.fixture
+def isolated_state_dir(_isolated_execution_state):
+    """Redirect XDG_STATE_HOME to an isolated temp directory."""
+    return _isolated_execution_state
 
 
 @pytest.fixture

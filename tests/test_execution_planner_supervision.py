@@ -16,6 +16,7 @@ from scripts.execution_control.gate_flow import (  # noqa: E402
     preview_focused_child_plans,
     run_bounded_planner,
 )
+from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.process_tree import ProcessResult  # noqa: E402
 from tests.conftest_execution import echo_command  # noqa: E402
 
@@ -114,7 +115,13 @@ def test_focused_runner_uses_planner_before_gate(isolated_state_dir, registry, t
         ),
         encoding="utf-8",
     )
-    gate_controller = GateController.open_gate_controller(ROOT)
+    gate_controller = GateController(
+        root=ROOT,
+        registry=registry,
+        history=HistoryStore.open(),
+        enforce_hard=True,
+        enforce_stall=False,
+    )
     calls: list[str] = []
 
     def _run(command, **kwargs):

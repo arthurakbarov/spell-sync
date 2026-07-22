@@ -96,26 +96,33 @@ def test_sigint_terminates_owned_tree_and_preserves_unrelated(isolated_state_dir
         text=True,
         start_new_session=True,
     )
-    _wait_for_markers(runner, ("RUNNER_READY",), timeout=10.0)
-    deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
-        if child_pid_file.is_file() and grandchild_pid_file.is_file():
-            break
-        time.sleep(0.05)
-    assert child_pid_file.is_file(), "child PID file missing"
-    assert grandchild_pid_file.is_file(), "grandchild PID file missing"
-    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
-    grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
-    os.kill(runner.pid, signal.SIGINT)
-    runner.wait(timeout=10)
-    assert runner.returncode == 130
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        if not _pid_alive(child_pid) and not _pid_alive(grandchild_pid):
-            break
-        time.sleep(0.05)
-    assert not _pid_alive(child_pid)
-    assert not _pid_alive(grandchild_pid)
-    assert _pid_alive(unrelated.pid)
+    try:
+        _wait_for_markers(runner, ("RUNNER_READY",), timeout=10.0)
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if child_pid_file.is_file() and grandchild_pid_file.is_file():
+                break
+            time.sleep(0.05)
+        assert child_pid_file.is_file(), "child PID file missing"
+        assert grandchild_pid_file.is_file(), "grandchild PID file missing"
+        child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+        grandchild_pid = int(grandchild_pid_file.read_text(encoding="utf-8"))
+        os.kill(runner.pid, signal.SIGINT)
+        runner.wait(timeout=10)
+        assert runner.returncode == 130
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if not _pid_alive(child_pid) and not _pid_alive(grandchild_pid):
+                break
+            time.sleep(0.05)
+        assert not _pid_alive(child_pid)
+        assert not _pid_alive(grandchild_pid)
+        assert _pid_alive(unrelated.pid)
+    finally:
+        if runner.stdout is not None:
+            runner.stdout.close()
+        if runner.poll() is None:
+            runner.kill()
+            runner.wait(timeout=5)
     unrelated.send_signal(signal.SIGTERM)
     unrelated.wait(timeout=5)
