@@ -136,6 +136,11 @@ def main(argv: list[str] | None = None) -> int:
         raise
     finally:
         gate_controller.finish_gate(gate, exit_code=exit_code, status=terminal_status)
+    if exit_code == 0:
+        print("SNAPSHOT_GATE_RESULT=success")
+    else:
+        print("SNAPSHOT_GATE_RESULT=failed")
+        print(f"SNAPSHOT_GATE_EXIT={exit_code}")
     return exit_code
 
 
