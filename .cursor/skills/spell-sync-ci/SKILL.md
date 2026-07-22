@@ -32,11 +32,15 @@ description: >-
 python3 scripts/check-ci-necessity.py --explain
 ```
 
-4. When `CI_NECESSITY_RESULT=full-required`, run full CI **once** on committed HEAD:
+4. When `CI_NECESSITY_RESULT=full-required`, run full CI **once** on committed HEAD through
+   the execution controller (integrated in `ci_runner.py`):
 
 ```bash
 scripts/ci.sh
 ```
+
+Do not pipe CI through `tail`, `tee`, or other wrappers — hard bounds and
+`CI_TIMEOUT_CHECK_ID` depend on direct runner output.
 
 5. When `CI_NECESSITY_RESULT=lightweight-sufficient`:
 

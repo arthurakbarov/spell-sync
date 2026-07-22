@@ -65,6 +65,11 @@ After successful final CI and evidence verification, do not modify tracked repos
 
 Staged validation levels and deduplication rules: `docs/TESTING_STRATEGY.md`.
 
+Execution time control (admission, immutable timing plans, bounded subprocess runs):
+`docs/EXECUTION_TIME_CONTROL.md`. Registered expensive commands run through the execution
+controller or integrated runners — not as unbounded direct subprocess calls. Rule:
+`.cursor/rules/execution-time-control.mdc`. Skill: `run-time-controlled-command`.
+
 ## Current-phase lifecycle
 
 Statuses in the architecture status block:

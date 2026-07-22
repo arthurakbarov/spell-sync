@@ -17,6 +17,17 @@ description: Select the smallest sufficient non-duplicated validation set for th
 - With `--force` in normal agent workflows
 - To skip safety clusters after mutation-path changes
 
+## Step 0 — admission
+
+Assess CI necessity before expensive commands:
+
+```bash
+python3 scripts/check-ci-necessity.py --explain
+```
+
+When result is `no-action`, skip redundant validation. Integrated runners apply execution
+admission and may print `EXECUTION_RESULT=reused` without subprocess start.
+
 ## Step 1 — classify change
 
 Determine changed files, behavior, risk level, and relevant clusters:
@@ -62,6 +73,7 @@ Report:
 - selected files and clusters
 - commands and durations
 - skipped duplicate commands (`TEST_RUN_REASON=already-passed-for-current-state`)
+- execution reuse skips (`EXECUTION_RESULT=reused`)
 - remaining final gates (full CI once)
 
 This skill does not run full CI.

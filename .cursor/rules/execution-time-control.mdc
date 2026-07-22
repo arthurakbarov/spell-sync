@@ -1,0 +1,39 @@
+---
+description: Bounded execution for registered development and CI commands.
+alwaysApply: true
+---
+
+# Execution time control
+
+Always-on contract for expensive development commands. SSOT: `docs/EXECUTION_TIME_CONTROL.md`.
+
+1. Registered expensive commands do not run directly — use the execution controller or integrated runners (`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`, `run_with_budget.py`).
+2. CI necessity and admission run before execution (`check-ci-necessity.py`, admission planner).
+3. Immutable budget is fixed before subprocess start (`ExecutionPlan` persisted and printed).
+4. The running plan is never recalculated mid-execution.
+5. Parent and child invocations each have separate hard bounds and own plans.
+6. PID existence is not progress — stall detection requires a tested ProgressContract.
+7. Stall enforcement is enabled only for profiles with a tested progress contract.
+8. Broad parent gates are not automatically retried after timeout (`parentRetries = 0`).
+9. Narrow diagnostic retry is limited to one per profile (`diagnosticRetries ≤ 1`).
+10. Timeouts do not train the normal duration model.
+11. Success beyond soft threshold is quarantined (`success-slow` excluded from learning).
+12. Hard caps change only through committed registry updates — never auto-increased after hangs.
+13. Reusable functional evidence does not re-execute the command or create fake duration samples.
+14. Duplicate active execution of the same normalized signature is rejected.
+15. `tail`, `tee`, and pipeline wrappers for CI are forbidden — run `scripts/ci.sh` directly.
+16. Product Pull, Push, and Recovery paths are not wrapped by the execution controller.
+17. Final required gates cannot be skipped solely because of timing prediction.
+18. Optional edit-loop checks may be narrowed, deferred, or reused; required safety checks may not.
+
+## Tools
+
+- Strategy: `docs/EXECUTION_TIME_CONTROL.md`
+- Registry: `tests/execution-budget.toml`
+- Run: skill `run-time-controlled-command`
+- Validate: `python3 scripts/validate_execution_budget.py`
+- Report: `python3 scripts/execution_budget_report.py`
+
+## Reporting
+
+Include `EXECUTION_*` lines, skipped reuse decisions, and duplicate blocks in task reports.

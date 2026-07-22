@@ -132,6 +132,11 @@ Modifying tasks finalize per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot b
 
 Prefer focused tests first, then assess CI necessity (`python3 scripts/check-ci-necessity.py`).
 
+Execution time control bounds registered development and CI commands through
+`scripts/execution_control/` (admission, immutable plans, SQLite history, owned process
+termination). Product Pull/Push/Recovery paths are not wrapped. See
+`docs/EXECUTION_TIME_CONTROL.md`.
+
 Full CI evidence is bound to CI-relevant inputs, not merely to the Git commit identifier.
 A later non-CI commit may reuse successful full CI evidence only when the CI input digest is
 unchanged and current lightweight validation succeeds. Exact Git HEAD matching remains required

@@ -195,9 +195,30 @@ Do not, for speed:
 - rerun identical successful commands on an unchanged tree
 - run packaging or wheel smoke during unrelated focused loops
 
+## Execution time control
+
+Registered expensive commands (focused runner, pre-final, full CI children) run through the
+execution controller — not as unbounded direct subprocess calls.
+
+Decision order before execution:
+
+```text
+CI necessity → functional evidence reuse → duplicate check → admission → immutable plan → run
+```
+
+Integrated runners (`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`) invoke
+the controller automatically. Admission may skip execution when evidence is valid
+(`EXECUTION_RESULT=reused`) or narrow over-budget edit-loop plans. Each run receives expected,
+soft, and hard thresholds printed as `EXECUTION_*` lines.
+
+Do not wrap CI with `tail`, `tee`, or other pipeline wrappers. Run `scripts/ci.sh` directly so
+hard bounds and child timeout IDs remain authoritative.
+
+Registry: `tests/execution-budget.toml`. Canonical detail: `docs/EXECUTION_TIME_CONTROL.md`.
+
 ## Developer report section
 
 Modifying tasks should include a **Test selection** section documenting changed scope,
-commands run, skipped duplicates, and full CI count (expected: 1).
+commands run, skipped duplicates, execution reuse decisions, and full CI count (expected: 1).
 
 See `docs/AGENT_DEVELOPMENT.md` and `.cursor/skills/select-and-run-tests/SKILL.md`.

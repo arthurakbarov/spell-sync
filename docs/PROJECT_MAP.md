@@ -57,3 +57,31 @@ Rules:
 
 See also `docs/ARCHITECTURE.md` and `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`. ADR:
 `docs/decisions/0004-structured-technical-events.md`.
+
+## Execution control (toolchain)
+
+Stdlib-only infrastructure under `scripts/execution_control/` — not part of the product
+application layer. Wraps development and CI runners only.
+
+| Module | Role |
+|--------|------|
+| `admission.py` | CI necessity integration, edit-loop budget, reuse decisions |
+| `context.py` | Normalized platform, Python, and workload bucket |
+| `controller.py` | Immutable plan, bounded run, span persistence |
+| `diagnostics.py` | Bounded timeout investigation bundles |
+| `history.py` | SQLite spans, leases, learning samples |
+| `identity.py` | Workload and policy fingerprints |
+| `mappings.py` | Stable execution IDs for CI checks and gates |
+| `models.py` | `ExecutionPlan`, `SpanRecord`, status enums |
+| `prediction.py` | Expected, soft, stall, hard thresholds |
+| `process_tree.py` | Owned process-group execution and termination |
+| `progress.py` | Progress contracts for stall observation |
+| `registry.py` | Load `tests/execution-budget.toml` |
+| `reporting.py` | Machine-readable `EXECUTION_*` stdout |
+| `session.py` | Edit-loop test-time share accounting |
+| `statistics.py` | Robust duration statistics |
+
+Entry points: `scripts/run_with_budget.py`, `scripts/validate_execution_budget.py`,
+`scripts/execution_budget_report.py`, `scripts/execution_budget_admin.py`.
+
+Canonical reference: `docs/EXECUTION_TIME_CONTROL.md`.
