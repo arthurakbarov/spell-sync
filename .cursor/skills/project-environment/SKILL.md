@@ -106,12 +106,30 @@ Do not hand-edit `.artifacts/environment/environment.json` or `.venv/.spell-sync
 
 ## Snapshot restoration
 
-After importing owner archive:
+After importing owner archive from **`$HOME/code.zip`** (canonical location only):
 
 1. Confirm snapshot manifest `environment` block matches extracted declarations
 2. `python scripts/project_environment.py sync` (fresh `.venv` from lock)
 3. `python scripts/project_environment.py check`
 4. Do **not** copy `.venv` from archive (excluded by policy)
+
+## Modifying-task snapshot finalization
+
+After final CI and `python scripts/check-ci-evidence.py` success:
+
+```bash
+python3 "$SPELL_SYNC_DEV/scripts/create-code-snapshot.py" \
+  --workspace "$HOME/code" \
+  --output "$HOME/code.zip" \
+  --force
+python3 "$SPELL_SYNC_DEV/scripts/create-code-snapshot.py" \
+  --workspace "$HOME/code" \
+  --output "$HOME/code.zip" \
+  --check
+```
+
+Do **not** write `code.zip` under the workspace tree. Report footer uses resolved `$HOME/code.zip`
+only. See `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
 
 ## Integration points
 

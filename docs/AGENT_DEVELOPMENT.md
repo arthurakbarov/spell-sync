@@ -268,19 +268,25 @@ Procedure — skill `create-code-snapshot` in spell-sync-dev:
 
 1. After commits, clean trees, final full CI, and `python3 scripts/check-ci-evidence.py` success: `--force`, then `--check`.
 2. Re-run `git status --short` and `python3 scripts/check-ci-evidence.py`; both must stay green.
-3. Canonical path: `$HOME/code.zip` only. No timestamped alternates; no hash sidecar file
-   (`code.zip.sha256`) on disk.
+3. Canonical path: **`$HOME/code.zip` only** — the archive must live in the owner home
+   directory (`Path.home() / "code.zip"`), not under the workspace tree. Do **not** use paths
+   such as `$SPELL_SYNC_WORKSPACE/code.zip`, `~/code/code.zip`, or any repository parent
+   directory. Prefer explicit `--output "$HOME/code.zip"` or omit `--output` (script default).
+   No timestamped alternates; no hash sidecar file (`code.zip.sha256`) on disk.
 4. Read-only tasks: skip recreation; report §14 with `result: skipped`.
 
 Report footer:
 
 ```text
 CODE_ARCHIVE
-<absolute path to $HOME/code.zip>
+$HOME/code.zip
 
 SHA256
 <digest from SNAPSHOT_SHA256>
 ```
+
+The report must give the resolved absolute home path (for example `/Users/<owner>/code.zip`), not
+a workspace-relative path.
 
 Maintainer script details: private `docs/OWNER_WORKSPACE_SNAPSHOT.md` in spell-sync-dev (not
 shipped in the public package).

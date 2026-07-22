@@ -137,6 +137,6 @@ List check ids: `scripts/ci.sh --list-checks`
 ## Finalize workspace snapshot
 
 Modifying tasks only — after `python3 scripts/check-ci-evidence.py` success: skill
-`create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; re-verify evidence;
-canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT:
-`docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+`create-code-snapshot` in spell-sync-dev with `--output "$HOME/code.zip"` (home directory only,
+never under the workspace tree), `--force`, then `--check`; re-verify evidence; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

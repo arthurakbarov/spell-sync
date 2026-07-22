@@ -153,6 +153,30 @@ def _check_snapshot_script(script_path: Path) -> list[str]:
     return errors
 
 
+def _check_docs_home_snapshot_path() -> list[str]:
+    errors: list[str] = []
+    agent_dev = ROOT / "docs" / "AGENT_DEVELOPMENT.md"
+    if not agent_dev.is_file():
+        return errors
+    text = _read(agent_dev)
+    if "$HOME/code.zip" not in text:
+        errors.append(
+            "[SNAPSHOT-PATH-011] AGENT_DEVELOPMENT.md must require canonical $HOME/code.zip output; "
+            "remediation: document home-directory snapshot path in § Workspace snapshot"
+        )
+    forbidden_markers = (
+        "$SPELL_SYNC_WORKSPACE/code.zip",
+        "~/code/code.zip",
+        "workspace tree",
+    )
+    if not any(marker in text for marker in forbidden_markers):
+        errors.append(
+            "[SNAPSHOT-PATH-011] AGENT_DEVELOPMENT.md must forbid workspace-tree code.zip paths; "
+            "remediation: state archive must not live under workspace directories"
+        )
+    return errors
+
+
 def _check_docs_no_tmp_workaround() -> list[str]:
     errors: list[str] = []
     for path in DOC_PATHS:
@@ -172,6 +196,7 @@ def main() -> int:
     errors: list[str] = []
     errors.extend(_check_snapshot_policy(policy_path))
     errors.extend(_check_snapshot_script(script_path))
+    errors.extend(_check_docs_home_snapshot_path())
     errors.extend(_check_docs_no_tmp_workaround())
 
     if errors:
