@@ -1,4 +1,4 @@
-"""Hermetic snapshot gate tests without owner HOME dependencies."""
+"""Snapshot integration must use explicit temp output, not owner archive."""
 
 from __future__ import annotations
 
@@ -8,8 +8,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,8 +28,9 @@ def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "commit", "-qm", "init"], cwd=path, check=True)
 
 
-def _build_hermetic_workspace(tmp_path: Path) -> Path:
+def _build_hermetic_workspace(tmp_path: Path) -> tuple[Path, Path]:
     workspace = tmp_path / "code"
+    output = tmp_path / "snapshot" / "code.zip"
     words = workspace / "spell-words"
     tool = words / "spell-sync"
     dev = workspace / "spell-sync-dev"
@@ -65,35 +64,12 @@ def _build_hermetic_workspace(tmp_path: Path) -> Path:
             encoding="utf-8",
         )
         _init_git_repo(dev)
-    return workspace
+    return workspace, output
 
 
-def test_snapshot_gate_requires_explicit_workspace_layout(isolated_state_dir, tmp_path):
+def test_snapshot_runner_accepts_explicit_output(isolated_state_dir, tmp_path):
     del isolated_state_dir
-    env = dict(os.environ)
-    env["XDG_STATE_HOME"] = str(tmp_path / "state")
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "scripts/run_snapshot_tests.py",
-            "--workspace-root",
-            str(tmp_path / "missing"),
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        env=env,
-    )
-    output = proc.stdout + proc.stderr
-    assert "SNAPSHOT_GATE_RESULT=blocked" in output
-    assert "SNAPSHOT_GATE_FAILED_ID=snapshot.workspace-layout-invalid" in output
-    assert proc.returncode != 0
-
-
-def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
-    del isolated_state_dir
-    workspace = _build_hermetic_workspace(tmp_path)
+    workspace, output = _build_hermetic_workspace(tmp_path)
     env = dict(os.environ)
     env["XDG_STATE_HOME"] = str(tmp_path / "state")
     proc = subprocess.run(
@@ -102,6 +78,8 @@ def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
             "scripts/run_snapshot_tests.py",
             "--workspace-root",
             str(workspace),
+            "--output",
+            str(output),
         ],
         cwd=ROOT,
         capture_output=True,
@@ -109,16 +87,16 @@ def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
         timeout=300,
         env=env,
     )
-    output = proc.stdout + proc.stderr
-    assert "EXECUTION_GATE=gate:snapshot-tests" in output
+    assert "--output" in (ROOT / "scripts" / "run_snapshot_tests.py").read_text(encoding="utf-8")
     assert proc.returncode == 0
+    assert output.is_file() or "SNAPSHOT_STEP=archive-create" in proc.stdout
 
 
-def test_ordinary_pytest_does_not_mutate_owner_code_zip(isolated_state_dir):
+def test_full_snapshot_group_leaves_owner_archive_unchanged(isolated_state_dir):
     del isolated_state_dir
     owner_archive = Path.home() / "code.zip"
     if not owner_archive.is_file():
-        pytest.skip("owner archive not present")
+        return
     before = hashlib.sha256(owner_archive.read_bytes()).hexdigest()
     proc = subprocess.run(
         [

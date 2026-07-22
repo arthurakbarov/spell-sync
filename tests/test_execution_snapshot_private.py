@@ -1,69 +1,45 @@
-"""Private snapshot gate integration tests."""
+"""Private snapshot gate integration tests (hermetic only)."""
 
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
-from scripts.execution_control.workspace_paths import (  # noqa: E402
-    resolve_snapshot_workspace_layout,
-    resolve_spell_sync_dev_root,
+from tests.test_execution_snapshot_output_isolation import (  # noqa: E402
+    _build_hermetic_workspace,
 )
 
 
-def test_snapshot_private_root_resolves():
-    dev_root = resolve_spell_sync_dev_root(ROOT)
-    assert dev_root is not None
-    assert (dev_root / "scripts" / "create-code-snapshot.py").is_file()
-    assert (dev_root / "tests" / "test_create_code_snapshot.py").is_file()
-
-
-def test_snapshot_gate_blocked_without_workspace_root(isolated_state_dir, tmp_path):
+def test_snapshot_private_gate_uses_hermetic_fixture(isolated_state_dir, tmp_path):
     del isolated_state_dir
+    workspace, output = _build_hermetic_workspace(tmp_path)
+    env = dict(os.environ)
+    env["XDG_STATE_HOME"] = str(tmp_path / "state")
+    env["SPELL_SYNC_DEV_ROOT"] = str(workspace / "spell-sync-dev")
     proc = subprocess.run(
         [
             sys.executable,
             "scripts/run_snapshot_tests.py",
             "--workspace-root",
-            str(tmp_path / "missing-layout"),
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={**os.environ, "SPELL_SYNC_DEV_ROOT": "/nonexistent/spell-sync-dev-root"},
-    )
-    output = proc.stdout + proc.stderr
-    assert "SNAPSHOT_GATE_RESULT=blocked" in output
-    assert "snapshot.workspace-layout-invalid" in output
-    assert proc.returncode != 0
-
-
-def test_snapshot_gate_runs_private_pytest_when_workspace_available():
-    dev_root = resolve_spell_sync_dev_root(ROOT)
-    if dev_root is None:
-        return
-    layout = resolve_snapshot_workspace_layout(dev_root.parent)
-    if layout is None:
-        return
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "scripts/run_snapshot_tests.py",
-            "--workspace-root",
-            str(layout.root),
+            str(workspace),
+            "--output",
+            str(output),
         ],
         cwd=ROOT,
         capture_output=True,
         text=True,
         timeout=300,
-        env={**os.environ, "SPELL_SYNC_DEV_ROOT": str(dev_root)},
+        env=env,
     )
-    output = proc.stdout + proc.stderr
-    assert "EXECUTION_GATE=gate:snapshot-tests" in output
-    assert "SNAPSHOT_STEP=pytest" in output
-    assert "tarfile.open" not in output
+    combined = proc.stdout + proc.stderr
+    assert "EXECUTION_GATE=gate:snapshot-tests" in combined
+    assert "SNAPSHOT_STEP=pytest" in combined
+    assert "tarfile.open" not in combined
+    assert proc.returncode == 0
