@@ -65,3 +65,26 @@ def test_metadata_from_probe_uses_venv_python_not_ambient() -> None:
     assert sys.version.split()[0] not in payload
     assert metadata.python_version == CANONICAL_PYTHON
     assert metadata.installed_environment_digest == probe.installed_environment_digest
+
+
+def test_probe_ignores_project_root_build_egg_info() -> None:
+    venv_dir = ROOT / ".venv"
+    venv_py = venv_python(venv_dir)
+    if venv_py is None:
+        pytest.skip("maintainer .venv required for build-artifact probe test")
+
+    before = run_interpreter_probe(venv_py, project_root=ROOT)
+    egg_info = ROOT / "spell_sync.egg-info"
+    egg_info.mkdir(exist_ok=True)
+    (egg_info / "PKG-INFO").write_text(
+        "Metadata-Version: 2.1\nName: spell-sync\nVersion: 0.0.0\n",
+        encoding="utf-8",
+    )
+    try:
+        after = run_interpreter_probe(venv_py, project_root=ROOT)
+    finally:
+        import shutil
+
+        shutil.rmtree(egg_info, ignore_errors=True)
+
+    assert after.installed_environment_digest == before.installed_environment_digest

@@ -18,6 +18,14 @@ import sys
 from pathlib import Path
 
 project_root = Path(sys.argv[1])
+purelib = Path(__import__("sysconfig").get_paths()["purelib"]).resolve()
+
+
+def _in_venv(dist_info_path):
+    try:
+        return Path(dist_info_path).resolve().is_relative_to(purelib)
+    except (OSError, ValueError):
+        return False
 
 
 def _identity(kind: str) -> str:
@@ -36,6 +44,9 @@ def _identity(kind: str) -> str:
 
 records = []
 for dist in importlib.metadata.distributions():
+    dist_path = getattr(dist, "_path", None)
+    if dist_path is None or not _in_venv(dist_path):
+        continue
     name = dist.metadata.get("Name")
     version = dist.version
     if not name or not version:

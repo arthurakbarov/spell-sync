@@ -71,7 +71,18 @@ def build_installed_manifest(
     if python is not None:
         return _build_installed_manifest_subprocess(python=python, project_root=project_root)
     records: list[DistributionRecord] = []
+    import sysconfig
+
+    purelib = Path(sysconfig.get_paths()["purelib"]).resolve()
     for dist in importlib.metadata.distributions():
+        dist_path = getattr(dist, "_path", None)
+        if dist_path is None:
+            continue
+        try:
+            if not Path(dist_path).resolve().is_relative_to(purelib):
+                continue
+        except (OSError, ValueError):
+            continue
         name = dist.metadata.get("Name")
         version = dist.version
         if not name or not version:
@@ -105,8 +116,21 @@ import importlib.metadata
 from pathlib import Path
 
 project_root = Path(__import__("sys").argv[1])
+purelib = Path(__import__("sysconfig").get_paths()["purelib"]).resolve()
+
+
+def _in_venv(dist_info_path):
+    try:
+        return Path(dist_info_path).resolve().is_relative_to(purelib)
+    except (OSError, ValueError):
+        return False
+
+
 records = []
 for dist in importlib.metadata.distributions():
+    dist_path = getattr(dist, "_path", None)
+    if dist_path is None or not _in_venv(dist_path):
+        continue
     name = dist.metadata.get("Name")
     version = dist.version
     if not name or not version:

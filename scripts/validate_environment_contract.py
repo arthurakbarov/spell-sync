@@ -286,6 +286,10 @@ def _check_project_environment_probe() -> list[str]:
         text = _read(probe_path)
         if "importlib.metadata.distributions()" not in text:
             errors.append("[ENVIRONMENT-PROBE-006] probe must interrogate .venv installed manifest")
+        if "purelib" not in text or "_in_venv" not in text:
+            errors.append(
+                "[ENVIRONMENT-PROBE-007] probe must limit installed manifest to venv site-packages"
+            )
     else:
         errors.append("[ENVIRONMENT-PROBE-006] missing scripts/environment_contract/probe.py")
     if project_env.is_file():
