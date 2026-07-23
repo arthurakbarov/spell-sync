@@ -21,25 +21,33 @@ def _resolve_dev_root() -> Path | None:
     return resolve_spell_sync_dev_root(ROOT)
 
 
-def _load_snapshot_module(dev_root: Path):
-    script = dev_root / "scripts" / "create-code-snapshot.py"
-    spec = importlib.util.spec_from_file_location("create_code_snapshot", script)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-@pytest.fixture(scope="module")
-def snapshot_mod():
-    dev_root = _resolve_dev_root()
-    if dev_root is None or not (dev_root / "scripts" / "create-code-snapshot.py").is_file():
-        pytest.skip("spell-sync-dev repository missing for snapshot environment tests")
+def _load_modules(dev_root: Path):
     scripts_dir = dev_root / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
-    return _load_snapshot_module(dev_root)
+    snap_spec = importlib.util.spec_from_file_location(
+        "create_code_snapshot_env_binding", scripts_dir / "create-code-snapshot.py"
+    )
+    policy_spec = importlib.util.spec_from_file_location(
+        "snapshot_policy_env_binding", scripts_dir / "snapshot_policy.py"
+    )
+    assert snap_spec and snap_spec.loader and policy_spec and policy_spec.loader
+    policy_mod = importlib.util.module_from_spec(policy_spec)
+    snap_mod = importlib.util.module_from_spec(snap_spec)
+    sys.modules[policy_spec.name] = policy_mod
+    sys.modules[snap_spec.name] = snap_mod
+    policy_spec.loader.exec_module(policy_mod)
+    sys.modules["snapshot_policy"] = policy_mod
+    snap_spec.loader.exec_module(snap_mod)
+    return snap_mod, policy_mod
+
+
+@pytest.fixture(scope="module")
+def modules():
+    dev_root = _resolve_dev_root()
+    if dev_root is None or not (dev_root / "scripts" / "create-code-snapshot.py").is_file():
+        pytest.skip("spell-sync-dev repository missing for snapshot environment tests")
+    return _load_modules(dev_root)
 
 
 def _sha256_file(path: Path) -> str:
@@ -48,34 +56,71 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _environment_binding() -> dict[str, object]:
+def _workspace_layout(snapshot_mod):
+    workspace_root = ROOT.parent.parent
+    return snapshot_mod.WorkspaceLayout(
+        root=workspace_root,
+        name="code",
+        repositories={
+            "spell-words": workspace_root / "spell-words",
+            "spell-sync-dev": workspace_root / "spell-sync-dev",
+            "spell-sync": ROOT,
+        },
+    )
+
+
+def _required_inputs(snapshot_mod, policy_mod, layout) -> dict[str, str]:
+    dev_root = _resolve_dev_root()
+    assert dev_root is not None
+    policy = policy_mod.load_snapshot_policy(dev_root / "snapshot-policy.toml")
+    return snapshot_mod._require_environment_inputs(layout, policy)
+
+
+def _environment_binding(snapshot_mod, policy_mod, layout) -> dict[str, object]:
+    dev_root = _resolve_dev_root()
+    assert dev_root is not None
+    policy = policy_mod.load_snapshot_policy(dev_root / "snapshot-policy.toml")
+    required_inputs = snapshot_mod._require_environment_inputs(layout, policy)
+    inventory = policy.inventory_from_archive_entries(())
     evidence = ROOT / ".artifacts" / "environment" / "environment.json"
-    return {
-        "pyprojectSha256": _sha256_file(ROOT / "pyproject.toml"),
-        "uvLockSha256": _sha256_file(ROOT / "uv.lock"),
-        "pythonVersionFileSha256": _sha256_file(ROOT / ".python-version"),
-        "environmentContractSha256": _sha256_file(ROOT / "config" / "environment-contract.toml"),
-        "environmentEvidenceSha256": _sha256_file(evidence) if evidence.is_file() else "",
-        "venvIncluded": False,
-        "cacheEntryCount": 0,
-        "timingDatabaseEntryCount": 0,
-        "excludedEntryCount": 0,
-        "disallowedArtifactEntryCount": 0,
-    }
+    evidence_sha = _sha256_file(evidence) if evidence.is_file() else ""
+    return snapshot_mod._legacy_environment_fields(
+        policy,
+        required_inputs=required_inputs,
+        evidence_sha=evidence_sha,
+        inventory=inventory,
+    )
 
 
-def test_compute_environment_binding_matches_repository_files(snapshot_mod) -> None:
+def test_compute_environment_binding_matches_repository_files(modules) -> None:
+    snapshot_mod, policy_mod = modules
     evidence = ROOT / ".artifacts" / "environment" / "environment.json"
     if not evidence.is_file():
         pytest.skip("maintainer environment evidence required for binding test")
-    binding = snapshot_mod._compute_environment_binding(ROOT)
-    expected = _environment_binding()
+    layout = _workspace_layout(snapshot_mod)
+    dev_root = _resolve_dev_root()
+    assert dev_root is not None
+    policy = policy_mod.load_snapshot_policy(dev_root / "snapshot-policy.toml")
+    required_inputs = snapshot_mod._require_environment_inputs(layout, policy)
+    inventory = policy.inventory_from_archive_entries(())
+    binding = snapshot_mod._compute_environment_binding(
+        layout,
+        policy,
+        required_inputs=required_inputs,
+        inventory=inventory,
+    )
+    expected = _environment_binding(snapshot_mod, policy_mod, layout)
     assert binding == expected
 
 
-def _write_synthetic_archive(snapshot_mod, path: Path, *, environment: dict[str, object]) -> None:
+def _write_synthetic_archive(
+    snapshot_mod, policy_mod, path: Path, *, environment: dict[str, object]
+) -> None:
+    dev_root = _resolve_dev_root()
+    assert dev_root is not None
+    policy = policy_mod.load_snapshot_policy(dev_root / "snapshot-policy.toml")
     prefix = "code"
-    rel = "spell-words/spell-sync"
+    rel = policy.authoritative_project_path
     base = f"{prefix}/{rel}"
     file_entries = {
         f"{base}/pyproject.toml": ROOT / "pyproject.toml",
@@ -84,8 +129,29 @@ def _write_synthetic_archive(snapshot_mod, path: Path, *, environment: dict[str,
         f"{base}/config/environment-contract.toml": ROOT / "config" / "environment-contract.toml",
     }
     evidence = ROOT / ".artifacts" / "environment" / "environment.json"
+    ci_summary = ROOT / ".artifacts" / "ci" / "ci-summary.json"
     if evidence.is_file():
         file_entries[f"{base}/.artifacts/environment/environment.json"] = evidence
+    if ci_summary.is_file():
+        file_entries[f"{base}/.artifacts/ci/ci-summary.json"] = ci_summary
+
+    inner_paths = tuple(
+        arcname[len(f"{prefix}/") :] for arcname in file_entries if arcname.startswith(f"{prefix}/")
+    )
+    inventory = policy.inventory_from_archive_entries(inner_paths)
+    retained_artifacts = {
+        artifact_path: {
+            "required": artifact_path in policy.retained_artifacts_required,
+            "present": artifact_path in inner_paths,
+            "sha256": _sha256_file(source)
+            if (source := file_entries.get(f"{prefix}/{artifact_path}")) is not None
+            else None,
+        }
+        for artifact_path in policy.all_retained_artifact_paths()
+    }
+    for artifact_path in policy.retained_artifacts_required:
+        entry = retained_artifacts[artifact_path]
+        assert isinstance(entry.get("sha256"), str)
 
     manifest = {
         "schemaVersion": snapshot_mod.SCHEMA_VERSION,
@@ -119,6 +185,11 @@ def _write_synthetic_archive(snapshot_mod, path: Path, *, environment: dict[str,
             },
         ],
         "environment": environment,
+        "policy": {
+            "snapshotPolicySha256": policy.digest(),
+            "retainedArtifacts": retained_artifacts,
+            **inventory.to_manifest_dict(),
+        },
         "archive": {},
         "skippedSpecialEntries": [],
     }
@@ -146,20 +217,17 @@ def _write_synthetic_archive(snapshot_mod, path: Path, *, environment: dict[str,
         manifest["archive"] = archive_meta
 
 
-def test_verify_archive_rejects_tampered_environment_binding(snapshot_mod, tmp_path: Path) -> None:
+def test_verify_archive_rejects_tampered_environment_binding(modules, tmp_path: Path) -> None:
+    snapshot_mod, policy_mod = modules
+    evidence = ROOT / ".artifacts" / "environment" / "environment.json"
+    ci_summary = ROOT / ".artifacts" / "ci" / "ci-summary.json"
+    if not evidence.is_file() or not ci_summary.is_file():
+        pytest.skip("maintainer CI/environment artifacts required for binding verify test")
     archive = tmp_path / "code.zip"
-    binding = _environment_binding()
-    _write_synthetic_archive(snapshot_mod, archive, environment=binding)
+    binding = _environment_binding(snapshot_mod, policy_mod, _workspace_layout(snapshot_mod))
+    _write_synthetic_archive(snapshot_mod, policy_mod, archive, environment=binding)
 
-    layout = snapshot_mod.WorkspaceLayout(
-        root=tmp_path,
-        name="code",
-        repositories={
-            "spell-words": tmp_path / "spell-words",
-            "spell-sync-dev": tmp_path / "spell-sync-dev",
-            "spell-sync": tmp_path / "spell-words" / "spell-sync",
-        },
-    )
+    layout = _workspace_layout(snapshot_mod)
     snapshot_mod.verify_archive(archive, layout=layout, states=None, stats=None, exclude_paths=None)
 
     tampered = tmp_path / "tampered.zip"
@@ -167,6 +235,10 @@ def test_verify_archive_rejects_tampered_environment_binding(snapshot_mod, tmp_p
     with zipfile.ZipFile(tampered, mode="r") as zf:
         manifest_name = "code/SNAPSHOT_MANIFEST.json"
         payload = json.loads(zf.read(manifest_name))
+        required_inputs = payload["environment"]["requiredInputs"]
+        pyproject_path = "spell-words/spell-sync/pyproject.toml"
+        required_inputs[pyproject_path] = "0" * 64
+        payload["environment"]["requiredInputs"] = required_inputs
         payload["environment"]["pyprojectSha256"] = "0" * 64
         entries = [
             (info, zf.read(info.filename))
