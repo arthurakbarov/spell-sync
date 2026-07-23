@@ -256,6 +256,19 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsInstance(app.screen, StatusScreen)
 
+    async def test_status_button_opens_status_screen(self):
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            await wait_for_text(pilot, "#dashboard-summary", "Ready")
+            screen = app.screen
+            assert isinstance(screen, DashboardScreen)
+            screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-status")))
+            await pilot.pause()
+            from spell_sync.tui.screens.status_screen import StatusScreen
+
+            self.assertIsInstance(app.screen, StatusScreen)
+
     async def test_layout_warning_at_80x24(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
