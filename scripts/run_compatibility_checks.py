@@ -14,9 +14,117 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+ROOT = _ROOT
+
+_WHEEL_ENV_KEYS_TO_CLEAR = (
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "PYTHONSTARTUP",
+    "PYTHONUSERBASE",
+    "VIRTUAL_ENV",
+    "__PYVENV_LAUNCHER__",
+)
+
+_ORIGIN_PROBE_SCRIPT = """
+import json
+import pathlib
+import sys
+import sysconfig
+import spell_sync
+
+payload = {
+    "origin": str(pathlib.Path(spell_sync.__file__).resolve()),
+    "executable": str(
+        pathlib.Path(sysconfig.get_path("scripts")) / pathlib.Path(sys.executable).name
+    ),
+    "sysPrefix": sys.prefix,
+    "basePrefix": getattr(sys, "base_prefix", sys.prefix),
+    "purelib": sysconfig.get_path("purelib"),
+    "platlib": sysconfig.get_path("platlib"),
+    "version": spell_sync.__version__,
+}
+print(json.dumps(payload))
+"""
+
+
+def _path_within(child: Path, parent: Path) -> bool:
+    try:
+        child_real = Path(os.path.realpath(child))
+        parent_real = Path(os.path.realpath(parent))
+        child_real.relative_to(parent_real)
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def _clean_wheel_env(base: dict[str, str]) -> dict[str, str]:
+    clean = {key: value for key, value in base.items() if not key.startswith("SPELL_SYNC")}
+    for key in _WHEEL_ENV_KEYS_TO_CLEAR:
+        clean.pop(key, None)
+    clean["PYTHONNOUSERSITE"] = "1"
+    return clean
+
+
+def _venv_interpreter_in_venv(executable: Path, venv_dir: Path) -> bool:
+    exe = Path(os.path.normpath(str(executable)))
+    venv = Path(os.path.normpath(str(venv_dir)))
+    for bin_dir in (venv / "bin", venv / "Scripts"):
+        bin_norm = Path(os.path.normpath(str(bin_dir)))
+        try:
+            exe.relative_to(bin_norm)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def _validate_wheel_origin_probe(
+    probe: dict[str, object],
+    *,
+    venv_dir: Path,
+    checkout_root: Path,
+) -> str | None:
+    required = (
+        "origin",
+        "executable",
+        "sysPrefix",
+        "purelib",
+        "platlib",
+        "version",
+    )
+    for key in required:
+        if not isinstance(probe.get(key), str) or not str(probe[key]):
+            return "compatibility.wheel-origin-failed"
+
+    origin = Path(str(probe["origin"]))
+    executable = Path(str(probe["executable"]))
+    sys_prefix = Path(str(probe["sysPrefix"]))
+    purelib = Path(str(probe["purelib"]))
+    platlib = Path(str(probe["platlib"]))
+    version = str(probe["version"])
+    venv_resolved = venv_dir
+    checkout_resolved = checkout_root
+
+    if not Path(os.path.realpath(origin)).is_file():
+        return "compatibility.wheel-origin-failed"
+    if version != "0.2.1":
+        return "compatibility.wheel-version-failed"
+    if not (_path_within(origin, purelib) or _path_within(origin, platlib)):
+        return "compatibility.wheel-origin-failed"
+    if not (_path_within(purelib, venv_resolved) and _path_within(platlib, venv_resolved)):
+        return "compatibility.wheel-origin-failed"
+    if not _path_within(sys_prefix, venv_resolved):
+        return "compatibility.wheel-origin-failed"
+    if not _venv_interpreter_in_venv(executable, venv_resolved):
+        return "compatibility.wheel-origin-failed"
+    if _path_within(origin, checkout_resolved):
+        return "compatibility.wheel-origin-failed"
+    return None
+
 
 _UV_VERSION_PATTERN = re.compile(r"uv\s+(\d+\.\d+\.\d+)")
 
@@ -107,6 +215,7 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
         rc, output = _run(
             [host_python, "-m", "build", "-w", "-n", "--outdir", str(build_dir)],
             cwd=ROOT,
+            env=_clean_wheel_env(os.environ),
         )
         results.append(
             {
@@ -122,7 +231,10 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
         if not wheels:
             return results, 1, "compatibility.wheel-build-failed"
 
-        rc, output = _run([host_python, "-m", "venv", str(venv_dir)])
+        rc, output = _run(
+            [host_python, "-m", "venv", str(venv_dir)],
+            env=_clean_wheel_env(os.environ),
+        )
         results.append(
             {
                 "step": "compatibility.wheel-venv",
@@ -134,8 +246,7 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
             return results, rc, "compatibility.wheel-venv-failed"
 
         venv_py = _venv_python(venv_dir)
-        clean_env = os.environ.copy()
-        clean_env.pop("PYTHONPATH", None)
+        clean_env = _clean_wheel_env(os.environ)
         rc, output = _run(
             [str(venv_py), "-m", "pip", "install", "-q", str(wheels[0])],
             env=clean_env,
@@ -150,15 +261,8 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
         if rc != 0:
             return results, rc, "compatibility.wheel-install-failed"
 
-        origin_script = (
-            "import pathlib, spell_sync, sys; "
-            f"root = pathlib.Path({str(ROOT)!r}).resolve(); "
-            "origin = pathlib.Path(spell_sync.__file__).resolve(); "
-            "print(origin); "
-            "print(str(origin).startswith(str(root)))"
-        )
         rc, output = _run(
-            [str(venv_py), "-c", origin_script],
+            [str(venv_py), "-c", _ORIGIN_PROBE_SCRIPT],
             cwd=work_dir,
             env=clean_env,
         )
@@ -171,9 +275,19 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
         )
         if rc != 0:
             return results, rc, "compatibility.wheel-origin-failed"
-        lines = [line.strip() for line in output.splitlines() if line.strip()]
-        if len(lines) < 2 or lines[1].lower() == "true":
+        try:
+            probe = json.loads(output.strip().splitlines()[-1])
+        except (json.JSONDecodeError, IndexError):
             return results, 1, "compatibility.wheel-origin-failed"
+        if not isinstance(probe, dict):
+            return results, 1, "compatibility.wheel-origin-failed"
+        origin_failure = _validate_wheel_origin_probe(
+            probe,
+            venv_dir=venv_dir,
+            checkout_root=ROOT,
+        )
+        if origin_failure is not None:
+            return results, 1, origin_failure
 
         rc, output = _run(
             [str(venv_py), "-m", "spell_sync", "version"],

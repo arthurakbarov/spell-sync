@@ -339,6 +339,23 @@ def _check_compatibility_runner() -> list[str]:
         )
     if "PYTHONPATH" not in text:
         errors.append("[COMPATIBILITY-WHEEL-013] compatibility wheel install must clear PYTHONPATH")
+    origin_markers = (
+        "sysPrefix",
+        "purelib",
+        "platlib",
+        "_validate_wheel_origin_probe",
+        "PYTHONNOUSERSITE",
+    )
+    for marker in origin_markers:
+        if marker not in text:
+            errors.append(
+                "[COMPATIBILITY-WHEEL-013] run_compatibility_checks.py must "
+                f"validate wheel origin using {marker}"
+            )
+    if "_clean_wheel_env" not in text:
+        errors.append(
+            "[COMPATIBILITY-WHEEL-013] compatibility wheel workflow must use cleaned subprocess env"
+        )
     return errors
 
 

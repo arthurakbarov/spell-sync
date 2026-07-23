@@ -97,15 +97,33 @@ def _check_snapshot_policy(policy_path: Path) -> list[str]:
                 "remediation: add to [requiredEnvironmentInputs].patterns"
             )
     retained = data.get("retainedArtifacts", {})
-    retained_patterns: list[str] = []
+    retained_required: list[str] = []
     if isinstance(retained, dict):
-        raw_retained = retained.get("patterns")
-        if isinstance(raw_retained, list):
-            retained_patterns = [str(item) for item in raw_retained]
-    if ".artifacts/environment/environment.json" not in retained_patterns:
+        if isinstance(retained.get("required"), list):
+            retained_required = [str(item) for item in retained["required"]]
+        legacy = retained.get("patterns")
+        if isinstance(legacy, list):
+            retained_required = [str(item) for item in legacy]
+    workspace = data.get("workspace", {})
+    authoritative = ""
+    if isinstance(workspace, dict):
+        authoritative = str(workspace.get("authoritativeProjectPath", "")).strip()
+    if not authoritative:
         errors.append(
-            "[SNAPSHOT-POLICY-008] snapshot-policy.toml must retain environment evidence; "
-            "remediation: add .artifacts/environment/environment.json to retainedArtifacts"
+            "[SNAPSHOT-POLICY-012] snapshot-policy.toml must declare "
+            "[workspace].authoritativeProjectPath"
+        )
+    expected_ci = "spell-words/spell-sync/.artifacts/ci/ci-summary.json"
+    expected_env = "spell-words/spell-sync/.artifacts/environment/environment.json"
+    if expected_ci not in retained_required:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] retainedArtifacts.required must include authoritative "
+            "ci-summary.json path"
+        )
+    if expected_env not in retained_required:
+        errors.append(
+            "[SNAPSHOT-POLICY-008] snapshot-policy.toml must retain environment evidence at "
+            "authoritative project path"
         )
     return errors
 
@@ -169,6 +187,31 @@ def _check_snapshot_script(script_path: Path) -> list[str]:
         errors.append(
             "[SNAPSHOT-ENVIRONMENT-010] snapshot manifest schema must be version 2 "
             "with environment block"
+        )
+    if "_require_environment_inputs" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] create-code-snapshot.py must require policy environment inputs"
+        )
+    if "requiredInputs" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] snapshot manifest must bind requiredInputs from policy"
+        )
+    if "retainedArtifacts" not in text or "_verify_retained_artifacts" not in text:
+        errors.append(
+            "[SNAPSHOT-POLICY-012] create-code-snapshot.py must verify "
+            "path-scoped retained artifacts"
+        )
+    if "authoritativeProjectPath" not in _read(policy_file):
+        errors.append(
+            "[SNAPSHOT-POLICY-012] snapshot-policy.toml must declare authoritativeProjectPath"
+        )
+    hardcoded_inputs = (
+        'root_repo / "pyproject.toml"',
+        "SNAPSHOT_EXCLUDE",
+    )
+    if any(marker in text for marker in hardcoded_inputs):
+        errors.append(
+            "[SNAPSHOT-POLICY-012] create-code-snapshot.py must not hard-code required input paths"
         )
     return errors
 

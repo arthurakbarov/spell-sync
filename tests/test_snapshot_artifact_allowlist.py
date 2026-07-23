@@ -51,3 +51,15 @@ def test_test_run_history_excluded(policy) -> None:
 def test_environment_evidence_allowed(policy) -> None:
     rel = "spell-words/spell-sync/.artifacts/environment/environment.json"
     assert not policy.should_skip_workspace_path(rel)
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "spell-sync-dev/.artifacts/ci/ci-summary.json",
+        "spell-words/.artifacts/environment/environment.json",
+    ],
+)
+def test_wrong_repository_retained_artifact_skipped(policy, rel: str) -> None:
+    assert policy.should_skip_workspace_path(rel)
+    assert policy.classify_archive_entry(rel) == "artifact_disallowed"
