@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +21,10 @@ def main() -> int:
         ("git-optional", "Git is optional" in README or "Git is **optional**" in README),
         ("no-spell-sync-dev-required", "spell-sync-dev" not in README),
         ("getting-started-exists", GETTING_STARTED.startswith("# Getting Started")),
-        ("private-git-optional", "private" in GETTING_STARTED.lower() and "optional" in GETTING_STARTED.lower()),
+        (
+            "private-git-optional",
+            "private" in GETTING_STARTED.lower() and "optional" in GETTING_STARTED.lower(),
+        ),
     ]
     for check_id, ok in checks:
         if not ok:

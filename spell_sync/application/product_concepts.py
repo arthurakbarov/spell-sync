@@ -77,9 +77,7 @@ UPDATE_APPS_HELP = (
 )
 
 CHECK_APPS_LABEL = "Check my apps"
-CHECK_APPS_HELP = (
-    "See which apps are ready and whether anything needs attention."
-)
+CHECK_APPS_HELP = "See which apps are ready and whether anything needs attention."
 
 COLLECT_WORDS_TECHNICAL = "Collect my words (Pull)"
 UPDATE_APPS_TECHNICAL = "Update my apps (Push)"

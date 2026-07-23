@@ -31,9 +31,9 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 32)) as pilot:
             content = await wait_for_text(pilot, "#welcome-content", "Welcome")
             text = str(content.render()).lower()
-            self.assertIn("custom diction", text)
+            self.assertIn("personal words", text)
             self.assertIn("built-in", text)
-            self.assertIn("does not inspect", text)
+            self.assertIn("never read or changed", text)
 
     async def test_wordlist_setup_explains_personal_exceptions(self):
         missing = ProjectSetupState(

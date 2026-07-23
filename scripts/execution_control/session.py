@@ -113,7 +113,11 @@ def record_session_event(
         print(f"EXECUTION_SESSION_EDIT_SECONDS={session_seconds:.0f}")
 
 
-def build_edit_loop_summary(totals: SessionTotals, *, history: object | None = None) -> dict[str, object]:
+def build_edit_loop_summary(
+    totals: SessionTotals,
+    *,
+    history: object | None = None,
+) -> dict[str, object]:
     """Aggregate edit-loop timing from session totals and optional history."""
     focused_runs = 0
     if history is not None and hasattr(history, "count_gate_runs"):
@@ -121,7 +125,10 @@ def build_edit_loop_summary(totals: SessionTotals, *, history: object | None = N
             history.count_gate_runs("gate:focused-cluster")
         )
     test_seconds = (
-        totals.focused_seconds + totals.pre_final_seconds + totals.full_ci_seconds + totals.diagnostic_seconds
+        totals.focused_seconds
+        + totals.pre_final_seconds
+        + totals.full_ci_seconds
+        + totals.diagnostic_seconds
     )
     non_test_seconds = max(0.0, totals.edit_seconds - test_seconds)
     total_seconds = max(1.0, totals.edit_seconds)
@@ -148,7 +155,9 @@ def build_edit_loop_summary(totals: SessionTotals, *, history: object | None = N
             "reuse: sum(expectedSeconds) for spans with status=reused; "
             "narrow: predicted broad plan minus actual replacement plan when recorded"
         ),
-        "medianFocusedCycleSeconds": round(totals.focused_seconds, 2) if focused_runs <= 1 else None,
+        "medianFocusedCycleSeconds": (
+            round(totals.focused_seconds, 2) if focused_runs <= 1 else None
+        ),
         "p90FocusedCycleSeconds": None,
     }
 

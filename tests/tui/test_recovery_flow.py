@@ -58,7 +58,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#blocking-banner", "Pending recovery")
             await pilot.click("#btn-recovery")
             await wait_for_text(pilot, "#recovery-content", "Recoverable files")

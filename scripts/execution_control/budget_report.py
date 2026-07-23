@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .history import HistoryStore
-from .registry import ExecutionBudgetRegistry, load_registry, REGISTRY_REL_PATH
+from .registry import REGISTRY_REL_PATH, ExecutionBudgetRegistry, load_registry
 from .session import build_edit_loop_summary, load_session
 from .statistics import compute_mae, compute_mape, compute_stats, confidence_label
 
@@ -137,9 +137,11 @@ def _environment_cohort(rows: list[dict[str, Any]]) -> str:
         return signatures[0][:16]
     return "mixed"
 
+
 def _stats_for_execution(execution_id: str, rows: list[dict[str, Any]]) -> ExecutionIdStats:
     durations = [float(row["duration_seconds"]) for row in rows]
-    stats = compute_stats(durations, progress_gaps=[float(row["maximum_progress_gap"]) for row in rows])
+    progress_gaps = [float(row["maximum_progress_gap"]) for row in rows]
+    stats = compute_stats(durations, progress_gaps=progress_gaps)
     success = sum(1 for row in rows if row["status"] in {"success", "success-slow"})
     failure = sum(1 for row in rows if row["status"] == "failed")
     timeout = sum(1 for row in rows if row["status"] in {"timeout-hard", "timeout-stall"})
@@ -155,11 +157,7 @@ def _stats_for_execution(execution_id: str, rows: list[dict[str, Any]]) -> Execu
     last_expected = float(rows[0]["expected_seconds"]) if rows else None
     last_actual = float(rows[0]["duration_seconds"]) if rows else None
     admission = _admission_counts(rows)
-    reuse_avoided = sum(
-        float(row["expected_seconds"])
-        for row in rows
-        if row["status"] == "reused"
-    )
+    reuse_avoided = sum(float(row["expected_seconds"]) for row in rows if row["status"] == "reused")
     return ExecutionIdStats(
         execution_id=execution_id,
         sample_count=stats.sample_count,
@@ -224,8 +222,12 @@ def render_text_report(payload: dict[str, Any]) -> str:
     if isinstance(summary, dict):
         lines.append(f"EDIT_LOOP_SESSION_COUNT={summary.get('sessionCount', 0)}")
         lines.append(f"EDIT_LOOP_TEST_TIME_SHARE={summary.get('testTimeShare', 0)}")
-        lines.append(f"EDIT_LOOP_ESTIMATED_SECONDS_AVOIDED={summary.get('estimatedSecondsAvoided', 0)}")
-        lines.append(f"EDIT_LOOP_MEDIAN_FOCUSED_SECONDS={summary.get('medianFocusedCycleSeconds', 0)}")
+        lines.append(
+            f"EDIT_LOOP_ESTIMATED_SECONDS_AVOIDED={summary.get('estimatedSecondsAvoided', 0)}"
+        )
+        lines.append(
+            f"EDIT_LOOP_MEDIAN_FOCUSED_SECONDS={summary.get('medianFocusedCycleSeconds', 0)}"
+        )
     return "\n".join(lines) + "\n"
 
 

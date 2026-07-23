@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,7 +26,14 @@ def test_insufficient_data_confidence() -> None:
     payload = build_execution_budget_report(ROOT, execution_id="tests.core")
     ids = payload["executionIds"]
     if ids:
-        assert ids[0]["confidence"] in {"insufficient-data", "none", "very-low", "low", "medium", "high"}
+        assert ids[0]["confidence"] in {
+            "insufficient-data",
+            "none",
+            "very-low",
+            "low",
+            "medium",
+            "high",
+        }
 
 
 def test_mae_mape_helpers() -> None:

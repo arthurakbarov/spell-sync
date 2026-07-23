@@ -95,7 +95,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_dashboard_logs_button_opens_screen(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DashboardScreen(controller))
             await pilot.pause()
             await pilot.click("#btn-history")

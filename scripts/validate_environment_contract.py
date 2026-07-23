@@ -244,8 +244,9 @@ def _check_pyproject(contract_data: dict[str, object] | None) -> list[str]:
                 if extra:
                     detail.append(f"extra in dev extra: {', '.join(extra)}")
                 errors.append(
-                    "[ENVIRONMENT-CONTRACT-001] dependency-groups dev and optional-dependencies dev "
-                    f"must align ({'; '.join(detail)}); remediation: sync dev extra with groups SSOT"
+                    "[ENVIRONMENT-CONTRACT-001] dependency-groups dev and "
+                    "optional-dependencies dev must align "
+                    f"({'; '.join(detail)}); remediation: sync dev extra with groups SSOT"
                 )
     return errors
 

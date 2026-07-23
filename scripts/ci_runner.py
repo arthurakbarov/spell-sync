@@ -28,7 +28,6 @@ if str(ROOT) not in sys.path:
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
-from scripts.test_groups import is_pytest_group  # noqa: E402
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.environment_contract.fingerprint import (  # noqa: E402
     resolve_project_environment_fingerprint,
@@ -48,6 +47,7 @@ from scripts.execution_control.gate_flow import (  # noqa: E402
 from scripts.execution_control.mappings import ci_check_execution_id  # noqa: E402
 from scripts.execution_control.models import ExecutionStatus  # noqa: E402
 from scripts.execution_control.privacy import sanitize_text, workspace_roots  # noqa: E402
+from scripts.test_groups import is_pytest_group  # noqa: E402
 from scripts.test_selection.tree_state import (  # noqa: E402
     changed_source_paths,
     content_tree_digest,
@@ -112,7 +112,7 @@ def _project_python(root: Path, fallback: str) -> str:
 
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
-    from scripts.test_groups import GROUP_ORDER, is_pytest_group, pytest_command_for_group
+    from scripts.test_groups import GROUP_ORDER, pytest_command_for_group
 
     steps: list[tuple[str, list[str]]] = [
         ("environment.contract", [py, "scripts/validate_environment_contract.py"]),
@@ -1444,8 +1444,7 @@ class CiRunner:
                 return self._finish_with_gate(0)
 
             if only is None and (
-                self._mode == "full"
-                or (start_from is not None and is_pytest_group(start_from))
+                self._mode == "full" or (start_from is not None and is_pytest_group(start_from))
             ):
                 cov_rc, cov_out, cov_timing = self._run_check(
                     "coverage.policy",

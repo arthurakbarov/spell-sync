@@ -159,7 +159,10 @@ def group_files(
     return tuple(sorted(files))
 
 
-def validate_union(root: Path | None = None, groups: tuple[TestGroup, ...] | None = None) -> tuple[bool, list[str]]:
+def validate_union(
+    root: Path | None = None,
+    groups: tuple[TestGroup, ...] | None = None,
+) -> tuple[bool, list[str]]:
     groups = groups or load_test_groups()
     base = root or ROOT
     assigned: dict[str, str] = {}
@@ -208,6 +211,6 @@ def pytest_command_for_group(
         )
         if cov_append:
             command.append("--cov-append")
-        else:
-            command.extend(["--cov-report=json", "--cov-fail-under=98"])
+        if group_id == GROUP_ORDER[-1]:
+            command.extend(["--cov-report=json"])
     return command

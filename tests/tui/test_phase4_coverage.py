@@ -323,7 +323,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "blocked")
             screen = app.screen
             assert isinstance(screen, DashboardScreen)
