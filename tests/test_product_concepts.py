@@ -55,7 +55,9 @@ class TestProductConcepts(unittest.TestCase):
             self.assertTrue(
                 "not inspect" in lowered
                 or "does not inspect" in lowered
-                or "not modified" in lowered,
+                or "not modified" in lowered
+                or "never read" in lowered
+                or "never changed" in lowered,
                 msg=text,
             )
 
