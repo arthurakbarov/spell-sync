@@ -207,10 +207,11 @@ def pytest_command_for_group(
                 "--cov=spell_sync",
                 "--cov-branch",
                 "--cov-report=term-missing:skip-covered",
+                "--cov-fail-under=0",
             ]
         )
         if cov_append:
             command.append("--cov-append")
         if group_id == GROUP_ORDER[-1]:
-            command.extend(["--cov-report=json"])
+            command.append("--cov-report=json")
     return command
