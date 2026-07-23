@@ -83,7 +83,8 @@ def test_stale_lease_allows_new_execution(isolated_state_dir, history):
 
 def test_ci_check_execution_id_mappings():
     assert ci_check_execution_id("ruff.check") == "ci:ruff-check"
-    assert ci_check_execution_id("tests.pytest") == "ci:pytest"
+    assert ci_check_execution_id("tests.core") == "tests.core"
+    assert ci_check_execution_id("tests.tui") == "tests.tui"
     assert ci_check_execution_id("execution-budget.registry") == "ci:execution-budget-registry"
     assert ci_check_execution_id("unknown-check") == "ci:unknown-check"
     assert "mypy" in CI_CHECK_EXECUTION_IDS

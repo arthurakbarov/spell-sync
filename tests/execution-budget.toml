@@ -293,6 +293,12 @@ source = "bootstrap-readonly-estimate"
 "ci:ruff-check" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ruff-format" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:mypy" = { profile = "ci-child", parent = "gate:full-ci" }
+"tests.core" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests.tui" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests.execution-control" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests.environment" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests.packaging" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests.integration" = { profile = "ci-pytest", parent = "gate:full-ci" }
 "ci:pytest" = { profile = "ci-pytest", parent = "gate:full-ci" }
 "ci:coverage" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:package-build" = { profile = "ci-child", parent = "gate:full-ci" }

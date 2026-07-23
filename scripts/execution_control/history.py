@@ -255,6 +255,87 @@ class HistoryStore:
             return []
         return [float(row["duration_seconds"]) for row in rows]
 
+    def fetch_report_spans(
+        self,
+        *,
+        execution_id: str | None = None,
+        since: datetime | None = None,
+        limit: int = 500,
+    ) -> list[dict[str, object]]:
+        query = """
+            SELECT execution_id, duration_seconds, expected_seconds, status,
+                   maximum_progress_gap, environment_signature, start_time
+            FROM spans
+            WHERE 1=1
+        """
+        params: list[object] = []
+        if execution_id:
+            query += " AND execution_id = ?"
+            params.append(execution_id)
+        if since is not None:
+            query += " AND start_time >= ?"
+            params.append(since.replace(microsecond=0).isoformat().replace("+00:00", "Z"))
+        query += " ORDER BY start_time DESC LIMIT ?"
+        params.append(limit)
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(query, params).fetchall()
+        except sqlite3.Error:
+            self.degraded = True
+            return []
+        return [dict(row) for row in rows]
+
+    def fetch_parent_overhead_samples(
+        self,
+        *,
+        execution_id: str,
+        limit: int = 30,
+    ) -> list[float]:
+        try:
+            with self._connect() as connection:
+                parents = connection.execute(
+                    """
+                    SELECT run_id, duration_seconds FROM spans
+                    WHERE execution_id = ?
+                      AND parent_span_id IS NULL
+                      AND accepted_for_learning = 1
+                      AND status IN ('success', 'success-slow')
+                    ORDER BY start_time DESC LIMIT ?
+                    """,
+                    (execution_id, limit),
+                ).fetchall()
+                samples: list[float] = []
+                for parent in parents:
+                    child_sum = connection.execute(
+                        """
+                        SELECT COALESCE(SUM(duration_seconds), 0) AS total
+                        FROM spans
+                        WHERE run_id = ? AND parent_span_id IS NOT NULL
+                        """,
+                        (parent["run_id"],),
+                    ).fetchone()
+                    child_total = float(child_sum["total"]) if child_sum else 0.0
+                    samples.append(max(0.0, float(parent["duration_seconds"]) - child_total))
+        except sqlite3.Error:
+            self.degraded = True
+            return []
+        return samples
+
+    def count_gate_runs(self, execution_id: str) -> int:
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT COUNT(*) AS total FROM spans
+                    WHERE execution_id = ? AND parent_span_id IS NULL
+                    """,
+                    (execution_id,),
+                ).fetchone()
+        except sqlite3.Error:
+            self.degraded = True
+            return 0
+        return int(row["total"]) if row else 0
+
     def acquire_lease(
         self,
         *,

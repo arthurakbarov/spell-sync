@@ -28,7 +28,7 @@ def assess_gate_admission(
     tui: bool = False,
     packaging: bool = False,
 ) -> tuple[AdmissionPlan, ExecutionPlan | None]:
-    summary = summarize_child_plans(child_plans)
+    summary = summarize_child_plans(child_plans, history=history, execution_id=execution_id)
     aggregate_expected = summary.planned_expected_sum + summary.orchestration_overhead_estimate
     aggregate_soft = summary.planned_soft_sum + summary.orchestration_overhead_estimate
     required_checks = tuple({plan.execution_id for plan in child_plans})
@@ -48,6 +48,7 @@ def assess_gate_admission(
                 mode=mode,
                 admission_decision=AdmissionDecision.NARROW.value,
                 test_file_count=test_file_count,
+                history=history,
             )
             admission = AdmissionPlan(
                 decision=AdmissionDecision.NARROW,
@@ -71,6 +72,7 @@ def assess_gate_admission(
                 mode=mode,
                 admission_decision=AdmissionDecision.NARROW.value,
                 test_file_count=test_file_count,
+                history=history,
             )
             admission = AdmissionPlan(
                 decision=AdmissionDecision.NARROW,
@@ -96,6 +98,7 @@ def assess_gate_admission(
         coverage=coverage,
         tui=tui,
         packaging=packaging,
+        history=history,
     )
     admission = AdmissionPlan(
         decision=AdmissionDecision.RUN,

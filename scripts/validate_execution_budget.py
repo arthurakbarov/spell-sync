@@ -51,7 +51,8 @@ LONG_CI_STEP_MARKERS = (
     "environment.lock",
     "environment.check",
     "packaging.wheel-smoke",
-    "tests.pytest",
+    "tests.core",
+    "tests.tui",
     "gate:full-ci",
 )
 

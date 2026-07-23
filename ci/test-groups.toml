@@ -1,0 +1,65 @@
+# Stable pytest groups for CI timing and selection.
+# Union of all groups must equal `python -m pytest tests` (minus explicit owner/slow exclusions).
+
+[[groups]]
+id = "tests.tui"
+executionId = "tests.tui"
+description = "TUI screens, navigation, wizard, and smoke tests"
+patterns = [
+  "tests/tui/**",
+  "tests/test_gui_smoke.py",
+  "tests/test_tui_*.py",
+]
+
+[[groups]]
+id = "tests.execution-control"
+executionId = "tests.execution-control"
+description = "Timing, admission, evidence, and test selection"
+patterns = [
+  "tests/test_execution_*.py",
+  "tests/test_ci_*.py",
+  "tests/test_test_impact*.py",
+  "tests/test_test_selection*.py",
+  "tests/test_test_run_ledger*.py",
+  "tests/test_run_focused_tests.py",
+  "tests/test_run_pre_final_checks.py",
+]
+
+[[groups]]
+id = "tests.environment"
+executionId = "tests.environment"
+description = "Environment contract, compatibility, and snapshot policy"
+patterns = [
+  "tests/test_environment*.py",
+  "tests/test_compatibility*.py",
+  "tests/test_project_environment*.py",
+  "tests/test_snapshot*.py",
+  "tests/test_support_matrix*.py",
+]
+
+[[groups]]
+id = "tests.packaging"
+executionId = "tests.packaging"
+description = "Wheel install, packaging, and installed smoke"
+patterns = [
+  "tests/test_installed_workflow.py",
+  "tests/test_wheel*.py",
+  "tests/test_package*.py",
+]
+
+[[groups]]
+id = "tests.integration"
+executionId = "tests.integration"
+description = "Slow multi-step and subprocess integration flows"
+patterns = [
+  "tests/test_*integration*.py",
+  "tests/test_*workflow*.py",
+]
+
+[[groups]]
+id = "tests.core"
+executionId = "tests.core"
+description = "Domain logic, CLI/JSON, Pull/Push, config, and discovery"
+patterns = [
+  "tests/test_*.py",
+]

@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
 from scripts.ci_impact.registry import REGISTRY_REL_PATH, load_registry  # noqa: E402
+from scripts.test_groups import is_pytest_group  # noqa: E402
 from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 from scripts.environment_contract.fingerprint import (  # noqa: E402
     resolve_project_environment_fingerprint,
@@ -111,7 +112,9 @@ def _project_python(root: Path, fallback: str) -> str:
 
 
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
-    return [
+    from scripts.test_groups import GROUP_ORDER, is_pytest_group, pytest_command_for_group
+
+    steps: list[tuple[str, list[str]]] = [
         ("environment.contract", [py, "scripts/validate_environment_contract.py"]),
         ("execution-budget.registry", [py, "scripts/validate_execution_budget.py"]),
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
@@ -126,22 +129,20 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
             [py, "-m", "ruff", "format", "--check", "spell_sync", "tests", "scripts"],
         ),
         ("mypy", [py, "-m", "mypy", "spell_sync"]),
-        (
-            "tests.pytest",
-            [
-                py,
-                "-m",
-                "pytest",
-                "tests/",
-                "-q",
-                "--cov=spell_sync",
-                "--cov-branch",
-                "--cov-report=term-missing:skip-covered",
-                "--cov-report=json",
-                "--cov-fail-under=98",
-            ],
-        ),
     ]
+    for index, group_id in enumerate(GROUP_ORDER):
+        steps.append(
+            (
+                group_id,
+                pytest_command_for_group(
+                    group_id,
+                    py,
+                    with_coverage=True,
+                    cov_append=index > 0,
+                ),
+            )
+        )
+    return steps
 
 
 def _check_ids(steps: list[tuple[str, list[str]]]) -> list[str]:
@@ -226,7 +227,7 @@ def _wheel_smoke_preview_steps(py: str) -> list[tuple[str, list[str], bool, bool
 def _full_ci_preview_steps(py: str) -> tuple[tuple[str, list[str], bool, bool, bool], ...]:
     steps: list[tuple[str, list[str], bool, bool, bool]] = []
     for step_id, argv in _build_check_steps(py):
-        coverage = step_id in {"tests.pytest", "coverage.policy"}
+        coverage = is_pytest_group(step_id) or step_id == "coverage.policy"
         steps.append((step_id, argv, coverage, False, False))
     steps.append(
         (
@@ -802,7 +803,7 @@ class CiRunner:
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
     ) -> tuple[int, str, dict[str, object] | None]:
-        coverage = step_id in {"tests.pytest", "coverage.policy"}
+        coverage = is_pytest_group(step_id) or step_id == "coverage.policy"
         tui = step_id == "smoke.tui"
         packaging = step_id.startswith("packaging.") or step_id.startswith("smoke.")
         if self._full_gate_active():
@@ -1422,10 +1423,12 @@ class CiRunner:
                 self.record(INTERNAL_CHECK_ID, 1, str(exc))
                 return self._finish_with_gate(1)
 
-            run_post_pytest = self._mode == "full" or start_from == "tests.pytest"
+            run_post_pytest = self._mode == "full" or (
+                start_from is not None and is_pytest_group(start_from)
+            )
             if resume_failed:
                 run_post_pytest = run_post_pytest or any(
-                    item in {"tests.pytest", "coverage.policy"} for item in resume_failed
+                    is_pytest_group(item) or item == "coverage.policy" for item in resume_failed
                 )
 
             for step_id, argv in selected:
@@ -1440,7 +1443,10 @@ class CiRunner:
             if not run_post_pytest:
                 return self._finish_with_gate(0)
 
-            if only is None and (self._mode == "full" or start_from == "tests.pytest"):
+            if only is None and (
+                self._mode == "full"
+                or (start_from is not None and is_pytest_group(start_from))
+            ):
                 cov_rc, cov_out, cov_timing = self._run_check(
                     "coverage.policy",
                     _coverage_argv(py),
@@ -1452,7 +1458,7 @@ class CiRunner:
                         return self._finish_with_gate(cov_rc, failed_id="execution.hard-timeout")
                     return self._finish_with_gate(cov_rc)
 
-            if self._mode != "full" and only not in {None, "tests.pytest"}:
+            if self._mode != "full" and only is not None and not is_pytest_group(only):
                 return self._finish_with_gate(0)
 
             shutil.rmtree(self.root / "build", ignore_errors=True)

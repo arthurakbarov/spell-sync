@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +37,8 @@ from scripts.environment_contract.metadata import (  # noqa: E402
 from scripts.environment_contract.probe import run_interpreter_probe, venv_python  # noqa: E402
 
 DEFAULT_GROUPS = ("dev",)
+FULL_CI_GROUPS = ("dev", "packaging", "release-check")
+COMPATIBILITY_GROUPS = ("test-core", "packaging")
 UV_VERSION_PATTERN = re.compile(r"uv\s+(\d+\.\d+\.\d+)")
 
 
@@ -73,16 +76,18 @@ def _uv_version() -> str:
     return match.group(1) if match else ""
 
 
-def _sync_command(*, allow_python_download: bool) -> list[str]:
+def _sync_command(*, allow_python_download: bool, groups: tuple[str, ...]) -> list[str]:
     command = [
         "uv",
         "sync",
         "--python",
         CANONICAL_PYTHON,
         "--locked",
-        "--group",
-        "dev",
     ]
+    if groups != DEFAULT_GROUPS:
+        command.append("--no-default-groups")
+    for group in groups:
+        command.extend(["--group", group])
     if not allow_python_download:
         command.append("--no-python-downloads")
     return command
@@ -98,12 +103,14 @@ def _git_head(root: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
-def _expected_metadata(root: Path, probe, *, uv_version: str) -> EnvironmentMetadata:
+def _expected_metadata(
+    root: Path, probe, *, uv_version: str, groups: tuple[str, ...] = DEFAULT_GROUPS
+) -> EnvironmentMetadata:
     fingerprint = build_environment_fingerprint_from_probe(
         root,
         probe,
         uv_version=uv_version,
-        selected_groups=DEFAULT_GROUPS,
+        selected_groups=groups,
     )
     return EnvironmentMetadata(
         schema_version=1,
@@ -116,13 +123,15 @@ def _expected_metadata(root: Path, probe, *, uv_version: str) -> EnvironmentMeta
         environment_contract_digest=fingerprint.environment_contract_digest,
         pyproject_digest=fingerprint.pyproject_digest,
         uv_lock_digest=fingerprint.uv_lock_digest,
-        selected_dependency_groups=DEFAULT_GROUPS,
+        selected_dependency_groups=groups,
         installed_environment_digest=probe.installed_environment_digest,
     )
 
 
-def _write_metadata(root: Path, venv_dir: Path, probe) -> None:
-    metadata = _expected_metadata(root, probe, uv_version=_uv_version())
+def _write_metadata(
+    root: Path, venv_dir: Path, probe, *, groups: tuple[str, ...] = DEFAULT_GROUPS
+) -> None:
+    metadata = _expected_metadata(root, probe, uv_version=_uv_version(), groups=groups)
     metadata = EnvironmentMetadata(
         schema_version=metadata.schema_version,
         created_at=metadata_now(),
@@ -155,7 +164,9 @@ def cmd_info(root: Path, *, json_output: bool) -> int:
         "venvPythonVersion": fingerprint.python_version if fingerprint else "",
         "metadataPresent": metadata is not None,
         "installedEnvironmentDigest": metadata.installed_environment_digest if metadata else "",
-        "selectedDependencyGroups": list(DEFAULT_GROUPS),
+        "selectedDependencyGroups": list(metadata.selected_dependency_groups)
+        if metadata
+        else list(DEFAULT_GROUPS),
         "environmentFingerprint": fingerprint.signature() if fingerprint else "",
     }
     if json_output:
@@ -199,7 +210,12 @@ def cmd_check(root: Path) -> CommandResult:
     metadata = read_environment_metadata(metadata_path)
     if metadata is None:
         return CommandResult(1, "environment.venv-stale", "environment metadata missing")
-    expected = _expected_metadata(root, probe, uv_version=actual_uv)
+    expected = _expected_metadata(
+        root,
+        probe,
+        uv_version=actual_uv,
+        groups=metadata.selected_dependency_groups,
+    )
     declaration_fields = (
         ("schemaVersion", metadata.schema_version, expected.schema_version),
         (
@@ -249,11 +265,16 @@ def cmd_check(root: Path) -> CommandResult:
     return CommandResult(0)
 
 
-def cmd_sync(root: Path, *, allow_python_download: bool = False) -> CommandResult:
+def cmd_sync(
+    root: Path, *, allow_python_download: bool = False, groups: tuple[str, ...] = DEFAULT_GROUPS
+) -> CommandResult:
     lock_code, lock_out = _run(["uv", "lock", "--check"], cwd=root)
     if lock_code != 0:
         return CommandResult(lock_code, "environment.lock-stale", lock_out)
-    code, output = _run(_sync_command(allow_python_download=allow_python_download), cwd=root)
+    code, output = _run(
+        _sync_command(allow_python_download=allow_python_download, groups=groups),
+        cwd=root,
+    )
     if code != 0:
         return CommandResult(code, "environment.sync-required", output)
     contract = load_contract(root)
@@ -263,7 +284,7 @@ def cmd_sync(root: Path, *, allow_python_download: bool = False) -> CommandResul
         return CommandResult(1, "environment.venv-missing", ".venv python missing after sync")
     try:
         probe = run_interpreter_probe(venv_py, project_root=root)
-        _write_metadata(root, venv_dir, probe)
+        _write_metadata(root, venv_dir, probe, groups=groups)
     except RuntimeError as exc:
         return CommandResult(1, "environment.venv-stale", str(exc))
     check = cmd_check(root)
@@ -304,6 +325,60 @@ def cmd_recreate(root: Path) -> CommandResult:
     return cmd_sync(root)
 
 
+def _resolve_sync_groups(profile: str | None) -> tuple[str, ...]:
+    if profile in {None, "", "contributor"}:
+        return DEFAULT_GROUPS
+    if profile == "full-ci":
+        return FULL_CI_GROUPS
+    if profile == "compatibility":
+        return COMPATIBILITY_GROUPS
+    raise ValueError(f"unknown sync profile: {profile}")
+
+
+def cmd_dependency_report(root: Path, *, json_output: bool) -> int:
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject.get("project", {})
+    runtime = [str(item) for item in project.get("dependencies", [])]
+    groups = {
+        str(name): list(body) for name, body in pyproject.get("dependency-groups", {}).items()
+    }
+    group_exports: dict[str, object] = {}
+    for group_name in sorted(groups):
+        code, output = _run(
+            ["uv", "export", "--group", group_name, "--no-hashes", "--no-emit-project"],
+            cwd=root,
+        )
+        packages: list[str] = []
+        if code == 0:
+            for line in output.splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    packages.append(stripped.split("==")[0].split("[")[0])
+        group_exports[group_name] = {
+            "directDeclarations": len(groups[group_name]),
+            "resolvedPackageCount": len(set(packages)),
+        }
+    payload = {
+        "directRuntimeDependencies": runtime,
+        "dependencyGroups": sorted(groups),
+        "groupExports": group_exports,
+    }
+    if json_output:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"directRuntimeDependencies={len(runtime)}")
+        for group_name in sorted(groups):
+            export = group_exports[group_name]
+            assert isinstance(export, dict)
+            print(
+                f"group:{group_name}="
+                f"direct={export['directDeclarations']} "
+                f"resolved={export['resolvedPackageCount']}"
+            )
+    print("DEPENDENCY_REPORT_RESULT=success")
+    return 0
+
+
 def cmd_clean(root: Path) -> CommandResult:
     contract = load_contract(root)
     venv_dir = root / contract.environment_directory
@@ -325,11 +400,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("info")
     sub.add_parser("check")
-    sub.add_parser("sync")
+    sync = sub.add_parser("sync")
+    sync.add_argument(
+        "--profile",
+        choices=("contributor", "full-ci", "compatibility"),
+        default="contributor",
+        help="contributor=dev; full-ci adds packaging and release-check",
+    )
     bootstrap = sub.add_parser("bootstrap")
     bootstrap.add_argument("--allow-python-download", action="store_true")
     sub.add_parser("recreate")
     sub.add_parser("clean")
+    sub.add_parser("dependency-report")
     sub.add_parser("installed-manifest")
     sub.add_parser("write-metadata")
     sub.add_parser("doctor")
@@ -345,7 +427,16 @@ def main(argv: list[str] | None = None) -> int:
     if command == "check":
         result = cmd_check(ROOT)
     elif command == "sync":
-        result = cmd_sync(ROOT)
+        try:
+            groups = _resolve_sync_groups(getattr(args, "profile", "contributor"))
+        except ValueError as exc:
+            print("ENVIRONMENT_RESULT=failed")
+            print("ENVIRONMENT_FAILED_ID=environment.profile-invalid")
+            print(str(exc), file=sys.stderr)
+            return 1
+        result = cmd_sync(ROOT, groups=groups)
+    elif command == "dependency-report":
+        return cmd_dependency_report(ROOT, json_output=args.json)
     elif command == "bootstrap":
         result = cmd_bootstrap(ROOT, allow_python_download=args.allow_python_download)
     elif command == "recreate":

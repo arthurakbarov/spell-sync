@@ -25,27 +25,28 @@ dependencies = [
 ]
 
 [dependency-groups]
-test = [
-    "pytest>=7",
-    "pytest-cov>=4",
+test-core = [
+  "pytest>=9,<10",
 ]
-lint = [
-    "ruff>=0.4",
+coverage = [
+  "pytest-cov>=7,<8",
 ]
-typing = [
-    "mypy>=1.0",
+quality = [
+  "ruff>=0.15,<1",
+  "mypy>=2,<3",
 ]
-build = [
-    "build",
-    "wheel",
-    "twine",
-    "setuptools>=77",
+packaging = [
+  "build>=1,<2",
+  "wheel>=0.47,<1",
+  "setuptools>=77",
+]
+release-check = [
+  "twine>=6,<7",
 ]
 dev = [
-    { include-group = "test" },
-    { include-group = "lint" },
-    { include-group = "typing" },
-    { include-group = "build" },
+  { include-group = "test-core" },
+  { include-group = "coverage" },
+  { include-group = "quality" },
 ]
 
 [project.urls]
@@ -53,17 +54,25 @@ Homepage = "https://github.com/arthurakbarov/spell-sync"
 Repository = "https://github.com/arthurakbarov/spell-sync"
 Issues = "https://github.com/arthurakbarov/spell-sync/issues"
 [project.optional-dependencies]
-# Transitional public install path; dependency-groups dev is the maintainer SSOT.
+# Deprecated: use uv dependency-groups (dev, packaging, release-check) for maintainer workflows.
 dev = [
-    "pytest>=7",
-    "pytest-cov>=4",
-    "ruff>=0.4",
-    "mypy>=1.0",
-    "build",
-    "wheel",
-    "twine",
-    "setuptools>=77",
+  "pytest>=9,<10",
+  "pytest-cov>=7,<8",
+  "ruff>=0.15,<1",
+  "mypy>=2,<3",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+  "owner: owner-only tests requiring maintainer workspace",
+  "core: core domain and application tests",
+  "tui: Textual UI tests",
+  "execution_control: execution timing and admission tests",
+  "environment: environment and compatibility tests",
+  "packaging: wheel and packaging tests",
+  "integration: slow integration tests",
+]
+addopts = "--strict-config --strict-markers"
 
 [project.scripts]
 spell-sync = "spell_sync.cli:entry_point"

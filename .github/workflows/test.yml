@@ -28,7 +28,7 @@ jobs:
       - name: Sync project environment
         run: |
           uv lock --check
-          "${{ steps.setup-python.outputs.python-path }}" scripts/project_environment.py sync
+          "${{ steps.setup-python.outputs.python-path }}" scripts/project_environment.py sync --profile full-ci
       - name: Full CI
         run: |
           .venv/bin/python scripts/ci_runner.py
@@ -47,7 +47,7 @@ jobs:
       - name: Compatibility checks
         run: |
           uv lock --check
-          uv sync --python 3.11 --locked --no-python-downloads
+          uv sync --python 3.11 --locked --no-python-downloads --no-default-groups --group test-core --group packaging
           uv run --python 3.11 --locked --no-sync --offline --no-python-downloads \
             python scripts/run_compatibility_checks.py --platform linux --python-version 3.11
 
@@ -65,7 +65,7 @@ jobs:
       - name: Compatibility checks
         run: |
           uv lock --check
-          uv sync --python 3.12 --locked --no-python-downloads
+          uv sync --python 3.12 --locked --no-python-downloads --no-default-groups --group test-core --group packaging
           uv run --python 3.12 --locked --no-sync --offline --no-python-downloads \
             python scripts/run_compatibility_checks.py --platform macos --python-version 3.12
 
@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           uv lock --check
-          uv sync --python 3.12 --locked --no-python-downloads
+          uv sync --python 3.12 --locked --no-python-downloads --no-default-groups --group test-core --group packaging
           uv run --python 3.12 --locked --no-sync --offline --no-python-downloads \
             python scripts/run_compatibility_checks.py --platform windows --python-version 3.12
 
@@ -103,6 +103,6 @@ jobs:
       - name: Experimental compatibility
         run: |
           uv lock --check
-          uv sync --python 3.13 --locked --no-python-downloads
+          uv sync --python 3.13 --locked --no-python-downloads --no-default-groups --group test-core --group packaging
           uv run --python 3.13 --locked --no-sync --offline --no-python-downloads \
             python scripts/run_compatibility_checks.py --platform linux --python-version 3.13 --experimental

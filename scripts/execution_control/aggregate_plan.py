@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .context import build_context
 from .identity import (
@@ -17,10 +18,29 @@ from .identity import (
 from .models import ExecutionPlan
 from .prediction import _round_up_seconds
 from .registry import ExecutionBudgetRegistry, Profile
+from .statistics import compute_stats
+
+if TYPE_CHECKING:
+    from .history import HistoryStore
+
+MINIMUM_OVERHEAD_SAMPLES = 5
+OVERHEAD_SAFETY_FLOOR_SECONDS = 10.0
 
 
-def orchestration_overhead_seconds(child_expected_sum: float) -> float:
-    return max(10.0, child_expected_sum * 0.1)
+def orchestration_overhead_seconds(
+    child_expected_sum: float,
+    *,
+    history: HistoryStore | None = None,
+    execution_id: str | None = None,
+) -> tuple[float, str]:
+    if history is not None and execution_id:
+        samples = history.fetch_parent_overhead_samples(execution_id=execution_id, limit=30)
+        stats = compute_stats(samples)
+        if stats.sample_count >= MINIMUM_OVERHEAD_SAMPLES:
+            learned = stats.p90
+            return max(OVERHEAD_SAFETY_FLOOR_SECONDS, learned), "history-p90"
+    conservative = max(OVERHEAD_SAFETY_FLOOR_SECONDS, child_expected_sum * 0.1)
+    return conservative, "conservative-fallback"
 
 
 def child_plan_digest(child_plans: tuple[ExecutionPlan, ...]) -> str:
@@ -45,20 +65,31 @@ class AggregateSummary:
     planned_soft_sum: float
     planned_hard_sum: float
     orchestration_overhead_estimate: float
+    orchestration_overhead_source: str
     child_plan_digest: str
 
 
-def summarize_child_plans(child_plans: tuple[ExecutionPlan, ...]) -> AggregateSummary:
+def summarize_child_plans(
+    child_plans: tuple[ExecutionPlan, ...],
+    *,
+    history: HistoryStore | None = None,
+    execution_id: str | None = None,
+) -> AggregateSummary:
     expected_sum = sum(plan.expected_seconds for plan in child_plans)
     soft_sum = sum(plan.soft_seconds for plan in child_plans)
     hard_sum = sum(plan.hard_seconds for plan in child_plans)
-    overhead = orchestration_overhead_seconds(expected_sum)
+    overhead, source = orchestration_overhead_seconds(
+        expected_sum,
+        history=history,
+        execution_id=execution_id,
+    )
     return AggregateSummary(
         planned_child_count=len(child_plans),
         planned_expected_sum=expected_sum,
         planned_soft_sum=soft_sum,
         planned_hard_sum=hard_sum,
         orchestration_overhead_estimate=overhead,
+        orchestration_overhead_source=source,
         child_plan_digest=child_plan_digest(child_plans),
     )
 
@@ -78,8 +109,13 @@ def build_aggregate_gate_plan(
     coverage: bool = False,
     tui: bool = False,
     packaging: bool = False,
+    history: HistoryStore | None = None,
 ) -> ExecutionPlan:
-    summary = summarize_child_plans(child_plans)
+    summary = summarize_child_plans(
+        child_plans,
+        history=history,
+        execution_id=execution_id,
+    )
     parent_expected = _round_up_seconds(
         summary.planned_expected_sum + summary.orchestration_overhead_estimate
     )

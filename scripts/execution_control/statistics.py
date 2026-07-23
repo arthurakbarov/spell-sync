@@ -74,3 +74,22 @@ def confidence_label(sample_count: int) -> str:
     if sample_count <= 9:
         return "medium"
     return "high"
+
+
+def compute_mae(expected: list[float], actual: list[float]) -> float | None:
+    if not expected or len(expected) != len(actual):
+        return None
+    return sum(abs(e - a) for e, a in zip(expected, actual, strict=True)) / len(expected)
+
+
+def compute_mape(expected: list[float], actual: list[float]) -> float | None:
+    if not expected or len(expected) != len(actual):
+        return None
+    ratios: list[float] = []
+    for e, a in zip(expected, actual, strict=True):
+        if e <= 0:
+            continue
+        ratios.append(abs(e - a) / e)
+    if not ratios:
+        return None
+    return sum(ratios) / len(ratios)

@@ -907,81 +907,67 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "build" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
-    { name = "setuptools" },
-    { name = "twine" },
-    { name = "wheel" },
 ]
 
 [package.dev-dependencies]
-build = [
-    { name = "build" },
-    { name = "setuptools" },
-    { name = "twine" },
-    { name = "wheel" },
+coverage = [
+    { name = "pytest-cov" },
 ]
 dev = [
-    { name = "build" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+]
+packaging = [
+    { name = "build" },
     { name = "setuptools" },
-    { name = "twine" },
     { name = "wheel" },
 ]
-lint = [
+quality = [
+    { name = "mypy" },
     { name = "ruff" },
 ]
-test = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
+release-check = [
+    { name = "twine" },
 ]
-typing = [
-    { name = "mypy" },
+test-core = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "build", marker = "extra == 'dev'" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=77" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=2,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9,<10" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7,<8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15,<1" },
     { name = "textual", specifier = ">=8.2.8,<9" },
-    { name = "twine", marker = "extra == 'dev'" },
-    { name = "wheel", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-build = [
-    { name = "build" },
-    { name = "setuptools", specifier = ">=77" },
-    { name = "twine" },
-    { name = "wheel" },
-]
+coverage = [{ name = "pytest-cov", specifier = ">=7,<8" }]
 dev = [
-    { name = "build" },
-    { name = "mypy", specifier = ">=1.0" },
-    { name = "pytest", specifier = ">=7" },
-    { name = "pytest-cov", specifier = ">=4" },
-    { name = "ruff", specifier = ">=0.4" },
+    { name = "mypy", specifier = ">=2,<3" },
+    { name = "pytest", specifier = ">=9,<10" },
+    { name = "pytest-cov", specifier = ">=7,<8" },
+    { name = "ruff", specifier = ">=0.15,<1" },
+]
+packaging = [
+    { name = "build", specifier = ">=1,<2" },
     { name = "setuptools", specifier = ">=77" },
-    { name = "twine" },
-    { name = "wheel" },
+    { name = "wheel", specifier = ">=0.47,<1" },
 ]
-lint = [{ name = "ruff", specifier = ">=0.4" }]
-test = [
-    { name = "pytest", specifier = ">=7" },
-    { name = "pytest-cov", specifier = ">=4" },
+quality = [
+    { name = "mypy", specifier = ">=2,<3" },
+    { name = "ruff", specifier = ">=0.15,<1" },
 ]
-typing = [{ name = "mypy", specifier = ">=1.0" }]
+release-check = [{ name = "twine", specifier = ">=6,<7" }]
+test-core = [{ name = "pytest", specifier = ">=9,<10" }]
 
 [[package]]
 name = "textual"

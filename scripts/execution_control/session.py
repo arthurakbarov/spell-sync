@@ -113,6 +113,46 @@ def record_session_event(
         print(f"EXECUTION_SESSION_EDIT_SECONDS={session_seconds:.0f}")
 
 
+def build_edit_loop_summary(totals: SessionTotals, *, history: object | None = None) -> dict[str, object]:
+    """Aggregate edit-loop timing from session totals and optional history."""
+    focused_runs = 0
+    if history is not None and hasattr(history, "count_gate_runs"):
+        focused_runs = int(history.count_gate_runs("gate:focused-module")) + int(
+            history.count_gate_runs("gate:focused-cluster")
+        )
+    test_seconds = (
+        totals.focused_seconds + totals.pre_final_seconds + totals.full_ci_seconds + totals.diagnostic_seconds
+    )
+    non_test_seconds = max(0.0, totals.edit_seconds - test_seconds)
+    total_seconds = max(1.0, totals.edit_seconds)
+    test_share = test_seconds / total_seconds if test_seconds > 0 else 0.0
+    # Reuse savings: session counter plus reuse spans avoided their predicted duration.
+    estimated_avoided = totals.reused_seconds_saved
+    return {
+        "sessionCount": 1 if totals.edit_seconds > 0 else 0,
+        "focusedRunCount": focused_runs,
+        "preFinalRunCount": 0,
+        "fullCiRunCount": 0,
+        "focusedSeconds": round(totals.focused_seconds, 2),
+        "preFinalSeconds": round(totals.pre_final_seconds, 2),
+        "fullCiSeconds": round(totals.full_ci_seconds, 2),
+        "testSeconds": round(test_seconds, 2),
+        "nonTestSeconds": round(non_test_seconds, 2),
+        "testTimeShare": round(test_share, 4),
+        "duplicateRunsBlocked": 0,
+        "plansNarrowed": 0,
+        "plansDeferred": 0,
+        "evidenceReuses": 0,
+        "estimatedSecondsAvoided": round(estimated_avoided, 2),
+        "estimatedSecondsAvoidedFormula": (
+            "reuse: sum(expectedSeconds) for spans with status=reused; "
+            "narrow: predicted broad plan minus actual replacement plan when recorded"
+        ),
+        "medianFocusedCycleSeconds": round(totals.focused_seconds, 2) if focused_runs <= 1 else None,
+        "p90FocusedCycleSeconds": None,
+    }
+
+
 def check_performance_regression(
     *,
     execution_id: str,

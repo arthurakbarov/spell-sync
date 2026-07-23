@@ -33,7 +33,7 @@ def test_child_plan_sum_drives_parent_expected(registry):
     assert multi_summary.planned_expected_sum != single_summary.planned_expected_sum
     assert multi_summary.planned_child_count == 5
 
-    overhead = orchestration_overhead_seconds(multi_summary.planned_expected_sum)
+    overhead, _source = orchestration_overhead_seconds(multi_summary.planned_expected_sum)
     profile = registry.profiles["focused-cluster"]
     parent = build_aggregate_gate_plan(
         root=ROOT,
