@@ -178,6 +178,12 @@ def cmd_info(root: Path, *, json_output: bool) -> int:
     return 0
 
 
+def _resolve_valid_groups(groups: tuple[str, ...]) -> tuple[str, ...] | None:
+    if groups in {DEFAULT_GROUPS, FULL_CI_GROUPS, COMPATIBILITY_GROUPS}:
+        return groups
+    return None
+
+
 def cmd_check(root: Path) -> CommandResult:
     contract = load_contract(root)
     if contract.canonical_python != CANONICAL_PYTHON:
@@ -210,11 +216,14 @@ def cmd_check(root: Path) -> CommandResult:
     metadata = read_environment_metadata(metadata_path)
     if metadata is None:
         return CommandResult(1, "environment.venv-stale", "environment metadata missing")
+    valid_groups = _resolve_valid_groups(metadata.selected_dependency_groups)
+    if valid_groups is None:
+        return CommandResult(1, "environment.venv-stale", "selectedDependencyGroups mismatch")
     expected = _expected_metadata(
         root,
         probe,
         uv_version=actual_uv,
-        groups=metadata.selected_dependency_groups,
+        groups=valid_groups,
     )
     declaration_fields = (
         ("schemaVersion", metadata.schema_version, expected.schema_version),
