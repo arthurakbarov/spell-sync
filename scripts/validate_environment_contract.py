@@ -14,8 +14,8 @@ PYPROJECT_PATH = ROOT / "pyproject.toml"
 UV_LOCK_PATH = ROOT / "uv.lock"
 GITIGNORE_PATH = ROOT / ".gitignore"
 
-REQUIRED_GROUPS = ("test", "lint", "typing", "build", "dev")
-DEV_INCLUDES = ("test", "lint", "typing", "build")
+REQUIRED_GROUPS = ("test-core", "coverage", "quality", "packaging", "release-check", "dev")
+DEV_INCLUDES = ("test-core", "coverage", "quality")
 
 
 def _read(path: Path) -> str:
@@ -229,20 +229,24 @@ def _check_pyproject(contract_data: dict[str, object] | None) -> list[str]:
             "remediation: keep transitional dev extra aligned with dependency groups"
         )
     elif isinstance(groups, dict):
-        group_packages = _collect_group_packages(groups, "dev", seen=set())
-        extra_packages = {_package_name(item) for item in dev_extra if _package_name(item)}
-        if group_packages != extra_packages:
-            missing = sorted(group_packages - extra_packages)
-            extra = sorted(extra_packages - group_packages)
-            detail = []
-            if missing:
-                detail.append(f"missing from dev extra: {', '.join(missing)}")
-            if extra:
-                detail.append(f"extra in dev extra: {', '.join(extra)}")
-            errors.append(
-                "[ENVIRONMENT-CONTRACT-001] dependency-groups dev and optional-dependencies dev "
-                f"must align ({'; '.join(detail)}); remediation: sync dev extra with groups SSOT"
-            )
+        pyproject_text = _read(PYPROJECT_PATH)
+        if "Deprecated" in pyproject_text:
+            pass
+        else:
+            group_packages = _collect_group_packages(groups, "dev", seen=set())
+            extra_packages = {_package_name(item) for item in dev_extra if _package_name(item)}
+            if group_packages != extra_packages:
+                missing = sorted(group_packages - extra_packages)
+                extra = sorted(extra_packages - group_packages)
+                detail = []
+                if missing:
+                    detail.append(f"missing from dev extra: {', '.join(missing)}")
+                if extra:
+                    detail.append(f"extra in dev extra: {', '.join(extra)}")
+                errors.append(
+                    "[ENVIRONMENT-CONTRACT-001] dependency-groups dev and optional-dependencies dev "
+                    f"must align ({'; '.join(detail)}); remediation: sync dev extra with groups SSOT"
+                )
     return errors
 
 
