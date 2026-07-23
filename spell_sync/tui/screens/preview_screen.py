@@ -13,6 +13,7 @@ from textual.worker import WorkerState
 from ...application.product_concepts import (
     PUSH_DIRECTION_LABEL,
     PUSH_FILTERING_NOTICE,
+    PUSH_PREVIEW_SAFETY,
     PUSH_REDUNDANCY_PREVIEW_NOTICE,
     PUSH_SCOPE_NOTICE,
 )
@@ -107,7 +108,9 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
             return
 
         lines = [
-            "Push preview (no writes)",
+            "Update apps preview (no writes)",
+            "",
+            PUSH_PREVIEW_SAFETY,
             "",
             PUSH_DIRECTION_LABEL,
             "",

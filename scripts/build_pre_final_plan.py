@@ -16,6 +16,14 @@ if str(ROOT) not in sys.path:
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.planner import build_plan  # noqa: E402
 
+POLISH_VALIDATORS: tuple[tuple[str, str], ...] = (
+    ("timing-observability", "scripts/validate_timing_observability.py"),
+    ("dependency-groups", "scripts/validate_dependency_groups.py"),
+    ("user-documentation", "scripts/validate_user_documentation.py"),
+    ("repository-consistency", "scripts/validate_repository_consistency.py"),
+    ("dead-code-audit", "scripts/audit_dead_code.py"),
+)
+
 
 def _changed_python_files(changed: list[str]) -> list[str]:
     return sorted(path for path in changed if path.endswith(".py"))
@@ -57,6 +65,8 @@ def _build_steps(changed: list[str], plan, *, py: str) -> list[dict[str, object]
             steps.append((validator, ["bash", validator]))
         else:
             steps.append((validator, [py, validator]))
+    for name, validator in POLISH_VALIDATORS:
+        steps.append((f"polish:{name}", [py, validator]))
     return [{"name": name, "command": command} for name, command in steps]
 
 

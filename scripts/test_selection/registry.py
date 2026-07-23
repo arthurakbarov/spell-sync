@@ -23,6 +23,7 @@ ALL_PYTEST_CLUSTERS = frozenset(
         "agent-workflow",
         "execution-control",
         "test-selection",
+        "user-documentation",
     }
 )
 

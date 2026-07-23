@@ -12,6 +12,7 @@ from textual.worker import WorkerState
 
 from ...application.product_concepts import (
     PULL_DIRECTION_LABEL,
+    PULL_PREVIEW_SAFETY,
     PULL_SCOPE_NOTICE,
     pull_preview_additions_line,
 )
@@ -61,7 +62,9 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             run_btn.disabled = True
             return
         lines = [
-            "Pull personal words from custom dictionaries",
+            "Collect words preview (no writes)",
+            "",
+            PULL_PREVIEW_SAFETY,
             "",
             PULL_DIRECTION_LABEL,
             "",

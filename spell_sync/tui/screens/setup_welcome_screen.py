@@ -7,8 +7,10 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Static
 
 from ...application.product_concepts import (
+    COLLECT_WORDS_TECHNICAL,
     PULL_DIRECTION_LABEL,
     PUSH_DIRECTION_LABEL,
+    UPDATE_APPS_TECHNICAL,
     WELCOME_BUILT_IN_EXCLUSION,
     WELCOME_INTRO,
     WORDLIST_SETUP_HEADING,
@@ -44,10 +46,10 @@ class SetupWelcomeScreen(Screen[None]):
                     "",
                     WELCOME_BUILT_IN_EXCLUSION,
                     "",
-                    "Pull",
+                    COLLECT_WORDS_TECHNICAL,
                     PULL_DIRECTION_LABEL,
                     "",
-                    "Push",
+                    UPDATE_APPS_TECHNICAL,
                     PUSH_DIRECTION_LABEL,
                 ]
             )

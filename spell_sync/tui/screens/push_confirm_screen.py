@@ -7,6 +7,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Static
 
+from ...application.product_concepts import PUSH_PREVIEW_SAFETY
 from ...application.reports import PushPreview
 from ..controller import TuiController
 
@@ -36,7 +37,8 @@ class PushConfirmScreen(ModalScreen[bool]):
         targets = preview.targets_to_update
         if self._requires_typed:
             text = (
-                f"This push will remove {preview.removals} words "
+                f"{PUSH_PREVIEW_SAFETY}\n\n"
+                f"This update will remove {preview.removals} words "
                 "from application dictionaries.\n\n"
                 "The exact removals shown in the preview will be used.\n"
                 "Type PUSH to continue.\n\n"
@@ -47,7 +49,8 @@ class PushConfirmScreen(ModalScreen[bool]):
             self.query_one("#btn-run", Button).disabled = True
         else:
             text = (
-                f"Push the canonical wordlist to {targets} targets?\n\n"
+                f"{PUSH_PREVIEW_SAFETY}\n\n"
+                f"Update {targets} app dictionaries from your personal word list?\n\n"
                 f"{preview.additions} additions\n"
                 f"{preview.removals} removals\n"
                 f"Plan id: {preview.plan_identifier}"

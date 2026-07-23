@@ -54,11 +54,50 @@ PUSH_REDUNDANCY_PREVIEW_NOTICE = (
 )
 
 WELCOME_INTRO = (
-    "Spell Sync keeps one canonical list of your personal spelling exceptions "
-    "synchronized with application custom dictionaries."
+    "Spell Sync keeps the personal words you add to browsers, editors, and system "
+    "spell checkers in one private word list."
 )
 
-WELCOME_BUILT_IN_EXCLUSION = "It does not inspect or copy applications' built-in dictionaries."
+USER_PROBLEM_STATEMENT = (
+    "You add a word in one app, but on another computer or in another app it is "
+    "marked as misspelled again. Spell Sync stores those personal words in one place "
+    "and safely syncs them between supported applications."
+)
+
+COLLECT_WORDS_LABEL = "Collect my words"
+COLLECT_WORDS_HELP = (
+    "Add custom words from your apps to your personal word list. Nothing is removed."
+)
+
+UPDATE_APPS_LABEL = "Update my apps"
+UPDATE_APPS_HELP = (
+    "Make enabled app dictionaries match your personal word list. Words missing from "
+    "your list may be removed from custom dictionaries. Built-in dictionaries are "
+    "never changed."
+)
+
+CHECK_APPS_LABEL = "Check my apps"
+CHECK_APPS_HELP = (
+    "See which apps are ready and whether anything needs attention."
+)
+
+COLLECT_WORDS_TECHNICAL = "Collect my words (Pull)"
+UPDATE_APPS_TECHNICAL = "Update my apps (Push)"
+
+PULL_PREVIEW_SAFETY = (
+    "These words will be added to your personal word list. Nothing will be removed."
+)
+
+PUSH_PREVIEW_SAFETY = (
+    "These app dictionaries will be updated. Words missing from your personal list may "
+    "be removed from custom dictionaries. Built-in dictionaries are never changed."
+)
+
+BUILTIN_DICTIONARY_GUARANTEE = (
+    "Built-in dictionaries shipped with applications are never read or changed."
+)
+
+WELCOME_BUILT_IN_EXCLUSION = BUILTIN_DICTIONARY_GUARANTEE
 
 WORDLIST_SETUP_HEADING = "Choose the canonical personal wordlist"
 

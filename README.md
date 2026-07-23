@@ -1,21 +1,34 @@
 # spell-sync
 
-**One canonical wordlist for all your spell-check custom dictionaries.**
-
-*Optionally keep it in Git.*
+**Keep personal spelling words in one place — and sync them between your apps.**
 
 [![CI](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml/badge.svg)](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/arthurakbarov/spell-sync)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-Keep one `wordlist.txt` as the source of truth for **personal spelling exceptions** across
-**application custom dictionaries** on **OS**, **browsers**, **editors and IDEs**, and
-**Hunspell**. Use **Pull** to merge new words from custom dictionaries into the wordlist, and
-**Push** to write applicable personal words from the wordlist to configured custom dictionaries. Version control is
-optional — Spell Sync works with a local wordlist directory just as well as a Git-tracked
-project.
+You add a word in a browser, editor, or system spell checker — then on another computer or
+in another app it is underlined again. **Spell Sync** stores those personal words in **one
+private word list** and safely synchronizes them with supported applications.
 
-## What the canonical wordlist contains
+```text
+Collect words:   your apps → your word list   (Pull)
+Update apps:     your word list → your apps   (Push)
+```
+
+You always see a **preview** before anything changes.
+
+- **Collect words** never removes words from your personal list.
+- **Update apps** may remove custom words that are no longer in your personal list.
+- **Built-in dictionaries are never changed.**
+
+**[Get started →](docs/GETTING_STARTED.md)** · [Supported apps](docs/SUPPORTED_APPS.md) ·
+[Personal workspace](docs/PERSONAL_WORKSPACE.md)
+
+Git is optional. Spell Sync works with a local folder just as well as a private Git-tracked
+project. Maintainer-only release tooling is kept separately and is **not** required to use
+Spell Sync.
+
+## What the personal word list contains
 
 The canonical wordlist holds **personal spelling exceptions**: names, technical terms,
 abbreviations, project-specific words, and other words you want enabled applications to

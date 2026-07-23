@@ -12,8 +12,11 @@ from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.product_concepts import (
+    CHECK_APPS_LABEL,
+    COLLECT_WORDS_TECHNICAL,
     DASHBOARD_WORDLIST_LABEL,
     DASHBOARD_WORDLIST_SUBTITLE,
+    UPDATE_APPS_TECHNICAL,
 )
 from ...application.reports import DashboardSeverity
 from ...application.user_notices import (
@@ -55,16 +58,17 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         yield Static(id="dashboard-summary")
         yield Static(id="dashboard-issues")
         with Vertical(id="action-grid"):
-            yield Button("Review and update", id="btn-review-update", variant="primary")
+            yield Button(CHECK_APPS_LABEL, id="btn-status", variant="primary")
+            yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
+            yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
+            yield Static("More actions", classes="section-label")
+            yield Button("Review and update", id="btn-review-update")
             yield Button(
                 "Review recovery",
                 id="btn-recovery",
                 disabled=True,
                 classes="-disabled-action",
             )
-            yield Static("Direct actions", classes="section-label")
-            yield Button("Pull new words", id="btn-pull")
-            yield Button("Push wordlist", id="btn-push")
             yield Static("Manage", classes="section-label")
             yield Button("Targets", id="btn-targets")
             yield Static("Support", classes="section-label")
@@ -236,6 +240,8 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             self.action_open_pull()
         elif button_id == "btn-push":
             self.action_open_preview()
+        elif button_id == "btn-status":
+            self.action_open_status()
         elif button_id == "btn-health":
             self.action_open_health()
         elif button_id == "btn-quit":

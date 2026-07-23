@@ -7,6 +7,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Static
 
+from ...application.product_concepts import PULL_PREVIEW_SAFETY
 from ...application.reports import PullPreview
 from ..controller import TuiController
 
@@ -28,7 +29,8 @@ class PullConfirmScreen(ModalScreen[bool]):
     def on_mount(self) -> None:
         preview = self._preview
         self.query_one("#confirm-summary", Static).update(
-            f"Add {preview.additions} words to the canonical wordlist?\n\n"
+            f"{PULL_PREVIEW_SAFETY}\n\n"
+            f"Add {preview.additions} words to your personal word list?\n\n"
             f"Wordlist: {preview.wordlist_path}\n"
             f"Plan id: {preview.plan_identifier}"
         )

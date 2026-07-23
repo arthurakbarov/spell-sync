@@ -273,7 +273,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_navigation(self):
         controller = TuiController(fake_service(pending_recovery=True), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:
             await wait_for_text(pilot, "#blocking-banner", "Recovery required")
             await pilot.click("#btn-recovery")
             await pilot.pause()

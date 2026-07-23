@@ -196,16 +196,23 @@ production = [
   "pyproject.toml",
   "spell_sync/__init__.py",
   "spell_sync/version.py",
+  "scripts/project_environment.py",
+  "scripts/validate_dependency_groups.py",
 ]
 moduleTests = [
   "tests/test_installed_workflow.py",
+  "tests/test_dependency_group_contract.py",
+  "tests/test_environment_dependency_report.py",
 ]
 clusterTests = [
   "tests/test_installed_workflow.py",
   "tests/test_ci_contract.py",
+  "tests/test_dependency_group_contract.py",
+  "tests/test_environment_dependency_report.py",
 ]
 validators = [
   "scripts/check-target-capabilities.py --check",
+  "scripts/validate_dependency_groups.py",
 ]
 staticTargets = [
   "spell_sync",
@@ -287,6 +294,11 @@ production = [
   "scripts/build_focused_plan.py",
   "scripts/build_pre_final_plan.py",
   "scripts/validate_execution_budget.py",
+  "scripts/validate_timing_observability.py",
+  "scripts/test_groups.py",
+  "ci/test-groups.toml",
+  "scripts/execution_budget_report.py",
+  "scripts/execution_control/budget_report.py",
   "tests/execution-budget.toml",
 ]
 moduleTests = [
@@ -295,12 +307,15 @@ moduleTests = [
   "tests/test_execution_process_tree.py",
   "tests/test_execution_planner_supervision.py",
   "tests/test_execution_parent_interrupt_status.py",
+  "tests/test_execution_budget_report.py",
+  "tests/test_execution_group_coverage.py",
 ]
 clusterTests = [
   "tests/test_execution_admission.py",
   "tests/test_execution_admission_narrow.py",
   "tests/test_execution_aggregate_plan.py",
   "tests/test_execution_bootstrap_timeout.py",
+  "tests/test_execution_budget_report.py",
   "tests/test_execution_context_learning.py",
   "tests/test_execution_controller.py",
   "tests/test_execution_descendant_cleanup.py",
@@ -309,8 +324,10 @@ clusterTests = [
   "tests/test_execution_diagnostic_no_fallback.py",
   "tests/test_execution_diagnostics.py",
   "tests/test_execution_dynamic_privacy.py",
+  "tests/test_execution_edit_loop_summary.py",
   "tests/test_execution_fingerprints.py",
   "tests/test_execution_gate_finalization.py",
+  "tests/test_execution_group_coverage.py",
   "tests/test_execution_hard_timeout_detached.py",
   "tests/test_execution_history.py",
   "tests/test_execution_integration.py",
@@ -323,6 +340,7 @@ clusterTests = [
   "tests/test_execution_plan.py",
   "tests/test_execution_planner_supervision.py",
   "tests/test_execution_prediction.py",
+  "tests/test_execution_prediction_accuracy.py",
   "tests/test_execution_process_fixture_cleanup.py",
   "tests/test_execution_process_tree.py",
   "tests/test_execution_profile_specificity.py",
@@ -342,6 +360,39 @@ clusterTests = [
 ]
 validators = [
   "scripts/validate_execution_budget.py",
+  "scripts/validate_timing_observability.py",
+]
+
+[clusters.user-documentation]
+production = [
+  "README.md",
+  "docs/GETTING_STARTED.md",
+  "docs/PERSONAL_WORKSPACE.md",
+  "docs/SUPPORTED_APPS.md",
+  "docs/technical/TARGET_SUPPORT_MATRIX.md",
+  "spell_sync/application/product_concepts.py",
+  "scripts/validate_user_documentation.py",
+  "scripts/validate_repository_consistency.py",
+  "scripts/audit_dead_code.py",
+]
+moduleTests = [
+  "tests/test_user_onboarding_copy.py",
+  "tests/test_public_documentation_contract.py",
+]
+clusterTests = [
+  "tests/test_user_onboarding_copy.py",
+  "tests/test_tui_primary_navigation.py",
+  "tests/test_tui_first_run.py",
+  "tests/test_tui_preview_language.py",
+  "tests/test_public_documentation_contract.py",
+  "tests/test_personal_workspace_docs.py",
+  "tests/test_documentation_links.py",
+  "tests/test_repository_consistency.py",
+  "tests/test_dead_code_audit.py",
+]
+validators = [
+  "scripts/validate_user_documentation.py",
+  "scripts/validate_repository_consistency.py",
 ]
 
 [clusters.test-selection]
