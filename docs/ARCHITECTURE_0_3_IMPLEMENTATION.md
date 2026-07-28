@@ -10,13 +10,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 5: structured technical events and diagnostics — **awaiting owner approval** (corrective
-fixes applied; JSON Lines formatter, typed metadata, terminal events, and architecture guards
-complete). Phase 4 (focused application services and thin facade) is **complete** and
-owner-approved.
+Phase 5: structured technical events, diagnostics, and polish — **complete** (owner-approved).
+Phase 6: architecture validator and project map — **current**, not started.
 
 [architecture-status:start]
-current: phase-5
+current: phase-6
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -25,23 +23,23 @@ phase-2d: complete
 phase-2e: complete
 phase-3: complete
 phase-4: complete
-phase-5: awaiting-approval
+phase-5: complete
+phase-6: not-started
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | Phase 5 corrective fixes (diagnostics layer + recovery terminals) | yes |
-| spell-sync-dev | `7bb8ecf` test: cover snapshot git timeout | yes |
-| spell-words | `3e5bc29` docs: align maintainer agent guide with snapshot contract | yes |
+| spell-sync | `7985302` polish arc + structured events | yes |
+| spell-sync-dev | `7833800` maintainer workflow index | yes |
+| spell-words | `3e5bc29` | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
 
 Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
 
-Phase 5 final CI evidence: pending — bind with `scripts/ci.sh` on committed clean HEAD
-(`phase-5: awaiting-approval`).
+Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -350,7 +348,41 @@ installed-wheel smoke
 
 ## Phase 5 — Structured technical events and diagnostics
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved)
+
+### Owner acceptance (recorded)
+
+- typed technical events with JSON Lines schema v1;
+- polish arc: user-first onboarding, timing observability, dependency groups, consistency validators;
+- final CI evidence bound to HEAD `7985302`, run `20260723T034038.010703Z`;
+- package version remains `0.2.1`.
+
+## Phase 6 — Architecture validator and project map
+
+**Status:** not-started
+
+### Goal
+
+Add a stdlib architecture validator and keep an agent-friendly project map synchronized with
+the repository layout.
+
+### Scope
+
+- `scripts/check-architecture.py`
+- `docs/PROJECT_MAP.md` with generated test-suite section
+- CI integration and focused validator tests
+
+### Required outcomes
+
+- AST-based dependency guards for application, TUI, facade, and requests
+- project map headings and generated section validated by the script
+- no dependency on private maintainer repositories
+
+### Deferred
+
+- documentation reorganization (Phase 7)
+- agent config refresh (Phase 8)
+- version `0.3.0`
 
 ### Goal
 
