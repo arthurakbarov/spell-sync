@@ -121,6 +121,7 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
         ("docs.contract", [py, "scripts/check-docs-contract.py"]),
+        ("architecture.boundaries", [py, "scripts/check-architecture.py", "--check"]),
         ("agent.config", [py, "scripts/check-agent-config.py"]),
         ("targets.capabilities", [py, "scripts/check-target-capabilities.py", "--check"]),
         ("ruff.check", [py, "-m", "ruff", "check", "spell_sync", "tests", "scripts"]),

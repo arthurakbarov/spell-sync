@@ -24,7 +24,7 @@ phase-2e: complete
 phase-3: complete
 phase-4: complete
 phase-5: complete
-phase-6: not-started
+phase-6: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
@@ -359,30 +359,25 @@ installed-wheel smoke
 
 ## Phase 6 — Architecture validator and project map
 
-**Status:** not-started
+**Status:** awaiting approval
 
-### Goal
+### Delivered
 
-Add a stdlib architecture validator and keep an agent-friendly project map synchronized with
-the repository layout.
+- `scripts/check-architecture.py` — AST-based dependency guards, request/event checks, project map sync
+- `docs/PROJECT_MAP.md` — agent-friendly ownership map with generated test-group section
+- CI step `architecture.boundaries` wired into `scripts/ci_runner.py`
+- focused tests in `tests/test_check_architecture.py`
 
-### Scope
+### Phase-specific validation (pending final CI)
 
-- `scripts/check-architecture.py`
-- `docs/PROJECT_MAP.md` with generated test-suite section
-- CI integration and focused validator tests
-
-### Required outcomes
-
-- AST-based dependency guards for application, TUI, facade, and requests
-- project map headings and generated section validated by the script
-- no dependency on private maintainer repositories
-
-### Deferred
-
-- documentation reorganization (Phase 7)
-- agent config refresh (Phase 8)
-- version `0.3.0`
+```text
+tests/test_check_architecture.py
+tests/test_application_requests.py
+tests/test_application_services.py
+tests/test_runtime_architecture.py
+tests/tui/test_architecture.py
+full final CI on committed clean HEAD
+```
 
 ### Goal
 

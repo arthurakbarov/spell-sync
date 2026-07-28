@@ -110,6 +110,7 @@ def _make_test_root(tmp: Path) -> tuple[Path, Path]:
     (root / "scripts" / "check-docs-style.sh").chmod(0o755)
     for name in (
         "check-docs-contract.py",
+        "check-architecture.py",
         "check-agent-config.py",
         "check-target-capabilities.py",
         "validate_test_impact.py",
@@ -143,6 +144,7 @@ def _is_validator_script(argv: list[str]) -> bool:
         for marker in (
             "check-docs-style.sh",
             "check-docs-contract.py",
+            "check-architecture.py",
             "check-agent-config.py",
             "check-target-capabilities.py",
             "validate_test_impact.py",
@@ -451,6 +453,7 @@ class TestCiContract(unittest.TestCase):
         for name in (
             "check-docs-style.sh",
             "check-docs-contract.py",
+            "check-architecture.py",
             "check-agent-config.py",
             "check-target-capabilities.py",
             "validate_test_impact.py",

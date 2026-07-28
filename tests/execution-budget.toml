@@ -274,6 +274,7 @@ source = "bootstrap-readonly-estimate"
 "ci:test-impact-registry" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:docs-style" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:docs-contract" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:architecture" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:agent-config" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:target-capabilities" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:unknown-check" = { profile = "bounded-unknown", parent = "gate:full-ci" }

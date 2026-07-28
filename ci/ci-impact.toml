@@ -89,6 +89,7 @@ patterns = [
 [classes.validators]
 patterns = [
   "scripts/check-agent-config.py",
+  "scripts/check-architecture.py",
   "scripts/check-docs-contract.py",
   "scripts/check-target-capabilities.py",
   "scripts/check-docs-style.sh",

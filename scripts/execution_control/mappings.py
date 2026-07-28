@@ -10,6 +10,7 @@ CI_CHECK_EXECUTION_IDS: dict[str, str] = {
     "test-impact.registry": "ci:test-impact-registry",
     "docs.style": "ci:docs-style",
     "docs.contract": "ci:docs-contract",
+    "architecture.boundaries": "ci:architecture",
     "agent.config": "ci:agent-config",
     "targets.capabilities": "ci:target-capabilities",
     "ruff.check": "ci:ruff-check",
