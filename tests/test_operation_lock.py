@@ -4,10 +4,10 @@
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import os
-import errno
 import subprocess
 import sys
 import tempfile
