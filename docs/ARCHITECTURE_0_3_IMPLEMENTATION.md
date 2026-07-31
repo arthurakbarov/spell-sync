@@ -10,11 +10,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 5: structured technical events, diagnostics, and polish — **complete** (owner-approved).
-Phase 6: architecture validator and project map — **current**, not started.
+Phase 6: architecture validator and project map — **complete** (owner-approved).
+Phase 7: documentation reorganization and ADRs — **current**, not started.
 
 [architecture-status:start]
-current: phase-6
+current: phase-7
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -24,22 +24,23 @@ phase-2e: complete
 phase-3: complete
 phase-4: complete
 phase-5: complete
-phase-6: awaiting-approval
+phase-6: complete
+phase-7: not-started
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `7985302` polish arc + structured events | yes |
+| spell-sync | `f82ed58` architecture validator + project map | yes |
 | spell-sync-dev | `7833800` maintainer workflow index | yes |
 | spell-words | `3e5bc29` | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
 
-Phase 4 final CI evidence: `0a69064`, run `20260721T133915.258179Z`, `finalEvidence=true`.
-
 Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
+
+Phase 6 final CI evidence: `f82ed58`, run `20260728T074706.122702Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -359,16 +360,22 @@ installed-wheel smoke
 
 ## Phase 6 — Architecture validator and project map
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved)
+
+### Goal
+
+Add automated architecture boundary validation and an agent-friendly project map with
+generated test-group coverage for safe, incremental changes.
 
 ### Delivered
 
-- `scripts/check-architecture.py` — AST-based dependency guards, request/event checks, project map sync
-- `docs/PROJECT_MAP.md` — agent-friendly ownership map with generated test-group section
-- CI step `architecture.boundaries` wired into `scripts/ci_runner.py`
+- `scripts/check-architecture.py` — AST-based dependency guards, request/event export checks,
+  project map heading sync, generated test-group section validation
+- `docs/PROJECT_MAP.md` — ownership map with generated test suites by responsibility
+- CI check `architecture.boundaries` wired into `scripts/ci_runner.py`
 - focused tests in `tests/test_check_architecture.py`
 
-### Phase-specific validation (pending final CI)
+### Phase-specific validation (passed)
 
 ```text
 tests/test_check_architecture.py
@@ -376,91 +383,21 @@ tests/test_application_requests.py
 tests/test_application_services.py
 tests/test_runtime_architecture.py
 tests/tui/test_architecture.py
-full final CI on committed clean HEAD
+full final CI on committed clean HEAD f82ed58
 ```
 
-### Goal
+### Completion criteria (met)
 
-Replace scattered free-form stage strings and ad-hoc technical logging with typed
-structured technical events while keeping presentation-neutral application and core
-boundaries.
+- architecture validator enforces layer boundaries and public application exports
+- project map matches validator-required headings and test-group registry
+- CI gate `architecture.boundaries` passes on final evidence HEAD
+- owner approval recorded; tracker status `complete`
 
-### Delivered
+### Owner acceptance (recorded)
 
-- `spell_sync/diagnostics/event_metadata.py` — typed `CorrelationId`, `TargetId`, `EventReason`,
-  `TerminalOutcome` (Chrome profile ids may include spaces)
-- `spell_sync/diagnostics/technical_event_model.py` — `EventId`, `TechnicalEvent`, typed enums
-- `spell_sync/diagnostics/technical_event_builder.py` — canonical event construction helpers
-- `spell_sync/application/events.py` — `EventEmitter`, `operation_emitter`, `PresentedEvent`
-  (re-exports typed model from diagnostics)
-- `spell_sync/application/event_presenter.py` — `present_event`, fixed message catalog,
-  contextual overrides for `target_id` and `reason_code`
-- `spell_sync/diagnostics/technical_event_log.py` — JSON Lines serialization
-  (`schemaVersion: 1`), privacy field allowlist, `write_technical_event`,
-  `parse_technical_log_line`, `format_log_line_for_display` for backward-compatible tail reading
-- `project_setup/execute.py`, `project_setup/target_settings.py` emit typed events with
-  `correlation_id` from preview/plan identifiers (imports diagnostics only, not application)
-- `DiagnosticsService.finalize_report` emits `diagnostics.history_write_failed` on history
-  append failure; `SpellSyncService` emits `diagnostics.logging_setup_failed` when file logging
-  cannot start
-- TUI `operation_screen.py` drives progress from `EventId` / `PresentedEvent` (replacing
-  free-form stage strings)
-- `safe_log.format_safe_log_record` bypasses sanitization for structured JSON lines;
-  legacy plain-text lines remain redacted
-- Recovery terminal events on confirmation mismatch and successful discard
-  (`EventId.RECOVERY_DISCARDED`)
-- Malformed JSON-like log lines redacted in display (no sentinel leakage)
-- ADR `docs/decisions/0004-structured-technical-events.md`
-- `docs/PROJECT_MAP.md` and `tests/test-impact.toml` diagnostics/events cluster updated
-
-### Required outcomes (delivered)
-
-- typed event identifiers instead of arbitrary stage strings
-- stable severity/category/operation metadata
-- safe structured payload without user words (serialize-time forbidden keys)
-- one canonical emission path via `operation_emitter` / `emit_technical`
-- CLI/TUI convert events to presentation only (`EventSink` → `PresentedEvent`)
-- technical file logging receives structured JSON Lines events
-- history diagnostics and support workflows remain privacy-safe (no event stream in history)
-- no parallel old/new event pipeline after migration
-- internal JSON Lines boundary with `schemaVersion: 1` and backward tail reading for legacy lines
-
-### Safety and privacy (preserved)
-
-- no user dictionary words in events or technical log payloads
-- no raw config, credentials, or journal contents in events
-- HOME paths redacted on legacy log lines; structured events omit path fields
-- logging failure does not block Pull/Push/Recovery
-- product semantics, CLI JSON, and exit codes unchanged
-
-### Deferred
-
-- version `0.3.0`
-- CLI redesign
-- TUI redesign
-- telemetry/network transport and remote logging (rejected — see ADR 0004)
-- release/tag/publication
-
-### Phase-specific validation (pending final CI)
-
-```text
-tests/test_technical_logging.py
-tests/test_diagnostic_redaction.py
-Pull/Push/Recovery safety suites
-TUI architecture and mutation safety
-privacy redaction on technical log tail
-full final CI on committed clean HEAD
-```
-
-### Completion criteria (met pending approval)
-
-- one structured event contract
-- no duplicate event pipeline
-- CLI/TUI adapters use presentation sinks
-- privacy tests on logging and redaction paths
-- application services emit typed events
-- final CI on committed clean HEAD (pending)
-- status `awaiting-approval`
+- architecture validator and expanded project map delivered;
+- final CI evidence bound to HEAD `f82ed58`, run `20260728T074706.122702Z`;
+- package version remains `0.2.1`.
 
 ## Phase 2B: complete application boundary
 
@@ -564,18 +501,25 @@ Summary:
 - Phase 2B: pure request DTOs, service-only CLI mutations, dependency direction
 - Phase 2C–2E: deterministic CI, agent workflow, test selection infrastructure
 - Phase 3: explicit runtime, RuntimeIdentity, clean-tree final CI evidence (owner-approved)
+- Phase 4: focused application services and thin facade (owner-approved)
+- Phase 5: structured technical events and polish (owner-approved)
+- Phase 6: architecture validator and project map (owner-approved)
 
 ## Last validation
 
 ```text
+Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
+Phase 5 (accepted): HEAD 7985302; full CI finalEvidence=true (20260723T034038.010703Z)
 Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.370414Z); 100% line coverage
-Phase 2B: pytest 1559+ passed; scripts/ci.sh green (2026-07-20)
 ```
 
 ## Remaining work
 
-Phases 4–10 on public spell-sync repository (see migration order). Phase 4 preflight
-maintenance (NUL-safe untracked digest, snapshot Git timeout) before decomposition.
+Phases 7–9 on public spell-sync repository (see migration order):
+
+7. Documentation reorganization and ADRs — **current**
+8. Agent config refresh
+9. Version 0.3.0
 
 ## Deferred work
 
