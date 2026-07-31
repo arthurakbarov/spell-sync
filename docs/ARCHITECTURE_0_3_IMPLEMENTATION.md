@@ -37,7 +37,7 @@ phase-10: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `e46ce45` version 0.3.0 bump (Phase 10) | yes |
+| spell-sync | `9069783` Phase 10 CI evidence in tracker | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
