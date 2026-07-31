@@ -76,13 +76,13 @@ def validate_relative_name(name: str) -> None:
 
 
 def relative_components(child: Path, root: Path) -> tuple[str, ...]:
-    """Split a presentation path into trusted-root-relative components (lexical)."""
+    """Split a presentation path into trusted-root-relative components."""
     root_res = root.resolve()
     try:
         rel = child.relative_to(root_res)
     except ValueError:
         try:
-            rel = child.relative_to(root)
+            rel = child.resolve().relative_to(root_res)
         except ValueError as exc:
             raise TrustedFsError(
                 "outside_trusted_root",
