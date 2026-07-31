@@ -17,6 +17,7 @@ from spell_sync.push_journal import (
     JOURNAL_STATE_WRITING,
     PushJournal,
     PushJournalSession,
+    _atomic_write_journal,
     journal_path_for_wordlist,
 )
 from spell_sync.push_prepared import _abort_journal_begin_failure
@@ -35,7 +36,9 @@ from spell_sync.secure_artifacts import (
     _chmod_private_dir,
     _flush_file_windows,
     _fsync_directory,
+    _fsync_fd,
     _reject_unsafe_component,
+    _relative_under_root,
     atomic_write_trusted_file,
     ensure_trusted_directory,
     is_reparse_point,
@@ -53,7 +56,9 @@ class TestPushAbortPrecedence(unittest.TestCase):
             _combined_reason("dict_fail", "journal_update_failed", "rollback_incomplete"),
             "journal_update_failed",
         )
-        self.assertEqual(_combined_reason("dict_fail", "rollback_incomplete"), "rollback_incomplete")
+        self.assertEqual(
+            _combined_reason("dict_fail", "rollback_incomplete"), "rollback_incomplete"
+        )
         self.assertEqual(_combined_reason("dict_fail", "other"), "dict_fail")
 
     def test_complete_rollback_journal_update_failed(self) -> None:
@@ -65,7 +70,9 @@ class TestPushAbortPrecedence(unittest.TestCase):
             dict_path.write_text("b\n", encoding="utf-8")
             tx = PushTransaction(
                 dictionary_backups=[
-                    _FileBackup(dict_path, None, True, "d", write_state=TargetWriteState.NOT_STARTED)
+                    _FileBackup(
+                        dict_path, None, True, "d", write_state=TargetWriteState.NOT_STARTED
+                    )
                 ],
                 wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
                 transaction_id="tid",
@@ -91,7 +98,9 @@ class TestPushAbortPrecedence(unittest.TestCase):
                 targets=[],
             )
             with patch.object(PushTransaction, "rollback", return_value=RollbackResult((), (), ())):
-                with patch.object(PushJournalSession, "discard", side_effect=OSError("discard fail")):
+                with patch.object(
+                    PushJournalSession, "discard", side_effect=OSError("discard fail")
+                ):
                     result = handle_failed_push_rollback(
                         tx,
                         session,
@@ -310,7 +319,9 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             wordlist.write_text("a\n", encoding="utf-8")
             root = trusted_project_root(wordlist)
             target = root / "blocker" / "nested"
-            with patch("spell_sync.secure_artifacts.os.mkdir", side_effect=OSError(errno.EEXIST, "exists")):
+            with patch(
+                "spell_sync.secure_artifacts.os.mkdir", side_effect=OSError(errno.EEXIST, "exists")
+            ):
                 with patch.object(Path, "is_dir", return_value=False):
                     with self.assertRaises(SecureArtifactError):
                         ensure_trusted_directory(target, root=root)
@@ -321,8 +332,13 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             wordlist.write_text("a\n", encoding="utf-8")
             root = trusted_project_root(wordlist)
             target = root / ".spell-sync.journal.json"
-            with patch("spell_sync.secure_artifacts.tempfile.mkstemp", return_value=(5, str(target.with_suffix(".tmp")))):
-                with patch("spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "io")):
+            with patch(
+                "spell_sync.secure_artifacts.tempfile.mkstemp",
+                return_value=(5, str(target.with_suffix(".tmp"))),
+            ):
+                with patch(
+                    "spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "io")
+                ):
                     with patch("spell_sync.secure_artifacts.os.close") as close_mock:
                         with self.assertRaises(SecureArtifactError):
                             atomic_write_trusted_file(target, b"x", root=root)
@@ -334,7 +350,9 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             wordlist.write_text("a\n", encoding="utf-8")
             root = trusted_project_root(wordlist)
             target = root / ".spell-sync.journal.json"
-            with patch("spell_sync.secure_artifacts.os.replace", side_effect=OSError(errno.EIO, "io")):
+            with patch(
+                "spell_sync.secure_artifacts.os.replace", side_effect=OSError(errno.EIO, "io")
+            ):
                 with patch.object(Path, "unlink", side_effect=OSError(errno.EIO, "io")):
                     with self.assertRaises(SecureArtifactError):
                         atomic_write_trusted_file(target, b"x", root=root)
@@ -390,12 +408,179 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
         with patch.object(sys, "platform", "win32"):
             _chmod_private_dir(Path("."))
             _fsync_directory(Path("."))
-            with patch("spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")):
+            with patch(
+                "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
+            ):
                 with patch.dict(
                     sys.modules,
                     {"msvcrt": fake_msvcrt, "ctypes": fake_ctypes},
                 ):
                     _flush_file_windows(1)
+
+
+class TestRemainingCoverageGaps(unittest.TestCase):
+    def test_relative_under_root_rejects_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            outside = Path(tmp).parent / "outside" / "file.txt"
+            with self.assertRaises(SecureArtifactError):
+                _relative_under_root(outside, root)
+
+    def test_reject_unsafe_component_reparse_and_unexpected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target.txt"
+            target.write_text("x", encoding="utf-8")
+            link = Path(tmp) / "link"
+            link.symlink_to(target)
+            with self.assertRaises(SecureArtifactError):
+                _reject_unsafe_component(link)
+            try:
+                fifo = Path(tmp) / "fifo"
+                os.mkfifo(fifo)
+                with self.assertRaises(SecureArtifactError):
+                    _reject_unsafe_component(fifo)
+            except (OSError, AttributeError):
+                self.skipTest("mkfifo unavailable")
+
+    def test_fsync_fd_enosys_ignored(self) -> None:
+        with patch(
+            "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.ENOSYS, "nosys")
+        ):
+            _fsync_fd(1)
+
+    def test_flush_windows_nested_oserror(self) -> None:
+        fake_msvcrt = MagicMock()
+        fake_msvcrt.get_osfhandle.side_effect = OSError(errno.EINVAL, "bad")
+        with patch.object(sys, "platform", "win32"):
+            with patch(
+                "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
+            ):
+                with patch.dict(sys.modules, {"msvcrt": fake_msvcrt}):
+                    _flush_file_windows(1)
+
+    def test_ensure_directory_mkdir_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            target = root / "newdir"
+            with patch(
+                "spell_sync.secure_artifacts.os.mkdir",
+                side_effect=OSError(errno.EACCES, "denied"),
+            ):
+                with self.assertRaises(SecureArtifactError) as ctx:
+                    ensure_trusted_directory(target, root=root)
+                self.assertEqual(ctx.exception.code, "mkdir_failed")
+
+    def test_ensure_directory_eexist_not_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            leaf = root / "leaf"
+            leaf.write_text("file-not-dir", encoding="utf-8")
+
+            def mkdir_conflict(path, mode=0o700):
+                if Path(path) == leaf:
+                    raise OSError(errno.EEXIST, "exists")
+                os.mkdir(path, mode)
+
+            with patch("spell_sync.secure_artifacts.os.mkdir", side_effect=mkdir_conflict):
+                with self.assertRaises(SecureArtifactError):
+                    ensure_trusted_directory(leaf / "child", root=root)
+
+    def test_atomic_write_inner_close_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            target = root / ".spell-sync.journal.json"
+            real_close = os.close
+
+            def close_fail(fd):
+                if fd == 7:
+                    raise OSError(errno.EIO, "close failed")
+                real_close(fd)
+
+            with patch(
+                "spell_sync.secure_artifacts.tempfile.mkstemp",
+                return_value=(7, str(target.with_suffix(".tmp"))),
+            ):
+                with patch(
+                    "spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "write")
+                ):
+                    with patch("spell_sync.secure_artifacts.os.close", side_effect=close_fail):
+                        with self.assertRaises(SecureArtifactError):
+                            atomic_write_trusted_file(target, b"x", root=root)
+
+    def test_remove_existing_symlink_and_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            victim = root / "victim.txt"
+            victim.write_text("x", encoding="utf-8")
+            link = root / "link.txt"
+            link.symlink_to(victim)
+            with patch(
+                "spell_sync.secure_artifacts._validate_existing_regular_file",
+                return_value=None,
+            ):
+                with self.assertRaises(SecureArtifactError):
+                    remove_trusted_file(link, root=root)
+                dir_path = root / "dir"
+                ensure_trusted_directory(dir_path, root=root)
+                with self.assertRaises(SecureArtifactError):
+                    remove_trusted_file(dir_path, root=root)
+
+    def test_atomic_write_journal_wraps_secure_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            journal = journal_path_for_wordlist(wordlist)
+            journal.parent.mkdir(parents=True, exist_ok=True)
+            journal.symlink_to(wordlist)
+            journal_obj = PushJournal(
+                schema_version=2,
+                transaction_id="tid",
+                command="push",
+                pid=os.getpid(),
+                started="2026-01-01T00:00:00+00:00",
+                state=JOURNAL_STATE_WRITING,
+                wordlist=str(wordlist),
+                wordlist_hash_before=None,
+                wordlist_hash_after=None,
+                wordlist_backup_path=None,
+                wordlist_existed_before=True,
+                snapshot_dir=None,
+                targets=[],
+            )
+            with self.assertRaises(OSError):
+                _atomic_write_journal(journal, journal_obj, wordlist=wordlist)
+
+    def test_discard_txn_snapshots_swallows_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            snap = root / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            with patch(
+                "spell_sync.push_transaction.remove_trusted_tree",
+                side_effect=SecureArtifactError("bad", "bad"),
+            ):
+                discard_txn_snapshots(snap, wordlist=wordlist, transaction_id="tid")
+
+    def test_artifact_root_from_txn_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            snap = root / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            self.assertEqual(_artifact_root(snap, None), root)
 
 
 if __name__ == "__main__":

@@ -305,6 +305,28 @@ class TestPushPreparedCoverage(unittest.TestCase):
             self.assertIsInstance(result, PushAbort)
             self.assertEqual(result.reason, "journal_update_failed")
 
+    def test_journal_begin_failure_returns_abort(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            dict_path = Path(d) / "dict.txt"
+            write_text_words(str(wordlist), ["a"], "utf-8", False, quiet=True)
+            write_text_words(str(dict_path), ["a"], "utf-8", False, quiet=True)
+            run = make_sync_run(
+                str(wordlist),
+                dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
+            )
+            prepared = run.prepare_push_operation()
+            assert not isinstance(prepared, ExitCode)
+            with patch.object(PushJournalSession, "begin", side_effect=OSError("journal begin")):
+                result = execute_prepared_push(
+                    prepared,
+                    execution_context=prepared.ctx,
+                    dry_run=False,
+                    running_app_skip_reasons_fn=lambda _names: {},
+                )
+            self.assertIsInstance(result, PushAbort)
+            self.assertEqual(result.reason, "journal_begin_failed")
+
 
 class TestCommandHelpersCoverage(unittest.TestCase):
     def test_invalid_config_exit_and_run_from_scope(self):
