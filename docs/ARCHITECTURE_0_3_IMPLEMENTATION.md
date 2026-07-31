@@ -607,7 +607,7 @@ Summary:
 ## Last validation
 
 ```text
-Phase 9 (awaiting approval): HEAD c1b8ecd; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change (run 20260731T104234.254905Z @ 3c6bc35)
+Phase 9 (awaiting approval): HEAD 990702f; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change (run 20260731T104234.254905Z @ 3c6bc35)
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
