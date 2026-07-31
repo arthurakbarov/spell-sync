@@ -1,9 +1,8 @@
 """Secure filesystem operations for spell-sync internal artifacts.
 
 Trust boundary: paths must stay under the project directory derived from the
-wordlist. Existing symlink, junction, and reparse-point components are rejected
-fail-closed. Publication uses exclusive temp files, fsync, atomic replace, and
-parent-directory sync on POSIX where available.
+wordlist. Authorization uses descriptor/handle-relative operations — path
+strings are presentation-only after the trusted root is opened.
 """
 
 from __future__ import annotations
@@ -12,26 +11,30 @@ import errno
 import os
 import stat
 import sys
-import tempfile
-from dataclasses import dataclass
+import uuid
 from pathlib import Path
 
 from .project import ProjectContext
+from .trusted_internal_fs import (
+    TrustedDirectory,
+    TrustedFsError,
+    TrustedRoot,
+    relative_components,
+    set_open_boundary_hook,
+    validate_relative_name,
+)
 
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 _PRIVATE_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR
 _PRIVATE_DIR_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
 
 
-@dataclass(frozen=True)
-class SecureArtifactError(OSError):
+class SecureArtifactError(TrustedFsError):
     """Fail-closed rejection or publication failure for an internal artifact."""
 
-    code: str
-    detail: str
 
-    def __str__(self) -> str:
-        return self.detail
+def _map_error(exc: TrustedFsError) -> SecureArtifactError:
+    return SecureArtifactError(exc.code, exc.detail)
 
 
 def trusted_project_root(wordlist: Path) -> Path:
@@ -45,18 +48,6 @@ def trusted_project_root_resolved(wordlist: Path) -> Path:
         return root.resolve()
     except OSError as exc:
         raise SecureArtifactError("trusted_root_unavailable", str(exc)) from exc
-
-
-def _relative_under_root(path: Path, root: Path) -> Path:
-    try:
-        root_resolved = root.resolve()
-        path_resolved = path.resolve()
-        return path_resolved.relative_to(root_resolved)
-    except (OSError, ValueError) as exc:
-        raise SecureArtifactError(
-            "outside_trusted_root",
-            "Path outside trusted project root.",
-        ) from exc
 
 
 def is_reparse_point(path: Path) -> bool:
@@ -73,36 +64,214 @@ def is_reparse_point(path: Path) -> bool:
         return False
 
 
-def _reject_unsafe_component(path: Path) -> None:
-    if not path.exists():
-        return
-    if is_reparse_point(path):
-        raise SecureArtifactError("reparse_point", "Internal artifact path must not be a link.")
-    if path.is_dir() and not path.is_symlink():
-        return
-    if path.is_file() and not path.is_symlink():
-        return
-    raise SecureArtifactError(
-        "unexpected_path_type",
-        "Internal artifact path has an unsupported type.",
-    )
-
-
-def _verify_parent_chain(path: Path, root: Path) -> None:
-    root = root.resolve()
-    current = root
+def _with_root(root: Path) -> TrustedRoot:
     try:
-        relative = path.resolve().relative_to(root)
-    except (OSError, ValueError) as exc:
-        raise SecureArtifactError(
-            "outside_trusted_root",
-            "Path outside trusted project root.",
-        ) from exc
-    for part in relative.parts[:-1] if relative.parts else ():
-        current = current / part
-        _reject_unsafe_component(current)
+        return TrustedRoot.open_root(root)
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
 
 
+def _directory_at(root: Path, path: Path) -> TrustedDirectory:
+    parts = relative_components(path, root)
+    try:
+        return TrustedDirectory.from_components(root, parts)
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+
+
+def _parent_directory_at(root: Path, path: Path) -> tuple[TrustedDirectory, str]:
+    parts = _relative_parts(path, root)
+    if len(parts) == 1:
+        trusted = _with_root(root)
+        return trusted, parts[0]
+    parent = TrustedDirectory.from_components(root, parts[:-1])
+    return parent, parts[-1]
+
+
+def _relative_parts(child: Path, root: Path) -> tuple[str, ...]:
+    try:
+        return relative_components(child, root)
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+
+
+def ensure_trusted_directory(path: Path, *, root: Path) -> None:
+    """Create ``path`` under ``root`` without following existing links."""
+    parts = _relative_parts(path, root)
+    trusted = _with_root(root)
+    try:
+        for part in parts:
+            try:
+                nxt = trusted.ensure_child_directory(part, private=True)
+            except TrustedFsError as exc:
+                raise _map_error(exc) from exc
+            trusted.close()
+            trusted = nxt
+    finally:
+        trusted.close()
+
+
+def open_trusted_regular_file(
+    path: Path,
+    *,
+    root: Path,
+    create: bool = False,
+    mutable: bool = False,
+) -> int:
+    """Open a trusted regular file without following links."""
+    parent, name = _parent_directory_at(root, path)
+    try:
+        handle = parent.open_regular_file(name, create=create, mutable=mutable)
+        fd = handle.fd
+        handle._fd = -1  # transfer ownership
+        return fd
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def read_trusted_regular_file(path: Path, *, root: Path) -> bytes:
+    """Read a trusted regular file via secure no-follow open."""
+    parent, name = _parent_directory_at(root, path)
+    try:
+        with parent.open_regular_file(name, create=False) as handle:
+            return handle.read_all()
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def atomic_write_trusted_file(path: Path, data: bytes, *, root: Path) -> None:
+    """Publish ``data`` to ``path`` atomically with durability best effort."""
+    parent, final_name = _parent_directory_at(root, path)
+    temp_name = f".{final_name}.{uuid.uuid4().hex}.tmp"
+    try:
+        validate_relative_name(temp_name)
+        with parent.open_regular_file(temp_name, create=True, exclusive=True) as temp:
+            temp.write_all(data)
+        parent.atomic_replace(temp_name, final_name)
+    except TrustedFsError as exc:
+        try:
+            parent.unlink_entry(temp_name)
+        except SecureArtifactError:
+            pass
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def remove_trusted_file(path: Path, *, root: Path) -> None:
+    parent, name = _parent_directory_at(root, path)
+    try:
+        parent.unlink_entry(name)
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def remove_trusted_tree(path: Path, *, root: Path) -> None:
+    parts = _relative_parts(path, root)
+    if len(parts) == 1:
+        parent = _with_root(root)
+        name = parts[0]
+    else:
+        try:
+            parent = TrustedDirectory.from_components(root, parts[:-1])
+        except TrustedFsError as exc:
+            raise _map_error(exc) from exc
+        name = parts[-1]
+    try:
+        try:
+            target = parent.open_child_directory(name)
+        except TrustedFsError as exc:
+            if exc.code == "missing_directory":
+                return
+            raise _map_error(exc) from exc
+        try:
+            target.remove_owned_tree()
+        finally:
+            target.close()
+        parent.remove_child_directory(name)
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def prepare_trusted_txn_root(wordlist: Path, transaction_id: str) -> Path:
+    """Ensure ``.spell-sync.txn/<transaction_id>`` exists safely under the project."""
+    root = trusted_project_root(wordlist)
+    validate_relative_name(".spell-sync.txn")
+    validate_relative_name(transaction_id)
+    trusted = _with_root(root)
+    try:
+        txn_parent = trusted.ensure_child_directory(".spell-sync.txn", private=True)
+        trusted.close()
+        txn_dir = txn_parent.ensure_child_directory(transaction_id, private=True)
+        presentation = txn_dir.presentation_path
+        txn_dir.close()
+        txn_parent.close()
+        return presentation
+    except TrustedFsError as exc:
+        trusted.close()
+        raise _map_error(exc) from exc
+
+
+def copy_trusted_snapshot_file(
+    snapshot_dir: Path,
+    *,
+    root: Path,
+    base_name: str,
+    source: Path,
+) -> Path:
+    """Create an exclusive snapshot under ``snapshot_dir`` and copy ``source`` via held fd."""
+    snap_name = f"{base_name}.{uuid.uuid4().hex}.snap"
+    parent = _directory_at(root, snapshot_dir)
+    try:
+        with parent.copy_regular_file_from_path(snap_name, source) as handle:
+            presentation = handle.presentation_path
+        return presentation
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+def create_trusted_snapshot_file(snapshot_dir: Path, *, root: Path, base_name: str) -> Path:
+    """Create an empty snapshot file exclusively under ``snapshot_dir``."""
+    snap_name = f"{base_name}.{uuid.uuid4().hex}.snap"
+    parent = _directory_at(root, snapshot_dir)
+    try:
+        with parent.open_regular_file(snap_name, create=True, exclusive=True) as handle:
+            return handle.presentation_path
+    except TrustedFsError as exc:
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
+# Re-export hook for adversarial tests.
+__all__ = [
+    "SecureArtifactError",
+    "atomic_write_trusted_file",
+    "copy_trusted_snapshot_file",
+    "create_trusted_snapshot_file",
+    "ensure_trusted_directory",
+    "is_reparse_point",
+    "open_trusted_regular_file",
+    "prepare_trusted_txn_root",
+    "read_trusted_regular_file",
+    "remove_trusted_file",
+    "remove_trusted_tree",
+    "set_open_boundary_hook",
+    "trusted_project_root",
+    "trusted_project_root_resolved",
+]
+
+# Legacy test helpers — fd-only private mode utilities.
 def _fchmod_private(fd: int) -> None:
     if sys.platform == "win32":
         return
@@ -113,12 +282,7 @@ def _fchmod_private(fd: int) -> None:
 
 
 def _chmod_private_dir(path: Path) -> None:
-    if sys.platform == "win32":
-        return
-    try:
-        os.chmod(path, _PRIVATE_DIR_MODE)
-    except OSError:
-        pass
+    del path  # path-based chmod forbidden in secure layer; kept for test patching only
 
 
 def _fsync_fd(fd: int) -> None:
@@ -150,225 +314,26 @@ def _fsync_directory(path: Path) -> None:
 
 
 def _flush_file_windows(fd: int) -> None:
-    if sys.platform != "win32":
-        return
-    try:
-        import msvcrt  # pragma: no cover
+    from .trusted_internal_fs import _flush_file
 
-        os.fsync(fd)
-    except OSError:
-        try:
-            import ctypes  # pragma: no cover
-
-            handle = msvcrt.get_osfhandle(fd)  # type: ignore[attr-defined]
-            if handle != -1:
-                ctypes.windll.kernel32.FlushFileBuffers(handle)  # type: ignore[attr-defined]
-        except OSError:
-            pass
+    _flush_file(fd)
 
 
-def ensure_trusted_directory(path: Path, *, root: Path) -> None:
-    """Create ``path`` under ``root`` without following existing links."""
-    _relative_under_root(path, root)
-    current = root.resolve()
-    relative = path.resolve().relative_to(current)
-    for part in relative.parts:
-        current = current / part
-        if current.exists():
-            _reject_unsafe_component(current)
-            if not current.is_dir():
-                raise SecureArtifactError(
-                    "not_a_directory",
-                    "Expected a directory for internal artifact.",
-                )
-            continue
-        try:
-            os.mkdir(current, mode=_PRIVATE_DIR_MODE)
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise SecureArtifactError("mkdir_failed", str(exc)) from exc
-            if not current.is_dir():
-                raise SecureArtifactError(
-                    "not_a_directory",
-                    "Expected a directory for internal artifact.",
-                ) from exc
-        _chmod_private_dir(current)
+def _relative_under_root(path: Path, root: Path) -> Path:
+    parts = _relative_parts(path, root)
+    return Path(*parts)
 
 
-def _validate_existing_regular_file(path: Path, *, root: Path) -> None:
-    _verify_parent_chain(path, root)
+def _reject_unsafe_component(path: Path) -> None:
     if not path.exists():
         return
     if is_reparse_point(path):
-        raise SecureArtifactError("reparse_point", "Internal artifact file must not be a link.")
-    if path.is_dir():
-        raise SecureArtifactError("not_a_file", "Expected a regular file for internal artifact.")
-    if not path.is_file():
-        raise SecureArtifactError(
-            "unexpected_path_type",
-            "Internal artifact file has an unsupported type.",
-        )
-
-
-def open_trusted_regular_file(
-    path: Path,
-    *,
-    root: Path,
-    create: bool = False,
-) -> int:
-    """Open a trusted regular file without following links."""
-    _verify_parent_chain(path, root)
-    if path.exists():
-        _validate_existing_regular_file(path, root=root)
-    elif not create:
-        raise SecureArtifactError("missing_file", "Internal artifact file is missing.")
-    else:
-        ensure_trusted_directory(path.parent, root=root)
-
-    flags = os.O_RDWR
-    if create:
-        flags |= os.O_CREAT
-    if sys.platform != "win32":
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-    try:
-        fd = os.open(path, flags, _PRIVATE_FILE_MODE)
-    except OSError as exc:
-        raise SecureArtifactError("open_failed", str(exc)) from exc
-
-    try:
-        st = os.fstat(fd)
-    except OSError as exc:
-        os.close(fd)
-        raise SecureArtifactError("fstat_failed", str(exc)) from exc
-    if not stat.S_ISREG(st.st_mode):
-        os.close(fd)
-        raise SecureArtifactError("not_a_file", "Internal artifact must be a regular file.")
-    _fchmod_private(fd)
-    return fd
-
-
-def atomic_write_trusted_file(path: Path, data: bytes, *, root: Path) -> None:
-    """Publish ``data`` to ``path`` atomically with durability best effort."""
-    ensure_trusted_directory(path.parent, root=root)
-    _validate_existing_regular_file(path, root=root)
-
-    prefix = f".{path.name}."
-    suffix = ".tmp"
-    temp_fd: int | None = None
-    temp_path: Path | None = None
-    try:
-        temp_fd, temp_name = tempfile.mkstemp(
-            prefix=prefix,
-            suffix=suffix,
-            dir=str(path.parent),
-        )
-        temp_path = Path(temp_name)
-        if sys.platform != "win32":
-            _fchmod_private(temp_fd)
-        try:
-            offset = 0
-            while offset < len(data):
-                written = os.write(temp_fd, data[offset:])
-                if written <= 0:
-                    raise SecureArtifactError(
-                        "partial_write",
-                        "Short write while publishing artifact.",
-                    )
-                offset += written
-            _fsync_fd(temp_fd)
-            _flush_file_windows(temp_fd)
-        finally:
-            os.close(temp_fd)
-            temp_fd = None
-
-        if path.exists():
-            _validate_existing_regular_file(path, root=root)
-        os.replace(temp_path, path)
-        temp_path = None
-        if sys.platform != "win32":
-            try:
-                os.chmod(path, _PRIVATE_FILE_MODE)
-            except OSError:
-                pass
-        _fsync_directory(path.parent)
-    except OSError as exc:
-        if isinstance(exc, SecureArtifactError):
-            raise
-        raise SecureArtifactError("publish_failed", str(exc)) from exc
-    finally:
-        if temp_fd is not None:
-            try:
-                os.close(temp_fd)
-            except OSError:
-                pass
-        if temp_path is not None:
-            try:
-                if temp_path.exists() and temp_path.is_file() and not is_reparse_point(temp_path):
-                    temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-
-def remove_trusted_file(path: Path, *, root: Path) -> None:
-    _validate_existing_regular_file(path, root=root)
-    if not path.exists():
+        raise SecureArtifactError("reparse_point", "Internal artifact path must not be a link.")
+    if path.is_dir() and not path.is_symlink():
         return
-    if is_reparse_point(path):
-        raise SecureArtifactError("reparse_point", "Refusing to remove link path.")
-    if not path.is_file():
-        raise SecureArtifactError("not_a_file", "Refusing to remove non-file path.")
-    try:
-        path.unlink(missing_ok=True)
-    except OSError as exc:
-        raise SecureArtifactError("unlink_failed", str(exc)) from exc
-
-
-def remove_trusted_tree(path: Path, *, root: Path) -> None:
-    _relative_under_root(path, root)
-    if is_reparse_point(path):
-        raise SecureArtifactError("reparse_point", "Refusing to remove link directory.")
-    if not path.exists():
+    if path.is_file() and not path.is_symlink():
         return
-    if not path.is_dir():
-        raise SecureArtifactError("not_a_directory", "Expected a directory for cleanup.")
-    for child in sorted(path.iterdir(), key=lambda p: p.name):
-        if child.is_dir() and not child.is_symlink() and not is_reparse_point(child):
-            remove_trusted_tree(child, root=root)
-        elif child.is_file() and not is_reparse_point(child):
-            remove_trusted_file(child, root=root)
-        else:
-            raise SecureArtifactError("reparse_point", "Refusing to remove suspicious child path.")
-    try:
-        path.rmdir()
-    except OSError as exc:
-        raise SecureArtifactError("rmdir_failed", str(exc)) from exc
-
-
-def prepare_trusted_txn_root(wordlist: Path, transaction_id: str) -> Path:
-    """Ensure ``.spell-sync.txn/<transaction_id>`` exists safely under the project."""
-    root = trusted_project_root(wordlist)
-    txn_parent = root / ".spell-sync.txn"
-    txn_dir = txn_parent / transaction_id
-    ensure_trusted_directory(txn_parent, root=root)
-    if txn_dir.exists():
-        if is_reparse_point(txn_dir) or not txn_dir.is_dir():
-            raise SecureArtifactError("invalid_txn_root", "Transaction snapshot root is unsafe.")
-    else:
-        ensure_trusted_directory(txn_dir, root=root)
-    return txn_dir
-
-
-def create_trusted_snapshot_file(snapshot_dir: Path, *, root: Path, base_name: str) -> Path:
-    """Create an empty snapshot file exclusively under ``snapshot_dir``."""
-    ensure_trusted_directory(snapshot_dir, root=root)
-    prefix = f"{base_name}."
-    suffix = ".snap"
-    temp_fd, temp_name = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=str(snapshot_dir))
-    os.close(temp_fd)
-    snap_path = Path(temp_name)
-    if sys.platform != "win32":
-        try:
-            os.chmod(snap_path, _PRIVATE_FILE_MODE)
-        except OSError:
-            pass
-    return snap_path
+    raise SecureArtifactError(
+        "unexpected_path_type",
+        "Internal artifact path has an unsupported type.",
+    )
