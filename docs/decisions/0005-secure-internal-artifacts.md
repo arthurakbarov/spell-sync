@@ -15,18 +15,21 @@ leaked across unrelated writes.
 
 ## Decision
 
-### 1. Unified layer: `spell_sync/secure_artifacts.py`
+### 1. Unified layer: `spell_sync/trusted_internal_fs.py` + `spell_sync/secure_artifacts.py`
 
-All internal artifact open/create/publish/cleanup goes through one module. Trust root is the
-project directory from `ProjectContext` (wordlist parent), not `cwd`.
+All internal artifact open/create/publish/cleanup goes through descriptor/handle-relative
+operations. Path strings are presentation-only after the trusted root is opened. Trust root is
+the project directory from `ProjectContext` (wordlist parent), not `cwd`.
 
 | Property | Behavior |
 |----------|----------|
-| Containment | Child paths verified under trusted root; existing link/reparse components rejected fail-closed |
-| POSIX open | `O_NOFOLLOW` where available; post-open `fstat` must show regular file or expected directory |
-| Windows | Reject `FILE_ATTRIBUTE_REPARSE_POINT` on existing components (symlinks and junctions) |
-| Modes | Private files `0600`, directories `0700` via descriptor-based chmod where possible |
-| Cleanup | Remove only operation-owned paths; never follow links; preserve evidence on doubt |
+| Containment | POSIX: `dir_fd` traversal with `O_NOFOLLOW`/`O_DIRECTORY`; identity re-checked before final open |
+| Same-user race | Parent directory swap between check and use fails closed via inode re-validation |
+| Windows | Handle-based open with reparse inspection; path-based residual limitations documented |
+| Modes | Private files `0600`, directories `0700` via `fchmod` on open descriptor |
+| Hard links | Mutable lock files rejected when `st_nlink != 1` on POSIX |
+| Cleanup | Enumerate via open directory fd; never `shutil.rmtree`; held fd prevents unrelated deletion |
+| Snapshots | Exclusive create + copy on held destination fd; no pathname reopen for content |
 
 ### 2. Atomic journal publication
 
@@ -56,16 +59,17 @@ Remove global `_BACKUP_DISABLED`. Transaction-owned dictionary writes pass
 
 ## Consequences
 
-- New adversarial and fault-matrix tests in `tests/test_internal_artifact_security.py`,
-  `tests/test_secure_artifacts.py`, and existing mutation safety suites.
+- New adversarial regressions in `tests/test_secure_artifacts_adversarial.py` (R1–R7),
+  static guard in `tests/test_secure_artifacts_static_guard.py`, and existing mutation safety suites.
 - Dictionary target paths remain product semantics (may follow app-configured paths); only
   spell-sync **internal** artifacts use this layer.
-- Residual risk: concurrent privileged attacker replacing path components between check and open
-  is mitigated on POSIX via descriptor-relative patterns where used, but not eliminated on all
-  platforms.
+- Residual risk: same-user concurrent pathname replacement is mitigated on POSIX via held
+  descriptors and inode re-validation; privileged attackers outside the supported threat model
+  may still race on Windows where handle-relative cleanup is incomplete.
 
 ## References
 
 - [MUTATION_SAFETY.md](../architecture/MUTATION_SAFETY.md)
 - [RECOVERY.md](../RECOVERY.md)
+- `spell_sync/trusted_internal_fs.py`
 - `spell_sync/secure_artifacts.py`
