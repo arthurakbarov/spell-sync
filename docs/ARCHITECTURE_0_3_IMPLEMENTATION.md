@@ -35,7 +35,7 @@ phase-9: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `e59a90b` accept phase 8, advance to phase 9 | yes |
+| spell-sync | `c1b8ecd` dead directory audit report (Phase 9) | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
