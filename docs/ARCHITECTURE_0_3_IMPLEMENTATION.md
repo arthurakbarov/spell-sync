@@ -10,11 +10,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 6: architecture validator and project map — **complete** (owner-approved).
-Phase 7: documentation reorganization and ADRs — **current**, awaiting approval.
+Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
+Phase 8: agent configuration refresh — **current**, not started.
 
 [architecture-status:start]
-current: phase-7
+current: phase-8
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -25,7 +25,8 @@ phase-3: complete
 phase-4: complete
 phase-5: complete
 phase-6: complete
-phase-7: awaiting-approval
+phase-7: complete
+phase-8: not-started
 [architecture-status:end]
 
 ## Verified baseline
@@ -403,7 +404,7 @@ full final CI on committed clean HEAD f82ed58
 
 ## Phase 7 — Documentation reorganization and ADRs
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved)
 
 ### Goal
 
@@ -420,14 +421,30 @@ Documentation describes the current system — not prompt history or implementat
 - Removed obsolete `docs/UX_0_2_IMPLEMENTATION.md` and `docs/platform-validation-readiness.md`
 - `scripts/check-docs-contract.py` historical doc list updated
 
-### Phase-specific validation (pending final CI)
+### Phase-specific validation (passed)
 
 ```text
 python3 scripts/check-docs-contract.py
 python3 scripts/check-docs-style.sh
 python3 scripts/check-agent-config.py
-full final CI or lightweight validation per check-ci-necessity on committed HEAD
+full final CI on committed clean HEAD 9a08a7e
 ```
+
+### Owner acceptance (recorded)
+
+- documentation index and architecture layer guides delivered;
+- obsolete implementation diaries removed;
+- final CI evidence bound to HEAD `9a08a7e`, run `20260731T101824.828581Z`;
+- package version remains `0.2.1`.
+
+## Phase 8 — Agent configuration refresh
+
+**Status:** not started
+
+### Goal
+
+Refresh public agent configuration (rules, skills, `AGENTS.md`, validator) for the 0.3
+architecture without handoff or reviewer-specific workflow language.
 
 ## Phase 2B: complete application boundary
 
@@ -538,6 +555,7 @@ Summary:
 ## Last validation
 
 ```text
+Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
 Phase 5 (accepted): HEAD 7985302; full CI finalEvidence=true (20260723T034038.010703Z)
 Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.370414Z); 100% line coverage
@@ -545,10 +563,10 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-Phases 8–9 on public spell-sync repository (see migration order):
+Phases 9–10 on public spell-sync repository (see migration order):
 
-8. Agent config refresh — **next after Phase 7 approval**
-9. Version 0.3.0
+9. Dead directory audit (report only)
+10. Version 0.3.0
 
 ## Deferred work
 
