@@ -35,7 +35,7 @@ phase-9: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `c1b8ecd` dead directory audit report (Phase 9) | yes |
+| spell-sync | `990702f` Phase 9 validation evidence in tracker | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -607,7 +607,7 @@ Summary:
 ## Last validation
 
 ```text
-Phase 9 (awaiting approval): HEAD pending; docs-only audit report; lightweight validation
+Phase 9 (awaiting approval): HEAD c1b8ecd; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change (run 20260731T104234.254905Z @ 3c6bc35)
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
