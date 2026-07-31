@@ -423,7 +423,7 @@ class TestCoverage101(unittest.TestCase):
                         wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
                         transaction_id="x",
                         snapshot_dir=None,
-                        _backups_cm=_NoopExit(),
+                        wordlist_path=wordlist,
                     )
                     result = tx2.rollback()
             self.assertIn("d", result.failed)
@@ -443,7 +443,7 @@ class TestCoverage101(unittest.TestCase):
                         wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
                         transaction_id="y",
                         snapshot_dir=None,
-                        _backups_cm=_NoopExit(),
+                        wordlist_path=wordlist,
                     )
                     tx3.rollback()
             self.assertIn("rollback failed for", buf2.getvalue())

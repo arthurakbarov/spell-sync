@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shutil
-import stat
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -27,6 +26,12 @@ from .journal_schema import (
 from .log import log
 from .project import ProjectContext
 from .push_transaction import PushTransaction, txn_snapshot_root
+from .secure_artifacts import (
+    SecureArtifactError,
+    atomic_write_trusted_file,
+    remove_trusted_file,
+    trusted_project_root,
+)
 
 JOURNAL_SCHEMA_VERSION = 2
 SUPPORTED_SCHEMA_VERSIONS = frozenset({2})
@@ -443,12 +448,13 @@ def load_push_journal(wordlist: Path) -> PushJournal | None:
     return None
 
 
-def _atomic_write_journal(path: Path, journal: PushJournal) -> None:
+def _atomic_write_journal(path: Path, journal: PushJournal, *, wordlist: Path) -> None:
     payload = json.dumps(journal_payload(journal), ensure_ascii=False, indent=2) + "\n"
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(payload, encoding="utf-8")
-    os.replace(temp, path)
-    _secure_file_mode(path, stat.S_IRUSR | stat.S_IWUSR)
+    root = trusted_project_root(wordlist)
+    try:
+        atomic_write_trusted_file(path, payload.encode("utf-8"), root=root)
+    except SecureArtifactError as exc:
+        raise OSError(exc.detail) from exc
 
 
 def _backup_path_string(backup: Path | None) -> str | None:
@@ -502,10 +508,11 @@ def _journal_from_transaction(
 class PushJournalSession:
     """Track in-progress push state on disk until COMPLETED or discard."""
 
-    def __init__(self, path: Path, journal: PushJournal) -> None:
+    def __init__(self, path: Path, journal: PushJournal, *, wordlist: Path) -> None:
         self._path = path
         self._journal = journal
-        _atomic_write_journal(path, journal)
+        self._wordlist = wordlist
+        _atomic_write_journal(path, journal, wordlist=wordlist)
 
     @classmethod
     def begin(
@@ -523,14 +530,14 @@ class PushJournalSession:
             tx=tx,
             dictionaries=dictionaries,
         )
-        return cls(path, journal)
+        return cls(path, journal, wordlist=wordlist)
 
     @property
     def journal(self) -> PushJournal:
         return self._journal
 
     def _persist(self) -> None:
-        _atomic_write_journal(self._path, self._journal)
+        _atomic_write_journal(self._path, self._journal, wordlist=self._wordlist)
 
     def mark_wordlist_write_started(self, hash_after: str) -> None:
         self._journal.wordlist_write_started = True
@@ -575,16 +582,16 @@ class PushJournalSession:
     def complete(self) -> None:
         """Mark COMPLETED durably, then best-effort remove the journal file."""
         self._journal.state = JOURNAL_STATE_COMPLETED
-        _atomic_write_journal(self._path, self._journal)
+        _atomic_write_journal(self._path, self._journal, wordlist=self._wordlist)
         try:
-            self._path.unlink(missing_ok=True)
-        except OSError as exc:
+            remove_trusted_file(self._path, root=trusted_project_root(self._wordlist))
+        except (SecureArtifactError, OSError) as exc:
             log.warn(f"journal cleanup warning — completed journal left on disk: {exc}")
 
     def discard(self) -> None:
         try:
-            self._path.unlink(missing_ok=True)
-        except OSError:
+            remove_trusted_file(self._path, root=trusted_project_root(self._wordlist))
+        except (SecureArtifactError, OSError):
             pass
 
 

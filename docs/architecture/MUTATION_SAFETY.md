@@ -24,6 +24,7 @@ preview (immutable prepared plan + RuntimeIdentity)
 | No automatic replan | User must run preview again |
 | Pending Recovery blocks writes | New Pull/Push/Recovery blocked until resolved |
 | Operation lock | One mutating operation per project at a time |
+| Internal artifact containment | `.spell-sync.lock`, journal, and `.spell-sync.txn` paths reject symlinks/reparse points and stay under the project root via `secure_artifacts` |
 | Atomic dictionary writes | Snapshots + journal v2 + rollback paths |
 | Privacy | User words never stored in history or technical logs |
 | TUI boundary | No subprocess CLI; no direct dictionary/journal writers |
@@ -43,6 +44,6 @@ arguments — not embedded in request DTOs.
 ## Where to read more
 
 - Journal schema and recovery commands: [RECOVERY.md](../RECOVERY.md)
-- Transaction implementation: `push_transaction.py`, `push_journal.py`
+- Transaction implementation: `push_transaction.py`, `push_journal.py`, `secure_artifacts.py`
 - Tests: `tests/test_pull_safety.py`, `tests/test_transaction_safety.py`,
   `tests/test_tui_mutation_safety.py`

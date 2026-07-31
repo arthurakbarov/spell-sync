@@ -10,7 +10,11 @@ from .io import atomic_write
 from .log import log
 from .neovim_mkspell import mkspell_after_neovim_writes
 from .push_abort import PushAbort, handle_failed_push_rollback
-from .push_journal import PushJournalSession, file_content_hash
+from .push_journal import (
+    PushJournalSession,
+    file_content_hash,
+    safe_discard_txn_snapshots,
+)
 from .push_plan import (
     PlannedTarget,
     PushPlan,
@@ -109,14 +113,43 @@ def plan_fingerprint_conflict(prepared: PreparedPush) -> str | None:
     return None
 
 
-def write_rendered(path: Path, rendered: RenderedWrite, *, settings: RuntimeSettings) -> bool:
+def write_rendered(
+    path: Path,
+    rendered: RenderedWrite,
+    *,
+    settings: RuntimeSettings,
+    keep_backup: bool = True,
+) -> bool:
     try:
-        atomic_write(path, rendered.payload, settings=settings)
+        atomic_write(path, rendered.payload, keep_backup=keep_backup, settings=settings)
     except OSError as exc:
         log.warn(f"no write access {path}: {exc}")
         return False
     actual = file_content_hash(path)
     return actual == rendered.sha256
+
+
+def _abort_journal_begin_failure(tx: PushTransaction, exc: OSError) -> PushAbort:
+    cleanup_ok = True
+    if tx.snapshot_dir is not None:
+        ok, _detail = safe_discard_txn_snapshots(
+            tx.wordlist_path,
+            tx.transaction_id,
+            str(tx.snapshot_dir),
+        )
+        cleanup_ok = cleanup_ok and ok
+        if ok:
+            tx.snapshot_dir = None
+    reason = "journal_begin_failed"
+    message = "push aborted — failed to create push journal."
+    if not cleanup_ok:
+        reason = "journal_begin_failed"
+        message = (
+            "push aborted — failed to create push journal; "
+            "recovery snapshots may remain for manual review."
+        )
+        return PushAbort(ExitCode.PUSH_ABORT, reason, message, recovery_materials_preserved=True)
+    return PushAbort(ExitCode.PUSH_ABORT, reason, message)
 
 
 def execute_prepared_push(
@@ -152,12 +185,15 @@ def execute_prepared_push(
                 written,
             )
 
-        journal_session = PushJournalSession.begin(
-            ctx.wordlist_file,
-            command="push",
-            tx=tx,
-            dictionaries=writable,
-        )
+        try:
+            journal_session = PushJournalSession.begin(
+                ctx.wordlist_file,
+                command="push",
+                tx=tx,
+                dictionaries=writable,
+            )
+        except OSError as exc:
+            return _abort_journal_begin_failure(tx, exc)
 
         if prepared.wordlist_needs_write and prepared.wordlist_rendered is not None:
             try:
@@ -175,6 +211,7 @@ def execute_prepared_push(
                 ctx.wordlist_file,
                 prepared.wordlist_rendered,
                 settings=ctx.settings,
+                keep_backup=tx.keep_dictionary_backup,
             ):
                 return handle_failed_push_rollback(
                     tx,
@@ -232,7 +269,12 @@ def execute_prepared_push(
                     journal_update_failed=True,
                 )
             tx.mark_write_started(dictionary)
-            ok = write_rendered(Path(dictionary.path), item.rendered, settings=ctx.settings)
+            ok = write_rendered(
+                Path(dictionary.path),
+                item.rendered,
+                settings=ctx.settings,
+                keep_backup=tx.keep_dictionary_backup,
+            )
             outcomes.append((dictionary.name, ok))
             if ok:
                 tx.mark_write_completed(dictionary)

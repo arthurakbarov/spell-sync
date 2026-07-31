@@ -2,25 +2,25 @@
 
 from __future__ import annotations
 
-import os
 import shutil
-import stat
 import tempfile
 import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Protocol
+from typing import List
 
 from .dictionaries import Dictionary
-from .io import (
-    backups_disabled,
-    create_bak_backup,
-    is_path_readable,
-    physical_path,
-)
+from .io import create_bak_backup, is_path_readable, physical_path
 from .log import log
 from .project import ProjectContext
+from .secure_artifacts import (
+    SecureArtifactError,
+    create_trusted_snapshot_file,
+    prepare_trusted_txn_root,
+    remove_trusted_tree,
+    trusted_project_root,
+)
 
 
 class TargetWriteState(str, Enum):
@@ -56,11 +56,7 @@ def txn_snapshot_root(wordlist: Path, transaction_id: str) -> Path:
     return ProjectContext.build(wordlist).project_dir / ".spell-sync.txn" / transaction_id
 
 
-def _recovery_snapshot(path: Path, snapshot_dir: Path, *, label: str) -> _FileBackup:
-    """Create a transaction recovery snapshot when the target exists.
-
-    Independent of ``[io] backup_keep`` (user ``.bak`` retention is optional).
-    """
+def _recovery_snapshot(path: Path, snapshot_dir: Path, *, root: Path, label: str) -> _FileBackup:
     existed_before = _file_existed(path)
     if not existed_before:
         return _FileBackup(path, None, False, label)
@@ -69,24 +65,9 @@ def _recovery_snapshot(path: Path, snapshot_dir: Path, *, label: str) -> _FileBa
         log.warn(f"backup skipped {path}: read failed (path permissions)")
         return _FileBackup(path, None, True, label)
     try:
-        snapshot_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            os.chmod(snapshot_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-        except OSError:
-            pass
-        parent = snapshot_dir.parent
-        if parent.name == ".spell-sync.txn":
-            try:
-                os.chmod(parent, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-            except OSError:
-                pass
-        snap = snapshot_dir / f"{target.name}.{uuid.uuid4().hex}.snap"
+        snap = create_trusted_snapshot_file(snapshot_dir, root=root, base_name=target.name)
         shutil.copy2(target, snap)
-        try:
-            os.chmod(snap, stat.S_IRUSR | stat.S_IWUSR)
-        except OSError:
-            pass
-    except OSError:
+    except (OSError, SecureArtifactError):
         log.warn(f"backup skipped {path}: recovery snapshot not created")
         return _FileBackup(path, None, True, label)
     create_bak_backup(target)
@@ -111,15 +92,25 @@ def _plan_backup_path(path: Path, temp_dir: Path, *, label: str = "plan") -> _Fi
     return _FileBackup(path, tmp_target, True, label)
 
 
-def backup_file(path: Path, backup_dir: Path, *, label: str = "wordlist") -> _FileBackup:
-    return _recovery_snapshot(path, backup_dir, label=label)
+def backup_file(
+    path: Path,
+    backup_dir: Path,
+    *,
+    root: Path,
+    label: str = "wordlist",
+) -> _FileBackup:
+    return _recovery_snapshot(path, backup_dir, root=root, label=label)
 
 
 def backup_dictionaries(
     dictionaries: List[Dictionary],
     backup_dir: Path,
+    *,
+    root: Path,
 ) -> List[_FileBackup]:
-    return [_recovery_snapshot(Path(d.path), backup_dir, label=d.name) for d in dictionaries]
+    return [
+        _recovery_snapshot(Path(d.path), backup_dir, root=root, label=d.name) for d in dictionaries
+    ]
 
 
 def dictionaries_ready_to_write(
@@ -174,18 +165,22 @@ def rollback_backups(backups: List[_FileBackup]) -> RollbackResult:
     return RollbackResult(tuple(restored), tuple(failed), ())
 
 
-def discard_txn_snapshots(snapshot_dir: Path | None) -> None:
-    if snapshot_dir is None:
+def discard_txn_snapshots(
+    snapshot_dir: Path | None,
+    *,
+    wordlist: Path | None = None,
+    transaction_id: str | None = None,
+) -> None:
+    del transaction_id  # retained for call-site compatibility
+    if snapshot_dir is None or wordlist is None:
         return
+    root = trusted_project_root(wordlist)
     try:
-        shutil.rmtree(snapshot_dir, ignore_errors=True)
+        remove_trusted_tree(snapshot_dir, root=root)
         parent = snapshot_dir.parent
         if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
-            try:
-                parent.rmdir()
-            except OSError:  # pragma: no cover -- directory may be non-empty/race
-                pass
-    except OSError:  # pragma: no cover -- rmtree(ignore_errors=True) rarely raises
+            parent.rmdir()
+    except (SecureArtifactError, OSError):
         pass
 
 
@@ -197,11 +192,8 @@ class PushTransaction:
     wordlist_backup: _FileBackup
     transaction_id: str
     snapshot_dir: Path | None
-
-    class _ExitStack(Protocol):
-        def __exit__(self, exc_type, exc, tb) -> object: ...
-
-    _backups_cm: _ExitStack
+    wordlist_path: Path
+    keep_dictionary_backup: bool = True
     _plan_tmpdir: tempfile.TemporaryDirectory[str] | None = None
 
     @classmethod
@@ -223,18 +215,22 @@ class PushTransaction:
                 wordlist_backup=_plan_backup_path(wordlist, root, label="wordlist"),
                 transaction_id=transaction_id,
                 snapshot_dir=None,
-                _backups_cm=_NoopExit(),
+                wordlist_path=wordlist,
+                keep_dictionary_backup=True,
                 _plan_tmpdir=tmp,
             )
-        snapshot_dir = txn_snapshot_root(wordlist, transaction_id)
-        cm = backups_disabled()
-        cm.__enter__()
+        root = trusted_project_root(wordlist)
+        try:
+            snapshot_dir = prepare_trusted_txn_root(wordlist, transaction_id)
+        except SecureArtifactError as exc:
+            raise OSError(exc.detail) from exc
         return cls(
-            dictionary_backups=backup_dictionaries(dictionaries, snapshot_dir),
-            wordlist_backup=backup_file(wordlist, snapshot_dir, label="wordlist"),
+            dictionary_backups=backup_dictionaries(dictionaries, snapshot_dir, root=root),
+            wordlist_backup=backup_file(wordlist, snapshot_dir, root=root, label="wordlist"),
             transaction_id=transaction_id,
             snapshot_dir=snapshot_dir,
-            _backups_cm=cm,
+            wordlist_path=wordlist,
+            keep_dictionary_backup=False,
             _plan_tmpdir=None,
         )
 
@@ -279,15 +275,13 @@ class PushTransaction:
         return result
 
     def discard_snapshots(self) -> None:
-        discard_txn_snapshots(self.snapshot_dir)
+        discard_txn_snapshots(
+            self.snapshot_dir,
+            wordlist=self.wordlist_path,
+            transaction_id=self.transaction_id,
+        )
         self.snapshot_dir = None
 
     def close(self) -> None:
-        self._backups_cm.__exit__(None, None, None)
         if self._plan_tmpdir is not None:
             self._plan_tmpdir.cleanup()
-
-
-class _NoopExit:
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None

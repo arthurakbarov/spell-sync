@@ -9,9 +9,8 @@ import shutil
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Union
 
 from .config import CHROME_CHECKSUM_PREFIX, backup_keep_count
 from .log import log
@@ -22,7 +21,6 @@ PathLike = Union[str, Path]
 
 _ENCODINGS_TO_TRY = ("utf-8-sig", "utf-16", "utf-8", "cp1251")
 _DETECT_SAMPLE_BYTES = 65536
-_BACKUP_DISABLED = 0
 
 
 # --- Helpers ---
@@ -197,30 +195,6 @@ def create_bak_backup(
     return True
 
 
-def _backups_allowed() -> bool:
-    return _BACKUP_DISABLED <= 0
-
-
-def _disable_backups() -> None:
-    global _BACKUP_DISABLED
-    _BACKUP_DISABLED += 1
-
-
-def _enable_backups() -> None:
-    global _BACKUP_DISABLED
-    _BACKUP_DISABLED = max(0, _BACKUP_DISABLED - 1)
-
-
-@contextmanager
-def backups_disabled() -> Iterator[None]:
-    """Temporarily disable `.bak` creation inside `atomic_write`."""
-    _disable_backups()
-    try:
-        yield
-    finally:
-        _enable_backups()
-
-
 def physical_path(path: PathLike) -> Path:
     """
     Physical path for I/O (backup, write, rollback).
@@ -252,7 +226,7 @@ def atomic_write(
     target = Path(path)
     destination = physical_path(target)
     ensure_parent_dir(destination)
-    if keep_backup and destination.exists() and _backups_allowed():
+    if keep_backup and destination.exists():
         create_bak_backup(destination, settings=settings)
     # Create a unique temp file in the destination directory to avoid collisions
     # in parallel runs and to keep os.replace() on the same filesystem.

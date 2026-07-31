@@ -9,7 +9,12 @@ from typing import Iterator
 from .exit_codes import ExitCode
 from .json_output import base_payload, emit_json
 from .log import log
-from .operation_lock import OperationLocked, acquire_operation_lock, lock_info_payload
+from .operation_lock import (
+    OperationLocked,
+    OperationLockRejected,
+    acquire_operation_lock,
+    lock_info_payload,
+)
 from .paths import wordlist_path
 from .push_journal import JournalLoadResult, JournalLoadStatus, journal_payload
 from .settings import config_blocks_mutating
@@ -25,6 +30,21 @@ def operation_lock_scope_for(
     try:
         with acquire_operation_lock(wordlist, command):
             yield None
+    except OperationLockRejected as exc:
+        if json_output:
+            emit_json(
+                {
+                    **base_payload(command, exit=int(ExitCode.PUSH_ABORT)),
+                    "reason": "unsafe_operation_lock",
+                    "detail": exc.detail,
+                }
+            )
+        else:
+            log.abort(
+                "operation aborted — project lock path is unsafe "
+                f"({exc.detail}). Inspect `.spell-sync.lock` in the project directory."
+            )
+        yield int(ExitCode.PUSH_ABORT)
     except OperationLocked as exc:
         if json_output:
             emit_json(

@@ -12,6 +12,15 @@ from pathlib import Path
 from typing import Iterator
 
 from .project import ProjectContext
+from .secure_artifacts import SecureArtifactError, open_trusted_regular_file, trusted_project_root
+
+
+class OperationLockRejected(Exception):
+    """Lock path is unsafe or cannot be opened securely."""
+
+    def __init__(self, detail: str) -> None:
+        self.detail = detail
+        super().__init__(detail)
 
 
 @dataclass(frozen=True)
@@ -175,7 +184,11 @@ def acquire_operation_lock(wordlist: Path, command: str) -> Iterator[OperationLo
     or replaced. Metadata (PID) is diagnostics only — never ownership truth.
     """
     lock_path = lock_path_for_wordlist(wordlist)
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    root = trusted_project_root(wordlist)
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise OperationLockRejected(str(exc)) from exc
     info = OperationLockInfo(
         pid=os.getpid(),
         started=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -183,7 +196,10 @@ def acquire_operation_lock(wordlist: Path, command: str) -> Iterator[OperationLo
         wordlist=str(wordlist.resolve()),
     )
 
-    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fd = open_trusted_regular_file(lock_path, root=root, create=True)
+    except SecureArtifactError as exc:
+        raise OperationLockRejected(exc.detail) from exc
     try:
         if not _try_acquire_fd(fd):
             existing = _read_lock_info(lock_path)
