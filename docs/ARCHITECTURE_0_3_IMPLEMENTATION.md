@@ -13,7 +13,7 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
 Phase 8: agent configuration refresh — **complete** (owner-approved).
 Phase 9: dead directory audit — **complete** (owner-approved).
-Phase 10: version 0.3.0 — **current**, in progress.
+Phase 10: version 0.3.0 — **complete**, awaiting approval.
 
 [architecture-status:start]
 current: phase-10
@@ -30,14 +30,14 @@ phase-6: complete
 phase-7: complete
 phase-8: complete
 phase-9: complete
-phase-10: in-progress
+phase-10: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `990702f` Phase 9 validation evidence in tracker | yes |
+| spell-sync | `e46ce45` version 0.3.0 bump (Phase 10) | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -50,6 +50,8 @@ Phase 6 final CI evidence: `f82ed58`, run `20260728T074706.122702Z`, `finalEvide
 Phase 7 final CI evidence: `9a08a7e`, run `20260731T101824.828581Z`, `finalEvidence=true`.
 
 Phase 8 final CI evidence: `3c6bc35`, run `20260731T104234.254905Z`, `finalEvidence=true`.
+
+Phase 10 final CI evidence: `e46ce45`, run `20260731T110156.184380Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -176,7 +178,8 @@ blocking, and privacy rules.
 6. Architecture validator + PROJECT_MAP
 7. Documentation reorganization + ADRs
 8. Agent config refresh
-9. Version 0.3.0
+9. ~~Dead directory audit~~ done
+10. ~~Version 0.3.0~~ done (awaiting approval)
 
 ## Phase 3 — Explicit runtime (complete)
 
@@ -507,7 +510,7 @@ python3 scripts/check-ci-evidence.py
 
 ## Phase 10 — Version 0.3.0
 
-**Status:** in progress
+**Status:** awaiting approval
 
 ### Goal
 
@@ -520,15 +523,14 @@ No tag, release, or publication in this phase.
 - Compatibility and installed-wheel tests aligned; `run_compatibility_checks.py` reads version from `pyproject.toml`
 - `check-docs-contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
 
-### Phase-specific validation (pending)
+### Phase-specific validation (passed)
 
 ```text
 python3 scripts/check-docs-contract.py
 python3 scripts/check-agent-config.py
-tests/test_installed_workflow.py
-tests/test_compatibility_wheel_origin_identity.py
-full final CI on committed clean HEAD
+full final CI on committed clean HEAD e46ce45
 spell-sync version → 0.3.0
+CI_EVIDENCE_MATCH=exact-head
 ```
 
 ## Phase 2B: complete application boundary
@@ -643,7 +645,8 @@ Summary:
 ## Last validation
 
 ```text
-Phase 9 (awaiting approval): HEAD 990702f; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change (run 20260731T104234.254905Z @ 3c6bc35)
+Phase 10 (awaiting approval): HEAD e46ce45; full CI finalEvidence=true (20260731T110156.184380Z); version 0.3.0
+Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
@@ -653,9 +656,8 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-Phase 10 on public spell-sync repository (see migration order):
-
-10. Version 0.3.0
+0.3 architecture migration complete pending Phase 10 owner acceptance. No further
+phases in the migration order. Release/tag/publication remain owner-initiated only.
 
 ## Deferred work
 
