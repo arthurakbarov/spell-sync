@@ -180,14 +180,11 @@ def _check_file_mode(st: os.stat_result, *, fd: int) -> None:
 
 
 def _listdir_at(parent_fd: int) -> list[str]:
+    probe = os.open(".", os.O_RDONLY | _o_directory() | _o_cloexec(), dir_fd=parent_fd)
     try:
-        return os.listdir(".", dir_fd=parent_fd)
-    except TypeError:
-        probe = os.open(".", os.O_RDONLY | _o_directory() | _o_cloexec(), dir_fd=parent_fd)
-        try:
-            return os.listdir(probe)
-        finally:
-            os.close(probe)
+        return list(os.listdir(probe))
+    finally:
+        os.close(probe)
 
 
 def _posix_open_at(parent_fd: int, name: str, flags: int, mode: int = 0) -> int:

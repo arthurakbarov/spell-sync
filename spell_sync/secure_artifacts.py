@@ -64,9 +64,9 @@ def is_reparse_point(path: Path) -> bool:
         return False
 
 
-def _with_root(root: Path) -> TrustedRoot:
+def _with_root(root: Path) -> TrustedDirectory:
     try:
-        return TrustedRoot.open_root(root)
+        return TrustedDirectory.open_root(root)
     except TrustedFsError as exc:
         raise _map_error(exc) from exc
 
@@ -270,6 +270,7 @@ __all__ = [
     "trusted_project_root",
     "trusted_project_root_resolved",
 ]
+
 
 # Legacy test helpers — fd-only private mode utilities.
 def _fchmod_private(fd: int) -> None:

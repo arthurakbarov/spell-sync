@@ -32,9 +32,17 @@ class _SecureGuardVisitor(ast.NodeVisitor):
             return
         func = node.func
         if isinstance(func, ast.Attribute):
-            if func.attr == "resolve" and isinstance(func.value, ast.Name) and func.value.id == "Path":
+            if (
+                func.attr == "resolve"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "Path"
+            ):
                 self.violations.append(f"{self.path}:{node.lineno}: Path.resolve() forbidden")
-            if func.attr == "rmtree" and isinstance(func.value, ast.Name) and func.value.id == "shutil":
+            if (
+                func.attr == "rmtree"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "shutil"
+            ):
                 self.violations.append(f"{self.path}:{node.lineno}: shutil.rmtree() forbidden")
         if isinstance(func, ast.Name) and func.id == "chmod":
             self.violations.append(f"{self.path}:{node.lineno}: os.chmod() forbidden")
