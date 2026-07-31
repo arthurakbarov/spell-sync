@@ -63,6 +63,12 @@ class TestRuntimeHelpers(unittest.TestCase):
         with patch("spell_sync.runtime.shutil.which", return_value="/usr/bin/spell-sync"):
             self.assertEqual(cli_argv(), ["/usr/bin/spell-sync"])
 
+    def test_read_pyproject_version_found(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "pyproject.toml"
+            path.write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
+            self.assertEqual(read_pyproject_version(path), "1.2.3")
+
     def test_read_pyproject_version_oserror(self):
         with patch.object(Path, "read_text", side_effect=OSError("nope")):
             self.assertIsNone(read_pyproject_version(Path("/x/pyproject.toml")))

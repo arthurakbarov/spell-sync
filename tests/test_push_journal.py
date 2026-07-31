@@ -463,6 +463,44 @@ class TestPushJournalHelpers(unittest.TestCase):
                 session.discard()
             tx.close()
 
+    def test_load_journal_result_oserror(self):
+        from spell_sync.push_journal import JournalLoadStatus, load_journal_result
+
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            _write_journal(wordlist)
+            with patch(
+                "spell_sync.push_journal.read_trusted_regular_file",
+                side_effect=OSError("read failed"),
+            ):
+                result = load_journal_result(wordlist)
+            self.assertEqual(result.status, JournalLoadStatus.CORRUPT)
+
+    def test_session_discard_swallows_remove_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            dict_path = Path(d) / "dict.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            dict_path.write_text("alpha\n", encoding="utf-8")
+            run = make_sync_run(
+                str(wordlist),
+                dictionaries=[Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
+            )
+            tx = PushTransaction.begin(wordlist, run.dictionaries, dry_run=False)
+            session = PushJournalSession.begin(
+                wordlist,
+                command="push",
+                tx=tx,
+                dictionaries=run.dictionaries,
+            )
+            with patch(
+                "spell_sync.push_journal.remove_trusted_file",
+                side_effect=OSError("remove failed"),
+            ):
+                session.discard()
+            tx.close()
+
     def test_discard_journal_oserror(self):
         from spell_sync.push_journal import DiscardSafetyError
 

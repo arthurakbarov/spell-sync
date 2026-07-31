@@ -252,6 +252,21 @@ class TestPathsHelpers(unittest.TestCase):
         ):
             self.assertEqual(paths_mod.project_root(), fake_repo)
 
+    def test_is_spell_sync_project_pyproject_read_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "pyproject.toml").write_text(
+                '[project]\nname = "spell-sync"\n', encoding="utf-8"
+            )
+            (root / "spell_sync").mkdir()
+            with patch.object(Path, "read_text", side_effect=OSError("nope")):
+                self.assertFalse(paths_mod._is_spell_sync_project(root))
+
+    def test_project_root_returns_cwd_when_unmarked(self):
+        with patch("spell_sync.paths.Path.cwd", return_value=Path("/tmp/unmarked")):
+            with patch.object(paths_mod, "_is_spell_sync_project", return_value=False):
+                self.assertEqual(paths_mod.project_root(), Path("/tmp/unmarked"))
+
     def test_is_spell_sync_project_pyproject_needs_package_dir(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

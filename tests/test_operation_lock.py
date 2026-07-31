@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import errno
 import subprocess
 import sys
 import tempfile
@@ -124,6 +125,26 @@ class TestOperationLock(unittest.TestCase):
         ):
             code = commands.cmd_push(CliOptions(wordlist=str(wordlist), yes=True))
         self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+
+    def test_read_lock_info_open_failure(self):
+        from spell_sync.operation_lock import _read_lock_info
+
+        with patch("spell_sync.operation_lock.os.open", side_effect=OSError(errno.EACCES, "denied")):
+            self.assertIsNone(_read_lock_info(Path("/tmp/.spell-sync.lock")))
+
+    def test_probe_lock_file_unreadable(self):
+        from spell_sync.operation_lock import _probe_lock_file
+
+        with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            with patch(
+                "spell_sync.operation_lock.open_trusted_regular_file",
+                side_effect=OSError(errno.EIO, "io"),
+            ):
+                state, info = _probe_lock_file(wordlist)
+            self.assertEqual(state, "unreadable")
+            self.assertIsNone(info)
 
     def test_read_lock_info_invalid_json(self):
         from spell_sync.operation_lock import _read_lock_info
