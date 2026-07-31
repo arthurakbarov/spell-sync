@@ -32,7 +32,7 @@ phase-7: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `a9e7ec3` phase 6 accepted, phase 7 current | yes |
+| spell-sync | `9a08a7e` documentation reorganization (Phase 7) | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -41,6 +41,8 @@ Public version: `0.2.1` (`pyproject.toml`).
 Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
 
 Phase 6 final CI evidence: `f82ed58`, run `20260728T074706.122702Z`, `finalEvidence=true`.
+
+Phase 7 final CI evidence: `9a08a7e`, run `20260731T101824.828581Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
