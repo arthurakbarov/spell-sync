@@ -32,8 +32,8 @@ phase-7: not-started
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `f82ed58` architecture validator + project map | yes |
-| spell-sync-dev | `7833800` maintainer workflow index | yes |
+| spell-sync | `a9e7ec3` phase 6 accepted, phase 7 current | yes |
+| spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
 Public version: `0.2.1` (`pyproject.toml`).
