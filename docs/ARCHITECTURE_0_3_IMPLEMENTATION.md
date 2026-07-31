@@ -12,10 +12,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
 Phase 8: agent configuration refresh — **complete** (owner-approved).
-Phase 9: dead directory audit — **current**, awaiting approval.
+Phase 9: dead directory audit — **complete** (owner-approved).
+Phase 10: version 0.3.0 — **current**, in progress.
 
 [architecture-status:start]
-current: phase-9
+current: phase-10
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -28,7 +29,8 @@ phase-5: complete
 phase-6: complete
 phase-7: complete
 phase-8: complete
-phase-9: awaiting-approval
+phase-9: complete
+phase-10: in-progress
 [architecture-status:end]
 
 ## Verified baseline
@@ -474,7 +476,7 @@ full final CI on committed clean HEAD 3c6bc35
 
 ## Phase 9 — Dead directory audit
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved)
 
 ### Goal
 
@@ -495,6 +497,13 @@ python3 scripts/check-docs-contract.py
 python3 scripts/run_lightweight_validation.py
 python3 scripts/check-ci-evidence.py
 ```
+
+### Owner acceptance (recorded)
+
+- dead directory audit report delivered (`docs/DEAD_DIRECTORY_AUDIT.md`);
+- report-only scope honored — no paths deleted;
+- lightweight validation and CI evidence reuse bound to HEAD `7d11b45`;
+- package version remains `0.2.1` until Phase 10.
 
 ## Phase 2B: complete application boundary
 
@@ -603,6 +612,7 @@ Summary:
 - Phase 6: architecture validator and project map (owner-approved)
 - Phase 7: documentation reorganization and ADRs (owner-approved)
 - Phase 8: agent configuration refresh (owner-approved)
+- Phase 9: dead directory audit (owner-approved)
 
 ## Last validation
 
