@@ -11,7 +11,7 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 ## Current phase
 
 Phase 6: architecture validator and project map — **complete** (owner-approved).
-Phase 7: documentation reorganization and ADRs — **current**, not started.
+Phase 7: documentation reorganization and ADRs — **current**, awaiting approval.
 
 [architecture-status:start]
 current: phase-7
@@ -25,7 +25,7 @@ phase-3: complete
 phase-4: complete
 phase-5: complete
 phase-6: complete
-phase-7: not-started
+phase-7: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
@@ -399,6 +399,34 @@ full final CI on committed clean HEAD f82ed58
 - final CI evidence bound to HEAD `f82ed58`, run `20260728T074706.122702Z`;
 - package version remains `0.2.1`.
 
+## Phase 7 — Documentation reorganization and ADRs
+
+**Status:** awaiting approval
+
+### Goal
+
+Documentation describes the current system — not prompt history or implementation diaries.
+
+### Delivered
+
+- `docs/README.md` — navigation index (users, contributors, architecture, safety, diagnostics,
+  targets, maintainers)
+- `docs/architecture/` — focused layer guides (`APPLICATION_LAYER`, `RUNTIME_CONTEXT`,
+  `MUTATION_SAFETY`, `DIAGNOSTICS`, `TARGET_MODEL`)
+- Updated `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/MANUAL_TESTING.md`
+- Normalized ADR status sections in `docs/decisions/0002`–`0004`
+- Removed obsolete `docs/UX_0_2_IMPLEMENTATION.md` and `docs/platform-validation-readiness.md`
+- `scripts/check-docs-contract.py` historical doc list updated
+
+### Phase-specific validation (pending final CI)
+
+```text
+python3 scripts/check-docs-contract.py
+python3 scripts/check-docs-style.sh
+python3 scripts/check-agent-config.py
+full final CI or lightweight validation per check-ci-necessity on committed HEAD
+```
+
 ## Phase 2B: complete application boundary
 
 ### CLI bypass inventory (resolved)
@@ -515,10 +543,9 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-Phases 7–9 on public spell-sync repository (see migration order):
+Phases 8–9 on public spell-sync repository (see migration order):
 
-7. Documentation reorganization and ADRs — **current**
-8. Agent config refresh
+8. Agent config refresh — **next after Phase 7 approval**
 9. Version 0.3.0
 
 ## Deferred work

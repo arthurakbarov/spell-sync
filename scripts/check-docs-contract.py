@@ -57,7 +57,6 @@ PINNED_PYTHON = re.compile(r"python3\.\d+")
 DEVELOPMENT_VERSION = Path("docs/DEVELOPMENT.md")
 HISTORICAL_DOC_PATHS = frozenset(
     {
-        "docs/UX_0_2_IMPLEMENTATION.md",
         "docs/MANUAL_TESTING.md",
         "docs/TEST_REPORT_TEMPLATE.md",
     }

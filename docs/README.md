@@ -1,0 +1,75 @@
+# Spell Sync documentation
+
+Navigation index for public repository documentation. Product semantics and safety rules live
+in the linked canonical documents — not in implementation trackers or release diaries.
+
+## For users
+
+| Document | Contents |
+|----------|----------|
+| [GETTING_STARTED.md](GETTING_STARTED.md) | First project, Pull, Push |
+| [SUPPORTED_APPS.md](SUPPORTED_APPS.md) | End-user application list |
+| [SUPPORTED_TARGETS.md](SUPPORTED_TARGETS.md) | Target capability matrix |
+| [CONFIGURATION.md](CONFIGURATION.md) | `spell-sync.toml` reference |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Symptom-based guidance |
+| [PERSONAL_WORKSPACE.md](PERSONAL_WORKSPACE.md) | Optional private wordlist layout |
+| [RECOVERY.md](RECOVERY.md) | Transaction journal and `recover` |
+
+## For contributors
+
+| Document | Contents |
+|----------|----------|
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, CI, local validation |
+| [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Agent workflow and evidence contracts |
+| [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Focused test levels and selection |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Pull requests |
+| [PROJECT_MAP.md](PROJECT_MAP.md) | Module ownership map |
+
+## Architecture
+
+| Document | Contents |
+|----------|----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Product model, command flow, core modules |
+| [architecture/APPLICATION_LAYER.md](architecture/APPLICATION_LAYER.md) | Requests, facade, services |
+| [architecture/RUNTIME_CONTEXT.md](architecture/RUNTIME_CONTEXT.md) | Explicit runtime resolution |
+| [architecture/MUTATION_SAFETY.md](architecture/MUTATION_SAFETY.md) | Preview, lock, journal invariants |
+| [architecture/DIAGNOSTICS.md](architecture/DIAGNOSTICS.md) | Events, logs, history, privacy |
+| [architecture/TARGET_MODEL.md](architecture/TARGET_MODEL.md) | Discovery, capabilities, validation |
+| [TUI_IMPLEMENTATION.md](TUI_IMPLEMENTATION.md) | Textual screens and flows |
+| [decisions/](decisions/) | Architecture decision records (ADRs) |
+
+Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md).
+
+## Safety and recovery
+
+| Document | Contents |
+|----------|----------|
+| [RECOVERY.md](RECOVERY.md) | Journal, snapshots, recovery commands |
+| [architecture/MUTATION_SAFETY.md](architecture/MUTATION_SAFETY.md) | Application-level safety contracts |
+
+## Diagnostics
+
+| Document | Contents |
+|----------|----------|
+| [architecture/DIAGNOSTICS.md](architecture/DIAGNOSTICS.md) | Technical events, logs, history |
+| [technical/](technical/) | Machine-readable schemas and contracts |
+
+## Targets and validation
+
+| Document | Contents |
+|----------|----------|
+| [SUPPORTED_TARGETS.md](SUPPORTED_TARGETS.md) | Public target registry |
+| [SUPPORTED_ENVIRONMENTS.md](SUPPORTED_ENVIRONMENTS.md) | Python and platform support |
+| [MANUAL_TESTING.md](MANUAL_TESTING.md) | Human release checklist |
+| [target-validation.json](target-validation.json) | Manual validation matrix (data) |
+
+## Maintainers
+
+| Document | Contents |
+|----------|----------|
+| [EXECUTION_TIME_CONTROL.md](EXECUTION_TIME_CONTROL.md) | CI timing and admission |
+| [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Evidence, snapshot, agent rules |
+| [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md) | 0.3 migration tracker |
+
+Private maintainer tooling and snapshot policy live in the separate `spell-sync-dev`
+repository (not shipped with this package).

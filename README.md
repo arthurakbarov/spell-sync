@@ -205,6 +205,7 @@ details.
 | [Configuration](docs/CONFIGURATION.md) | `spell-sync.toml` reference |
 | [Recovery](docs/RECOVERY.md) | Transaction journal and `recover` |
 | [Architecture](docs/ARCHITECTURE.md) | Internal design and safety model |
+| [Documentation index](docs/README.md) | Full docs map |
 | [TUI implementation](docs/TUI_IMPLEMENTATION.md) | Terminal UI screen map and invariants |
 | [Development](docs/DEVELOPMENT.md) | Hacking, tests, CI |
 | [Manual testing](docs/MANUAL_TESTING.md) | Release checklist for human testers |

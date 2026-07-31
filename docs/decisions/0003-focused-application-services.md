@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (owner-approved Phase 4)
+Accepted
 
 ## Context
 
@@ -65,3 +65,9 @@ Verified by:
 - `tests/test_application_services.py`
 - existing runtime identity, Pull/Push/Recovery safety, and TUI architecture tests
 - full CI on committed clean HEAD
+
+## Rejected alternatives
+
+- Multiple parallel application facades for CLI vs TUI
+- Moving presentation builders into focused services
+- Embedding mutation orchestration back into `SpellSyncService`

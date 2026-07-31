@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Phase 5 awaiting owner approval)
+Accepted
 
 ## Context
 

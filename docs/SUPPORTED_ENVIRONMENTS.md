@@ -34,7 +34,7 @@ Target platforms for Pull/Push/TUI product behavior:
 
 Classifiers currently list `Operating System :: OS Independent`. Platform-specific dictionary
 paths and filesystem behavior are validated in CI; real-application manual validation is
-tracked separately in `docs/platform-validation-readiness.md`.
+recorded in `docs/target-validation.json` (see [MANUAL_TESTING.md](MANUAL_TESTING.md)).
 
 ## Maintainer tooling
 

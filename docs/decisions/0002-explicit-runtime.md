@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Phase 3 complete)
+Accepted
 
 ## Context
 
@@ -35,4 +35,9 @@ automatic replanning.
 - No module-level config cache and no `ContextVar` runtime scope; each resolve reads current config.
 - Fresh mutation resolution happens under the project operation lock.
 - Typed `RuntimeSettings` and `RuntimeResolver` form the application boundary.
-- Service decomposition and structured technical events remain deferred to later phases.
+
+## Rejected alternatives
+
+- Keeping `ContextVar` implicit runtime for mutating commands
+- Module-level settings cache keyed by project path
+- Automatic replan when runtime identity changes after preview

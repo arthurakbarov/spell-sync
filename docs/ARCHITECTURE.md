@@ -128,3 +128,10 @@ Envelope `schema_version: 1` on all `--json` output. Journal internal schema is 
 
 100% line coverage on `spell_sync/` enforced in CI. Regression tests for transaction safety live
 in `tests/test_transaction_safety.py` and `tests/test_push_safety_coverage.py`.
+
+## Further reading
+
+- Documentation index: [docs/README.md](README.md)
+- Layer guides: [docs/architecture/](architecture/)
+- Module map: [PROJECT_MAP.md](PROJECT_MAP.md)
+- ADRs: [docs/decisions/](decisions/)

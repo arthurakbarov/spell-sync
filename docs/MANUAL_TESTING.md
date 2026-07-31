@@ -1,8 +1,23 @@
-# Manual testing — Spell Sync 0.2.0
+# Manual testing
 
-This checklist is for a human tester validating **Spell Sync 0.2.0** before wider distribution.
-Use synthetic dictionary targets only. Do not test against real personal spell-check data unless
-you accept the risk of file changes.
+Human release checklist for Spell Sync. Use synthetic dictionary targets by default. Test against
+real personal spell-check data only when you accept file mutation risk.
+
+## Manual validation policy
+
+Manual validation records belong in `docs/target-validation.json` — not in one-off readiness
+reports.
+
+| Requirement | Detail |
+|-------------|--------|
+| Throwaway profiles | Use dedicated browser/editor profiles when mutating real dictionaries |
+| Application version | Record exact version per target when marking `manual_validation: pass` |
+| Evidence | Redacted notes only — no wordlist contents or owner paths in public commits |
+| Safe without mutation | `check-target-capabilities`, `doctor --targets`, Targets → Details, synthetic HOME smoke |
+| Matrix default | All rows start `not-run` until owner-approved manual pass |
+
+Follow `.cursor/skills/platform-validation/SKILL.md` in the maintainer workspace when updating
+the matrix.
 
 ## Test environment
 
@@ -14,7 +29,7 @@ Record before you start:
 | Terminal app | |
 | Python version | |
 | Installation method | wheel / source archive / git clone |
-| Package version (`spell-sync version`) | expect `0.2.0` |
+| Package version (`spell-sync version`) | match `pyproject.toml` |
 | Temporary test directory | e.g. `~/spell-sync-rc-test` |
 | Synthetic targets used | e.g. Cursor `spell-sync-words.txt`, local text file |
 
@@ -26,21 +41,14 @@ account so application state does not mix with daily use.
 From the repository checkout (release artifacts live in `dist/`):
 
 ```bash
-uv tool install ./dist/spell_sync-0.2.0-py3-none-any.whl
+python3 -m pip install dist/spell_sync-*.whl
 spell-sync version
 spell-sync --help
 ```
 
-If you received the wheel file separately (not inside a clone), use the path to wherever you
-saved it, for example:
-
-```bash
-uv tool install ~/Downloads/spell_sync-0.2.0-py3-none-any.whl
-```
-
 Expected:
 
-- Version prints `0.2.0`.
+- Version matches `project.version` in `pyproject.toml`.
 - Help lists commands: `status`, `pull`, `push`, `plan`, `config-check`, `lint`, `recover`,
   `init`, `doctor`, `version`, `ui`.
 - Pull and Push descriptions mention direction (applications → wordlist / wordlist → applications).
@@ -84,7 +92,7 @@ From Welcome, run the Setup wizard:
 - [ ] External application dictionaries were **not** modified during setup.
 - [ ] Quit and relaunch `spell-sync` — wizard does **not** appear again.
 
-## Dashboard (0.2)
+## Dashboard
 
 After setup, on the sectioned dashboard:
 
