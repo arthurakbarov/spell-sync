@@ -49,7 +49,7 @@ HOME="$smoke_home" /tmp/spell-sync-smoke-venv/bin/spell-sync support-report --fo
 ```
 
 4. Verify TUI import and bundled resources (TCSS, examples) load from installed package.
-   Exercise Target Details, Health → Export support report, and Review session Save report when validating 0.2.1+ transparency features.
+   Exercise Target Details, Health → Export support report, and Review session Save report when validating 0.3.0+ transparency features.
 
 5. Optional: run `tests/test_installed_workflow.py` — automated end-to-end smoke (includes `support-report`).
 

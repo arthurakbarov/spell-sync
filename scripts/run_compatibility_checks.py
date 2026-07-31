@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,15 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 ROOT = _ROOT
+
+
+def _expected_package_version() -> str:
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = data.get("project", {}).get("version")
+    return version if isinstance(version, str) else ""
+
+
+_EXPECTED_VERSION = _expected_package_version()
 
 _WHEEL_ENV_KEYS_TO_CLEAR = (
     "PYTHONPATH",
@@ -111,7 +121,7 @@ def _validate_wheel_origin_probe(
 
     if not Path(os.path.realpath(origin)).is_file():
         return "compatibility.wheel-origin-failed"
-    if version != "0.2.1":
+    if version != _EXPECTED_VERSION:
         return "compatibility.wheel-version-failed"
     if not (_path_within(origin, purelib) or _path_within(origin, platlib)):
         return "compatibility.wheel-origin-failed"
@@ -301,7 +311,7 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
                 "outputLines": len(output.splitlines()),
             }
         )
-        if rc != 0 or "0.2.1" not in output:
+        if rc != 0 or _EXPECTED_VERSION not in output:
             return results, 1, "compatibility.wheel-version-failed"
 
         rc, output = _run(

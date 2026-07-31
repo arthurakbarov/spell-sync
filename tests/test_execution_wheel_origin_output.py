@@ -60,7 +60,7 @@ def test_wheel_origin_json_read_before_retained_sanitization(private_home, tmp_p
     result_path = tmp_path / "wheel-origin.json"
     payload = {
         "origin": str(origin_file.resolve()),
-        "metadataVersion": "0.2.1",
+        "metadataVersion": "0.3.0",
         "sysPrefix": str(venv_dir.resolve()),
         "basePrefix": str(venv_dir.resolve()),
         "sysExecutable": str(venv_dir / "bin" / "python"),
@@ -70,7 +70,7 @@ def test_wheel_origin_json_read_before_retained_sanitization(private_home, tmp_p
     origin_path, metadata_version, diagnostics = _read_wheel_origin_result(result_path)
     ok, detail = _verify_wheel_origin(origin_path, venv_dir=venv_dir, root=checkout)
     assert ok, detail
-    assert metadata_version == "0.2.1"
+    assert metadata_version == "0.3.0"
     assert str(venv_dir.resolve()) in diagnostics["sysPrefix"]
 
     retained = sanitize_text(

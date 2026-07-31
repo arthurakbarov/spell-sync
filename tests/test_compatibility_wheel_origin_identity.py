@@ -37,7 +37,7 @@ def test_global_site_packages_origin_rejected(tmp_path: Path) -> None:
         "basePrefix": str(venv),
         "purelib": str(venv / "lib/python3.12/site-packages"),
         "platlib": str(venv / "lib/python3.12/site-packages"),
-        "version": "0.2.1",
+        "version": "0.3.0",
     }
     assert (
         mod._validate_wheel_origin_probe(probe, venv_dir=venv, checkout_root=checkout)
@@ -61,7 +61,7 @@ def test_wrong_sys_prefix_rejected(tmp_path: Path) -> None:
         "basePrefix": "/tmp/other-venv",
         "purelib": str(site),
         "platlib": str(site),
-        "version": "0.2.1",
+        "version": "0.3.0",
     }
     assert (
         mod._validate_wheel_origin_probe(probe, venv_dir=venv, checkout_root=checkout)
@@ -86,7 +86,7 @@ def test_origin_outside_purelib_rejected(tmp_path: Path) -> None:
         "basePrefix": str(venv),
         "purelib": str(site),
         "platlib": str(site),
-        "version": "0.2.1",
+        "version": "0.3.0",
     }
     assert (
         mod._validate_wheel_origin_probe(probe, venv_dir=venv, checkout_root=checkout)
@@ -110,7 +110,7 @@ def test_temporary_venv_origin_accepted(tmp_path: Path) -> None:
         "basePrefix": str(venv),
         "purelib": str(site),
         "platlib": str(site),
-        "version": "0.2.1",
+        "version": "0.3.0",
     }
     assert mod._validate_wheel_origin_probe(probe, venv_dir=venv, checkout_root=checkout) is None
     assert not mod._path_within(origin, checkout)

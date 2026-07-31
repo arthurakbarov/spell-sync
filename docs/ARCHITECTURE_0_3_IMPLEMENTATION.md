@@ -41,7 +41,7 @@ phase-10: in-progress
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
-Public version: `0.2.1` (`pyproject.toml`).
+Public version: `0.3.0` (`pyproject.toml`).
 
 Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
 
@@ -504,6 +504,32 @@ python3 scripts/check-ci-evidence.py
 - report-only scope honored — no paths deleted;
 - lightweight validation and CI evidence reuse bound to HEAD `7d11b45`;
 - package version remains `0.2.1` until Phase 10.
+
+## Phase 10 — Version 0.3.0
+
+**Status:** in progress
+
+### Goal
+
+Bump public package version to `0.3.0` reflecting the completed 0.3 architecture migration.
+No tag, release, or publication in this phase.
+
+### Delivered
+
+- `pyproject.toml` and `uv.lock` — `0.3.0`
+- Compatibility and installed-wheel tests aligned; `run_compatibility_checks.py` reads version from `pyproject.toml`
+- `check-docs-contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
+
+### Phase-specific validation (pending)
+
+```text
+python3 scripts/check-docs-contract.py
+python3 scripts/check-agent-config.py
+tests/test_installed_workflow.py
+tests/test_compatibility_wheel_origin_identity.py
+full final CI on committed clean HEAD
+spell-sync version → 0.3.0
+```
 
 ## Phase 2B: complete application boundary
 

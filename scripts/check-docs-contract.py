@@ -513,10 +513,12 @@ def _check_agent_workflow_docs(root: Path) -> list[ContractViolation]:
 
 def _check_stale_version_claims(root: Path, version: str) -> list[ContractViolation]:
     violations: list[ContractViolation] = []
-    stale = re.compile(r"\b0\.2\.0\b")
+    stale = re.compile(r"\b0\.2\.[01]\b")
     for path in _tracked_markdown(root):
         rel = str(path.relative_to(root))
         if rel in HISTORICAL_DOC_PATHS or rel == IMPLEMENTATION_TRACKER:
+            continue
+        if rel.startswith("docs/decisions/"):
             continue
         if any(part in rel for part in EXCLUDE_PATH_PARTS):
             continue
