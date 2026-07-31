@@ -12,14 +12,19 @@ from pathlib import Path
 from typing import Iterator
 
 from .project import ProjectContext
-from .secure_artifacts import SecureArtifactError, open_trusted_regular_file, trusted_project_root
+from .secure_artifacts import (
+    SecureArtifactError,
+    open_trusted_regular_file,
+    trusted_project_root,
+)
 
 
 class OperationLockRejected(Exception):
     """Lock path is unsafe or cannot be opened securely."""
 
-    def __init__(self, detail: str) -> None:
+    def __init__(self, detail: str, *, code: str = "unsafe_lock") -> None:
         self.detail = detail
+        self.code = code
         super().__init__(detail)
 
 
@@ -80,9 +85,16 @@ def _pid_alive(pid: int) -> bool:
     return _pid_alive_unix(pid)  # pragma: no cover
 
 
-def _read_lock_info(path: Path) -> OperationLockInfo | None:
+def _read_lock_info_fd(fd: int) -> OperationLockInfo | None:
     try:
-        raw = path.read_text(encoding="utf-8")
+        os.lseek(fd, 0, os.SEEK_SET)
+        raw_bytes = b""
+        while True:
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                break
+            raw_bytes += chunk
+        raw = raw_bytes.decode("utf-8")
         data = json.loads(raw)
         return OperationLockInfo(
             pid=int(data["pid"]),
@@ -92,6 +104,24 @@ def _read_lock_info(path: Path) -> OperationLockInfo | None:
         )
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
         return None
+
+
+def _probe_lock_file(wordlist: Path) -> tuple[str, OperationLockInfo | None]:
+    lock_path = lock_path_for_wordlist(wordlist)
+    root = trusted_project_root(wordlist)
+    try:
+        fd = open_trusted_regular_file(lock_path, root=root, create=False, mutable=True)
+    except SecureArtifactError:
+        if not lock_path.exists():
+            return "absent", None
+        return "unsafe", None
+    except OSError:
+        return "unreadable", None
+    try:
+        info = _read_lock_info_fd(fd)
+        return "present", info
+    finally:
+        os.close(fd)
 
 
 def _write_lock_info(fd: int, info: OperationLockInfo) -> None:
@@ -165,12 +195,11 @@ def _unknown_lock_info(wordlist: Path) -> OperationLockInfo:
 
 def read_active_operation_lock(wordlist: Path) -> OperationLockInfo | None:
     """Return lock metadata when another live process holds the project lock."""
-    lock_path = lock_path_for_wordlist(wordlist)
-    if not lock_path.is_file():
+    status, info = _probe_lock_file(wordlist)
+    if status in {"unsafe", "unreadable"}:
         return None
-    info = _read_lock_info(lock_path)
-    if info is None:
-        return _unknown_lock_info(wordlist)
+    if status == "absent" or info is None:
+        return None
     if info.pid and _pid_alive(info.pid):
         return info
     return None
@@ -197,12 +226,12 @@ def acquire_operation_lock(wordlist: Path, command: str) -> Iterator[OperationLo
     )
 
     try:
-        fd = open_trusted_regular_file(lock_path, root=root, create=True)
+        fd = open_trusted_regular_file(lock_path, root=root, create=True, mutable=True)
     except SecureArtifactError as exc:
-        raise OperationLockRejected(exc.detail) from exc
+        raise OperationLockRejected(exc.detail, code=exc.code) from exc
     try:
         if not _try_acquire_fd(fd):
-            existing = _read_lock_info(lock_path)
+            existing = _read_lock_info_fd(fd)
             raise OperationLocked(
                 existing if existing is not None else _unknown_lock_info(wordlist),
                 lock_path,

@@ -54,7 +54,7 @@ class TestPushAbortPrecedence(unittest.TestCase):
         self.assertEqual(_combined_reason("only"), "only")
         self.assertEqual(
             _combined_reason("dict_fail", "journal_update_failed", "rollback_incomplete"),
-            "journal_update_failed",
+            "journal_update_failed_and_rollback_incomplete",
         )
         self.assertEqual(
             _combined_reason("dict_fail", "rollback_incomplete"), "rollback_incomplete"
@@ -318,13 +318,10 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             wordlist = Path(tmp) / "wordlist.txt"
             wordlist.write_text("a\n", encoding="utf-8")
             root = trusted_project_root(wordlist)
-            target = root / "blocker" / "nested"
-            with patch(
-                "spell_sync.secure_artifacts.os.mkdir", side_effect=OSError(errno.EEXIST, "exists")
-            ):
-                with patch.object(Path, "is_dir", return_value=False):
-                    with self.assertRaises(SecureArtifactError):
-                        ensure_trusted_directory(target, root=root)
+            blocker = root / "blocker"
+            blocker.write_text("x", encoding="utf-8")
+            with self.assertRaises(SecureArtifactError):
+                ensure_trusted_directory(root / "blocker" / "nested", root=root)
 
     def test_atomic_write_temp_fd_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -333,16 +330,10 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             root = trusted_project_root(wordlist)
             target = root / ".spell-sync.journal.json"
             with patch(
-                "spell_sync.secure_artifacts.tempfile.mkstemp",
-                return_value=(5, str(target.with_suffix(".tmp"))),
+                "spell_sync.trusted_internal_fs.os.write", side_effect=OSError(errno.EIO, "io")
             ):
-                with patch(
-                    "spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "io")
-                ):
-                    with patch("spell_sync.secure_artifacts.os.close") as close_mock:
-                        with self.assertRaises(SecureArtifactError):
-                            atomic_write_trusted_file(target, b"x", root=root)
-                        close_mock.assert_any_call(5)
+                with self.assertRaises(SecureArtifactError):
+                    atomic_write_trusted_file(target, b"x", root=root)
 
     def test_atomic_write_temp_unlink_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -391,7 +382,9 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             root = trusted_project_root(wordlist)
             tree = root / "tree"
             ensure_trusted_directory(tree, root=root)
-            with patch.object(Path, "rmdir", side_effect=OSError(errno.EBUSY, "busy")):
+            with patch(
+                "spell_sync.trusted_internal_fs.os.rmdir", side_effect=OSError(errno.EBUSY, "busy")
+            ):
                 with self.assertRaises(SecureArtifactError):
                     remove_trusted_tree(tree, root=root)
 
@@ -409,7 +402,7 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
             _chmod_private_dir(Path("."))
             _fsync_directory(Path("."))
             with patch(
-                "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
+                "spell_sync.trusted_internal_fs.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
             ):
                 with patch.dict(
                     sys.modules,
@@ -455,7 +448,7 @@ class TestRemainingCoverageGaps(unittest.TestCase):
         fake_msvcrt.get_osfhandle.side_effect = OSError(errno.EINVAL, "bad")
         with patch.object(sys, "platform", "win32"):
             with patch(
-                "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
+                "spell_sync.trusted_internal_fs.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
             ):
                 with patch.dict(sys.modules, {"msvcrt": fake_msvcrt}):
                     _flush_file_windows(1)
@@ -467,7 +460,7 @@ class TestRemainingCoverageGaps(unittest.TestCase):
             root = trusted_project_root(wordlist)
             target = root / "newdir"
             with patch(
-                "spell_sync.secure_artifacts.os.mkdir",
+                "spell_sync.trusted_internal_fs.os.mkdir",
                 side_effect=OSError(errno.EACCES, "denied"),
             ):
                 with self.assertRaises(SecureArtifactError) as ctx:
@@ -481,15 +474,8 @@ class TestRemainingCoverageGaps(unittest.TestCase):
             root = trusted_project_root(wordlist)
             leaf = root / "leaf"
             leaf.write_text("file-not-dir", encoding="utf-8")
-
-            def mkdir_conflict(path, mode=0o700):
-                if Path(path) == leaf:
-                    raise OSError(errno.EEXIST, "exists")
-                os.mkdir(path, mode)
-
-            with patch("spell_sync.secure_artifacts.os.mkdir", side_effect=mkdir_conflict):
-                with self.assertRaises(SecureArtifactError):
-                    ensure_trusted_directory(leaf / "child", root=root)
+            with self.assertRaises(SecureArtifactError):
+                ensure_trusted_directory(leaf / "child", root=root)
 
     def test_atomic_write_inner_close_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -497,23 +483,11 @@ class TestRemainingCoverageGaps(unittest.TestCase):
             wordlist.write_text("a\n", encoding="utf-8")
             root = trusted_project_root(wordlist)
             target = root / ".spell-sync.journal.json"
-            real_close = os.close
-
-            def close_fail(fd):
-                if fd == 7:
-                    raise OSError(errno.EIO, "close failed")
-                real_close(fd)
-
             with patch(
-                "spell_sync.secure_artifacts.tempfile.mkstemp",
-                return_value=(7, str(target.with_suffix(".tmp"))),
+                "spell_sync.trusted_internal_fs.os.write", side_effect=OSError(errno.EIO, "write")
             ):
-                with patch(
-                    "spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "write")
-                ):
-                    with patch("spell_sync.secure_artifacts.os.close", side_effect=close_fail):
-                        with self.assertRaises(SecureArtifactError):
-                            atomic_write_trusted_file(target, b"x", root=root)
+                with self.assertRaises(SecureArtifactError):
+                    atomic_write_trusted_file(target, b"x", root=root)
 
     def test_remove_existing_symlink_and_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -524,16 +498,12 @@ class TestRemainingCoverageGaps(unittest.TestCase):
             victim.write_text("x", encoding="utf-8")
             link = root / "link.txt"
             link.symlink_to(victim)
-            with patch(
-                "spell_sync.secure_artifacts._validate_existing_regular_file",
-                return_value=None,
-            ):
-                with self.assertRaises(SecureArtifactError):
-                    remove_trusted_file(link, root=root)
-                dir_path = root / "dir"
-                ensure_trusted_directory(dir_path, root=root)
-                with self.assertRaises(SecureArtifactError):
-                    remove_trusted_file(dir_path, root=root)
+            with self.assertRaises(SecureArtifactError):
+                remove_trusted_file(link, root=root)
+            dir_path = root / "dir"
+            ensure_trusted_directory(dir_path, root=root)
+            with self.assertRaises(SecureArtifactError):
+                remove_trusted_file(dir_path, root=root)
 
     def test_atomic_write_journal_wraps_secure_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

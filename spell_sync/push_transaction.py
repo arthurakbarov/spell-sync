@@ -16,7 +16,7 @@ from .log import log
 from .project import ProjectContext
 from .secure_artifacts import (
     SecureArtifactError,
-    create_trusted_snapshot_file,
+    copy_trusted_snapshot_file,
     prepare_trusted_txn_root,
     remove_trusted_tree,
     trusted_project_root,
@@ -65,8 +65,12 @@ def _recovery_snapshot(path: Path, snapshot_dir: Path, *, root: Path, label: str
         log.warn(f"backup skipped {path}: read failed (path permissions)")
         return _FileBackup(path, None, True, label)
     try:
-        snap = create_trusted_snapshot_file(snapshot_dir, root=root, base_name=target.name)
-        shutil.copy2(target, snap)
+        snap = copy_trusted_snapshot_file(
+            snapshot_dir,
+            root=root,
+            base_name=target.name,
+            source=target,
+        )
     except (OSError, SecureArtifactError):
         log.warn(f"backup skipped {path}: recovery snapshot not created")
         return _FileBackup(path, None, True, label)

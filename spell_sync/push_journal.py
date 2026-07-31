@@ -29,6 +29,7 @@ from .push_transaction import PushTransaction, txn_snapshot_root
 from .secure_artifacts import (
     SecureArtifactError,
     atomic_write_trusted_file,
+    read_trusted_regular_file,
     remove_trusted_file,
     trusted_project_root,
 )
@@ -47,6 +48,7 @@ class JournalLoadStatus(str, Enum):
     VALID_COMPLETED = "valid_completed"
     CORRUPT = "corrupt"
     UNSUPPORTED_SCHEMA = "unsupported_schema"
+    UNSAFE_ARTIFACT = "unsafe_artifact"
 
 
 @dataclass(frozen=True)
@@ -414,11 +416,18 @@ def load_journal_result(
     validate_wordlist: bool = False,
 ) -> JournalLoadResult:
     path = journal_path_for_wordlist(wordlist)
-    if not path.is_file():
-        return JournalLoadResult(JournalLoadStatus.ABSENT, None)
+    root = trusted_project_root(wordlist)
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raw_bytes = read_trusted_regular_file(path, root=root)
+    except SecureArtifactError as exc:
+        if exc.code == "missing_file":
+            return JournalLoadResult(JournalLoadStatus.ABSENT, None)
+        return JournalLoadResult(JournalLoadStatus.UNSAFE_ARTIFACT, None, exc.detail)
+    except OSError as exc:
+        return JournalLoadResult(JournalLoadStatus.CORRUPT, None, str(exc))
+    try:
+        raw = json.loads(raw_bytes.decode("utf-8"))
+    except (json.JSONDecodeError, TypeError, ValueError, UnicodeDecodeError) as exc:
         return JournalLoadResult(JournalLoadStatus.CORRUPT, None, str(exc))
     if not isinstance(raw, dict):
         return JournalLoadResult(JournalLoadStatus.CORRUPT, None, "journal root must be object")

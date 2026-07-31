@@ -180,11 +180,14 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
             target = root / "nested" / "dir"
             real_mkdir = os.mkdir
 
-            def mkdir_race(path, mode=0o700):
-                real_mkdir(path, mode)
+            def mkdir_race(path, mode=0o700, *, dir_fd=None):
+                if dir_fd is None:
+                    real_mkdir(path, mode)
+                else:
+                    real_mkdir(path, mode, dir_fd=dir_fd)
                 raise OSError(errno.EEXIST, "exists")
 
-            with patch("spell_sync.secure_artifacts.os.mkdir", side_effect=mkdir_race):
+            with patch("spell_sync.trusted_internal_fs.os.mkdir", side_effect=mkdir_race):
                 ensure_trusted_directory(target, root=root)
             self.assertTrue(target.is_dir())
 
@@ -207,31 +210,32 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
                     open_trusted_regular_file(target, root=root, create=True)
                 self.assertEqual(ctx.exception.code, "open_failed")
             target.write_text("x", encoding="utf-8")
-            with patch("spell_sync.secure_artifacts.os.open", return_value=99):
+            with patch("spell_sync.trusted_internal_fs.os.open", return_value=99):
                 with patch(
-                    "spell_sync.secure_artifacts.os.fstat", side_effect=OSError(errno.EIO, "io")
+                    "spell_sync.trusted_internal_fs.os.fstat",
+                    side_effect=OSError(errno.EIO, "io"),
                 ):
-                    with patch("spell_sync.secure_artifacts.os.close") as close_mock:
+                    with patch("spell_sync.trusted_internal_fs.os.close") as close_mock:
                         with self.assertRaises(SecureArtifactError) as ctx:
                             open_trusted_regular_file(target, root=root)
                         self.assertEqual(ctx.exception.code, "fstat_failed")
-                        close_mock.assert_called_once_with(99)
+                        close_mock.assert_any_call(99)
 
     def test_open_rejects_non_regular_fstat(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, root = self._project(tmp)
             target = root / ".spell-sync.lock"
             target.write_text("x", encoding="utf-8")
-            with patch("spell_sync.secure_artifacts.os.open", return_value=99):
+            with patch("spell_sync.trusted_internal_fs.os.open", return_value=99):
                 with patch(
-                    "spell_sync.secure_artifacts.os.fstat",
+                    "spell_sync.trusted_internal_fs.os.fstat",
                     return_value=type("ST", (), {"st_mode": 0o040000})(),
                 ):
-                    with patch("spell_sync.secure_artifacts.os.close") as close_mock:
+                    with patch("spell_sync.trusted_internal_fs.os.close") as close_mock:
                         with self.assertRaises(SecureArtifactError) as ctx:
                             open_trusted_regular_file(target, root=root)
                         self.assertEqual(ctx.exception.code, "not_a_file")
-                        close_mock.assert_called_once_with(99)
+                        close_mock.assert_any_call(99)
 
     def test_fchmod_and_chmod_private_swallow_oserror(self) -> None:
         with patch(

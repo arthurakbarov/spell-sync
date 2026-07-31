@@ -16,6 +16,12 @@ class PushAbort:
     reason: str
     message: str
     recovery_materials_preserved: bool = False
+    recovery_required: bool = False
+    journal_update_failed: bool = False
+    rollback_incomplete: bool = False
+    failed_rollback_labels: tuple[str, ...] = ()
+    cleanup_failure_codes: tuple[str, ...] = ()
+    transaction_id: str | None = None
 
 
 def _combined_reason(*parts: str) -> str:
@@ -25,7 +31,7 @@ def _combined_reason(*parts: str) -> str:
     if len(ordered) == 1:
         return ordered[0]
     if "rollback_incomplete" in ordered and "journal_update_failed" in ordered:
-        return "journal_update_failed"
+        return "journal_update_failed_and_rollback_incomplete"
     if "rollback_incomplete" in ordered:
         return "rollback_incomplete"
     return ordered[0]
@@ -62,12 +68,23 @@ def handle_failed_push_rollback(
             json_reason,
             message,
             recovery_materials_preserved=True,
+            recovery_required=True,
+            journal_update_failed=journal_update_failed,
+            rollback_incomplete=True,
+            failed_rollback_labels=rollback.failed,
+            transaction_id=tx.transaction_id,
         )
 
     if journal_update_failed:
         _best_effort_cleanup_after_complete_rollback(tx, journal_session)
         log.abort(message)
-        return PushAbort(ExitCode.PUSH_ABORT, "journal_update_failed", message)
+        return PushAbort(
+            ExitCode.PUSH_ABORT,
+            "journal_update_failed",
+            message,
+            journal_update_failed=True,
+            transaction_id=tx.transaction_id,
+        )
 
     _best_effort_cleanup_after_complete_rollback(tx, journal_session)
     log.abort(message)
