@@ -33,7 +33,7 @@ phase-8: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `9a08a7e` documentation reorganization (Phase 7) | yes |
+| spell-sync | `3c6bc35` agent configuration refresh (Phase 8) | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -44,6 +44,8 @@ Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvide
 Phase 6 final CI evidence: `f82ed58`, run `20260728T074706.122702Z`, `finalEvidence=true`.
 
 Phase 7 final CI evidence: `9a08a7e`, run `20260731T101824.828581Z`, `finalEvidence=true`.
+
+Phase 8 final CI evidence: `3c6bc35`, run `20260731T104234.254905Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -453,13 +455,13 @@ architecture without handoff or reviewer-specific workflow language.
 - New skill `diagnostics-change`; updated `architecture-refactor`
 - `scripts/check-agent-config.py` — requires `diagnostics-change`, bans stale runtime and handoff terms
 
-### Phase-specific validation (pending final CI)
+### Phase-specific validation (passed)
 
 ```text
 python3 scripts/check-agent-config.py
 python3 scripts/check-docs-contract.py
 python3 scripts/check-architecture.py --check
-full final CI or lightweight validation per check-ci-necessity on committed HEAD
+full final CI on committed clean HEAD 3c6bc35
 ```
 
 ## Phase 2B: complete application boundary
@@ -571,6 +573,7 @@ Summary:
 ## Last validation
 
 ```text
+Phase 8 (awaiting approval): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
 Phase 5 (accepted): HEAD 7985302; full CI finalEvidence=true (20260723T034038.010703Z)
