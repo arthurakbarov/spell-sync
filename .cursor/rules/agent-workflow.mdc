@@ -9,7 +9,7 @@ alwaysApply: true
 2. Read the architecture status block in `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
 3. Use applicable `.cursor/skills/**` (`execute-current-phase`, `spell-sync-ci`, etc.).
 4. Implement **only** the current architecture phase.
-5. Run focused pytest before full `scripts/ci.sh`.
+5. Run focused pytest; run `python3 scripts/check-architecture.py --check` when boundaries change.
 6. Commit tracked changes and verify clean trees before final full CI.
 7. Verify `python3 scripts/check-ci-evidence.py` after final CI; snapshot only after evidence success.
 8. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.

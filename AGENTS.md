@@ -4,37 +4,49 @@ Public repository for Spell Sync: a CLI and TUI tool that keeps one **canonical 
 wordlist** synchronized with **application custom dictionaries**. Built-in application
 dictionaries are never inspected or modified.
 
-Development is **agent-first**: the Cursor Agent implements changes, runs tests, interprets
-CI logs, and updates docs/contracts. The repository owner defines intent, approves scope,
-and decides release policy. See `docs/AGENT_DEVELOPMENT.md`.
+Development is **agent-first**: implement changes, run tests, interpret CI output, and update
+docs/contracts. See `docs/AGENT_DEVELOPMENT.md`.
 
 ## Architecture map
 
 ```text
-CLI parser (CliOptions) / TUI controller
-    ↓
-CLI adapter / direct request builders
-    ↓
-immutable application requests (application/requests.py)
-    ↓
-SpellSyncService (application/service.py)
-    ↓
-core planning and execution (sync_run, push_prepared, push_transaction, pull)
-    ↓
-filesystem adapters (dictionaries, io, paths)
+CLI (CliOptions) → cli_request_adapter → typed application requests
+TUI controller   → typed application requests
+  → SpellSyncService (thin facade)
+  → application/services/* (Diagnostics, Inspection, Sync, Recovery, Setup, TargetSettings)
+  → RuntimeResolver → ResolvedRuntime / RuntimeIdentity
+  → core (sync_run, push_*, pull, project_setup, diagnostics)
 ```
 
-CLI/TUI adapters create immutable application requests. The application layer does not
-depend on `CliOptions`. Mutation CLI commands route through `SpellSyncService`; `config-check`
-and `lint` are CLI utilities. Runtime settings are still implicit in 0.2.1 (ContextVar);
-explicit runtime is Phase 3.
+- **Typed requests:** immutable DTOs in `application/requests.py`; no `CliOptions` outside CLI
+- **Explicit runtime:** `RuntimeResolver`; no production `ContextVar` for settings or validated runtime
+- **Thin facade:** `SpellSyncService` delegates to focused services under `application/services/`
+- **Structured diagnostics:** typed `EventId` / `TechnicalEvent`; JSON Lines technical log; presentation at CLI/TUI only
+- **Architecture guards:** `scripts/check-architecture.py` (`architecture.boundaries` in CI)
+
+## CLI commands (12)
+
+```text agent-config-cli-commands
+`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `support-report`, `ui`, `version`
+```
+
+No-args on a TTY launches the TUI when a project is ready. See `spell_sync/cli.py`.
 
 Canonical references:
 
-- `docs/ARCHITECTURE.md` — wordlist model, Pull/Push semantics, module map
-- `docs/TUI_IMPLEMENTATION.md` — Textual screens, controller, workers
-- `docs/RECOVERY.md` — journal, snapshots, recovery invariants
-- `docs/CONFIGURATION.md` — spell-sync.toml schema
+```text agent-config-paths
+docs/README.md
+docs/ARCHITECTURE.md
+docs/architecture/APPLICATION_LAYER.md
+docs/architecture/RUNTIME_CONTEXT.md
+docs/architecture/MUTATION_SAFETY.md
+docs/architecture/DIAGNOSTICS.md
+docs/PROJECT_MAP.md
+docs/RECOVERY.md
+docs/TUI_IMPLEMENTATION.md
+docs/CONFIGURATION.md
+docs/AGENT_DEVELOPMENT.md
+```
 
 ## Pull and Push
 
@@ -45,32 +57,25 @@ Canonical references:
 
 Central product copy lives in `spell_sync/application/product_concepts.py`.
 
-## CLI commands (12)
-
-```text agent-config-cli-commands
-`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `support-report`, `ui`, `version`
-```
-
-No-args on a TTY launches the TUI when a project is ready. See `spell_sync/cli.py`.
-
 ## Critical commands
 
 ```bash
-python3 -m pytest <focused tests> -q
 python3 scripts/test_plan.py
 python3 scripts/run_focused_tests.py
-scripts/ci.sh
-python3 scripts/check-agent-config.py
+python3 scripts/check-architecture.py --check
 python3 scripts/check-docs-contract.py
+python3 scripts/check-agent-config.py
+python3 scripts/check-ci-necessity.py --explain
+scripts/ci.sh
+python3 scripts/check-ci-evidence.py
 ```
 
 `scripts/ci.sh` is the single CI entry point. On completion it prints `CI_RESULT`, `CI_EXIT`,
-`CI_SUMMARY`, and `CI_LOG` (full log under `.artifacts/ci/`). The Cursor Agent reads those
-paths; the owner is not expected to tail logs manually. Architecture and documentation
-contracts are mandatory before declaring a task complete.
+`CI_SUMMARY`, and `CI_LOG`. Read those paths — do not rely on manual log tailing.
 
-Docs style, docs contract, ruff, mypy, pytest with **100% line** and **≥96% branch**
-coverage on `spell_sync/`, wheel build, twine check, lint smoke, headless command scenarios.
+Docs style, docs contract, agent config, architecture boundaries, ruff, mypy, grouped pytest
+with **100% line** and **≥96% branch** coverage on `spell_sync/`, packaging, installed-wheel
+smoke, and headless command scenarios.
 
 Requires **Python 3.11+** (`pyproject.toml`).
 
@@ -78,6 +83,8 @@ Requires **Python 3.11+** (`pyproject.toml`).
 
 - TUI must not call low-level dictionary writers, journal writers, or config writers directly
 - TUI must not invoke CLI via subprocess — use `SpellSyncService`
+- Application and TUI must not import `CliOptions`, argparse, or Textual from core paths
+- No hidden runtime `ContextVar` or module-level config cache in production paths
 - No mutation without project operation lock
 - No execution from a stale preview or mismatched plan/update ID
 - Pending Recovery blocks new write operations
@@ -89,8 +96,6 @@ Requires **Python 3.11+** (`pyproject.toml`).
 
 ## Cursor configuration
 
-Project-specific agent context for contributors:
-
 ```text
 .cursor/rules/     short invariants and file-scoped guidance
 .cursor/skills/    procedural workflows (CI, phases, safety audit, TUI, packaging)
@@ -101,18 +106,19 @@ Phase-driven workflow skills:
 - `execute-current-phase` — implement and validate the current architecture phase
 - `apply-phase-fixes` — correct owner-listed defects without advancing the roadmap
 - `advance-current-phase` — mark an approved phase complete (owner command only)
+- `architecture-refactor` — architecture migration with safety and guard updates
+- `diagnostics-change` — structured events, logging, and privacy changes
 
 Architecture tracker: `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` (`[architecture-status:start]` block).
 
-Open this repository alone — engineering rules and skills are self-contained here. Maintainer
-topology, remotes, and publication workflows live only in the private maintainer workspace
-(not shipped with this repository).
+Engineering rules and skills are self-contained in this repository. Maintainer topology and
+publication workflows live only in the private maintainer workspace (not shipped here).
 
 ## Agent prohibitions
 
 - Do not start the next architecture phase without owner approval
 - Do not mark a phase `complete` from implementation work — use `awaiting-approval`, then `advance-current-phase`
-- Do not create **external review** archive, handoff, or upload workflows (see **Workspace snapshot**)
+- Do not create handoff or upload archive workflows (see **Workspace snapshot**)
 
 ## Workspace snapshot
 
@@ -122,22 +128,20 @@ Modifying tasks finalize per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot b
 
 | Area | Typical tests |
 |------|---------------|
+| Architecture | `tests/test_check_architecture.py`, `tests/tui/test_architecture.py` |
 | TUI | `tests/tui/`, fake service for UI; real core for safety integration |
 | Pull/Push safety | `tests/test_pull_safety.py`, `tests/test_transaction_safety.py` |
 | TUI mutation | `tests/test_tui_mutation_safety.py`, `tests/test_tui_recovery_safety.py` |
+| Diagnostics | `tests/test_technical_logging.py`, `tests/test_diagnostic_redaction.py` |
 | Target settings | `tests/test_target_settings.py` |
-| Review workflow | `tests/test_review_workflow.py`, `tests/tui/test_review_workflow.py` |
 | Installed wheel | `tests/test_installed_workflow.py` |
-| Architecture | `tests/tui/test_architecture.py` |
 
 Prefer focused tests first, then assess CI necessity (`python3 scripts/check-ci-necessity.py`).
 
 Execution time control bounds registered development and CI commands through
-`scripts/execution_control/` (admission, immutable plans, SQLite history, owned process
-termination). Product Pull/Push/Recovery paths are not wrapped. See
+`scripts/execution_control/`. Product Pull/Push/Recovery paths are not wrapped. See
 `docs/EXECUTION_TIME_CONTROL.md`.
 
-Full CI evidence is bound to CI-relevant inputs, not merely to the Git commit identifier.
-A later non-CI commit may reuse successful full CI evidence only when the CI input digest is
-unchanged and current lightweight validation succeeds. Exact Git HEAD matching remains required
-for release, publication, and signed artifact workflows.
+Full CI evidence binds to CI-relevant inputs. A later non-CI commit may reuse successful full
+CI evidence when the CI input digest is unchanged and lightweight validation succeeds. Exact Git
+HEAD matching remains required for release, publication, and signed artifact workflows.

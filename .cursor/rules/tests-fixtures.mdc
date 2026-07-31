@@ -29,6 +29,13 @@ alwaysApply: false
 - Prefer behavior and invariant tests over line-execution padding
 - Do not create `coverage_gaps` files or weaken safety suites
 - Preserve strict safety coverage: `test_transaction_safety`, `test_pull_safety`, `test_tui_mutation_safety`, `test_tui_recovery_safety`
+- Diagnostics changes require privacy tests (`test_technical_logging`, `test_diagnostic_redaction`)
+
+## Architecture tests
+
+- Layer boundaries: `tests/test_check_architecture.py`, `tests/test_runtime_architecture.py`
+- Application services: `tests/test_application_services.py`
+- TUI guards: `tests/tui/test_architecture.py`
 
 ## Installed-wheel tests
 

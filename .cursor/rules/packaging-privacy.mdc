@@ -17,6 +17,11 @@ alwaysApply: false
 - Use `git archive` from the public repository root
 - Never zip or archive a parent workspace containing private repos or personal data
 
+## Diagnostics privacy
+
+- Technical log and support report exports must pass redaction tests before release
+- Do not embed raw event payloads with user dictionary content in shipped artifacts
+
 ## Publication
 
 - Package publication, tagging, and remote push only on explicit owner request

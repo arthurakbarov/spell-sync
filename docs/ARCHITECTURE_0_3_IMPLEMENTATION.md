@@ -11,7 +11,7 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 ## Current phase
 
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
-Phase 8: agent configuration refresh — **current**, not started.
+Phase 8: agent configuration refresh — **current**, awaiting approval.
 
 [architecture-status:start]
 current: phase-8
@@ -26,7 +26,7 @@ phase-4: complete
 phase-5: complete
 phase-6: complete
 phase-7: complete
-phase-8: not-started
+phase-8: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
@@ -439,12 +439,28 @@ full final CI on committed clean HEAD 9a08a7e
 
 ## Phase 8 — Agent configuration refresh
 
-**Status:** not started
+**Status:** awaiting approval
 
 ### Goal
 
 Refresh public agent configuration (rules, skills, `AGENTS.md`, validator) for the 0.3
 architecture without handoff or reviewer-specific workflow language.
+
+### Delivered
+
+- `AGENTS.md` — current architecture map, services, explicit runtime, diagnostics, validation commands
+- Updated rules: `architecture-boundaries`, `project-safety`, `tui`, `tests-fixtures`, `packaging-privacy`
+- New skill `diagnostics-change`; updated `architecture-refactor`
+- `scripts/check-agent-config.py` — requires `diagnostics-change`, bans stale runtime and handoff terms
+
+### Phase-specific validation (pending final CI)
+
+```text
+python3 scripts/check-agent-config.py
+python3 scripts/check-docs-contract.py
+python3 scripts/check-architecture.py --check
+full final CI or lightweight validation per check-ci-necessity on committed HEAD
+```
 
 ## Phase 2B: complete application boundary
 

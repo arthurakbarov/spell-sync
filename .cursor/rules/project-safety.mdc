@@ -10,6 +10,7 @@ alwaysApply: true
 - No push, tag, GitHub Release, or package publish without explicit owner request
 - No private user data, personal wordlists, maintainer paths, or credentials in public commits
 - Effective project context comes from the wordlist path — do not assume cwd alone
+- Structured diagnostics must not leak user words, config bodies, or journal contents
 
 ## Mutation safety
 
@@ -19,11 +20,13 @@ alwaysApply: true
 - Stale preview must not execute; no automatic re-plan after confirmation
 - Pending Recovery blocks new write operations
 - No automatic Pull, Push, or Recovery
+- Fresh runtime resolved under lock; `RuntimeIdentity` mismatch stops safely
 
 ## Engineering discipline
 
 - Minimal diff — no drive-by refactors or parallel reimplementations of existing paths
-- Run focused tests for changed scope, then full `scripts/ci.sh`
+- Run focused tests for changed scope; assess CI necessity before full `scripts/ci.sh`
 - Do not stop on red tests; do not mask failures with meaningless coverage tests
+- Update `scripts/check-architecture.py` expectations when public application exports change
 
 Recovery protocol details: `@docs/RECOVERY.md`

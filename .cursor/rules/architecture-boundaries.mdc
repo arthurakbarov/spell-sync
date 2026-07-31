@@ -10,12 +10,19 @@ alwaysApply: false
 
 - CLI parser builds `CliOptions`; `cli_request_adapter.py` maps to immutable application requests
 - TUI builds application requests directly from `ProjectRef` / controller context
-- CLI and TUI call `SpellSyncService` (`spell_sync/application/service.py`) — not core writers directly
-- Application layer orchestrates; it must not import `CliOptions`, `argparse`, `cli_request_adapter`, or Textual
-- `spell_sync/application/requests.py` holds UI-neutral frozen request dataclasses only
-- `spell_sync/application/project_resolution.py` resolves requests to paths and explicit runtime config
+- CLI and TUI call `SpellSyncService` — not core writers directly
+- Application layer must not import `CliOptions`, `argparse`, `cli_request_adapter`, or Textual
+- `application/requests.py` holds UI-neutral frozen request dataclasses only
+- Focused services under `application/services/` own inspection, sync, recovery, setup, diagnostics
+- `RuntimeResolver` resolves explicit runtime; no production `ContextVar` for settings or validated runtime
 - Core and `project_setup` must not import `spell_sync.application`
 - TUI must not import dictionary writers, journal internals, snapshot writers, or config writers
+
+## Diagnostics
+
+- Emit typed `TechnicalEvent` / `EventId` through `operation_emitter` — no free-form stage strings
+- Presentation copy only at CLI/TUI via `PresentedEvent` / `event_presenter.py`
+- Technical log: privacy-safe JSON Lines (`schemaVersion: 1`); user words forbidden in payloads
 
 ## Immutability and reports
 
@@ -23,7 +30,15 @@ alwaysApply: false
 - `ReportScreen` displays results — it does not write history or mutate filesystem state
 - Do not add a second implementation of an existing execution path
 
+## Validation
+
+- Run `python3 scripts/check-architecture.py --check` when boundaries change
+- Extend architecture tests in the same change
+
 ## Canonical references
 
-- `@docs/ARCHITECTURE.md` — module map, Pull/Push model
+- `@docs/architecture/APPLICATION_LAYER.md` — requests, services, facade
+- `@docs/architecture/RUNTIME_CONTEXT.md` — resolver, identity
+- `@docs/architecture/DIAGNOSTICS.md` — events, logs, privacy
+- `@docs/PROJECT_MAP.md` — module ownership
 - `@docs/TUI_IMPLEMENTATION.md` — controller, workers, screen routing

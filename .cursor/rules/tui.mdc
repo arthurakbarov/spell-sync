@@ -6,11 +6,22 @@ alwaysApply: false
 
 # TUI
 
+## Service boundary
+
+- Build typed application requests; call `SpellSyncService` only
+- Do not subprocess the CLI or import low-level dictionary/journal/config writers
+- Do not import `CliOptions` or argparse in TUI modules
+
 ## Workers and loading
 
 - Filesystem and service calls run in Textual workers, not on the UI thread
 - Use existing load-generation / token pattern (`LoadTokenMixin`) — stale worker results are ignored
 - Do not misuse `call_from_thread` for mutation paths
+
+## Progress and diagnostics
+
+- Drive operation progress from `EventId` / `PresentedEvent` — not free-form stage strings
+- Logs screen uses sanitized tail display; malformed JSON lines must stay redacted
 
 ## Mutation policy
 

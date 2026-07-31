@@ -24,6 +24,9 @@ STALE_PATTERNS = [
     (re.compile(r"daily\.sh"), "maintainer daily.sh reference"),
     (re.compile(r"sync-tool\.sh"), "maintainer sync-tool.sh reference"),
     (re.compile(r"first stable.*1\.0\.0", re.I), "stale 1.0.0 release plan"),
+    (re.compile(r"explicit runtime is Phase", re.I), "stale explicit-runtime deferral"),
+    (re.compile(r"still implicit in 0\.2\.1", re.I), "stale implicit runtime claim"),
+    (re.compile(r"ContextVar\).*0\.2\.1", re.I), "stale ContextVar runtime claim"),
 ]
 PRIVATE_PATH_PATTERNS = [
     re.compile(r"~/code/"),
@@ -70,6 +73,7 @@ REQUIRED_SKILLS = (
     "apply-phase-fixes",
     "advance-current-phase",
     "architecture-refactor",
+    "diagnostics-change",
     "spell-sync-ci",
     "mutation-safety-audit",
     "select-and-run-tests",
@@ -80,7 +84,10 @@ BANNED_WORKFLOW_TERMS = [
     (re.compile(r"\bUPLOAD_THIS_FILE\b"), "UPLOAD_THIS_FILE"),
     (re.compile(r"\bupload handoff\b", re.I), "upload handoff"),
     (re.compile(r"\bexternal reviewer\b", re.I), "external reviewer"),
+    (re.compile(r"\bexternal review\b", re.I), "external review"),
     (re.compile(r"\barchive handoff\b", re.I), "archive handoff"),
+    (re.compile(r"\bAI assistant\b", re.I), "AI assistant"),
+    (re.compile(r"\bchat prompt\b", re.I), "chat prompt"),
 ]
 
 MODIFYING_SKILLS = (
@@ -88,6 +95,7 @@ MODIFYING_SKILLS = (
     "apply-phase-fixes",
     "advance-current-phase",
     "architecture-refactor",
+    "diagnostics-change",
     "release-candidate",
     "spell-sync-ci",
     "add-target",
@@ -129,6 +137,7 @@ FINAL_CI_LIFECYCLE_SKILLS = (
     "execute-current-phase",
     "apply-phase-fixes",
     "architecture-refactor",
+    "diagnostics-change",
     "spell-sync-ci",
 )
 

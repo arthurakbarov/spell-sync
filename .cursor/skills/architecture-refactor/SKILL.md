@@ -17,31 +17,28 @@ description: Perform an architecture migration while preserving safety contracts
 
 ## Required steps
 
-1. **Dependency inventory** — map imports before and after; no reverse dependencies.
-2. **Safety inventory** — list Pull/Push/Recovery/lock/journal invariants at risk.
-3. **Migration order** — follow the tracker; finish one layer before the next.
-4. **Single path** — remove or migrate callers; no permanent compatibility wrappers.
-5. **No hidden globals** — prefer explicit parameters, resolver objects, or frozen context.
-6. **Architecture tests** — extend phase-specific guards.
-7. **Combined focused validation** — build one deduplicated cluster plan with
-   `python3 scripts/test_plan.py --explain` and run via `select-and-run-tests` once.
-   Do not rerun overlapping clusters sequentially.
-8. **ADR** — add or update `docs/decisions/` when a decision is accepted.
-9. **Pre-final checks** — `python3 scripts/run_pre_final_checks.py` before commits.
-10. **Commits and clean tree** — local commits; `git status --short` clean.
-11. **Full CI once** — `scripts/ci.sh` on committed HEAD only.
-12. **Final evidence** — `python3 scripts/check-ci-evidence.py`.
-13. **Package smoke** — covered by final CI when package boundaries change.
+1. **Dependency audit** — map imports before and after; no reverse dependencies.
+2. **Safety contracts** — list Pull/Push/Recovery/lock/journal invariants at risk (`mutation-safety-audit` when mutation paths change).
+3. **Migration without parallel paths** — remove or migrate callers; no permanent compatibility wrappers.
+4. **Architecture guard updates** — extend `scripts/check-architecture.py` and `tests/test_check_architecture.py` when exports or boundaries change.
+5. **Focused tests** — one deduplicated cluster plan via `python3 scripts/test_plan.py --explain` and `select-and-run-tests`.
+6. **Docs and ADR** — update `docs/architecture/`, `docs/PROJECT_MAP.md`, and `docs/decisions/` when decisions change.
+7. **Pre-final checks** — `python3 scripts/run_pre_final_checks.py` before commits.
+8. **Commits and clean tree** — local commits; `git status --short` clean before final CI.
+9. **Full CI once** — `scripts/ci.sh` on committed HEAD when `check-ci-necessity` requires it.
+10. **Final evidence** — `python3 scripts/check-ci-evidence.py`.
+11. **Installed-wheel smoke** — when package boundaries or entry points change (included in full CI).
 
 ## Stop conditions
 
-- Stop when phase completion criteria are met and final CI is green
+- Stop when phase completion criteria are met and final CI evidence is green
 - Stop and report if a change would break CLI JSON, exit codes, or Pull/Push semantics
 
 ## Related skills
 
 - `select-and-run-tests` — staged validation during migration
 - `mutation-safety-audit` — mandatory for mutation-path changes
+- `diagnostics-change` — structured event pipeline changes
 - `spell-sync-ci` — final CI and diagnostic reruns
 
 ## Finalize workspace snapshot
