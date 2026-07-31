@@ -200,13 +200,17 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, root = self._project(tmp)
             target = root / ".spell-sync.lock"
-            with patch("spell_sync.secure_artifacts.os.open", side_effect=OSError(errno.EACCES, "denied")):
+            with patch(
+                "spell_sync.secure_artifacts.os.open", side_effect=OSError(errno.EACCES, "denied")
+            ):
                 with self.assertRaises(SecureArtifactError) as ctx:
                     open_trusted_regular_file(target, root=root, create=True)
                 self.assertEqual(ctx.exception.code, "open_failed")
             target.write_text("x", encoding="utf-8")
             with patch("spell_sync.secure_artifacts.os.open", return_value=99):
-                with patch("spell_sync.secure_artifacts.os.fstat", side_effect=OSError(errno.EIO, "io")):
+                with patch(
+                    "spell_sync.secure_artifacts.os.fstat", side_effect=OSError(errno.EIO, "io")
+                ):
                     with patch("spell_sync.secure_artifacts.os.close") as close_mock:
                         with self.assertRaises(SecureArtifactError) as ctx:
                             open_trusted_regular_file(target, root=root)
@@ -230,10 +234,14 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
                         close_mock.assert_called_once_with(99)
 
     def test_fchmod_and_chmod_private_swallow_oserror(self) -> None:
-        with patch("spell_sync.secure_artifacts.os.fchmod", side_effect=OSError(errno.EPERM, "perm")):
+        with patch(
+            "spell_sync.secure_artifacts.os.fchmod", side_effect=OSError(errno.EPERM, "perm")
+        ):
             _fchmod_private(1)
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")):
+            with patch(
+                "spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")
+            ):
                 _chmod_private_dir(Path(tmp))
 
     def test_fsync_fd_raises_non_enosys(self) -> None:
@@ -254,7 +262,9 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, root = self._project(tmp)
             target = root / ".spell-sync.journal.json"
-            with patch("spell_sync.secure_artifacts.os.replace", side_effect=OSError(errno.EIO, "io")):
+            with patch(
+                "spell_sync.secure_artifacts.os.replace", side_effect=OSError(errno.EIO, "io")
+            ):
                 with self.assertRaises(SecureArtifactError) as ctx:
                     atomic_write_trusted_file(target, b"{}\n", root=root)
                 self.assertEqual(ctx.exception.code, "publish_failed")
@@ -265,7 +275,9 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, root = self._project(tmp)
             target = root / ".spell-sync.journal.json"
-            with patch("spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")):
+            with patch(
+                "spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")
+            ):
                 atomic_write_trusted_file(target, b"{}\n", root=root)
             self.assertTrue(target.is_file())
 
@@ -316,7 +328,9 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist, root = self._project(tmp)
             txn = prepare_trusted_txn_root(wordlist, "snap")
-            with patch("spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")):
+            with patch(
+                "spell_sync.secure_artifacts.os.chmod", side_effect=OSError(errno.EPERM, "perm")
+            ):
                 snap = create_trusted_snapshot_file(txn, root=root, base_name="dict")
             self.assertTrue(snap.is_file())
 

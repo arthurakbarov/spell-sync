@@ -1,0 +1,402 @@
+"""Coverage for security hardening integration paths."""
+
+from __future__ import annotations
+
+import errno
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from spell_sync.mutation_guards import operation_lock_scope_for
+from spell_sync.operation_lock import OperationLockRejected, acquire_operation_lock
+from spell_sync.push_abort import PushAbort, _combined_reason, handle_failed_push_rollback
+from spell_sync.push_journal import (
+    JOURNAL_STATE_WRITING,
+    PushJournal,
+    PushJournalSession,
+    journal_path_for_wordlist,
+)
+from spell_sync.push_prepared import _abort_journal_begin_failure
+from spell_sync.push_transaction import (
+    PushTransaction,
+    RollbackResult,
+    TargetWriteState,
+    _artifact_root,
+    _FileBackup,
+    backup_file,
+    discard_txn_snapshots,
+    rollback_backups,
+)
+from spell_sync.secure_artifacts import (
+    SecureArtifactError,
+    _chmod_private_dir,
+    _flush_file_windows,
+    _fsync_directory,
+    _reject_unsafe_component,
+    atomic_write_trusted_file,
+    ensure_trusted_directory,
+    is_reparse_point,
+    remove_trusted_file,
+    remove_trusted_tree,
+    trusted_project_root,
+)
+
+
+class TestPushAbortPrecedence(unittest.TestCase):
+    def test_combined_reason_branches(self) -> None:
+        self.assertEqual(_combined_reason(), "push_aborted")
+        self.assertEqual(_combined_reason("only"), "only")
+        self.assertEqual(
+            _combined_reason("dict_fail", "journal_update_failed", "rollback_incomplete"),
+            "journal_update_failed",
+        )
+        self.assertEqual(_combined_reason("dict_fail", "rollback_incomplete"), "rollback_incomplete")
+        self.assertEqual(_combined_reason("dict_fail", "other"), "dict_fail")
+
+    def test_complete_rollback_journal_update_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wordlist = root / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            dict_path = root / "dict.txt"
+            dict_path.write_text("b\n", encoding="utf-8")
+            tx = PushTransaction(
+                dictionary_backups=[
+                    _FileBackup(dict_path, None, True, "d", write_state=TargetWriteState.NOT_STARTED)
+                ],
+                wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
+                transaction_id="tid",
+                snapshot_dir=None,
+                wordlist_path=wordlist,
+            )
+            session = PushJournalSession.__new__(PushJournalSession)
+            session._path = journal_path_for_wordlist(wordlist)
+            session._wordlist = wordlist
+            session._journal = PushJournal(
+                schema_version=2,
+                transaction_id="tid",
+                command="push",
+                pid=os.getpid(),
+                started="2026-01-01T00:00:00+00:00",
+                state=JOURNAL_STATE_WRITING,
+                wordlist=str(wordlist),
+                wordlist_hash_before=None,
+                wordlist_hash_after=None,
+                wordlist_backup_path=None,
+                wordlist_existed_before=True,
+                snapshot_dir=None,
+                targets=[],
+            )
+            with patch.object(PushTransaction, "rollback", return_value=RollbackResult((), (), ())):
+                with patch.object(PushJournalSession, "discard", side_effect=OSError("discard fail")):
+                    result = handle_failed_push_rollback(
+                        tx,
+                        session,
+                        reason="dictionary_write_failed",
+                        message="push aborted",
+                        journal_update_failed=True,
+                    )
+            self.assertEqual(result.reason, "journal_update_failed")
+
+    def test_incomplete_rollback_mark_incomplete_oserror(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wordlist = root / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            dict_path = root / "dict.txt"
+            dict_path.write_text("b\n", encoding="utf-8")
+            tx = PushTransaction(
+                dictionary_backups=[
+                    _FileBackup(
+                        dict_path,
+                        None,
+                        True,
+                        "d",
+                        write_state=TargetWriteState.WRITE_STARTED,
+                    )
+                ],
+                wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
+                transaction_id="tid",
+                snapshot_dir=root / ".spell-sync.txn" / "tid",
+                wordlist_path=wordlist,
+            )
+            session = PushJournalSession.__new__(PushJournalSession)
+            session._path = journal_path_for_wordlist(wordlist)
+            session._wordlist = wordlist
+            session._journal = PushJournal(
+                schema_version=2,
+                transaction_id="tid",
+                command="push",
+                pid=os.getpid(),
+                started="2026-01-01T00:00:00+00:00",
+                state=JOURNAL_STATE_WRITING,
+                wordlist=str(wordlist),
+                wordlist_hash_before=None,
+                wordlist_hash_after=None,
+                wordlist_backup_path=None,
+                wordlist_existed_before=True,
+                snapshot_dir=str(tx.snapshot_dir),
+                targets=[],
+            )
+            with patch.object(
+                PushTransaction,
+                "rollback",
+                return_value=RollbackResult((), ("d",), ()),
+            ):
+                with patch.object(
+                    PushJournalSession,
+                    "mark_rollback_incomplete",
+                    side_effect=OSError("mark fail"),
+                ):
+                    result = handle_failed_push_rollback(
+                        tx,
+                        session,
+                        reason="dictionary_write_failed",
+                        message="push aborted",
+                        journal_update_failed=False,
+                    )
+            self.assertTrue(result.recovery_materials_preserved)
+            self.assertEqual(result.reason, "rollback_incomplete")
+
+
+class TestJournalBeginFailure(unittest.TestCase):
+    def test_abort_journal_begin_cleanup_success(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            snap = trusted_project_root(wordlist) / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            tx = PushTransaction(
+                dictionary_backups=[],
+                wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
+                transaction_id="tid",
+                snapshot_dir=snap,
+                wordlist_path=wordlist,
+            )
+            result = _abort_journal_begin_failure(tx, OSError("journal fail"))
+            self.assertIsInstance(result, PushAbort)
+            self.assertFalse(result.recovery_materials_preserved)
+            self.assertIsNone(tx.snapshot_dir)
+
+    def test_abort_journal_begin_cleanup_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            snap = trusted_project_root(wordlist) / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            tx = PushTransaction(
+                dictionary_backups=[],
+                wordlist_backup=_FileBackup(wordlist, None, True, "wordlist"),
+                transaction_id="tid",
+                snapshot_dir=snap,
+                wordlist_path=wordlist,
+            )
+            with patch(
+                "spell_sync.push_prepared.safe_discard_txn_snapshots",
+                return_value=(False, "leftover"),
+            ):
+                result = _abort_journal_begin_failure(tx, OSError("journal fail"))
+            self.assertTrue(result.recovery_materials_preserved)
+
+
+class TestMutationGuardsLockRejected(unittest.TestCase):
+    def test_operation_lock_context_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            lock = trusted_project_root(wordlist) / ".spell-sync.lock"
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            lock.symlink_to(wordlist)
+            with patch("spell_sync.mutation_guards.emit_json") as emit:
+                with operation_lock_scope_for(wordlist, "push", json_output=True) as exit_code:
+                    self.assertEqual(exit_code, 1)
+                emit.assert_called_once()
+                payload = emit.call_args[0][0]
+                self.assertEqual(payload["reason"], "unsafe_operation_lock")
+
+    def test_operation_lock_context_human(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            lock = trusted_project_root(wordlist) / ".spell-sync.lock"
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            lock.symlink_to(wordlist)
+            with patch("spell_sync.mutation_guards.log.abort") as abort:
+                with operation_lock_scope_for(wordlist, "push", json_output=False) as exit_code:
+                    self.assertEqual(exit_code, 1)
+                abort.assert_called_once()
+
+
+class TestOperationLockMkdirFailure(unittest.TestCase):
+    def test_lock_parent_mkdir_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "nested" / "wordlist.txt"
+            with patch.object(Path, "mkdir", side_effect=OSError(errno.EROFS, "ro")):
+                with self.assertRaises(OperationLockRejected):
+                    with acquire_operation_lock(wordlist, "push"):
+                        pass
+
+
+class TestPushTransactionBranches(unittest.TestCase):
+    def test_artifact_root_fallback(self) -> None:
+        backup_dir = Path("/tmp/backup-dir")
+        self.assertEqual(_artifact_root(backup_dir, None), backup_dir.parent)
+
+    def test_rollback_restored_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "dict.txt"
+            path.write_text("old\n", encoding="utf-8")
+            backup = Path(tmp) / "snap"
+            backup.write_text("old\n", encoding="utf-8")
+            bak = _FileBackup(path, backup, True, "d", write_state=TargetWriteState.WRITE_STARTED)
+            result = rollback_backups([bak])
+            self.assertIn("d", result.restored)
+
+    def test_begin_rejects_unsafe_txn_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            bad_txn = root / ".spell-sync.txn"
+            bad_txn.write_text("not-a-directory", encoding="utf-8")
+            with self.assertRaises(OSError):
+                PushTransaction.begin(wordlist, [])
+
+    def test_discard_removes_empty_txn_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            snap = root / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            (snap / "file.snap").write_text("x", encoding="utf-8")
+            discard_txn_snapshots(snap, wordlist=wordlist, transaction_id="tid")
+            self.assertFalse(snap.exists())
+            self.assertFalse((root / ".spell-sync.txn").exists())
+
+    def test_backup_file_uses_explicit_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            snap = root / ".spell-sync.txn" / "tid"
+            snap.mkdir(parents=True)
+            bak = backup_file(wordlist, snap, root=root)
+            self.assertTrue(bak.existed_before)
+
+
+class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
+    def test_reject_unsafe_nonexistent(self) -> None:
+        _reject_unsafe_component(Path("/nonexistent-path-xyz"))
+
+    def test_is_reparse_point_windows_attrs(self) -> None:
+        with patch.object(sys, "platform", "win32"):
+            path = Path("fake")
+            with patch.object(Path, "is_symlink", return_value=False):
+                with patch.object(Path, "lstat") as lstat:
+                    lstat.return_value = type(
+                        "ST",
+                        (),
+                        {"st_file_attributes": 0x400},
+                    )()
+                    self.assertTrue(is_reparse_point(path))
+
+    def test_ensure_directory_eexist_not_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            target = root / "blocker" / "nested"
+            with patch("spell_sync.secure_artifacts.os.mkdir", side_effect=OSError(errno.EEXIST, "exists")):
+                with patch.object(Path, "is_dir", return_value=False):
+                    with self.assertRaises(SecureArtifactError):
+                        ensure_trusted_directory(target, root=root)
+
+    def test_atomic_write_temp_fd_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            target = root / ".spell-sync.journal.json"
+            with patch("spell_sync.secure_artifacts.tempfile.mkstemp", return_value=(5, str(target.with_suffix(".tmp")))):
+                with patch("spell_sync.secure_artifacts.os.write", side_effect=OSError(errno.EIO, "io")):
+                    with patch("spell_sync.secure_artifacts.os.close") as close_mock:
+                        with self.assertRaises(SecureArtifactError):
+                            atomic_write_trusted_file(target, b"x", root=root)
+                        close_mock.assert_any_call(5)
+
+    def test_atomic_write_temp_unlink_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            target = root / ".spell-sync.journal.json"
+            with patch("spell_sync.secure_artifacts.os.replace", side_effect=OSError(errno.EIO, "io")):
+                with patch.object(Path, "unlink", side_effect=OSError(errno.EIO, "io")):
+                    with self.assertRaises(SecureArtifactError):
+                        atomic_write_trusted_file(target, b"x", root=root)
+
+    def test_remove_file_reparse_and_non_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            link = root / "link.txt"
+            victim = root / "victim.txt"
+            victim.write_text("x", encoding="utf-8")
+            link.symlink_to(victim)
+            with self.assertRaises(SecureArtifactError):
+                remove_trusted_file(link, root=root)
+            dir_path = root / "dir"
+            ensure_trusted_directory(dir_path, root=root)
+            with self.assertRaises(SecureArtifactError):
+                remove_trusted_file(dir_path, root=root)
+
+    def test_remove_tree_missing_and_not_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            remove_trusted_tree(root / "missing", root=root)
+            file_path = root / "file.txt"
+            file_path.write_text("x", encoding="utf-8")
+            with self.assertRaises(SecureArtifactError):
+                remove_trusted_tree(file_path, root=root)
+
+    def test_remove_tree_rmdir_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("a\n", encoding="utf-8")
+            root = trusted_project_root(wordlist)
+            tree = root / "tree"
+            ensure_trusted_directory(tree, root=root)
+            with patch.object(Path, "rmdir", side_effect=OSError(errno.EBUSY, "busy")):
+                with self.assertRaises(SecureArtifactError):
+                    remove_trusted_tree(tree, root=root)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows-only branches")
+    def test_windows_private_helpers(self) -> None:
+        _chmod_private_dir(Path("."))
+        _fsync_directory(Path("."))
+        _flush_file_windows(1)
+
+    def test_windows_branches_via_platform_patch(self) -> None:
+        fake_msvcrt = MagicMock()
+        fake_msvcrt.get_osfhandle.return_value = 1
+        fake_ctypes = MagicMock()
+        with patch.object(sys, "platform", "win32"):
+            _chmod_private_dir(Path("."))
+            _fsync_directory(Path("."))
+            with patch("spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.EINVAL, "bad")):
+                with patch.dict(
+                    sys.modules,
+                    {"msvcrt": fake_msvcrt, "ctypes": fake_ctypes},
+                ):
+                    _flush_file_windows(1)
+
+
+if __name__ == "__main__":
+    unittest.main()

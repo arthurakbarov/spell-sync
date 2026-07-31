@@ -53,6 +53,24 @@ Recovery compares on-disk file hashes to journal `hash_before` / `hash_after`:
 `.spell-sync.lock` uses kernel `flock`. Only one mutating command per wordlist project at a time.
 Stale PID metadata does not override a free lock.
 
+The lock path is opened through `secure_artifacts`: symlinks, junctions, and reparse points are
+rejected; only a regular file in the project directory is written.
+
+## Internal artifact security
+
+| Artifact | Protection |
+|----------|------------|
+| `.spell-sync.lock` | No-follow open; regular file only |
+| `.spell-sync.journal.json` | Unique temp, fsync, atomic replace, parent dir sync (POSIX) |
+| `.spell-sync.txn/` | Directory containment; snapshot files created exclusively |
+
+On abort, **incomplete rollback always preserves** journal and snapshots even when journal update
+or cleanup fails. Journal begin failure before target writes removes snapshots when safe, or reports
+remaining recovery materials.
+
+Durability: atomic visibility and process-crash safety are guaranteed; power-loss durability is best
+effort (file + directory sync). See [ADR 0005](decisions/0005-secure-internal-artifacts.md).
+
 ## Fail closed
 
 - String booleans in JSON (`"false"`) → corrupt journal

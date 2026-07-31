@@ -59,7 +59,7 @@ Clusters are defined in `tests/test-impact.toml`:
 | `configuration` | Config, settings, project setup |
 | `pull` | Pull safety and flow |
 | `push` | Push writers, app guards |
-| `transaction` | Journal, lock, atomic writes |
+| `transaction` | Journal, lock, atomic writes, internal artifact security |
 | `recovery` | Recovery commands and TUI safety |
 | `tui` | Textual screens and mutation routing |
 | `cli-json` | CLI commands and JSON contracts |
@@ -162,6 +162,17 @@ agent docs change). Product pytest suites are not run during the focused loop.
 
 Changes under Pull, Push, transaction, journal, lock, or Recovery paths always include the
 matching safety cluster. The planner cannot omit these clusters.
+
+Internal artifact security changes (lock, journal temp/publication, transaction root) require:
+
+| Suite | Purpose |
+|-------|---------|
+| `tests/test_internal_artifact_security.py` | Adversarial symlink/reparse and rollback preserve |
+| `tests/test_secure_artifacts.py` | Unit coverage for `secure_artifacts` branches |
+| `tests/test_transaction_safety.py` | End-to-end mutation fault matrix |
+
+Verify victim files outside trusted root are unchanged in adversarial scenarios. Do not use real
+application dictionaries.
 
 ## Final CI evidence
 

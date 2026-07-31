@@ -104,6 +104,7 @@ validated before serialization. See ADR `docs/decisions/0004-structured-technica
 | `push_journal.py` | Journal v2 persistence and recovery |
 | `journal_schema.py` | Strict journal parsing |
 | `operation_lock.py` | Project-wide flock |
+| `secure_artifacts.py` | Trusted internal artifact filesystem (lock, journal, txn) |
 | `settings.py` | Strict TOML validation |
 
 ## Push transaction
@@ -114,6 +115,10 @@ validated before serialization. See ADR `docs/decisions/0004-structured-technica
 4. Write journal (`state: writing`) with `hash_before` / `hash_after`.
 5. Atomic replace per target; update journal per target/wordlist WAH flags.
 6. Complete journal or rollback on failure; `rollback_incomplete` preserves artifacts.
+
+Internal artifacts (lock, journal, transaction snapshots) use `secure_artifacts.py`: no symlink or
+reparse-point follow, containment under project root, exclusive temp publication with fsync. See
+[ADR 0005](decisions/0005-secure-internal-artifacts.md).
 
 ## Config
 
