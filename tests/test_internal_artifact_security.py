@@ -19,7 +19,7 @@ from spell_sync.push_journal import (
     journal_path_for_wordlist,
 )
 from spell_sync.push_transaction import PushTransaction, TargetWriteState, _FileBackup
-from spell_sync.secure_artifacts import SecureArtifactError, atomic_write_trusted_file
+from spell_sync.secure_artifacts import atomic_write_trusted_file
 
 
 class TestSecureArtifacts(unittest.TestCase):

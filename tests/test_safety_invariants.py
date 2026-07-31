@@ -138,10 +138,15 @@ class TestBackupKeepZeroRollback(unittest.TestCase):
 
             original_write_rendered = push_prepared.write_rendered
 
-            def flaky_write_rendered(path, rendered, *, settings):
+            def flaky_write_rendered(path, rendered, *, settings, **kwargs):
                 write_count["n"] += 1
                 if write_count["n"] == 1:
-                    return original_write_rendered(path, rendered, settings=settings)
+                    return original_write_rendered(
+                        path,
+                        rendered,
+                        settings=settings,
+                        keep_backup=kwargs.get("keep_backup", True),
+                    )
                 return False
 
             with (
@@ -544,10 +549,12 @@ class TestSafetyCoverageExtras(unittest.TestCase):
         from spell_sync.push_transaction import discard_txn_snapshots
 
         with tempfile.TemporaryDirectory() as d:
+            wordlist = Path(d) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
             root = Path(d) / ".spell-sync.txn" / "tid"
             root.mkdir(parents=True)
             (root / "x.snap").write_text("a", encoding="utf-8")
-            discard_txn_snapshots(root)
+            discard_txn_snapshots(root, wordlist=wordlist, transaction_id="tid")
             self.assertFalse(root.exists())
             discard_txn_snapshots(None)
 

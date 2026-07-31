@@ -43,7 +43,7 @@ class TestLimitationBackupFail(unittest.TestCase):
                     raise OSError("backup failed")
                 return original_copy2(src, dst, *args, **kwargs)
 
-            def flaky_render(path, rendered, *, settings):
+            def flaky_render(path, rendered, *, settings, **kwargs):
                 if Path(path).name == "b.txt":
                     return False
                 return True

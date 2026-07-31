@@ -266,7 +266,7 @@ class TestPushPreparedCoverage(unittest.TestCase):
             assert not isinstance(prepared, ExitCode)
             with patch(
                 "spell_sync.push_prepared.write_rendered",
-                side_effect=lambda path, rendered, *, settings: path.name != "dict.txt",
+                side_effect=lambda path, rendered, *, settings, **kwargs: path.name != "dict.txt",
             ):
                 result = execute_prepared_push(
                     prepared,
@@ -377,7 +377,7 @@ class TestPushTransactionChmodCoverage(unittest.TestCase):
             dict_path = Path(d) / "dict.txt"
             wordlist.write_text("a\n", encoding="utf-8")
             dict_path.write_text("a\n", encoding="utf-8")
-            with patch("spell_sync.push_transaction.os.chmod", side_effect=OSError("nope")):
+            with patch("spell_sync.secure_artifacts.os.chmod", side_effect=OSError("nope")):
                 tx = PushTransaction.begin(
                     wordlist,
                     [Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
@@ -717,7 +717,7 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             )
             with patch(
                 "spell_sync.push_prepared.write_rendered",
-                side_effect=lambda path, payload, *, settings: path.name != "wordlist.txt",
+                side_effect=lambda path, payload, *, settings, **kwargs: path.name != "wordlist.txt",
             ):
                 result = execute_prepared_push(
                     prepared,
@@ -960,6 +960,7 @@ class TestPushJournalRemainingBranches(unittest.TestCase):
 
 class TestPushTransactionSnapChmod(unittest.TestCase):
     def test_snap_file_chmod_oserror(self):
+        from spell_sync.project import ProjectContext
         from spell_sync.push_transaction import _recovery_snapshot, txn_snapshot_root
 
         with tempfile.TemporaryDirectory() as d:
@@ -968,19 +969,20 @@ class TestPushTransactionSnapChmod(unittest.TestCase):
             wordlist.write_text("a\n", encoding="utf-8")
             dict_path.write_text("a\n", encoding="utf-8")
             snap_dir = txn_snapshot_root(wordlist, str(uuid.uuid4()))
-            real_chmod = os.chmod
-            file_chmods = [0]
+            from spell_sync.secure_artifacts import prepare_trusted_txn_root
 
-            def wrapped(path, mode, *args, **kwargs):
-                if Path(path).is_file():
-                    file_chmods[0] += 1
-                    if file_chmods[0] > 1:
-                        raise OSError("nope")
-                return real_chmod(path, mode, *args, **kwargs)
+            prepare_trusted_txn_root(wordlist, snap_dir.name)
+            root = ProjectContext.build(wordlist).project_dir
+            chmod_calls = [0]
+
+            def flaky_fchmod(fd, mode):
+                chmod_calls[0] += 1
+                if chmod_calls[0] > 1:
+                    raise OSError("nope")
 
             with patch("spell_sync.push_transaction.create_bak_backup"):
-                with patch("spell_sync.push_transaction.os.chmod", side_effect=wrapped):
-                    backup = _recovery_snapshot(dict_path, snap_dir, label="d")
+                with patch("spell_sync.secure_artifacts._fchmod_private", side_effect=flaky_fchmod):
+                    backup = _recovery_snapshot(dict_path, snap_dir, root=root, label="d")
             self.assertIsNotNone(backup.backup)
 
 

@@ -26,6 +26,8 @@ def _combined_reason(*parts: str) -> str:
         return ordered[0]
     if "rollback_incomplete" in ordered and "journal_update_failed" in ordered:
         return "journal_update_failed"
+    if "rollback_incomplete" in ordered:
+        return "rollback_incomplete"
     return ordered[0]
 
 

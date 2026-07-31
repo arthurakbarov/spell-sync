@@ -88,7 +88,7 @@ class TestPushTransaction(unittest.TestCase):
             ]
             run = make_sync_run(wordlist, dictionaries=dictionaries)
 
-            def flaky_render(path, rendered, *, settings):
+            def flaky_render(path, rendered, *, settings, **kwargs):
                 if Path(path).name == "b.txt":
                     return False
                 return True

@@ -92,24 +92,34 @@ def _plan_backup_path(path: Path, temp_dir: Path, *, label: str = "plan") -> _Fi
     return _FileBackup(path, tmp_target, True, label)
 
 
+def _artifact_root(backup_dir: Path, root: Path | None) -> Path:
+    if root is not None:
+        return root
+    if backup_dir.parent.name == ".spell-sync.txn":
+        return backup_dir.parent.parent
+    return backup_dir.parent
+
+
 def backup_file(
     path: Path,
     backup_dir: Path,
     *,
-    root: Path,
+    root: Path | None = None,
     label: str = "wordlist",
 ) -> _FileBackup:
-    return _recovery_snapshot(path, backup_dir, root=root, label=label)
+    return _recovery_snapshot(path, backup_dir, root=_artifact_root(backup_dir, root), label=label)
 
 
 def backup_dictionaries(
     dictionaries: List[Dictionary],
     backup_dir: Path,
     *,
-    root: Path,
+    root: Path | None = None,
 ) -> List[_FileBackup]:
+    effective_root = _artifact_root(backup_dir, root)
     return [
-        _recovery_snapshot(Path(d.path), backup_dir, root=root, label=d.name) for d in dictionaries
+        _recovery_snapshot(Path(d.path), backup_dir, root=effective_root, label=d.name)
+        for d in dictionaries
     ]
 
 
