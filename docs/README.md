@@ -70,6 +70,7 @@ Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLE
 | [EXECUTION_TIME_CONTROL.md](EXECUTION_TIME_CONTROL.md) | CI timing and admission |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Evidence, snapshot, agent rules |
 | [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md) | 0.3 migration tracker |
+| [DEAD_DIRECTORY_AUDIT.md](DEAD_DIRECTORY_AUDIT.md) | Maintainer workspace dead-path inventory (report only) |
 
 Private maintainer tooling and snapshot policy live in the separate `spell-sync-dev`
 repository (not shipped with this package).

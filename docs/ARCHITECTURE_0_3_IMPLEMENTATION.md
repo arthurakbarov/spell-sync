@@ -28,14 +28,14 @@ phase-5: complete
 phase-6: complete
 phase-7: complete
 phase-8: complete
-phase-9: in-progress
+phase-9: awaiting-approval
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `2cc6784` Phase 8 CI evidence in tracker | yes |
+| spell-sync | `e59a90b` accept phase 8, advance to phase 9 | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -472,6 +472,30 @@ full final CI on committed clean HEAD 3c6bc35
 - final CI evidence bound to HEAD `3c6bc35`, run `20260731T104234.254905Z`;
 - package version remains `0.2.1`.
 
+## Phase 9 — Dead directory audit
+
+**Status:** awaiting approval
+
+### Goal
+
+Inventory obsolete and generated paths in the maintainer workspace (`~/code/`). Report
+only — no automated deletion.
+
+### Delivered
+
+- `docs/DEAD_DIRECTORY_AUDIT.md` — categorized inventory (safe generated, obsolete,
+  likely stale, keep, stashes)
+- Linked from `docs/README.md` (Maintainers)
+
+### Phase-specific validation (passed)
+
+```text
+python3 scripts/check-agent-config.py
+python3 scripts/check-docs-contract.py
+python3 scripts/run_lightweight_validation.py
+python3 scripts/check-ci-evidence.py
+```
+
 ## Phase 2B: complete application boundary
 
 ### CLI bypass inventory (resolved)
@@ -583,7 +607,8 @@ Summary:
 ## Last validation
 
 ```text
-Phase 8 (awaiting approval): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
+Phase 9 (awaiting approval): HEAD pending; docs-only audit report; lightweight validation
+Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
 Phase 6 (accepted): HEAD f82ed58; full CI finalEvidence=true (20260728T074706.122702Z); architecture.boundaries pass
 Phase 5 (accepted): HEAD 7985302; full CI finalEvidence=true (20260723T034038.010703Z)
@@ -592,9 +617,8 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-Phases 9–10 on public spell-sync repository (see migration order):
+Phase 10 on public spell-sync repository (see migration order):
 
-9. Dead directory audit (report only)
 10. Version 0.3.0
 
 ## Deferred work
