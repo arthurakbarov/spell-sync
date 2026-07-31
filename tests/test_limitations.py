@@ -3,6 +3,7 @@
 """Tests for documented edge-case limitations."""
 
 import os
+from spell_sync.secure_artifacts import copy_trusted_snapshot_file
 import shutil
 import tempfile
 import unittest
@@ -36,12 +37,17 @@ class TestLimitationBackupFail(unittest.TestCase):
                     Dictionary("b", path_b, DictionaryFormat.TEXT),
                 ],
             )
-            original_copy2 = shutil.copy2
+            original_copy = copy_trusted_snapshot_file
 
-            def flaky_copy2(src, dst, *args, **kwargs):
-                if os.path.basename(str(src)) == "a.txt":
+            def flaky_snapshot(snapshot_dir, *, root, base_name, source):
+                if os.path.basename(str(source)) == "a.txt":
                     raise OSError("backup failed")
-                return original_copy2(src, dst, *args, **kwargs)
+                return original_copy(
+                    snapshot_dir,
+                    root=root,
+                    base_name=base_name,
+                    source=source,
+                )
 
             def flaky_render(path, rendered, *, settings, **kwargs):
                 if Path(path).name == "b.txt":
@@ -49,7 +55,7 @@ class TestLimitationBackupFail(unittest.TestCase):
                 return True
 
             with (
-                patch("spell_sync.push_transaction.shutil.copy2", flaky_copy2),
+                patch("spell_sync.push_transaction.copy_trusted_snapshot_file", flaky_snapshot),
                 patch("spell_sync.push_prepared.write_rendered", flaky_render),
             ):
                 result = run.push_from_wordlist()
@@ -76,7 +82,7 @@ class TestLimitationBackupFail(unittest.TestCase):
             )
             side_effect = OSError("snap fail")
             with patch(
-                "spell_sync.push_transaction.shutil.copy2",
+                "spell_sync.push_transaction.copy_trusted_snapshot_file",
                 side_effect=side_effect,
             ):
                 result = run.push_from_wordlist()
@@ -95,14 +101,19 @@ class TestLimitationBackupFail(unittest.TestCase):
                 wordlist,
                 dictionaries=[Dictionary("a", dict_path, DictionaryFormat.TEXT)],
             )
-            original_copy2 = shutil.copy2
+            original_copy = copy_trusted_snapshot_file
 
-            def flaky_copy2(src, dst, *args, **kwargs):
-                if os.path.basename(str(src)) == "a.txt":
+            def flaky_snapshot(snapshot_dir, *, root, base_name, source):
+                if os.path.basename(str(source)) == "a.txt":
                     raise OSError("backup failed")
-                return original_copy2(src, dst, *args, **kwargs)
+                return original_copy(
+                    snapshot_dir,
+                    root=root,
+                    base_name=base_name,
+                    source=source,
+                )
 
-            with patch("spell_sync.push_transaction.shutil.copy2", flaky_copy2):
+            with patch("spell_sync.push_transaction.copy_trusted_snapshot_file", flaky_snapshot):
                 result = run.push_from_wordlist()
 
             self.assertEqual(result, ExitCode.PUSH_ABORT)

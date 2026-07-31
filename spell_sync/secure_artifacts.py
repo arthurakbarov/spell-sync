@@ -18,7 +18,6 @@ from .project import ProjectContext
 from .trusted_internal_fs import (
     TrustedDirectory,
     TrustedFsError,
-    TrustedRoot,
     relative_components,
     set_open_boundary_hook,
     validate_relative_name,

@@ -21,6 +21,7 @@ from service_test_utils import (
 
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
+from spell_sync.secure_artifacts import copy_trusted_snapshot_file
 import spell_sync.lint as lint_mod
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
@@ -80,14 +81,19 @@ class TestPushStrict(unittest.TestCase):
                 Dictionary("fail", path_fail, DictionaryFormat.TEXT),
             ]
             run = make_sync_run(wordlist, dictionaries=dictionaries, strict_push=True)
-            original_copy2 = shutil.copy2
+            original_copy = copy_trusted_snapshot_file
 
-            def selective_copy2(src, dst, *args, **kwargs):
-                if os.path.basename(str(src)) == "fail.txt":
+            def selective_snapshot(snapshot_dir, *, root, base_name, source):
+                if os.path.basename(str(source)) == "fail.txt":
                     raise OSError("backup failed")
-                return original_copy2(src, dst, *args, **kwargs)
+                return original_copy(
+                    snapshot_dir,
+                    root=root,
+                    base_name=base_name,
+                    source=source,
+                )
 
-            with patch("spell_sync.push_transaction.shutil.copy2", selective_copy2):
+            with patch("spell_sync.push_transaction.copy_trusted_snapshot_file", selective_snapshot):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     result = run.push_from_wordlist()

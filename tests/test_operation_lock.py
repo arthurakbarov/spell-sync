@@ -203,7 +203,7 @@ class TestOperationLock(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             with (
                 patch("spell_sync.operation_lock._try_acquire_fd", return_value=False),
-                patch("spell_sync.operation_lock._read_lock_info", return_value=None),
+                patch("spell_sync.operation_lock._read_lock_info_fd", return_value=None),
             ):
                 with self.assertRaises(OperationLocked) as ctx:
                     with acquire_operation_lock(wordlist, "push"):
@@ -216,7 +216,7 @@ class TestOperationLock(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
-            with patch("spell_sync.operation_lock.os.close", side_effect=OSError("nope")):
+            with patch("spell_sync.operation_lock._close_lock_fd", side_effect=OSError("nope")):
                 with acquire_operation_lock(wordlist, "push"):
                     pass
 
@@ -245,6 +245,7 @@ class TestOperationLockWin32(unittest.TestCase):
         mock_ctypes.windll.kernel32.OpenProcess.return_value = 1
         with (
             patch("spell_sync.operation_lock.sys.platform", "win32"),
+            patch("spell_sync.trusted_internal_fs.sys.platform", "win32"),
             patch.dict(sys.modules, {"msvcrt": msvcrt, "ctypes": mock_ctypes}),
         ):
             from spell_sync.operation_lock import _pid_alive
@@ -254,8 +255,15 @@ class TestOperationLockWin32(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 wordlist = Path(d) / "wordlist.txt"
                 wordlist.write_text("alpha\n", encoding="utf-8")
-                with acquire_operation_lock(wordlist, "push"):
-                    pass
+                lock_path = lock_path_for_wordlist(wordlist)
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+                with patch(
+                    "spell_sync.operation_lock.open_trusted_regular_file",
+                    return_value=lock_fd,
+                ):
+                    with acquire_operation_lock(wordlist, "push"):
+                        pass
         self.assertTrue(msvcrt.locking.called)
 
     def test_win32_pid_not_alive(self):
@@ -263,6 +271,7 @@ class TestOperationLockWin32(unittest.TestCase):
         mock_ctypes.windll.kernel32.OpenProcess.return_value = 0
         with (
             patch("spell_sync.operation_lock.sys.platform", "win32"),
+            patch("spell_sync.trusted_internal_fs.sys.platform", "win32"),
             patch.dict(sys.modules, {"ctypes": mock_ctypes}),
         ):
             from spell_sync.operation_lock import _pid_alive
@@ -275,14 +284,22 @@ class TestOperationLockWin32(unittest.TestCase):
         msvcrt.locking.side_effect = OSError("locked")
         with (
             patch("spell_sync.operation_lock.sys.platform", "win32"),
+            patch("spell_sync.trusted_internal_fs.sys.platform", "win32"),
             patch.dict(sys.modules, {"msvcrt": msvcrt}),
         ):
             with tempfile.TemporaryDirectory() as d:
                 wordlist = Path(d) / "wordlist.txt"
                 wordlist.write_text("alpha\n", encoding="utf-8")
-                with self.assertRaises(OperationLocked):
-                    with acquire_operation_lock(wordlist, "pull"):
-                        pass
+                lock_path = lock_path_for_wordlist(wordlist)
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+                with patch(
+                    "spell_sync.operation_lock.open_trusted_regular_file",
+                    return_value=lock_fd,
+                ):
+                    with self.assertRaises(OperationLocked):
+                        with acquire_operation_lock(wordlist, "pull"):
+                            pass
 
     def test_win32_release_oserror(self):
         msvcrt = mock.MagicMock()
@@ -290,6 +307,7 @@ class TestOperationLockWin32(unittest.TestCase):
         msvcrt.locking.side_effect = OSError("unlock failed")
         with (
             patch("spell_sync.operation_lock.sys.platform", "win32"),
+            patch("spell_sync.trusted_internal_fs.sys.platform", "win32"),
             patch.dict(sys.modules, {"msvcrt": msvcrt}),
         ):
             from spell_sync.operation_lock import _release_fd

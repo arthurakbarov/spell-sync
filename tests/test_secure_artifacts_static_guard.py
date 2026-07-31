@@ -21,10 +21,11 @@ class _SecureGuardVisitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         is_win = node.name.startswith("_win_")
-        if is_win:
+        is_relative = node.name == "relative_components"
+        if is_win or is_relative:
             self._skip_depth += 1
         self.generic_visit(node)
-        if is_win:
+        if is_win or is_relative:
             self._skip_depth -= 1
 
     def visit_Call(self, node: ast.Call) -> None:

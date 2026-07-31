@@ -242,12 +242,19 @@ class TestStrictPushSymlinkBackup(unittest.TestCase):
             write_text_words(real, ["stale"], "utf-8", False, quiet=True)
             os.symlink(real, link)
 
-            original_copy = push_tx.shutil.copy2
+            from spell_sync.secure_artifacts import copy_trusted_snapshot_file
 
-            def selective_copy(src, dst, **kwargs):
-                if Path(src).resolve() == Path(real).resolve():
+            original_copy = copy_trusted_snapshot_file
+
+            def selective_snapshot(snapshot_dir, *, root, base_name, source):
+                if Path(source).resolve() == Path(real).resolve():
                     raise OSError("backup denied")
-                return original_copy(src, dst, **kwargs)
+                return original_copy(
+                    snapshot_dir,
+                    root=root,
+                    base_name=base_name,
+                    source=source,
+                )
 
             run = make_sync_run(
                 wordlist,
@@ -257,7 +264,10 @@ class TestStrictPushSymlinkBackup(unittest.TestCase):
                 ],
                 strict_push=True,
             )
-            with patch.object(push_tx.shutil, "copy2", side_effect=selective_copy):
+            with patch(
+                "spell_sync.push_transaction.copy_trusted_snapshot_file",
+                side_effect=selective_snapshot,
+            ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     result = run.push_from_wordlist()

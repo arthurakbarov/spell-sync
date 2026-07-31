@@ -226,10 +226,10 @@ class TestJournalCompletion(unittest.TestCase):
                 )
                 journal_path = wordlist.parent / ".spell-sync.journal.json"
 
-                def fail_unlink(*_args, **_kwargs):
-                    raise OSError("simulated unlink failure")
-
-                with patch.object(Path, "unlink", fail_unlink):
+                with patch(
+                    "spell_sync.push_journal.remove_trusted_file",
+                    side_effect=OSError("simulated unlink failure"),
+                ):
                     session.complete()
                 loaded = load_journal_result(wordlist)
                 self.assertEqual(loaded.status, JournalLoadStatus.VALID_COMPLETED)

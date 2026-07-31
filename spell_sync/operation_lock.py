@@ -85,6 +85,18 @@ def _pid_alive(pid: int) -> bool:
     return _pid_alive_unix(pid)  # pragma: no cover
 
 
+def _read_lock_info(path: Path) -> OperationLockInfo | None:
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        return _read_lock_info_fd(fd)
+    finally:
+        os.close(fd)
+
+
 def _read_lock_info_fd(fd: int) -> OperationLockInfo | None:
     try:
         os.lseek(fd, 0, os.SEEK_SET)
@@ -196,13 +208,17 @@ def _unknown_lock_info(wordlist: Path) -> OperationLockInfo:
 def read_active_operation_lock(wordlist: Path) -> OperationLockInfo | None:
     """Return lock metadata when another live process holds the project lock."""
     status, info = _probe_lock_file(wordlist)
-    if status in {"unsafe", "unreadable"}:
+    if status in {"unsafe", "unreadable", "absent"}:
         return None
-    if status == "absent" or info is None:
-        return None
+    if info is None:
+        return _unknown_lock_info(wordlist)
     if info.pid and _pid_alive(info.pid):
         return info
     return None
+
+
+def _close_lock_fd(fd: int) -> None:
+    os.close(fd)
 
 
 @contextmanager
@@ -244,6 +260,6 @@ def acquire_operation_lock(wordlist: Path, command: str) -> Iterator[OperationLo
             _release_fd(fd)
     finally:
         try:
-            os.close(fd)
+            _close_lock_fd(fd)
         except OSError:  # pragma: no cover -- rare fd close failure; exercised on Unix CI
             pass

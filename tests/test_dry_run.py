@@ -94,7 +94,22 @@ class TestDryRun(unittest.TestCase):
                     raise OSError("backup failed")
                 return original_copy2(src, dst, *args, **kwargs)
 
-            with patch("spell_sync.push_transaction.shutil.copy2", flaky_copy2):
+            def flaky_snapshot(snapshot_dir, *, root, base_name, source):
+                if os.path.basename(str(source)) == "a.txt":
+                    raise OSError("backup failed")
+                from spell_sync.secure_artifacts import copy_trusted_snapshot_file as real_copy
+
+                return real_copy(
+                    snapshot_dir,
+                    root=root,
+                    base_name=base_name,
+                    source=source,
+                )
+
+            with (
+                patch("spell_sync.push_transaction.shutil.copy2", flaky_copy2),
+                patch("spell_sync.push_transaction.copy_trusted_snapshot_file", flaky_snapshot),
+            ):
                 plan = run.plan_push()
                 push = run.push_from_wordlist()
 
