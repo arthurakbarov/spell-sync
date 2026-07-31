@@ -37,7 +37,7 @@ phase-10: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `9069783` Phase 10 CI evidence in tracker | yes |
+| spell-sync | `9f5e83c` Phase 10 tracker baseline aligned | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -645,7 +645,7 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (awaiting approval): HEAD e46ce45; full CI finalEvidence=true (20260731T110156.184380Z); version 0.3.0
+Phase 10 (awaiting approval): HEAD 9069783; full CI finalEvidence=true (20260731T110156.184380Z @ e46ce45); version 0.3.0
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)
