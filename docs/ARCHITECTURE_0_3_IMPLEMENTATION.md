@@ -11,10 +11,11 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 ## Current phase
 
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
-Phase 8: agent configuration refresh — **current**, awaiting approval.
+Phase 8: agent configuration refresh — **complete** (owner-approved).
+Phase 9: dead directory audit — **current**, awaiting approval.
 
 [architecture-status:start]
-current: phase-8
+current: phase-9
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -26,14 +27,15 @@ phase-4: complete
 phase-5: complete
 phase-6: complete
 phase-7: complete
-phase-8: awaiting-approval
+phase-8: complete
+phase-9: in-progress
 [architecture-status:end]
 
 ## Verified baseline
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `3c6bc35` agent configuration refresh (Phase 8) | yes |
+| spell-sync | `2cc6784` Phase 8 CI evidence in tracker | yes |
 | spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
 | spell-words | `3e5bc29` | yes |
 
@@ -441,7 +443,7 @@ full final CI on committed clean HEAD 9a08a7e
 
 ## Phase 8 — Agent configuration refresh
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved)
 
 ### Goal
 
@@ -463,6 +465,12 @@ python3 scripts/check-docs-contract.py
 python3 scripts/check-architecture.py --check
 full final CI on committed clean HEAD 3c6bc35
 ```
+
+### Owner acceptance (recorded)
+
+- agent rules, skills, `AGENTS.md`, and validator refreshed for 0.3 architecture;
+- final CI evidence bound to HEAD `3c6bc35`, run `20260731T104234.254905Z`;
+- package version remains `0.2.1`.
 
 ## Phase 2B: complete application boundary
 
@@ -569,6 +577,8 @@ Summary:
 - Phase 4: focused application services and thin facade (owner-approved)
 - Phase 5: structured technical events and polish (owner-approved)
 - Phase 6: architecture validator and project map (owner-approved)
+- Phase 7: documentation reorganization and ADRs (owner-approved)
+- Phase 8: agent configuration refresh (owner-approved)
 
 ## Last validation
 
