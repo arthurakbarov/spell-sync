@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import io
 import os
-import shutil
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -21,13 +20,13 @@ from service_test_utils import (
 
 import spell_sync.command_helpers as command_helpers
 import spell_sync.commands as commands
-from spell_sync.secure_artifacts import copy_trusted_snapshot_file
 import spell_sync.lint as lint_mod
 from spell_sync.cli_options import CliOptions
 from spell_sync.dictionaries import Dictionary, DictionaryFormat
 from spell_sync.exit_codes import ExitCode
 from spell_sync.io import read_text_words, write_text_words
 from spell_sync.runtime_settings import RuntimeSettings
+from spell_sync.secure_artifacts import copy_trusted_snapshot_file
 from spell_sync.skip_reasons import PushSkipReason
 from spell_sync.sync_run import PushResult
 from tests.runtime_helpers import make_sync_run
@@ -93,7 +92,9 @@ class TestPushStrict(unittest.TestCase):
                     source=source,
                 )
 
-            with patch("spell_sync.push_transaction.copy_trusted_snapshot_file", selective_snapshot):
+            with patch(
+                "spell_sync.push_transaction.copy_trusted_snapshot_file", selective_snapshot
+            ):
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     result = run.push_from_wordlist()

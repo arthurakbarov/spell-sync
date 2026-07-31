@@ -230,7 +230,6 @@ class TestExportThroughSymlink(unittest.TestCase):
 @unittest.skipUnless(_can_create_symlinks(), _symlink_skip_reason())
 class TestStrictPushSymlinkBackup(unittest.TestCase):
     def test_strict_aborts_when_symlink_dict_backup_fails(self):
-        import spell_sync.push_transaction as push_tx
 
         with tempfile.TemporaryDirectory() as tmp:
             wordlist = os.path.join(tmp, "wordlist.txt")
