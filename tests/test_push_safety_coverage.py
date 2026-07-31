@@ -717,7 +717,9 @@ class TestPushPreparedRemainingBranches(unittest.TestCase):
             )
             with patch(
                 "spell_sync.push_prepared.write_rendered",
-                side_effect=lambda path, payload, *, settings, **kwargs: path.name != "wordlist.txt",
+                side_effect=lambda path, payload, *, settings, **kwargs: (
+                    path.name != "wordlist.txt"
+                ),
             ):
                 result = execute_prepared_push(
                     prepared,
