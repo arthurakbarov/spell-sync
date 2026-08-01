@@ -394,7 +394,7 @@ class TestRemainingCoverage(unittest.TestCase):
                 wordlist_write_started=True,
                 wordlist_write_completed=True,
             )
-            with patch("spell_sync.push_journal.shutil.rmtree", side_effect=OSError("busy")):
+            with patch("spell_sync.push_journal.remove_trusted_tree", side_effect=OSError("busy")):
                 ok, detail = safe_discard_txn_snapshots(
                     wordlist,
                     journal.transaction_id,

@@ -343,6 +343,8 @@ class TestPhase4FacadeCoverage(unittest.TestCase):
             ExitCode.PUSH_ABORT,
             "rollback_incomplete",
             "incomplete",
+            recovery_required=True,
+            rollback_incomplete=True,
         )
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
