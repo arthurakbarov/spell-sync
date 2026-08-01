@@ -212,6 +212,52 @@ def _venv_python(venv_dir: Path) -> Path:
     raise RuntimeError("compatibility.wheel-venv-failed")
 
 
+def _wheel_build_invocation(
+    host_python: str,
+    *,
+    project_root: Path,
+    outdir: Path,
+    work_dir: Path,
+) -> tuple[list[str], Path]:
+    """Build wheel without cwd ``build/`` artifact shadowing the PyPI ``build`` module."""
+    project_arg = str(project_root.resolve())
+    out_arg = str(outdir.resolve())
+    if shutil.which("uv") and (project_root / "uv.lock").is_file():
+        argv = [
+            _resolve_uv_executable(),
+            "run",
+            "--isolated",
+            "--with",
+            "build",
+            "--with",
+            "wheel",
+            "--with",
+            "setuptools>=77",
+            "python",
+            "-m",
+            "build",
+            "-w",
+            "-n",
+            "--outdir",
+            out_arg,
+            project_arg,
+        ]
+        return argv, work_dir
+    return (
+        [
+            host_python,
+            "-m",
+            "build",
+            "-w",
+            "-n",
+            "--outdir",
+            out_arg,
+            project_arg,
+        ],
+        work_dir,
+    )
+
+
 def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]], int, str]:
     results: list[dict[str, object]] = []
     with tempfile.TemporaryDirectory(prefix="spell-sync-compat-") as tmp:
@@ -222,9 +268,15 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
         work_dir = tmp_path / "work"
         work_dir.mkdir()
 
+        build_argv, build_cwd = _wheel_build_invocation(
+            host_python,
+            project_root=ROOT,
+            outdir=build_dir,
+            work_dir=work_dir,
+        )
         rc, output = _run(
-            [host_python, "-m", "build", "-w", "-n", "--outdir", str(build_dir)],
-            cwd=ROOT,
+            build_argv,
+            cwd=build_cwd,
             env=_clean_wheel_env(os.environ),
         )
         results.append(
