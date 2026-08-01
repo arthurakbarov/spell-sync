@@ -44,17 +44,40 @@ def _editor_dictionary(home: Path) -> Path:
     return user_path / EDITOR_DICT_FILENAME
 
 
+def _load_compatibility_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_compatibility_checks",
+        _repo_root() / "scripts" / "run_compatibility_checks.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 @pytest.fixture(scope="module")
 def installed_spell_sync(tmp_path_factory):
     root = _repo_root()
     build_dir = tmp_path_factory.mktemp("wheel-build")
+    compat = _load_compatibility_module()
+    work_dir = build_dir / "work"
+    work_dir.mkdir(exist_ok=True)
+    build_argv, build_cwd = compat._wheel_build_invocation(
+        sys.executable,
+        project_root=root,
+        outdir=build_dir,
+        work_dir=work_dir,
+    )
     try:
         subprocess.run(
-            [sys.executable, "-m", "build", "-w", "-n", "--outdir", str(build_dir)],
-            cwd=root,
+            build_argv,
+            cwd=build_cwd,
             check=True,
             capture_output=True,
             text=True,
+            env=compat._clean_wheel_env(os.environ),
         )
         _remove_build_artifacts(root)
         wheels = list(build_dir.glob("*.whl"))
