@@ -590,6 +590,15 @@ class TestRemainingCoverage(unittest.TestCase):
     def test_discard_txn_snapshots_none(self):
         discard_txn_snapshots(None, wordlist=None)
 
+    def test_discard_txn_snapshots_swallows_remove_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            snap = wordlist.parent / ".spell-sync.txn" / "abc"
+            snap.mkdir(parents=True)
+            with patch("spell_sync.push_journal.remove_trusted_tree", side_effect=OSError("busy")):
+                discard_txn_snapshots(snap, wordlist=wordlist)
+
     def test_safe_discard_snapshot_missing_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist = Path(tmp) / "wordlist.txt"
