@@ -111,6 +111,33 @@ def _project_python(root: Path, fallback: str) -> str:
     return fallback
 
 
+def _uv_isolated_tool_argv(*packages: str) -> list[str] | None:
+    uv = shutil.which("uv")
+    if not uv:
+        return None
+    command = [uv, "run", "--isolated"]
+    for package in packages:
+        command.extend(["--with", package])
+    command.append("python")
+    return command
+
+
+def _packaging_build_invocation(root: Path, py: str) -> tuple[list[str], Path]:
+    work_dir = root / ".artifacts" / "packaging-cwd"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    uv_tool = _uv_isolated_tool_argv("build", "wheel", "setuptools>=77")
+    if uv_tool is not None and (root / "uv.lock").is_file():
+        return [*uv_tool, "-m", "build", str(root.resolve())], work_dir
+    return [py, "-m", "build"], root
+
+
+def _packaging_twine_argv(py: str, artifacts: list[str]) -> list[str]:
+    uv_tool = _uv_isolated_tool_argv("twine")
+    if uv_tool is not None:
+        return [*uv_tool, "-m", "twine", "check", *artifacts]
+    return [py, "-m", "twine", "check", *artifacts]
+
+
 def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     from scripts.test_groups import GROUP_ORDER, pytest_command_for_group
 
@@ -1464,10 +1491,11 @@ class CiRunner:
             shutil.rmtree(self.root / "build", ignore_errors=True)
             shutil.rmtree(self.root / "dist", ignore_errors=True)
             shutil.rmtree(self.root / "spell_sync.egg-info", ignore_errors=True)
+            build_argv, build_cwd = _packaging_build_invocation(self.root, py)
             build_rc, build_out, build_timing = self._run_check(
                 "packaging.build",
-                [py, "-m", "build"],
-                cwd=self.root,
+                build_argv,
+                cwd=build_cwd,
             )
             self.record("packaging.build", build_rc, build_out, timing=build_timing)
             if build_rc != 0:
@@ -1478,7 +1506,7 @@ class CiRunner:
             if not dist_artifacts:
                 self.record("packaging.twine", 1, "", "no artifacts in dist/")
                 return self._finish_with_gate(1)
-            twine_argv = [py, "-m", "twine", "check", *[str(path) for path in dist_artifacts]]
+            twine_argv = _packaging_twine_argv(py, [str(path) for path in dist_artifacts])
             twine_rc, twine_out, twine_timing = self._run_check(
                 "packaging.twine",
                 twine_argv,
