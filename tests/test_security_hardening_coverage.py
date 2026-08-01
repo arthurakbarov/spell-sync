@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import errno
+import io
+import json
 import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -209,6 +212,7 @@ class TestJournalBeginFailure(unittest.TestCase):
             ):
                 result = _abort_journal_begin_failure(tx, OSError("journal fail"))
             self.assertTrue(result.recovery_materials_preserved)
+            self.assertTrue(result.recovery_required)
 
 
 class TestMutationGuardsLockRejected(unittest.TestCase):
@@ -551,6 +555,28 @@ class TestRemainingCoverageGaps(unittest.TestCase):
             snap = root / ".spell-sync.txn" / "tid"
             snap.mkdir(parents=True)
             self.assertEqual(_artifact_root(snap, None), root)
+
+
+class TestPushCliRecoveryJson(unittest.TestCase):
+    def test_finish_push_json_includes_recovery_required(self) -> None:
+        from spell_sync.cli_options import CliOptions
+        from spell_sync.command_helpers import finish_push
+        from spell_sync.exit_codes import ExitCode
+        from spell_sync.json_output import reset_json_emission
+
+        reset_json_emission()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = finish_push(
+                ExitCode.PUSH_ABORT,
+                CliOptions(json_output=True),
+                recovery_required=True,
+                outcome="recovery_required",
+            )
+        self.assertEqual(code, int(ExitCode.PUSH_ABORT))
+        payload = json.loads(buf.getvalue())
+        self.assertTrue(payload["recovery_required"])
+        self.assertEqual(payload["outcome"], "recovery_required")
 
 
 if __name__ == "__main__":

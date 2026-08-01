@@ -31,6 +31,7 @@ from .secure_artifacts import (
     atomic_write_trusted_file,
     read_trusted_regular_file,
     remove_trusted_file,
+    remove_trusted_tree,
     trusted_project_root,
 )
 
@@ -770,13 +771,14 @@ def safe_discard_txn_snapshots(
         return False, str(exc)
     if snap is None:
         return True, None
+    root = trusted_project_root(wordlist)
     try:
-        shutil.rmtree(snap)
+        remove_trusted_tree(snap, root=root)
         parent = snap.parent
         if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
             parent.rmdir()
         return True, None
-    except OSError as exc:
+    except (SecureArtifactError, OSError) as exc:
         return False, str(exc)
 
 
@@ -798,18 +800,23 @@ def safe_discard_journal_file(wordlist: Path) -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-def discard_txn_snapshots(snapshot_dir: Path | None) -> None:
-    if snapshot_dir is None:
+def discard_txn_snapshots(
+    snapshot_dir: Path | None,
+    *,
+    wordlist: Path | None = None,
+) -> None:
+    if snapshot_dir is None or wordlist is None:
         return
+    root = trusted_project_root(wordlist)
     try:
-        shutil.rmtree(snapshot_dir, ignore_errors=True)
+        remove_trusted_tree(snapshot_dir, root=root)
         parent = snapshot_dir.parent
         if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
             try:
                 parent.rmdir()
             except OSError:  # pragma: no cover -- directory may be non-empty/race
                 pass
-    except OSError:  # pragma: no cover -- rmtree(ignore_errors=True) rarely raises
+    except (SecureArtifactError, OSError):
         pass
 
 

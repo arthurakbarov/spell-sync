@@ -148,8 +148,15 @@ def _abort_journal_begin_failure(tx: PushTransaction, exc: OSError) -> PushAbort
             "push aborted — failed to create push journal; "
             "recovery snapshots may remain for manual review."
         )
-        return PushAbort(ExitCode.PUSH_ABORT, reason, message, recovery_materials_preserved=True)
-    return PushAbort(ExitCode.PUSH_ABORT, reason, message)
+        return PushAbort(
+            ExitCode.PUSH_ABORT,
+            reason,
+            message,
+            recovery_materials_preserved=True,
+            recovery_required=True,
+            transaction_id=tx.transaction_id,
+        )
+    return PushAbort(ExitCode.PUSH_ABORT, reason, message, transaction_id=tx.transaction_id)
 
 
 def execute_prepared_push(

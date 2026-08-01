@@ -208,9 +208,16 @@ def _cmd_push_via_service(opts: CliOptions) -> int:
         snapshot = _SERVICE.load_status(status_request(opts))
         for diff in snapshot.diffs:
             print_status_diff(diff, verbose=opts.verbose)
-    if not dry_run and not isinstance(result, ExitCode):
+    if not dry_run:
         _SERVICE.build_push_report(execution)
-    return finish_push(result, opts, dry_run=dry_run, command="push")
+    return finish_push(
+        result,
+        opts,
+        dry_run=dry_run,
+        command="push",
+        recovery_required=execution.recovery_required,
+        outcome=execution.outcome.value,
+    )
 
 
 def cmd_init(opts: CliOptions) -> int:

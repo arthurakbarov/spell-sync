@@ -417,10 +417,12 @@ class TestRemainingCoverage(unittest.TestCase):
 
     def test_discard_txn_snapshots_helper(self):
         with tempfile.TemporaryDirectory() as tmp:
-            snap = Path(tmp) / ".spell-sync.txn" / "abc"
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            snap = wordlist.parent / ".spell-sync.txn" / "abc"
             snap.mkdir(parents=True)
             (snap / "file.snap").write_text("x", encoding="utf-8")
-            discard_txn_snapshots(snap)
+            discard_txn_snapshots(snap, wordlist=wordlist)
             self.assertFalse(snap.exists())
 
     def test_discard_completed_journal_absent(self):
@@ -586,7 +588,7 @@ class TestRemainingCoverage(unittest.TestCase):
             self.assertIsNone(count)
 
     def test_discard_txn_snapshots_none(self):
-        discard_txn_snapshots(None)
+        discard_txn_snapshots(None, wordlist=None)
 
     def test_safe_discard_snapshot_missing_directory(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -820,7 +820,7 @@ class SyncService:
                     reason=push_abort_reason_to_event_reason(result.reason),
                 ),
             )
-            recovery = result.reason == "rollback_incomplete"
+            recovery = result.recovery_required
             if not recovery:
                 journal = _operation_deps.load_journal_result(wordlist)
                 recovery = journal.status is JournalLoadStatus.VALID_IN_PROGRESS

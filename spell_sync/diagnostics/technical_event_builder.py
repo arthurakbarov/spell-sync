@@ -88,6 +88,7 @@ def push_abort_reason_to_event_reason(reason: str | None) -> EventReason | None:
         return None
     mapping = {
         "rollback_incomplete": EventReason.ROLLBACK_INCOMPLETE,
+        "journal_update_failed_and_rollback_incomplete": EventReason.ROLLBACK_INCOMPLETE,
         "journal_in_progress": EventReason.JOURNAL_INVALID,
         "journal_update_failed": EventReason.JOURNAL_INVALID,
     }

@@ -260,9 +260,16 @@ def finish_push(
     *,
     dry_run: bool = False,
     command: str = "push",
+    recovery_required: bool = False,
+    outcome: str | None = None,
 ) -> int:
     if isinstance(result, ExitCode):
-        return emit_command_exit(opts, command, result, dry_run=dry_run)
+        extra: dict[str, object] = {"dry_run": dry_run}
+        if recovery_required:
+            extra["recovery_required"] = True
+        if outcome is not None:
+            extra["outcome"] = outcome
+        return emit_command_exit(opts, command, result, **extra)
 
     exit_code = ExitCode.PARTIAL_PUSH if result.skipped else ExitCode.OK
     if opts.json_output:

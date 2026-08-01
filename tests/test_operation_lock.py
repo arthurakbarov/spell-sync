@@ -129,7 +129,9 @@ class TestOperationLock(unittest.TestCase):
     def test_read_lock_info_open_failure(self):
         from spell_sync.operation_lock import _read_lock_info
 
-        with patch("spell_sync.operation_lock.os.open", side_effect=OSError(errno.EACCES, "denied")):
+        with patch(
+            "spell_sync.operation_lock.os.open", side_effect=OSError(errno.EACCES, "denied")
+        ):
             self.assertIsNone(_read_lock_info(Path("/tmp/.spell-sync.lock")))
 
     def test_probe_lock_file_unreadable(self):
