@@ -15,9 +15,9 @@ Phase 8: agent configuration refresh — **complete** (owner-approved).
 Phase 9: dead directory audit — **complete** (owner-approved).
 Phase 10: version 0.3.0 — **complete**, awaiting approval.
 
-Corrective work (security hardening, post-review): in progress on current branch — filesystem
-containment for internal artifacts, rollback precedence, explicit backup policy; does not
-advance phase-10 approval or start a new architecture phase.
+Corrective work (security hardening, post-review): in progress on current branch — descriptor/handle
+trusted internal filesystem, R1–R7 adversarial regressions, recovery outcome propagation to CLI/TUI,
+explicit backup policy; does not advance phase-10 approval or start a new architecture phase.
 
 [architecture-status:start]
 current: phase-10

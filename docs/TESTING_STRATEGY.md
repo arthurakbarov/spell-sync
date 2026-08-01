@@ -167,6 +167,7 @@ Internal artifact security changes (lock, journal temp/publication, transaction 
 
 | Suite | Purpose |
 |-------|---------|
+| `tests/test_secure_artifacts_adversarial.py` | Mandatory R1–R7 adversarial regressions |
 | `tests/test_internal_artifact_security.py` | Adversarial symlink/reparse and rollback preserve |
 | `tests/test_secure_artifacts.py` | Unit coverage for `secure_artifacts` branches |
 | `tests/test_transaction_safety.py` | End-to-end mutation fault matrix |

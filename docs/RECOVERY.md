@@ -62,11 +62,11 @@ rejected; only a regular file in the project directory is written.
 |----------|------------|
 | `.spell-sync.lock` | No-follow open; regular file only |
 | `.spell-sync.journal.json` | Unique temp, fsync, atomic replace, parent dir sync (POSIX) |
-| `.spell-sync.txn/` | Directory containment; snapshot files created exclusively |
+| `.spell-sync.txn/` | Directory containment; snapshot files created exclusively; cleanup via descriptor-relative `remove_trusted_tree` (no `shutil.rmtree`) |
 
 On abort, **incomplete rollback always preserves** journal and snapshots even when journal update
 or cleanup fails. Journal begin failure before target writes removes snapshots when safe, or reports
-remaining recovery materials.
+remaining recovery materials with `recovery_required=true`.
 
 Durability: atomic visibility and process-crash safety are guaranteed; power-loss durability is best
 effort (file + directory sync). See [ADR 0005](decisions/0005-secure-internal-artifacts.md).
