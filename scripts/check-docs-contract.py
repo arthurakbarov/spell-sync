@@ -439,6 +439,48 @@ def _check_phase_tracker_readiness(root: Path) -> list[ContractViolation]:
                 )
             )
 
+    if phase10_status == "awaiting-approval" and statuses.get("current") == "phase-10":
+        baseline = re.search(
+            r"## Verified baseline\s*\n(.*?)\n## ",
+            text,
+            re.DOTALL,
+        )
+        baseline_body = baseline.group(1) if baseline else ""
+        tip_ssot = (
+            "Tip HEAD and exact-head CI" in baseline_body
+            and "authoritative via" in baseline_body
+            and "check-ci-evidence.py" in baseline_body
+        )
+        head_chase = bool(
+            re.search(
+                r"\|\s*Repository\s*\|\s*HEAD\s*\|\s*Clean\s*\|",
+                baseline_body,
+            )
+        )
+        if head_chase or not tip_ssot:
+            violations.append(
+                ContractViolation(
+                    "PHASE-022",
+                    tracker,
+                    None,
+                    "phase-10 verified baseline must use tip-SSOT wording (not HEAD-chase table)",
+                    "document tip HEAD/CI via check-ci-evidence and owner dossier, not a frozen HEAD table",
+                )
+            )
+        if last_validation:
+            first_line = last_validation.group(1).strip().splitlines()[0]
+            if first_line.lower().startswith("phase 10"):
+                if "tip evidence" not in first_line.lower() and "check-ci-evidence" not in first_line.lower():
+                    violations.append(
+                        ContractViolation(
+                            "PHASE-023",
+                            tracker,
+                            None,
+                            "last validation Phase 10 line must cite tip evidence SSOT",
+                            "document tip evidence via check-ci-evidence + owner dossier",
+                        )
+                    )
+
     return violations
 
 

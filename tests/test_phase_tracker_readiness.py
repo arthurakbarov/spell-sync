@@ -44,3 +44,10 @@ def test_p6_valid_pending_approval_state() -> None:
 def test_phase_tracker_readiness_passes() -> None:
     violations = docs_contract._check_phase_tracker_readiness(ROOT)
     assert violations == []
+
+
+def test_p7_tip_ssot_baseline() -> None:
+    violations = docs_contract._check_phase_tracker_readiness(ROOT)
+    ids = {v.check_id for v in violations}
+    assert "PHASE-022" not in ids
+    assert "PHASE-023" not in ids

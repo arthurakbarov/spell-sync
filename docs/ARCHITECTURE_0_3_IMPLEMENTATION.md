@@ -41,13 +41,11 @@ phase-10: awaiting-approval
 
 ## Verified baseline
 
-| Repository | HEAD | Clean |
+| Repository | Role | Notes |
 |------------|------|-------|
-| spell-sync | `8bcc424` Phase 10 product + readiness guards + docs contract | yes |
-| spell-sync-dev | `b743c84` owner decision integrity + handoff tooling | yes |
-| spell-words | `3e5bc29` | yes |
-
-Owner-decision dossier and CI evidence are authoritative for the tip HEAD after any subsequent tracker sync commit; this table records the last documented exact-head CI at commit time.
+| spell-sync | product | Tip HEAD and exact-head CI: authoritative via `python3 scripts/check-ci-evidence.py` and owner-decision `FINAL_STATE.json` / `OWNER_DECISION_MANIFEST.json`. |
+| spell-sync-dev | maintainer tooling | Tip HEAD via `git -C ../spell-sync-dev rev-parse HEAD` (layout-dependent); owner dossier records maintainerHead. |
+| spell-words | private data | Unchanged by this readiness cycle unless noted in dossier. |
 
 Public version: `0.3.0` (`pyproject.toml`).
 
@@ -55,10 +53,10 @@ Owner approval: **pending** (phase-10 remains `awaiting-approval`).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
 
-Implementation patch range (product corrective): `ad37965` … `8bcc424`.
+Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD (see owner-decision PATCH_VALIDATION.txt).
 
-Current exact-head CI evidence (product): `8bcc424`, run `20260802T042307.043352Z`,
-`CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=c37c7768…`.
+Last recorded exact-head CI snapshot in this file (may lag tip by at most one docs-sync commit; tip evidence is authoritative):
+`897bb81`, run `20260802T044113.811390Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=c37c7768…`.
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -665,7 +663,7 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (awaiting owner approval): product HEAD 8bcc424; exact-head CI 20260802T042307.043352Z;
+Phase 10 (awaiting owner approval): tip evidence via check-ci-evidence + owner dossier; last recorded in tracker 897bb81 / 20260802T044113.811390Z;
   R1–R7 7/7; safe_discard 9/9; handoff integrity success; version 0.3.0; release not performed
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
