@@ -425,6 +425,23 @@ class TestRemainingCoverage(unittest.TestCase):
             discard_txn_snapshots(snap, wordlist=wordlist)
             self.assertFalse(snap.exists())
 
+    def test_discard_txn_snapshots_ignores_empty_parent_cleanup_error(self):
+        from spell_sync.push_journal import discard_txn_snapshots
+        from spell_sync.secure_artifacts import SecureArtifactError
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            snap = wordlist.parent / ".spell-sync.txn" / "abc"
+            snap.mkdir(parents=True)
+            (snap / "file.snap").write_text("x", encoding="utf-8")
+            with patch(
+                "spell_sync.push_journal.remove_empty_trusted_directory",
+                side_effect=SecureArtifactError("reparse_point", "blocked"),
+            ):
+                discard_txn_snapshots(snap, wordlist=wordlist)
+            self.assertFalse(snap.exists())
+
     def test_discard_completed_journal_absent(self):
         with tempfile.TemporaryDirectory() as tmp:
             wordlist = Path(tmp) / "wordlist.txt"

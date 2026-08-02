@@ -166,5 +166,32 @@ class TestSafeDiscardAdversarial(unittest.TestCase):
             self.assertFalse(txn_parent.exists())
 
 
+    def test_remove_empty_nested_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            project = trusted_project_root(wordlist)
+            nested = project / "nested" / "empty"
+            nested.mkdir(parents=True)
+            from spell_sync.secure_artifacts import remove_empty_trusted_directory
+
+            remove_empty_trusted_directory(nested, root=project)
+            self.assertFalse(nested.exists())
+            self.assertTrue((project / "nested").exists())
+
+    def test_remove_empty_non_empty_directory_noop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            project = trusted_project_root(wordlist)
+            target = project / ".spell-sync.txn"
+            target.mkdir()
+            (target / "keep.txt").write_text("x", encoding="utf-8")
+            from spell_sync.secure_artifacts import remove_empty_trusted_directory
+
+            remove_empty_trusted_directory(target, root=project)
+            self.assertTrue(target.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

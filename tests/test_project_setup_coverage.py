@@ -127,6 +127,8 @@ class TestProjectSetupCoverage(unittest.TestCase):
     def test_discard_journal_raises_on_failure(self):
         import tempfile
 
+        from spell_sync.secure_artifacts import SecureArtifactError
+
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
             project.mkdir()
@@ -134,7 +136,10 @@ class TestProjectSetupCoverage(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             journal = project / ".spell-sync.journal.json"
             journal.write_text('{"schema_version":2}\n', encoding="utf-8")
-            with patch.object(Path, "unlink", side_effect=OSError("nope")):
+            with patch(
+                "spell_sync.push_journal.remove_trusted_file",
+                side_effect=SecureArtifactError("unlink_failed", "nope"),
+            ):
                 with self.assertRaises(DiscardSafetyError):
                     discard_journal(wordlist)
 

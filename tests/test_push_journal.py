@@ -503,12 +503,16 @@ class TestPushJournalHelpers(unittest.TestCase):
 
     def test_discard_journal_oserror(self):
         from spell_sync.push_journal import DiscardSafetyError
+        from spell_sync.secure_artifacts import SecureArtifactError
 
         with tempfile.TemporaryDirectory() as d:
             wordlist = Path(d) / "wordlist.txt"
             wordlist.write_text("alpha\n", encoding="utf-8")
             _write_journal(wordlist)
-            with patch.object(Path, "unlink", side_effect=OSError("nope")):
+            with patch(
+                "spell_sync.push_journal.remove_trusted_file",
+                side_effect=SecureArtifactError("unlink_failed", "nope"),
+            ):
                 with self.assertRaises(DiscardSafetyError):
                     discard_journal(wordlist)
 
