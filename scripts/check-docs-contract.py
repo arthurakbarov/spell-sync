@@ -405,7 +405,8 @@ def _check_phase_tracker_readiness(root: Path) -> list[ContractViolation]:
                         tracker,
                         None,
                         "last validation Phase 10 line references stale HEAD 9069783",
-                        "update Phase 10 validation line to current product HEAD or mark historical",
+                        "update Phase 10 validation line to current product HEAD "
+                        "or mark historical",
                     )
                 )
             if phase10_status == "awaiting-approval" and "awaiting" not in first_line.lower():

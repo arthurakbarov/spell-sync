@@ -43,8 +43,8 @@ phase-10: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `9de9de2` Phase 10 product + corrective security complete | yes |
-| spell-sync-dev | `fa127c5` handoff integrity + snapshot tooling | yes |
+| spell-sync | `cfb462c` Phase 10 product + readiness guards + docs contract | yes |
+| spell-sync-dev | `b743c84` owner decision integrity + handoff tooling | yes |
 | spell-words | `3e5bc29` | yes |
 
 Public version: `0.3.0` (`pyproject.toml`).
@@ -53,10 +53,10 @@ Owner approval: **pending** (phase-10 remains `awaiting-approval`).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
 
-Implementation patch range (product corrective): `ad37965` … `9de9de2`.
+Implementation patch range (product corrective): `ad37965` … `cfb462c`.
 
-Current exact-head CI evidence (product): `9de9de2`, run `20260802T023245.069527Z`,
-`CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=880641f4…`.
+Current exact-head CI evidence (product): `cfb462c`, run `20260802T040409.723333Z`,
+`CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=c37c7768…`.
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -663,7 +663,7 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (awaiting owner approval): product HEAD 9de9de2; exact-head CI 20260802T023245.069527Z;
+Phase 10 (awaiting owner approval): product HEAD cfb462c; exact-head CI 20260802T040409.723333Z;
   R1–R7 7/7; safe_discard 9/9; handoff integrity success; version 0.3.0; release not performed
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
