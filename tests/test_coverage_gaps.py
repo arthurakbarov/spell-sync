@@ -807,7 +807,7 @@ class TestRemainingCoverage(unittest.TestCase):
                                 journal.snapshot_dir,
                             )
 
-    def test_safe_discard_journal_resolves_outside_project(self):
+    def test_safe_discard_journal_uses_descriptor_not_resolve_spoof(self):
         from spell_sync.push_journal import journal_path_for_wordlist
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -826,8 +826,9 @@ class TestRemainingCoverage(unittest.TestCase):
 
             with patch.object(Path, "resolve", selective_resolve):
                 ok, detail = safe_discard_journal_file(wordlist)
-            self.assertFalse(ok)
-            self.assertIn("outside project", detail or "")
+            self.assertTrue(ok)
+            self.assertIsNone(detail)
+            self.assertFalse(journal.exists())
 
 
 class TestPhase2BCliCoverage(unittest.TestCase):

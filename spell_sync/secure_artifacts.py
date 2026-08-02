@@ -171,6 +171,30 @@ def remove_trusted_file(path: Path, *, root: Path) -> None:
         parent.close()
 
 
+def remove_empty_trusted_directory(path: Path, *, root: Path) -> None:
+    """Remove ``path`` when it is an empty trusted directory under ``root``."""
+    parts = _relative_parts(path, root)
+    if len(parts) == 1:
+        parent = _with_root(root)
+        name = parts[0]
+    else:
+        try:
+            parent = TrustedDirectory.from_components(root, parts[:-1])
+        except TrustedFsError as exc:
+            raise _map_error(exc) from exc
+        name = parts[-1]
+    try:
+        child = parent.open_child_directory(name)
+        child.close()
+        parent.remove_child_directory(name)
+    except TrustedFsError as exc:
+        if exc.code in {"missing_directory", "rmdir_failed"}:
+            return
+        raise _map_error(exc) from exc
+    finally:
+        parent.close()
+
+
 def remove_trusted_tree(path: Path, *, root: Path) -> None:
     parts = _relative_parts(path, root)
     if len(parts) == 1:
@@ -263,6 +287,7 @@ __all__ = [
     "open_trusted_regular_file",
     "prepare_trusted_txn_root",
     "read_trusted_regular_file",
+    "remove_empty_trusted_directory",
     "remove_trusted_file",
     "remove_trusted_tree",
     "set_open_boundary_hook",

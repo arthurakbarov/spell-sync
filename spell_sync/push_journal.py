@@ -30,6 +30,7 @@ from .secure_artifacts import (
     SecureArtifactError,
     atomic_write_trusted_file,
     read_trusted_regular_file,
+    remove_empty_trusted_directory,
     remove_trusted_file,
     remove_trusted_tree,
     trusted_project_root,
@@ -774,9 +775,12 @@ def safe_discard_txn_snapshots(
     root = trusted_project_root(wordlist)
     try:
         remove_trusted_tree(snap, root=root)
-        parent = snap.parent
-        if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
-            parent.rmdir()
+        txn_parent = snap.parent
+        if txn_parent.name == ".spell-sync.txn":
+            try:
+                remove_empty_trusted_directory(txn_parent, root=root)
+            except SecureArtifactError:
+                pass
         return True, None
     except (SecureArtifactError, OSError) as exc:
         return False, str(exc)
@@ -784,20 +788,12 @@ def safe_discard_txn_snapshots(
 
 def safe_discard_journal_file(wordlist: Path) -> tuple[bool, str | None]:
     path = journal_path_for_wordlist(wordlist)
-    project = ProjectContext.build(wordlist).project_dir.resolve()
-    if path.is_symlink():
-        return False, "journal file is a symlink"
+    root = trusted_project_root(wordlist)
     try:
-        path.resolve().relative_to(project)
-    except (OSError, ValueError):
-        return False, "journal file outside project directory"
-    if not path.exists():
+        remove_trusted_file(path, root=root)
         return True, None
-    try:
-        path.unlink(missing_ok=True)
-        return True, None
-    except OSError as exc:
-        return False, str(exc)
+    except SecureArtifactError as exc:
+        return False, exc.detail or exc.code
 
 
 def discard_txn_snapshots(
@@ -810,11 +806,11 @@ def discard_txn_snapshots(
     root = trusted_project_root(wordlist)
     try:
         remove_trusted_tree(snapshot_dir, root=root)
-        parent = snapshot_dir.parent
-        if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
+        txn_parent = snapshot_dir.parent
+        if txn_parent.name == ".spell-sync.txn":
             try:
-                parent.rmdir()
-            except OSError:  # pragma: no cover -- directory may be non-empty/race
+                remove_empty_trusted_directory(txn_parent, root=root)
+            except SecureArtifactError:
                 pass
     except (SecureArtifactError, OSError):
         pass
