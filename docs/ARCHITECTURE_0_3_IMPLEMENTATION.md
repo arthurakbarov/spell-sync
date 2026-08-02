@@ -13,10 +13,12 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
 Phase 8: agent configuration refresh — **complete** (owner-approved).
 Phase 9: dead directory audit — **complete** (owner-approved).
-Phase 10: version 0.3.0 — **complete**, awaiting approval.
+Phase 10: version 0.3.0 — implementation **complete**, corrective security work **complete**,
+**awaiting owner approval**. Release not performed.
 
-Corrective work (security hardening, post-review): in progress on current branch — descriptor/handle
-trusted internal filesystem, R1–R7 adversarial regressions, recovery outcome propagation to CLI/TUI,
+Corrective work (security hardening, post-review): **complete** — descriptor/handle
+trusted internal filesystem, R1–R7 adversarial regressions, descriptor-safe `safe_discard`,
+handoff-integrity schema v5, recovery outcome propagation to CLI/TUI,
 explicit backup policy; does not advance phase-10 approval or start a new architecture phase.
 
 [architecture-status:start]
@@ -41,13 +43,25 @@ phase-10: awaiting-approval
 
 | Repository | HEAD | Clean |
 |------------|------|-------|
-| spell-sync | `9f5e83c` Phase 10 tracker baseline aligned | yes |
-| spell-sync-dev | `5765e7d` health check uses CI evidence | yes |
+| spell-sync | `9de9de2` Phase 10 product + corrective security complete | yes |
+| spell-sync-dev | `fa127c5` handoff integrity + snapshot tooling | yes |
 | spell-words | `3e5bc29` | yes |
 
 Public version: `0.3.0` (`pyproject.toml`).
 
-Phase 5 final CI evidence: `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
+Owner approval: **pending** (phase-10 remains `awaiting-approval`).
+
+Release: **not performed** (no tag, no GitHub Release, no package publish).
+
+Implementation patch range (product corrective): `ad37965` … `9de9de2`.
+
+Current exact-head CI evidence (product): `9de9de2`, run `20260802T023245.069527Z`,
+`CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=880641f4…`.
+
+Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
+maintainer snapshot tests green.
+
+Historical phase CI evidence (pre-corrective Phase 10 bump): `7985302`, run `20260723T034038.010703Z`, `finalEvidence=true`.
 
 Phase 6 final CI evidence: `f82ed58`, run `20260728T074706.122702Z`, `finalEvidence=true`.
 
@@ -55,7 +69,7 @@ Phase 7 final CI evidence: `9a08a7e`, run `20260731T101824.828581Z`, `finalEvide
 
 Phase 8 final CI evidence: `3c6bc35`, run `20260731T104234.254905Z`, `finalEvidence=true`.
 
-Phase 10 final CI evidence: `e46ce45`, run `20260731T110156.184380Z`, `finalEvidence=true`.
+Phase 10 historical CI evidence (version bump): `e46ce45`, run `20260731T110156.184380Z`, `finalEvidence=true`.
 
 ## Current dependency graph
 
@@ -649,7 +663,9 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (awaiting approval): HEAD 9069783; full CI finalEvidence=true (20260731T110156.184380Z @ e46ce45); version 0.3.0
+Phase 10 (awaiting owner approval): product HEAD 9de9de2; exact-head CI 20260802T023245.069527Z;
+  R1–R7 7/7; safe_discard 9/9; handoff integrity success; version 0.3.0; release not performed
+Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
 Phase 7 (accepted): HEAD 9a08a7e; full CI finalEvidence=true (20260731T101824.828581Z)

@@ -323,6 +323,124 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
     return violations
 
 
+_CORRECTIVE_IN_PROGRESS = re.compile(
+    r"corrective work[^.\n]{0,120}:\s*in progress\b",
+    re.IGNORECASE,
+)
+_PHASE10_SECTION = re.compile(
+    r"## Phase 10 — Version 0\.3\.0(.*?)(?=^## |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+_OWNER_APPROVED_CLAIM = re.compile(
+    r"owner[- ]approved|owner approval recorded",
+    re.IGNORECASE,
+)
+_RELEASE_PUBLISHED_CLAIM = re.compile(
+    r"\b(released|published|tagged)\b",
+    re.IGNORECASE,
+)
+_STALE_PHASE10_HEAD = re.compile(r"\b9069783\b")
+
+
+def _check_phase_tracker_readiness(root: Path) -> list[ContractViolation]:
+    """P1–P6: phase-10 approval-readiness consistency guards."""
+    tracker = root / IMPLEMENTATION_TRACKER
+    violations: list[ContractViolation] = []
+    if not tracker.is_file():
+        return violations
+    text = tracker.read_text(encoding="utf-8")
+    statuses, parse_error = _parse_architecture_status(text)
+    if parse_error or statuses is None:
+        return violations
+
+    _, current_body = _current_phase_body(text)
+    if _CORRECTIVE_IN_PROGRESS.search(current_body):
+        violations.append(
+            ContractViolation(
+                "PHASE-016",
+                tracker,
+                None,
+                "corrective work still marked in progress in current phase section",
+                "mark corrective work complete when evidence is current",
+            )
+        )
+
+    phase10_status = statuses.get("phase-10")
+    phase10_match = _PHASE10_SECTION.search(text)
+    phase10_body = phase10_match.group(1) if phase10_match else ""
+    if phase10_status == "awaiting-approval":
+        if _OWNER_APPROVED_CLAIM.search(phase10_body):
+            violations.append(
+                ContractViolation(
+                    "PHASE-017",
+                    tracker,
+                    None,
+                    "phase-10 awaiting-approval conflicts with owner-approved claim",
+                    "remove owner-approved wording until owner decision is recorded",
+                )
+            )
+        if _RELEASE_PUBLISHED_CLAIM.search(phase10_body):
+            violations.append(
+                ContractViolation(
+                    "PHASE-018",
+                    tracker,
+                    None,
+                    "phase-10 section claims release publication before approval",
+                    "state release not performed while awaiting owner approval",
+                )
+            )
+
+    last_validation = re.search(
+        r"## Last validation\s*\n\s*```text\s*\n(.*?)```",
+        text,
+        re.DOTALL,
+    )
+    if last_validation:
+        first_line = last_validation.group(1).strip().splitlines()[0]
+        if first_line.lower().startswith("phase 10"):
+            if _STALE_PHASE10_HEAD.search(first_line):
+                violations.append(
+                    ContractViolation(
+                        "PHASE-019",
+                        tracker,
+                        None,
+                        "last validation Phase 10 line references stale HEAD 9069783",
+                        "update Phase 10 validation line to current product HEAD or mark historical",
+                    )
+                )
+            if phase10_status == "awaiting-approval" and "awaiting" not in first_line.lower():
+                violations.append(
+                    ContractViolation(
+                        "PHASE-020",
+                        tracker,
+                        None,
+                        "last validation Phase 10 line missing awaiting-approval semantics",
+                        "document Phase 10 as awaiting owner approval",
+                    )
+                )
+
+    if (
+        phase10_status == "awaiting-approval"
+        and statuses.get("current") == "phase-10"
+        and "implementation **complete**" in current_body
+        and "awaiting owner approval" in current_body.lower()
+    ):
+        pass
+    elif phase10_status == "awaiting-approval" and statuses.get("current") == "phase-10":
+        if "implementation **complete**" not in current_body:
+            violations.append(
+                ContractViolation(
+                    "PHASE-021",
+                    tracker,
+                    None,
+                    "phase-10 awaiting approval without implementation-complete note",
+                    "document implementation complete while owner approval is pending",
+                )
+            )
+
+    return violations
+
+
 def _phase_section_index(text: str) -> dict[str, list[int]]:
     sections: dict[str, list[int]] = {}
     for match in _PHASE_SECTION_HEADING.finditer(text):
@@ -660,6 +778,7 @@ def check_repository(root: Path) -> list[ContractViolation]:
         )
 
     violations.extend(_check_current_phase_section(root))
+    violations.extend(_check_phase_tracker_readiness(root))
     violations.extend(_check_architecture_phase_sections(root))
     violations.extend(_check_stale_version_claims(root, version))
     violations.extend(_check_agent_workflow_docs(root))
