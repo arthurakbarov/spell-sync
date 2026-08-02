@@ -165,7 +165,6 @@ class TestSafeDiscardAdversarial(unittest.TestCase):
             txn_parent = trusted_project_root(wordlist) / ".spell-sync.txn"
             self.assertFalse(txn_parent.exists())
 
-
     def test_remove_empty_nested_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wordlist = Path(tmp) / "wordlist.txt"
@@ -191,6 +190,23 @@ class TestSafeDiscardAdversarial(unittest.TestCase):
 
             remove_empty_trusted_directory(target, root=project)
             self.assertTrue(target.exists())
+
+    def test_remove_empty_nested_from_components_failure(self) -> None:
+        from spell_sync.secure_artifacts import SecureArtifactError, remove_empty_trusted_directory
+        from spell_sync.trusted_internal_fs import TrustedFsError
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wordlist = Path(tmp) / "wordlist.txt"
+            wordlist.write_text("alpha\n", encoding="utf-8")
+            project = trusted_project_root(wordlist)
+            nested = project / "nested" / "empty"
+            nested.mkdir(parents=True)
+            with unittest.mock.patch(
+                "spell_sync.secure_artifacts.TrustedDirectory.from_components",
+                side_effect=TrustedFsError("open_failed", "broken"),
+            ):
+                with self.assertRaises(SecureArtifactError):
+                    remove_empty_trusted_directory(nested, root=project)
 
 
 if __name__ == "__main__":
