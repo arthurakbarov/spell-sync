@@ -260,12 +260,18 @@ def test_skipped_when_already_passed(runner_mod, steps_mod, capsys) -> None:
             _gate,
         ):
             with patch.object(runner_mod.TestRunLedger, "find_success", return_value=record):
-                rc = runner_mod.main(["--target", "tests/test_core.py"])
+                with patch.object(runner_mod, "record_session_event") as session_event:
+                    rc = runner_mod.main(["--target", "tests/test_core.py"])
         assert controller.run_child_with_plan.call_count == 0
     assert rc == 0
     output = capsys.readouterr().out
     assert "TEST_RUN_RESULT=skipped" in output
     assert "already-passed-for-current-state" in output
+    session_event.assert_called_once_with(
+        category="focused",
+        duration_seconds=0.0,
+        reused_saved=2.5,
+    )
 
 
 def test_docs_only_runs_validators(runner_mod, steps_mod, capsys) -> None:
