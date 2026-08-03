@@ -33,3 +33,6 @@ def test_user_documentation_validator_requires_support_report_and_recovery_links
     assert "readme-cli-support-report" in source
     assert "getting-started-recovery-link" in source
     assert "getting-started-troubleshooting-link" in source
+    assert "getting-started-cli-bridge" in source
+    assert "troubleshooting-config-check" in source
+    assert "readme-support-report-output" in source

@@ -44,7 +44,7 @@ spell-sync
 
 ## First safe steps
 
-1. **Start Spell Sync** — with no arguments it opens the terminal UI.
+1. **Start Spell Sync** — with no arguments on a terminal it opens the UI.
 2. **Set up a project** — choose a folder for your personal word list, or open an existing one.
 3. **Check my apps** — see which applications were found and whether anything needs attention.
 4. **Collect my words (Pull)** — preview words from your apps; confirm to add them to your list.
@@ -55,6 +55,21 @@ spell-sync
    changed.
 
 The guided setup does **not** run Update (Push) automatically.
+
+### Same steps from the command line
+
+If you prefer CLI (or have no interactive terminal):
+
+| Goal | Command |
+|------|---------|
+| Non-interactive setup | `spell-sync init` |
+| Collect words | `spell-sync pull` |
+| Preview before update | `spell-sync status` or `spell-sync plan` |
+| Update apps | `spell-sync push` |
+| Check health | `spell-sync doctor` |
+| Validate config | `spell-sync config-check` |
+
+Full command list: [README → CLI](../README.md#cli).
 
 ## Optional: use a private Git repository
 

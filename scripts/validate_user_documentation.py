@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 GETTING_STARTED = (ROOT / "docs" / "GETTING_STARTED.md").read_text(encoding="utf-8")
+TROUBLESHOOTING = (ROOT / "docs" / "TROUBLESHOOTING.md").read_text(encoding="utf-8")
 
 
 def main() -> int:
@@ -33,6 +34,20 @@ def main() -> int:
         (
             "getting-started-troubleshooting-link",
             "TROUBLESHOOTING.md" in GETTING_STARTED,
+        ),
+        (
+            "getting-started-cli-bridge",
+            "spell-sync pull" in GETTING_STARTED
+            and "spell-sync init" in GETTING_STARTED
+            and "config-check" in GETTING_STARTED,
+        ),
+        (
+            "troubleshooting-config-check",
+            "config-check" in TROUBLESHOOTING,
+        ),
+        (
+            "readme-support-report-output",
+            "support-report --output" in README,
         ),
     ]
     for check_id, ok in checks:

@@ -72,6 +72,28 @@ Close the application named in the notice, rebuild the preview, and confirm Push
 ### How to export a safe support report
 Run `spell-sync support-report`.
 
+## Configuration is invalid or rejected
+
+### What happened
+Mutating commands refuse to run, or doctor reports an invalid project configuration.
+
+### Why Spell Sync stopped or skipped
+`spell-sync.toml` must validate before Pull, Push, or Recovery writes. A bad path, unknown
+target, or schema error fails closed.
+
+### What was changed
+Nothing.
+
+### What was not changed
+Wordlist and application custom dictionaries.
+
+### What to do next
+Run `spell-sync config-check` (or `spell-sync doctor`) and fix the reported fields. Then rebuild
+any preview before confirming writes.
+
+### How to export a safe support report
+Run `spell-sync support-report` and include `spell-sync version` output.
+
 ## Configuration changed after preview
 
 ### What happened
@@ -88,10 +110,11 @@ Nothing.
 The preview remains invalid until rebuilt; no partial write from the stale plan.
 
 ### What to do next
-Rebuild the preview from the dashboard or guided review flow and confirm again.
+Rebuild the preview from the dashboard or guided review flow and confirm again. If the config
+file itself looks wrong, run `spell-sync config-check` first.
 
 ### How to export a safe support report
-Run `spell-sync support-report`.
+Run `spell-sync support-report` and include `spell-sync version` output.
 
 ## A target was skipped safely
 
@@ -220,7 +243,8 @@ Choose a new output path with `--output`, ensure the application state directory
 and run `spell-sync doctor`. Retry export after fixing permissions.
 
 ### How to export a safe support report
-Use `--output /path/to/new-report.json` after resolving the error above.
+Use `--output /path/to/new-report.json` after resolving the error above. Include
+`spell-sync version` when you share the report.
 
 ## Spell Sync was installed but the command is not found
 

@@ -186,7 +186,8 @@ Run `spell-sync` in an empty directory (or use `spell-sync init` for a non-inter
 | `version` | Print installed package version |
 
 Common flags: `-C/--wordlist PATH`, `--json`, `push -n/--dry-run`, `push -y/--yes`,
-`push --strict`, `push --review-removals`, `recover --discard-corrupt-journal`.
+`push --strict`, `push --review-removals`, `recover --discard-corrupt-journal`,
+`support-report --output PATH`, `support-report --format json|text`.
 
 Run `spell-sync --help` for the full list.
 
