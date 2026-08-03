@@ -50,7 +50,7 @@ Expected:
 
 - Version matches `project.version` in `pyproject.toml`.
 - Help lists commands: `status`, `pull`, `push`, `plan`, `config-check`, `lint`, `recover`,
-  `init`, `doctor`, `version`, `ui`.
+  `init`, `doctor`, `version`, `ui`, `support-report`.
 - Pull and Push descriptions mention direction (applications → wordlist / wordlist → applications).
 
 ## First launch

@@ -25,6 +25,15 @@ def main() -> int:
             "private-git-optional",
             "private" in GETTING_STARTED.lower() and "optional" in GETTING_STARTED.lower(),
         ),
+        ("readme-cli-support-report", "support-report" in README),
+        (
+            "getting-started-recovery-link",
+            "RECOVERY.md" in GETTING_STARTED,
+        ),
+        (
+            "getting-started-troubleshooting-link",
+            "TROUBLESHOOTING.md" in GETTING_STARTED,
+        ),
     ]
     for check_id, ok in checks:
         if not ok:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import tempfile
 import time
@@ -95,8 +96,15 @@ def main(argv: list[str] | None = None) -> int:
             mode=gate_mode,
             cwd=ROOT,
         )
-        if planner_rc != 0:
-            return planner_rc if planner_state != "reused" else 0
+        if planner_rc != 0 and planner_state != "reused":
+            return planner_rc
+
+        # Reused planner admission skips the subprocess, so the ephemeral --output
+        # path stays empty. Materialize the plan so downstream steps can load it.
+        if planner_state == "reused" or not plan_path.is_file() or plan_path.stat().st_size == 0:
+            direct = subprocess.run(planner_argv, cwd=ROOT, check=False)
+            if direct.returncode != 0:
+                return direct.returncode
 
         plan_payload = _load_planned_payload(plan_path)
         if args.explain:

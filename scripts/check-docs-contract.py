@@ -58,7 +58,6 @@ DEVELOPMENT_VERSION = Path("docs/DEVELOPMENT.md")
 HISTORICAL_DOC_PATHS = frozenset(
     {
         "docs/MANUAL_TESTING.md",
-        "docs/TEST_REPORT_TEMPLATE.md",
     }
 )
 
@@ -464,13 +463,16 @@ def _check_phase_tracker_readiness(root: Path) -> list[ContractViolation]:
                     tracker,
                     None,
                     "phase-10 verified baseline must use tip-SSOT wording (not HEAD-chase table)",
-                    "document tip HEAD/CI via check-ci-evidence and owner dossier, not a frozen HEAD table",
+                    "document tip HEAD/CI via check-ci-evidence and owner "
+                    "dossier, not a frozen HEAD table",
                 )
             )
         if last_validation:
             first_line = last_validation.group(1).strip().splitlines()[0]
             if first_line.lower().startswith("phase 10"):
-                if "tip evidence" not in first_line.lower() and "check-ci-evidence" not in first_line.lower():
+                tip_line = "tip evidence" in first_line.lower()
+                evidence_line = "check-ci-evidence" in first_line.lower()
+                if not tip_line and not evidence_line:
                     violations.append(
                         ContractViolation(
                             "PHASE-023",
@@ -700,6 +702,116 @@ def _check_stale_version_claims(root: Path, version: str) -> list[ContractViolat
     return violations
 
 
+def _extract_backticked_tokens(text: str) -> set[str]:
+    return {m.group(1) for m in re.finditer(r"`([^`\n]+)`", text)}
+
+
+def _section_after_heading(text: str, heading: str, *, max_chars: int = 800) -> str | None:
+    idx = text.find(heading)
+    if idx < 0:
+        return None
+    return text[idx : idx + max_chars]
+
+
+def _check_cli_command_listings(root: Path, cli_commands: set[str]) -> list[ContractViolation]:
+    """Fail when curated CLI command lists omit canonical AGENTS.md commands."""
+    violations: list[ContractViolation] = []
+    if not cli_commands:
+        return violations
+
+    tui_path = root / "docs" / "TUI_IMPLEMENTATION.md"
+    if tui_path.is_file():
+        tui_text = tui_path.read_text(encoding="utf-8")
+        heading_match = re.search(r"^### CLI commands \((\d+)\)\s*$", tui_text, re.MULTILINE)
+        if heading_match is None:
+            violations.append(
+                ContractViolation(
+                    "CLI-003",
+                    tui_path,
+                    None,
+                    "missing ### CLI commands (N) heading",
+                    "document all canonical CLI commands under ### CLI commands (N)",
+                )
+            )
+        else:
+            declared = int(heading_match.group(1))
+            if declared != len(cli_commands):
+                line_no = tui_text[: heading_match.start()].count("\n") + 1
+                violations.append(
+                    ContractViolation(
+                        "CLI-003",
+                        tui_path,
+                        line_no,
+                        f"CLI commands count ({declared}) != canonical ({len(cli_commands)})",
+                        f"use ### CLI commands ({len(cli_commands)}) matching AGENTS.md",
+                    )
+                )
+            section = _section_after_heading(tui_text, heading_match.group(0)) or ""
+            present = _extract_backticked_tokens(section)
+            missing = sorted(cli_commands - present)
+            if missing:
+                line_no = tui_text[: heading_match.start()].count("\n") + 1
+                violations.append(
+                    ContractViolation(
+                        "CLI-004",
+                        tui_path,
+                        line_no,
+                        f"CLI commands section omits: {missing}",
+                        "include every canonical CLI command from AGENTS.md",
+                    )
+                )
+
+    manual_path = root / "docs" / "MANUAL_TESTING.md"
+    if manual_path.is_file():
+        lines = manual_path.read_text(encoding="utf-8").splitlines()
+        help_idx = None
+        for idx, line in enumerate(lines):
+            if "Help lists commands:" in line:
+                help_idx = idx
+                break
+        if help_idx is None:
+            violations.append(
+                ContractViolation(
+                    "CLI-005",
+                    manual_path,
+                    None,
+                    "missing Expected help command list",
+                    "list all canonical CLI commands under Expected help",
+                )
+            )
+        else:
+            block = "\n".join(lines[help_idx : help_idx + 3])
+            present = _extract_backticked_tokens(block)
+            missing = sorted(cli_commands - present)
+            if missing:
+                violations.append(
+                    ContractViolation(
+                        "CLI-005",
+                        manual_path,
+                        help_idx + 1,
+                        f"Expected help list omits: {missing}",
+                        "include every canonical CLI command including support-report",
+                    )
+                )
+
+    report_path = root / "docs" / "TEST_REPORT_TEMPLATE.md"
+    if report_path.is_file():
+        report_text = report_path.read_text(encoding="utf-8")
+        first_line = report_text.splitlines()[0] if report_text.splitlines() else ""
+        if re.search(r"\b0\.2\.[01]\b", first_line):
+            violations.append(
+                ContractViolation(
+                    "VERSION-002",
+                    report_path,
+                    1,
+                    first_line.strip(),
+                    "update TEST_REPORT_TEMPLATE title to the current package version",
+                )
+            )
+
+    return violations
+
+
 def _check_testing_strategy_doc(root: Path) -> list[ContractViolation]:
     violations: list[ContractViolation] = []
     path = root / TESTING_STRATEGY_DOC
@@ -824,6 +936,7 @@ def check_repository(root: Path) -> list[ContractViolation]:
     violations.extend(_check_phase_tracker_readiness(root))
     violations.extend(_check_architecture_phase_sections(root))
     violations.extend(_check_stale_version_claims(root, version))
+    violations.extend(_check_cli_command_listings(root, cli_commands))
     violations.extend(_check_agent_workflow_docs(root))
     violations.extend(_check_testing_strategy_doc(root))
     return violations

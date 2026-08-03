@@ -438,6 +438,108 @@ class TestDocsContract(unittest.TestCase):
                 msg="[DOCS-CONTRACT-PHASE-013] duplicate architecture phase section must fail",
             )
 
+    def test_tui_cli_command_count_mismatch_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            commands = (
+                "config-check",
+                "doctor",
+                "init",
+                "lint",
+                "plan",
+                "pull",
+                "push",
+                "recover",
+                "status",
+                "support-report",
+                "ui",
+                "version",
+            )
+            agents = (
+                "# Agents\n\n```text agent-config-cli-commands\n"
+                + ", ".join(f"`{name}`" for name in commands)
+                + "\n```\n"
+            )
+            cli = "COMMANDS = {" + ", ".join(f"'{name}': None" for name in commands) + "}\n"
+            _init_synthetic_repo(
+                root,
+                {
+                    "AGENTS.md": agents,
+                    "spell_sync/cli.py": cli,
+                    "docs/TUI_IMPLEMENTATION.md": (
+                        "### CLI commands (11)\n\n"
+                        "`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, "
+                        "`push`, `recover`, `status`, `ui`, `version`\n"
+                    ),
+                },
+            )
+            violations = mod.check_repository(root)
+            self.assertTrue(
+                any(v.check_id in {"CLI-003", "CLI-004"} for v in violations),
+                msg="[DOCS-CONTRACT-CLI-LIST] stale TUI CLI list must fail",
+            )
+
+    def test_manual_testing_help_omits_support_report_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            commands = (
+                "config-check",
+                "doctor",
+                "init",
+                "lint",
+                "plan",
+                "pull",
+                "push",
+                "recover",
+                "status",
+                "support-report",
+                "ui",
+                "version",
+            )
+            agents = (
+                "# Agents\n\n```text agent-config-cli-commands\n"
+                + ", ".join(f"`{name}`" for name in commands)
+                + "\n```\n"
+            )
+            cli = "COMMANDS = {" + ", ".join(f"'{name}': None" for name in commands) + "}\n"
+            _init_synthetic_repo(
+                root,
+                {
+                    "AGENTS.md": agents,
+                    "spell_sync/cli.py": cli,
+                    "docs/MANUAL_TESTING.md": (
+                        "Expected:\n\n"
+                        "- Help lists commands: `status`, `pull`, `push`, `plan`, "
+                        "`config-check`, `lint`, `recover`,\n"
+                        "  `init`, `doctor`, `version`, `ui`.\n"
+                    ),
+                },
+            )
+            violations = [v for v in mod.check_repository(root) if v.check_id == "CLI-005"]
+            self.assertEqual(
+                len(violations),
+                1,
+                msg="[DOCS-CONTRACT-CLI-HELP] MANUAL_TESTING must list support-report",
+            )
+
+    def test_test_report_template_stale_title_fails(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/TEST_REPORT_TEMPLATE.md": "# Spell Sync 0.2.0 test report\n",
+                },
+            )
+            violations = mod.check_repository(root)
+            self.assertTrue(
+                any(v.check_id in {"VERSION-001", "VERSION-002"} for v in violations),
+                msg="[DOCS-CONTRACT-VERSION-TEMPLATE] stale 0.2.0 title must fail",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

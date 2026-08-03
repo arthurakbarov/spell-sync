@@ -32,9 +32,9 @@ spell_sync/tui/                Textual app, controller, screens, workers
 
 Routing logic: `spell_sync/tui/routing.py` (`should_launch_tui`).
 
-### CLI commands (11)
+### CLI commands (12)
 
-`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `ui`, `version`
+`config-check`, `doctor`, `init`, `lint`, `plan`, `pull`, `push`, `recover`, `status`, `support-report`, `ui`, `version`
 
 CLI and TUI call the same `SpellSyncService` methods for setup, pull, push, recovery, status,
 doctor, logs, and post-setup target settings.

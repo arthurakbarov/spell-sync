@@ -7,7 +7,7 @@ Thanks for improving spell-sync. Small, focused pull requests are easier to revi
 See [Development](DEVELOPMENT.md). Requires Python **3.11+**.
 
 ```bash
-pip install -e ".[dev]"
+python3 scripts/project_environment.py sync --profile full-ci
 scripts/ci.sh   # must exit 0
 ```
 
