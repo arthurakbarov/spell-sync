@@ -70,9 +70,9 @@ def test_ci_runner_lists_diagnostic_checks() -> None:
     assert proc.returncode == 0
     ids = proc.stdout.splitlines()
     assert "ruff.format" in ids
-    assert "tests.core" in ids
-    assert "tests.tui" in ids
-    assert "tests.execution-control" in ids
+    assert "tests:rest" in ids
+    assert "tests:tui" in ids
+    assert "tests:dev-tooling" in ids
 
 
 def test_modifying_skills_reference_select_and_run_tests() -> None:

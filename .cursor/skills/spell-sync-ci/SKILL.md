@@ -99,7 +99,7 @@ Via `scripts/ci_runner.py`:
 | `targets.capabilities` | Target registry |
 | `ruff.check` / `ruff.format` | Lint and format (`spell_sync`, `tests`, `scripts`) |
 | `mypy` | Types on `spell_sync/` |
-| `tests.core` … `tests.integration` | Grouped pytest suite |
+| `tests:tui` … `tests:rest` | Grouped pytest suite |
 | `coverage.policy` | 100% lines, ≥96% branches on `spell_sync/` |
 | `packaging.build` | wheel + sdist build |
 | `packaging.twine` | Artifact validation |

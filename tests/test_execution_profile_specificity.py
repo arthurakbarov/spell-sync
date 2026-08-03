@@ -35,7 +35,7 @@ def test_pytest_profile_does_not_change_docs_validator_hard(registry):
 
 def test_unknown_child_does_not_inherit_pytest_budget(registry):
     profile = profile_for_execution_id(registry, "ci:unknown-check")
-    assert profile.profile_id == "bounded-unknown"
+    assert profile.profile_id == "unknown-check"
     assert (
         profile.initial_hard_seconds
         != profile_for_execution_id(registry, "ci:pytest").initial_hard_seconds

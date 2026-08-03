@@ -190,7 +190,7 @@ def validate_registry(registry: ExecutionBudgetRegistry) -> list[str]:
         "ci-child",
         "snapshot-tests",
         "diagnostic-pytest",
-        "bounded-unknown",
+        "unknown-check",
         "focused-pytest",
     }
     missing = required - set(registry.profiles)
@@ -301,4 +301,4 @@ def profile_for_execution_id(
     for profile in registry.profiles.values():
         if profile.execution_id == execution_id:
             return profile
-    return registry.profiles["bounded-unknown"]
+    return registry.profiles["unknown-check"]

@@ -234,7 +234,7 @@ parentRetries = 0
 diagnosticRetries = 1
 source = "diagnostic-pytest-estimate"
 
-[profiles.bounded-unknown]
+[profiles.unknown-check]
 kind = "fallback"
 executionId = "ci:unknown-check"
 initialExpectedSeconds = 120
@@ -279,7 +279,7 @@ source = "bootstrap-readonly-estimate"
 "ci:architecture" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:agent-config" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:target-capabilities" = { profile = "ci-validator", parent = "gate:full-ci" }
-"ci:unknown-check" = { profile = "bounded-unknown", parent = "gate:full-ci" }
+"ci:unknown-check" = { profile = "unknown-check", parent = "gate:full-ci" }
 "bootstrap:python" = { profile = "bootstrap", parent = "gate:full-ci" }
 "bootstrap:clean-tree" = { profile = "bootstrap", parent = "gate:full-ci" }
 "ci:environment-contract" = { profile = "ci-validator", parent = "gate:full-ci" }
@@ -296,12 +296,12 @@ source = "bootstrap-readonly-estimate"
 "ci:ruff-check" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:ruff-format" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:mypy" = { profile = "ci-child", parent = "gate:full-ci" }
-"tests.core" = { profile = "ci-pytest", parent = "gate:full-ci" }
-"tests.tui" = { profile = "ci-pytest", parent = "gate:full-ci" }
-"tests.execution-control" = { profile = "ci-pytest", parent = "gate:full-ci" }
-"tests.environment" = { profile = "ci-pytest", parent = "gate:full-ci" }
-"tests.packaging" = { profile = "ci-pytest", parent = "gate:full-ci" }
-"tests.integration" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:rest" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:tui" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:dev-tooling" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:environment" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:packaging" = { profile = "ci-pytest", parent = "gate:full-ci" }
+"tests:integration" = { profile = "ci-pytest", parent = "gate:full-ci" }
 "ci:pytest" = { profile = "ci-pytest", parent = "gate:full-ci" }
 "ci:coverage" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:package-build" = { profile = "ci-child", parent = "gate:full-ci" }

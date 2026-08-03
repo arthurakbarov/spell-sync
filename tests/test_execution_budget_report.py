@@ -23,7 +23,7 @@ def test_report_schema_version() -> None:
 
 
 def test_insufficient_data_confidence() -> None:
-    payload = build_execution_budget_report(ROOT, execution_id="tests.core")
+    payload = build_execution_budget_report(ROOT, execution_id="tests:rest")
     ids = payload["executionIds"]
     if ids:
         assert ids[0]["confidence"] in {

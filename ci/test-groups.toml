@@ -2,8 +2,8 @@
 # Union of all groups must equal `python -m pytest tests` (minus explicit owner/slow exclusions).
 
 [[groups]]
-id = "tests.tui"
-executionId = "tests.tui"
+id = "tests:tui"
+executionId = "tests:tui"
 description = "TUI screens, navigation, wizard, and smoke tests"
 patterns = [
   "tests/tui/**",
@@ -12,9 +12,9 @@ patterns = [
 ]
 
 [[groups]]
-id = "tests.execution-control"
-executionId = "tests.execution-control"
-description = "Timing, admission, evidence, and test selection"
+id = "tests:dev-tooling"
+executionId = "tests:dev-tooling"
+description = "CI timing, admission, evidence, test selection, and agent tooling"
 patterns = [
   "tests/test_execution_*.py",
   "tests/test_ci_*.py",
@@ -26,8 +26,8 @@ patterns = [
 ]
 
 [[groups]]
-id = "tests.environment"
-executionId = "tests.environment"
+id = "tests:environment"
+executionId = "tests:environment"
 description = "Environment contract, compatibility, and snapshot policy"
 patterns = [
   "tests/test_environment*.py",
@@ -38,8 +38,8 @@ patterns = [
 ]
 
 [[groups]]
-id = "tests.packaging"
-executionId = "tests.packaging"
+id = "tests:packaging"
+executionId = "tests:packaging"
 description = "Wheel install, packaging, and installed smoke"
 patterns = [
   "tests/test_installed_workflow.py",
@@ -48,8 +48,8 @@ patterns = [
 ]
 
 [[groups]]
-id = "tests.integration"
-executionId = "tests.integration"
+id = "tests:integration"
+executionId = "tests:integration"
 description = "Slow multi-step and subprocess integration flows"
 patterns = [
   "tests/test_*integration*.py",
@@ -57,9 +57,10 @@ patterns = [
 ]
 
 [[groups]]
-id = "tests.core"
-executionId = "tests.core"
-description = "Domain logic, CLI/JSON, Pull/Push, config, and discovery"
+id = "tests:rest"
+executionId = "tests:rest"
+description = "Unclaimed remainder tests (fallback group)"
+fallback = true
 patterns = [
   "tests/test_*.py",
 ]

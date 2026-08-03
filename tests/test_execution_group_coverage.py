@@ -25,5 +25,5 @@ def test_each_group_has_files() -> None:
 
 
 def test_is_pytest_group() -> None:
-    assert is_pytest_group("tests.core")
+    assert is_pytest_group("tests:rest")
     assert not is_pytest_group("mypy")

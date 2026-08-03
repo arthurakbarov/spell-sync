@@ -80,7 +80,7 @@ validators = []
 [clusters.pull]
 production = [
   "spell_sync/sync_run.py",
-  "spell_sync/pull*.py",
+  "spell_sync/application/services/sync.py",
   "spell_sync/io.py",
 ]
 moduleTests = [
@@ -138,7 +138,7 @@ validators = []
 [clusters.recovery]
 production = [
   "spell_sync/recover*.py",
-  "spell_sync/recovery*.py",
+  "spell_sync/application/services/recovery.py",
   "spell_sync/push_journal.py",
 ]
 moduleTests = [
@@ -195,7 +195,7 @@ validators = []
 production = [
   "pyproject.toml",
   "spell_sync/__init__.py",
-  "spell_sync/version.py",
+  "spell_sync/version_cmd.py",
   "scripts/project_environment.py",
   "scripts/validate_dependency_groups.py",
 ]
@@ -253,7 +253,7 @@ validators = [
 production = [
   "docs/",
   "README.md",
-  "CONTRIBUTING.md",
+  "docs/CONTRIBUTING.md",
 ]
 moduleTests = []
 clusterTests = []

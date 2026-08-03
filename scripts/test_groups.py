@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "ci" / "test-groups.toml"
 
 GROUP_ORDER = (
-    "tests.tui",
-    "tests.execution-control",
-    "tests.environment",
-    "tests.packaging",
-    "tests.integration",
-    "tests.core",
+    "tests:tui",
+    "tests:dev-tooling",
+    "tests:environment",
+    "tests:packaging",
+    "tests:integration",
+    "tests:rest",
 )
 
 
@@ -26,19 +26,20 @@ class TestGroup:
     execution_id: str
     patterns: tuple[str, ...]
     description: str = ""
+    fallback: bool = False
 
 
 def _default_groups() -> tuple[TestGroup, ...]:
     return (
         TestGroup(
-            "tests.tui",
-            "tests.tui",
+            "tests:tui",
+            "tests:tui",
             ("tests/tui/**", "tests/test_gui_smoke.py", "tests/test_tui_*.py"),
             "TUI screens, navigation, wizard, and smoke tests",
         ),
         TestGroup(
-            "tests.execution-control",
-            "tests.execution-control",
+            "tests:dev-tooling",
+            "tests:dev-tooling",
             (
                 "tests/test_execution_*.py",
                 "tests/test_ci_*.py",
@@ -48,11 +49,11 @@ def _default_groups() -> tuple[TestGroup, ...]:
                 "tests/test_run_focused_tests.py",
                 "tests/test_run_pre_final_checks.py",
             ),
-            "Timing, admission, evidence, and test selection",
+            "CI timing, admission, evidence, test selection, and agent tooling",
         ),
         TestGroup(
-            "tests.environment",
-            "tests.environment",
+            "tests:environment",
+            "tests:environment",
             (
                 "tests/test_environment*.py",
                 "tests/test_compatibility*.py",
@@ -63,8 +64,8 @@ def _default_groups() -> tuple[TestGroup, ...]:
             "Environment contract, compatibility, and snapshot policy",
         ),
         TestGroup(
-            "tests.packaging",
-            "tests.packaging",
+            "tests:packaging",
+            "tests:packaging",
             (
                 "tests/test_installed_workflow.py",
                 "tests/test_wheel*.py",
@@ -73,8 +74,8 @@ def _default_groups() -> tuple[TestGroup, ...]:
             "Wheel install, packaging, and installed smoke",
         ),
         TestGroup(
-            "tests.integration",
-            "tests.integration",
+            "tests:integration",
+            "tests:integration",
             (
                 "tests/test_*integration*.py",
                 "tests/test_*workflow*.py",
@@ -82,10 +83,11 @@ def _default_groups() -> tuple[TestGroup, ...]:
             "Slow multi-step and subprocess integration flows",
         ),
         TestGroup(
-            "tests.core",
-            "tests.core",
+            "tests:rest",
+            "tests:rest",
             ("tests/test_*.py",),
-            "Domain logic, CLI/JSON, Pull/Push, config, and discovery",
+            "Unclaimed remainder tests (fallback group)",
+            fallback=True,
         ),
     )
 
@@ -109,6 +111,7 @@ def load_test_groups(manifest_path: Path | None = None) -> tuple[TestGroup, ...]
                     execution_id=execution_id,
                     patterns=patterns,
                     description=str(item.get("description", "")),
+                    fallback=bool(item.get("fallback", False)),
                 )
             )
     return tuple(groups) if groups else _default_groups()
@@ -128,16 +131,22 @@ def _matches(pattern: str, rel_path: str) -> bool:
     return False
 
 
+def _fallback_group_id(groups: tuple[TestGroup, ...]) -> str | None:
+    for group in groups:
+        if group.fallback:
+            return group.group_id
+    return None
+
+
 def assign_group(rel_path: str, groups: tuple[TestGroup, ...]) -> str | None:
     for group in groups:
-        if group.group_id == "tests.core":
+        if group.fallback:
             continue
         if any(_matches(pattern, rel_path) for pattern in group.patterns):
             return group.group_id
     for group in groups:
-        if group.group_id == "tests.core":
-            if any(_matches(pattern, rel_path) for pattern in group.patterns):
-                return group.group_id
+        if group.fallback and any(_matches(pattern, rel_path) for pattern in group.patterns):
+            return group.group_id
     return None
 
 
@@ -212,6 +221,8 @@ def pytest_command_for_group(
         )
         if cov_append:
             command.append("--cov-append")
-        if group_id == GROUP_ORDER[-1]:
+        groups = load_test_groups()
+        fallback_id = _fallback_group_id(groups)
+        if group_id == fallback_id or (fallback_id is None and group_id == GROUP_ORDER[-1]):
             command.append("--cov-report=json")
     return command
