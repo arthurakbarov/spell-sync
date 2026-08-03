@@ -207,7 +207,7 @@ non-blocking warning. Errors go to the technical log only (no traceback in TUI).
 Headless Textual tests live in `tests/tui/`. Run:
 
 ```bash
-python3.11 -m pytest tests/tui -q
+python3 -m pytest tests/tui -q
 scripts/ci.sh
 ```
 

@@ -15,7 +15,7 @@ SUPPORTED_ENVIRONMENTS = (ROOT / "docs" / "SUPPORTED_ENVIRONMENTS.md").read_text
 def main() -> int:
     checks = [
         ("problem-statement", "underlined again" in README or "marked as misspelled" in README),
-        ("pull-direction", "Collect words" in README and "Pull" in README),
+        ("pull-direction", "Collect my words" in README and "Pull" in README),
         ("push-direction", "Update apps" in README and "Push" in README),
         ("removal-warning", "may remove" in README.lower()),
         ("builtin-guarantee", "Built-in dictionaries" in README),

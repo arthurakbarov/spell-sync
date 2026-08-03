@@ -57,15 +57,19 @@ Clusters are defined in `tests/test-impact.toml`:
 |---------|---------------|
 | `runtime` | Resolver, mutation scope, runtime settings |
 | `configuration` | Config, settings, project setup |
-| `pull` | Pull safety and flow |
+| `pull` | Pull safety, sync_run, dry-run, TUI pull flow |
 | `push` | Push writers, app guards |
-| `transaction` | Journal, lock, atomic writes, internal artifact security |
-| `recovery` | Recovery commands and TUI safety |
+| `transaction` | Journal, lock, atomic writes, secure internal artifacts |
+| `recovery` | Recovery commands, discard safety, TUI recovery |
 | `tui` | Textual screens and mutation routing |
 | `cli-json` | CLI commands and JSON contracts |
 | `packaging` | Wheel metadata and installed workflow |
 | `agent-workflow` | Cursor rules, skills, validators |
 | `documentation` | Docs style and contract only |
+| `diagnostics-events` | Technical events and history privacy |
+| `execution-control` | Execution budgets, admission, stall contracts |
+| `user-documentation` | User docs and onboarding copy validators |
+| `test-selection` | Focused-test planner and impact registry |
 
 ```bash
 python3 scripts/run_focused_tests.py --cluster runtime

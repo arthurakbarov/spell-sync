@@ -60,7 +60,7 @@ Vivaldi | windows | Yes | Yes | full | multi-profile | not-required | pass | not
 Windows Spelling | windows | Yes | Yes | locale-specific | system-managed | not-required | pass | not-run | —
 [target-capabilities:end]
 
-Run `python3.11 scripts/check_target_capabilities.py --write` to regenerate after updating
+Run `python3 scripts/check_target_capabilities.py --write` to regenerate after updating
 validation data.
 
 ## Platform validation status
@@ -75,12 +75,17 @@ pass` only.
 - Chrome, Edge, Firefox, and Obsidian Push may skip dictionaries while the application is running.
 - macOS and Windows system spelling targets are platform-specific and not available on all OSes.
 - Real spell-checker behavior beyond custom dictionary writes is not guaranteed.
+- Adversarial internal-artifact suite R1–R7 is exercised with POSIX symlink/hard-link vectors in
+  CI. Windows reparse points and junctions are not covered by a real-hardware adversarial suite;
+  treat Windows as capability-limited for that threat model (see [Supported environments](SUPPORTED_ENVIRONMENTS.md)).
+- Real-application manual validation is recorded in `docs/target-validation.json` and may be
+  `not-run` for every target/OS row even when automated synthetic tests pass.
 
 ## How to contribute a manual test result
 
 1. Follow the `platform-validation` Cursor skill in `.cursor/skills/platform-validation/`.
 2. Use a dedicated throwaway profile when possible and obtain owner permission before mutating real dictionaries.
 3. Record results in `docs/target-validation.json` with `application_version`, `tested_on`, and repository-relative `evidence`.
-4. Run `python3.11 scripts/check_target_capabilities.py --write` and `scripts/ci.sh`.
+4. Run `python3 scripts/check_target_capabilities.py --write` and `scripts/ci.sh`.
 
 Do not mark manual pass without a real test date and application version.

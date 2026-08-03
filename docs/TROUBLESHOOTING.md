@@ -179,6 +179,32 @@ Open **Review recovery** in the TUI or run `spell-sync recover`. See [Recovery](
 ### How to export a safe support report
 Run `spell-sync support-report`.
 
+## I pushed and want to undo it
+
+### What happened
+You completed a Push and want the previous custom-dictionary contents back.
+
+### Why Spell Sync stopped or skipped
+Spell Sync has no `rollback` command. Recovery only finishes an **interrupted** Push journal;
+it does not reverse a successful Push.
+
+### What was changed
+Targets that finished successfully already have the new dictionary contents.
+
+### What was not changed
+Targets that were skipped or failed keep their previous files. Rotating `.bak` files next to
+dictionaries (when the target writer creates them) are not automatically restored.
+
+### What to do next
+1. Prefer restoring from the application's own backup or from your wordlist Git history if you
+   track the personal word list.
+2. If a `.bak` file exists beside a target dictionary, restore it only when you understand that
+   file's format — see [Recovery](RECOVERY.md) for backup policy.
+3. Re-run **Review and update** after fixing the word list if you only need a corrected Push.
+
+### How to export a safe support report
+Run `spell-sync support-report`.
+
 ## Words returned after Push
 
 ### What happened

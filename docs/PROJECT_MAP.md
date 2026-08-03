@@ -78,9 +78,15 @@ Presentation helpers: `application/builders.py`, `application/event_presenter.py
 | `push_prepared.py` | Prepared push execution and fingerprint binding |
 | `push_transaction.py` | Atomic dictionary writes inside transactions |
 | `push_journal.py` | Journal lifecycle for Push |
-| `pull.py` | Wordlist union Pull semantics |
-| `sync_run.py` | Shared runtime context for sync operations |
+| `sync_run.py` | Shared sync runtime; Pull union into wordlist |
 | `mutation_guards.py` | Shared mutation safety helpers |
+| `operation_lock.py` | Per-project exclusive mutation lock |
+| `secure_artifacts.py` | Symlink/reparse-safe lock, journal, and txn paths |
+| `trusted_internal_fs.py` | Descriptor-relative trusted internal filesystem |
+| `journal_schema.py` | Journal schema versions and validation |
+| `runtime_identity.py` | Immutable identity bound to prepared mutations |
+| `resolved_runtime.py` | Resolved runtime snapshot for operations |
+| `validated_runtime.py` | Validated runtime inputs under lock |
 | `application/mutation_scope.py` | Operation lock + fresh runtime resolution |
 
 Preview objects carry `RuntimeIdentity`; execution re-resolves under lock and stops safely on

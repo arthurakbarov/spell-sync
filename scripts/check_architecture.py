@@ -102,13 +102,31 @@ FACADE_IMPORT_BANS = (
     "atomic_write",
 )
 
-CONTEXTVAR_MODULES = (
-    ROOT / "spell_sync" / "settings.py",
-    ROOT / "spell_sync" / "sync_context.py",
-    ROOT / "spell_sync" / "command_helpers.py",
-    ROOT / "spell_sync" / "application" / "runtime_resolver.py",
-    ROOT / "spell_sync" / "application" / "mutation_scope.py",
+# CLI entry surface may import application; core / project_setup must not.
+DEP_ALLOWED_APPLICATION_IMPORTERS = frozenset(
+    {
+        "cli.py",
+        "cli_request_adapter.py",
+        "command_helpers.py",
+        "commands.py",
+        "doctor.py",
+        "plan_cmd.py",
+        "recover_cmd.py",
+        "removal_review.py",
+        "support_report_cmd.py",
+    }
 )
+# Documented layering inversion: diagnostics history/types depend on application report DTOs.
+DEP_KNOWN_APPLICATION_EXCEPTIONS = frozenset(
+    {
+        "diagnostics/history_builder.py",
+        "diagnostics/history_store.py",
+        "diagnostics/technical_event_builder.py",
+        "diagnostics/types.py",
+    }
+)
+DEP_EXEMPT_PACKAGES = frozenset({"application", "tui"})
+RT_CONTEXTVAR_EXEMPT_PACKAGES = frozenset({"bundled"})
 
 REQUEST_CLASS_NAMES = (
     "ProjectRef",
@@ -161,6 +179,85 @@ def _module_import_hits(source_path: Path, banned: tuple[str, ...]) -> list[str]
                 if token in node.module:
                     hits.append(f"from {node.module}")
     return hits
+
+
+def _module_package(source_path: Path) -> str:
+    """Dotted package that anchors relative imports in this file."""
+    rel = source_path.relative_to(ROOT).with_suffix("")
+    parts = list(rel.parts)
+    if parts[-1] != "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def _is_type_checking_test(test: ast.AST) -> bool:
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return True
+    return isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+
+
+def _type_checking_guarded_nodes(tree: ast.AST) -> set[ast.AST]:
+    guarded: set[ast.AST] = set()
+    for parent in ast.walk(tree):
+        if isinstance(parent, ast.If) and _is_type_checking_test(parent.test):
+            for node in ast.walk(parent):
+                guarded.add(node)
+    return guarded
+
+
+def _resolve_import_from(package: str, node: ast.ImportFrom) -> str:
+    """Resolve ImportFrom to an absolute dotted module name."""
+    if node.level == 0:
+        return node.module or ""
+    anchor = package.split(".") if package else []
+    if node.level > 1:
+        anchor = anchor[: len(anchor) - (node.level - 1)]
+    if node.module:
+        return ".".join([*anchor, node.module])
+    return ".".join(anchor)
+
+
+def _resolved_application_import_hits(source_path: Path) -> list[str]:
+    """Return rendered imports that resolve to spell_sync.application (runtime only)."""
+    package = _module_package(source_path)
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    guarded = _type_checking_guarded_nodes(tree)
+    hits: list[str] = []
+    for node in ast.walk(tree):
+        if node in guarded:
+            continue
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                absolute = alias.name
+                if absolute == "spell_sync.application" or absolute.startswith(
+                    "spell_sync.application."
+                ):
+                    hits.append(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            absolute = _resolve_import_from(package, node)
+            if absolute == "spell_sync.application" or absolute.startswith(
+                "spell_sync.application."
+            ):
+                dots = "." * node.level
+                module = node.module or ""
+                hits.append(f"from {dots}{module} resolves to {absolute}")
+    return hits
+
+
+def _uses_contextvar(source_path: Path) -> bool:
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id == "ContextVar":
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == "ContextVar":
+            return True
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "contextvars" or alias.name.startswith("contextvars."):
+                    return True
+        if isinstance(node, ast.ImportFrom) and node.module == "contextvars":
+            return True
+    return False
 
 
 def _source_token_hits(source_path: Path, banned: tuple[str, ...]) -> list[str]:
@@ -234,29 +331,20 @@ def _check_cli_options_isolation() -> list[ArchitectureViolation]:
 
 def _check_contextvars() -> list[ArchitectureViolation]:
     violations: list[ArchitectureViolation] = []
-    for path in CONTEXTVAR_MODULES:
-        if not path.is_file():
+    spell_sync = ROOT / "spell_sync"
+    for path in sorted(spell_sync.rglob("*.py")):
+        rel = path.relative_to(spell_sync)
+        if rel.parts and rel.parts[0] in RT_CONTEXTVAR_EXEMPT_PACKAGES:
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Name) and node.id == "ContextVar":
-                violations.append(
-                    ArchitectureViolation(
-                        f"{CHECK_ID}-RT-001",
-                        path,
-                        "uses ContextVar",
-                        "use explicit RuntimeResolver and scoped parameters",
-                    )
+        if _uses_contextvar(path):
+            violations.append(
+                ArchitectureViolation(
+                    f"{CHECK_ID}-RT-001",
+                    path,
+                    "uses ContextVar",
+                    "use explicit RuntimeResolver and scoped parameters",
                 )
-            if isinstance(node, ast.Attribute) and node.attr == "ContextVar":
-                violations.append(
-                    ArchitectureViolation(
-                        f"{CHECK_ID}-RT-001",
-                        path,
-                        "uses ContextVar",
-                        "use explicit RuntimeResolver and scoped parameters",
-                    )
-                )
+            )
     return violations
 
 
@@ -357,15 +445,14 @@ def _check_application_exports() -> list[ArchitectureViolation]:
 def _check_core_does_not_import_application() -> list[ArchitectureViolation]:
     violations: list[ArchitectureViolation] = []
     spell_sync = ROOT / "spell_sync"
+    allowed = DEP_ALLOWED_APPLICATION_IMPORTERS | DEP_KNOWN_APPLICATION_EXCEPTIONS
     for path in sorted(spell_sync.rglob("*.py")):
         rel = path.relative_to(spell_sync)
-        if rel.parts and rel.parts[0] in {"application", "tui", "cli.py", "cli_options.py"}:
+        if rel.parts and rel.parts[0] in DEP_EXEMPT_PACKAGES:
             continue
-        if rel.parts and rel.parts[0] == "application":
+        if rel.as_posix() in allowed:
             continue
-        if "application" in rel.parts:
-            continue
-        for hit in _module_import_hits(path, ("spell_sync.application",)):
+        for hit in _resolved_application_import_hits(path):
             violations.append(
                 ArchitectureViolation(
                     f"{CHECK_ID}-DEP-001",

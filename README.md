@@ -11,13 +11,13 @@ You teach a browser or editor a personal word — then another app has it underl
 copy them into supported apps' **custom** dictionaries.
 
 ```text
-Collect words:   your apps → your word list   (Pull)
+Collect my words:   your apps → your word list   (Pull)
 Update apps:     your word list → your apps   (Push)
 ```
 
 You always see a **preview** before anything changes.
 
-- **Collect words** never removes words from your personal list.
+- **Collect my words** never removes words from your personal list.
 - **Update apps** may remove custom words that are no longer in your personal list.
 - **Built-in dictionaries are never changed.**
 
@@ -208,6 +208,7 @@ details.
 | Document | Contents |
 |----------|----------|
 | [Supported targets](docs/SUPPORTED_TARGETS.md) | Capability matrix and validation levels |
+| [Supported environments](docs/SUPPORTED_ENVIRONMENTS.md) | Python/OS support and Windows honesty |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Symptom-based support guidance |
 | [Configuration](docs/CONFIGURATION.md) | `spell-sync.toml` reference |
 | [Recovery](docs/RECOVERY.md) | Transaction journal and `recover` |

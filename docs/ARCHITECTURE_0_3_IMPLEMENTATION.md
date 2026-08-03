@@ -14,12 +14,15 @@ Phase 7: documentation reorganization and ADRs — **complete** (owner-approved)
 Phase 8: agent configuration refresh — **complete** (owner-approved).
 Phase 9: dead directory audit — **complete** (owner-approved).
 Phase 10: version 0.3.0 — implementation **complete**, corrective security work **complete**,
+post-review architecture/test/docs corrective work **complete**,
 **awaiting owner approval**. Release not performed.
 
 Corrective work (security hardening, post-review): **complete** — descriptor/handle
 trusted internal filesystem, R1–R7 adversarial regressions, descriptor-safe `safe_discard`,
 handoff-integrity schema v5, recovery outcome propagation to CLI/TUI,
-explicit backup policy; does not advance phase-10 approval or start a new architecture phase.
+explicit backup policy; ARCH-DEP-001 relative-import enforcement, impact-map pull/secure_artifacts
+wiring, user-doc honesty (Collect my words, Windows POSIX-adversarial caveat), dead-directory
+audit de-privatized; does not advance phase-10 approval or start a new architecture phase.
 
 [architecture-status:start]
 current: phase-10

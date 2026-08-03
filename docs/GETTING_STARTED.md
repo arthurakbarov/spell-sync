@@ -80,7 +80,7 @@ If you prefer commands (or have no interactive terminal):
 | Goal | Command |
 |------|---------|
 | Non-interactive setup | `spell-sync init` |
-| Collect words | `spell-sync pull` |
+| Collect my words | `spell-sync pull` |
 | Preview before update | `spell-sync status` or `spell-sync plan` |
 | Update apps | `spell-sync push` |
 | Check health | `spell-sync doctor` |

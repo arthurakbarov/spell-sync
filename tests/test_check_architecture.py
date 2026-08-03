@@ -63,6 +63,67 @@ def test_main_check_success(architecture_module, capsys) -> None:
     assert "ARCHITECTURE_VALIDATION=success" in capsys.readouterr().out
 
 
+def test_resolved_application_import_hits_relative(architecture_module, tmp_path: Path) -> None:
+    package = tmp_path / "spell_sync" / "core_like"
+    package.mkdir(parents=True)
+    (tmp_path / "spell_sync" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    path = package / "sample.py"
+    path.write_text("from ..application.reports import X\n", encoding="utf-8")
+    original_root = architecture_module.ROOT
+    architecture_module.ROOT = tmp_path
+    try:
+        hits = architecture_module._resolved_application_import_hits(path)
+    finally:
+        architecture_module.ROOT = original_root
+    assert hits
+    assert any("spell_sync.application.reports" in hit for hit in hits)
+
+
+def test_resolved_application_import_skips_type_checking(
+    architecture_module, tmp_path: Path
+) -> None:
+    package = tmp_path / "spell_sync" / "core_like"
+    package.mkdir(parents=True)
+    (tmp_path / "spell_sync" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    path = package / "sample.py"
+    path.write_text(
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    from ..application.reports import X\n",
+        encoding="utf-8",
+    )
+    original_root = architecture_module.ROOT
+    architecture_module.ROOT = tmp_path
+    try:
+        hits = architecture_module._resolved_application_import_hits(path)
+    finally:
+        architecture_module.ROOT = original_root
+    assert hits == []
+
+
+def test_core_import_of_application_is_flagged(architecture_module, tmp_path: Path) -> None:
+    spell_sync = tmp_path / "spell_sync"
+    spell_sync.mkdir()
+    (spell_sync / "__init__.py").write_text("", encoding="utf-8")
+    offender = spell_sync / "sync_run.py"
+    offender.write_text("from .application.reports import X\n", encoding="utf-8")
+    original_root = architecture_module.ROOT
+    architecture_module.ROOT = tmp_path
+    try:
+        violations = architecture_module._check_core_does_not_import_application()
+    finally:
+        architecture_module.ROOT = original_root
+    assert any(item.check_id.endswith("DEP-001") for item in violations)
+
+
+def test_uses_contextvar_detects_import(architecture_module, tmp_path: Path) -> None:
+    path = tmp_path / "sample.py"
+    path.write_text("from contextvars import ContextVar\n", encoding="utf-8")
+    assert architecture_module._uses_contextvar(path) is True
+
+
 def test_stale_generated_section_reports_violation(architecture_module, tmp_path: Path) -> None:
     project_map = tmp_path / "PROJECT_MAP.md"
     project_map.write_text(

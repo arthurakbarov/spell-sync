@@ -79,15 +79,20 @@ validators = []
 
 [clusters.pull]
 production = [
-  "spell_sync/sync_run.py",
   "spell_sync/application/services/sync.py",
   "spell_sync/io.py",
+  "spell_sync/sync_run.py",
 ]
 moduleTests = [
   "tests/test_pull_safety.py",
 ]
 clusterTests = [
+  "tests/test_dry_run.py",
   "tests/test_pull_safety.py",
+  "tests/test_read_outcome.py",
+  "tests/test_symlinks.py",
+  "tests/test_sync_run.py",
+  "tests/tui/test_pull_flow.py",
 ]
 validators = []
 
@@ -118,28 +123,35 @@ validators = []
 
 [clusters.transaction]
 production = [
-  "spell_sync/push_transaction.py",
-  "spell_sync/push_journal.py",
   "spell_sync/operation_lock.py",
+  "spell_sync/push_journal.py",
   "spell_sync/push_prepared.py",
+  "spell_sync/push_transaction.py",
+  "spell_sync/secure_artifacts.py",
+  "spell_sync/trusted_internal_fs.py",
 ]
 moduleTests = [
-  "tests/test_push_journal.py",
   "tests/test_operation_lock.py",
+  "tests/test_push_journal.py",
+  "tests/test_secure_artifacts.py",
 ]
 clusterTests = [
-  "tests/test_push_transaction.py",
-  "tests/test_transaction_safety.py",
-  "tests/test_push_journal.py",
+  "tests/test_internal_artifact_security.py",
   "tests/test_operation_lock.py",
+  "tests/test_push_journal.py",
+  "tests/test_push_transaction.py",
+  "tests/test_secure_artifacts.py",
+  "tests/test_secure_artifacts_adversarial.py",
+  "tests/test_secure_artifacts_static_guard.py",
+  "tests/test_transaction_safety.py",
 ]
 validators = []
 
 [clusters.recovery]
 production = [
-  "spell_sync/recover*.py",
   "spell_sync/application/services/recovery.py",
   "spell_sync/push_journal.py",
+  "spell_sync/recover*.py",
 ]
 moduleTests = [
   "tests/test_recovery_discard_safety.py",
@@ -147,6 +159,7 @@ moduleTests = [
 clusterTests = [
   "tests/test_recovery_discard_safety.py",
   "tests/test_recovery_facade_coverage.py",
+  "tests/test_safe_discard_adversarial.py",
   "tests/test_tui_recovery_safety.py",
 ]
 validators = []

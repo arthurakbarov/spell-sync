@@ -55,11 +55,19 @@ CLI / TUI
   → application requests
   → SpellSyncService / services/*
   → RuntimeResolver
-  → core (sync_run, push_*, pull, project_setup)
+  → core (sync_run, push_*, project_setup)
 
 core / project_setup
-  ✗ must not import spell_sync.application
+  ✗ must not import spell_sync.application (absolute or relative)
 ```
+
+`scripts/check_architecture.py` (`ARCH-DEP-001`) resolves relative imports and allows only the
+CLI entry surface (`cli.py`, `cli_request_adapter.py`, `commands.py`, `*_cmd.py`,
+`command_helpers.py`, `doctor.py`, `removal_review.py`) plus `application/` and `tui/`.
+`spell_sync/diagnostics/` currently imports `application.reports` DTOs — recorded as a
+temporary known exception until shared outcome types move below application.
+
+`ARCH-RT-001` forbids `ContextVar` anywhere under `spell_sync/` (except `bundled/`).
 
 Enforced by `scripts/check_architecture.py` (`architecture.boundaries` CI check).
 

@@ -107,7 +107,7 @@ source = ["spell_sync"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 98
+fail_under = 100
 skip_covered = true
 
 [tool.uv]
