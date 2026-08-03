@@ -59,12 +59,14 @@ def _span(**overrides: object) -> SpanRecord:
         environment_signature="",
     )
     base.update(overrides)
-    return SpanRecord(**base)  # type: ignore[arg-type]
+    return SpanRecord(**base)
 
 
 def test_edit_loop_summary_counters_from_history(isolated_state_dir, history: HistoryStore) -> None:
     del isolated_state_dir
-    history.insert_span(_span(span_id="s1", execution_id="gate:focused-module"), context_signature="ctx")
+    history.insert_span(
+        _span(span_id="s1", execution_id="gate:focused-module"), context_signature="ctx"
+    )
     history.insert_span(
         _span(span_id="s2", run_id="run-2", execution_id="gate:pre-final", profile_id="pre-final"),
         context_signature="ctx",
@@ -81,13 +83,15 @@ def test_edit_loop_summary_counters_from_history(isolated_state_dir, history: Hi
         _span(
             span_id="s5",
             run_id="run-5",
+            execution_id="gate:focused-cluster",
+            profile_id="focused-cluster",
             status="defer-to-pre-final",
             exit_code=1,
         ),
         context_signature="ctx",
     )
     summary = build_edit_loop_summary(SessionTotals(edit_seconds=10.0), history=history)
-    assert summary["focusedRunCount"] == 2  # focused-module success + reused parent
+    assert summary["focusedRunCount"] == 3  # module + reused module + deferred cluster
     assert summary["preFinalRunCount"] == 1
     assert summary["fullCiRunCount"] == 1
     assert summary["evidenceReuses"] == 1
