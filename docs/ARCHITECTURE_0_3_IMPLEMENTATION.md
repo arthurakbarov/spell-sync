@@ -13,19 +13,14 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
 Phase 8: agent configuration refresh — **complete** (owner-approved).
 Phase 9: dead directory audit — **complete** (owner-approved).
-Phase 10: version 0.3.0 — implementation **complete**, corrective security work **complete**,
-post-review architecture/test/docs corrective work **complete**,
-**awaiting owner approval**. Release not performed.
+Phase 10: version 0.3.0 — **complete** (owner-approved with documented residuals:
+R-WIN, R-PWR, R-CON). Release not performed.
 
-Corrective work (security hardening, post-review): **complete** — descriptor/handle
-trusted internal filesystem, R1–R7 adversarial regressions, descriptor-safe `safe_discard`,
-handoff-integrity schema v5, recovery outcome propagation to CLI/TUI,
-explicit backup policy; ARCH-DEP-001 relative-import enforcement, impact-map pull/secure_artifacts
-wiring, user-doc honesty (Collect my words, Windows POSIX-adversarial caveat), dead-directory
-audit de-privatized; does not advance phase-10 approval or start a new architecture phase.
+Post-0.3 ops: **not started** — release/tag/publication and real-app manual validation remain
+owner-initiated only; not an architecture migration phase.
 
 [architecture-status:start]
-current: phase-10
+current: post-0.3-ops
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -39,7 +34,8 @@ phase-6: complete
 phase-7: complete
 phase-8: complete
 phase-9: complete
-phase-10: awaiting-approval
+phase-10: complete
+post-0.3-ops: not-started
 [architecture-status:end]
 
 ## Verified baseline
@@ -52,14 +48,15 @@ phase-10: awaiting-approval
 
 Public version: `0.3.0` (`pyproject.toml`).
 
-Owner approval: **pending** (phase-10 remains `awaiting-approval`).
+Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-CON).
+Phase 10 is **complete**. Current tracker focus: `post-0.3-ops` (not started).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
 
-Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD (see owner-decision PATCH_VALIDATION.txt).
+Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD.
 
 Last recorded exact-head CI snapshot in this file (may lag tip by at most one docs-sync commit; tip evidence is authoritative):
-`897bb81`, run `20260802T044113.811390Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=c37c7768…`.
+`03adfea`, run `20260803T233156.787500Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=791d2bdc…`.
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -531,7 +528,7 @@ python3 scripts/check_ci_evidence.py
 
 ## Phase 10 — Version 0.3.0
 
-**Status:** awaiting approval
+**Status:** complete (owner-approved with documented residuals)
 
 ### Goal
 
@@ -543,16 +540,33 @@ No tag, release, or publication in this phase.
 - `pyproject.toml` and `uv.lock` — `0.3.0`
 - Compatibility and installed-wheel tests aligned; `run_compatibility_checks.py` reads version from `pyproject.toml`
 - `check_docs_contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
+- Post-review corrective: ARCH-DEP-001 relative-import enforcement, ARCH-RT-001 package-wide
+  ContextVar ban, pull/secure_artifacts impact wiring, user-doc honesty, dead-directory
+  audit de-privatized
+
+### Residuals accepted by owner
+
+- R-WIN: Windows real-hardware adversarial R1–R7 (reparse/junction) not run
+- R-PWR: power-loss durability not physically proven
+- R-CON: same-user concurrent replacement outside threat model
 
 ### Phase-specific validation (passed)
 
 ```text
 python3 scripts/check_docs_contract.py
 python3 scripts/check_agent_config.py
-full final CI on committed clean HEAD e46ce45
+full final CI on committed clean HEAD 03adfea
 spell-sync version → 0.3.0
 CI_EVIDENCE_MATCH=exact-head
 ```
+
+## Post-0.3 ops
+
+**Status:** not started
+
+Owner-initiated only: GitHub Release / tag / package publish, real-application manual
+validation matrix updates, and optional Windows real-hardware adversarial evidence.
+Not an architecture migration phase — do not start without an explicit owner command.
 
 ## Phase 2B: complete application boundary
 
@@ -666,8 +680,8 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (awaiting owner approval): tip evidence via check-ci-evidence + owner dossier; last recorded in tracker 897bb81 / 20260802T044113.811390Z;
-  R1–R7 7/7; safe_discard 9/9; handoff integrity success; version 0.3.0; release not performed
+Phase 10 (complete, owner-approved with residuals): HEAD 03adfea; CI 20260803T233156.787500Z; exact-head;
+  R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
@@ -679,8 +693,8 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-0.3 architecture migration complete pending Phase 10 owner acceptance. No further
-phases in the migration order. Release/tag/publication remain owner-initiated only.
+0.3 architecture migration **complete**. Current: `post-0.3-ops` (not started). Release/tag/
+publication and real-app manual validation remain owner-initiated only.
 
 ## Deferred work
 
