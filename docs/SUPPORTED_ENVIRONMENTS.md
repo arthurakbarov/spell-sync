@@ -28,13 +28,16 @@ Target platforms for Pull/Push/TUI product behavior:
 
 | Platform | Product support | Evidence |
 |----------|-----------------|----------|
-| macOS | Supported | CI compatibility matrix, synthetic tests |
-| Linux | Supported | CI compatibility matrix, synthetic tests |
-| Windows | Supported | CI compatibility matrix, synthetic tests |
+| macOS | Supported | Synthetic CI + real-app manual validation: see `target-validation.json` (currently not-run) |
+| Linux | Supported | Synthetic CI + real-app manual validation: see `target-validation.json` (currently not-run) |
+| Windows | Supported (capability-limited) | Synthetic CI; no real-hardware adversarial filesystem suite — see [Supported targets](SUPPORTED_TARGETS.md) Known limitations |
 
 Classifiers currently list `Operating System :: OS Independent`. Platform-specific dictionary
 paths and filesystem behavior are validated in CI; real-application manual validation is
 recorded in `docs/target-validation.json` (see [MANUAL_TESTING.md](MANUAL_TESTING.md)).
+
+**Supported** means product paths are implemented and CI-tested synthetically. It does not mean
+every target has real-application manual validation on every OS.
 
 ## Maintainer tooling
 

@@ -288,3 +288,47 @@ available commands.
 
 ### How to export a safe support report
 Use `spell-sync support-report` from the CLI when the TUI is unavailable.
+
+## I want to preview differences before Push
+
+### What happened
+You want to see what would change before writing application custom dictionaries.
+
+### Why Spell Sync stopped or skipped
+Nothing is wrong — preview is intentional. Push never runs automatically from status or plan.
+
+### What was changed
+Nothing. Preview commands are read-only.
+
+### What was not changed
+Wordlist, application dictionaries, and Recovery state.
+
+### What to do next
+Run `spell-sync status` for a short drift summary, or `spell-sync plan` for a detailed Push
+preview. In the TUI, open **Push** (or **Plan**) to review the same preview before confirming.
+
+### How to export a safe support report
+Run `spell-sync support-report` if preview output looks unexpected.
+
+## Wordlist quality warnings
+
+### What happened
+You want to check the canonical wordlist for quality issues before Pull or Push.
+
+### Why Spell Sync stopped or skipped
+Lint is advisory quality checking; it does not mutate dictionaries by itself.
+
+### What was changed
+Nothing unless you edit the wordlist afterward.
+
+### What was not changed
+Application custom dictionaries and Recovery state.
+
+### What to do next
+Run `spell-sync lint` and fix or accept reported warnings in your canonical wordlist. Rebuild
+any Push preview after editing the wordlist.
+
+### How to export a safe support report
+Run `spell-sync support-report` after resolving path or permission issues if lint cannot read
+the wordlist.
+

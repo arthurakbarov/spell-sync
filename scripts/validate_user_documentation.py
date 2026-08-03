@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 GETTING_STARTED = (ROOT / "docs" / "GETTING_STARTED.md").read_text(encoding="utf-8")
 TROUBLESHOOTING = (ROOT / "docs" / "TROUBLESHOOTING.md").read_text(encoding="utf-8")
+SUPPORTED_ENVIRONMENTS = (ROOT / "docs" / "SUPPORTED_ENVIRONMENTS.md").read_text(encoding="utf-8")
 
 
 def main() -> int:
@@ -48,6 +49,18 @@ def main() -> int:
         (
             "readme-support-report-output",
             "support-report --output" in README,
+        ),
+        (
+            "troubleshooting-status",
+            "spell-sync status" in TROUBLESHOOTING,
+        ),
+        (
+            "troubleshooting-lint",
+            "spell-sync lint" in TROUBLESHOOTING,
+        ),
+        (
+            "supported-environments-windows-honesty",
+            "capability-limited" in SUPPORTED_ENVIRONMENTS,
         ),
     ]
     for check_id, ok in checks:
