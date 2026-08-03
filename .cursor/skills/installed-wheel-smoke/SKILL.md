@@ -25,8 +25,8 @@ description: >-
 
 ```bash
 rm -rf build dist
-python3.11 -m build
-python3.11 -m twine check dist/*
+python3 -m build
+python3 -m twine check dist/*
 ```
 
 2. Inspect wheel contents — no tests, caches, logs, personal config:
@@ -40,7 +40,7 @@ unzip -l dist/*.whl
 ```bash
 smoke_home="$(mktemp -d)"
 smoke_cwd="$(mktemp -d)"
-python3.11 -m venv /tmp/spell-sync-smoke-venv
+python3 -m venv /tmp/spell-sync-smoke-venv
 /tmp/spell-sync-smoke-venv/bin/pip install dist/*.whl
 cd "$smoke_cwd"
 HOME="$smoke_home" /tmp/spell-sync-smoke-venv/bin/spell-sync --help

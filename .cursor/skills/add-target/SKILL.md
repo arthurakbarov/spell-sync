@@ -49,7 +49,7 @@ description: >-
 - [ ] Installed-wheel resource check if bundled paths involved
 - [ ] `spell_sync/target_capabilities.py` descriptor added or updated
 - [ ] `docs/target-validation.json` row(s) for each supported platform
-- [ ] Regenerate matrix: `python3.11 scripts/check_target_capabilities.py --write`
+- [ ] Regenerate matrix: `python3 scripts/check_target_capabilities.py --write`
 - [ ] Contract tests in `tests/test_target_capabilities.py`
 - [ ] Manual validation status explicit (`not-run` until real-app evidence exists)
 
@@ -74,4 +74,7 @@ description: >-
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

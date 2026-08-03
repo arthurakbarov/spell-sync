@@ -85,29 +85,17 @@ python3 scripts/check_ci_evidence.py --release
 
 ## What ci.sh enforces
 
-Via `scripts/ci_runner.py`:
+`scripts/ci.sh` is the single CI entry point (via `scripts/ci_runner.py`). Gate ids are
+not duplicated here — list the current set with:
 
-| Check ID | Gate |
-|----------|------|
-| `ci-impact.registry` | CI impact classification registry |
-| `test-impact.registry` | Test impact registry |
-| `bootstrap.python` | Python 3.11+ |
-| `deps.install` / `deps.editable` | Tooling + editable install |
-| `docs.style` | Markdown style |
-| `docs.contract` | Documentation contracts |
-| `agent.config` | Cursor agent configuration |
-| `targets.capabilities` | Target registry |
-| `ruff.check` / `ruff.format` | Lint and format (`spell_sync`, `tests`, `scripts`) |
-| `mypy` | Types on `spell_sync/` |
-| `tests:tui` … `tests:rest` | Grouped pytest suite |
-| `coverage.policy` | 100% lines, ≥96% branches on `spell_sync/` |
-| `packaging.build` | wheel + sdist build |
-| `packaging.twine` | Artifact validation |
-| `packaging.wheel-smoke` | Installed wheel outside checkout |
-| `smoke.init` / `smoke.lint` | Temporary project smoke |
-| `smoke.tui` | Headless CLI scenarios |
+```bash
+scripts/ci.sh --list-checks
+```
 
-List check ids: `scripts/ci.sh --list-checks`
+Grouped coverage typically includes docs style/contract, agent config, architecture and
+target capability checks, ruff, mypy, grouped pytest with coverage policy, packaging
+(build/twine/wheel-smoke), and headless smoke scenarios. Treat `--list-checks` as SSOT
+for exact check ids.
 
 ## Common fixes
 
@@ -136,7 +124,7 @@ List check ids: `scripts/ci.sh --list-checks`
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after `python3 scripts/check_ci_evidence.py` success: skill
-`create-code-snapshot` in spell-sync-dev with `--output "$HOME/code.zip"` (home directory only,
-never under the workspace tree), `--force`, then `--check`; re-verify evidence; report §14 and
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
 footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

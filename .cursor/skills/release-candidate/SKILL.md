@@ -28,7 +28,7 @@ description: >-
 - [ ] Privacy scan (`privacy-export` skill)
 - [ ] SHA-256 hashes recorded for release artifacts
 - [ ] `docs/MANUAL_TESTING.md` scenarios current
-- [ ] `python3.11 scripts/check_target_capabilities.py --check` green
+- [ ] `python3 scripts/check_target_capabilities.py --check` green
 - [ ] No false `manual_validation: pass` claims in `docs/target-validation.json`
 - [ ] Pending real-app validations listed explicitly
 - [ ] Known limitations documented
@@ -64,4 +64,7 @@ shasum -a 256 /tmp/spell-sync-source.zip dist/*
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

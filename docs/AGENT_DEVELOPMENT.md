@@ -29,7 +29,7 @@ After bootstrap, later sessions can use:
 ```
 
 ```text
-Текущая фase принята. Выполни skill advance-current-phase, затем execute-current-phase.
+Текущая фаза принята. Выполни skill advance-current-phase, затем execute-current-phase.
 ```
 
 Skills live under `.cursor/skills/`. Canonical process detail is in this document.

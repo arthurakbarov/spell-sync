@@ -143,7 +143,7 @@ Return the final report contract from `docs/AGENT_DEVELOPMENT.md`. Stop. Do not 
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after step 12 evidence verification: skill `create-code-snapshot` in
-spell-sync-dev with `--force`, then `--check`; re-run `python3 scripts/check_ci_evidence.py`
-and `git status --short`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` /
-`SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

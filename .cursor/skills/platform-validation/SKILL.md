@@ -36,8 +36,8 @@ description: >-
 13. Update `docs/target-validation.json` and regenerate docs:
 
 ```bash
-python3.11 scripts/check_target_capabilities.py --write
-python3.11 scripts/check_target_capabilities.py --check
+python3 scripts/check_target_capabilities.py --write
+python3 scripts/check_target_capabilities.py --check
 ```
 
 14. Do not mark other OS platforms as manually validated.

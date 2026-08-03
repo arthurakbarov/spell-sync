@@ -31,7 +31,7 @@ description: Change structured technical events, logging, history presentation, 
 ## Validation
 
 ```bash
-python3 scripts/run_focused_tests.py tests/test_technical_logging.py tests/test_diagnostic_redaction.py
+python3 scripts/run_focused_tests.py --cluster diagnostics-events
 python3 -m pytest tests/tui/test_logs_screen.py -q
 python3 scripts/check_architecture.py --check
 ```
@@ -50,4 +50,7 @@ when contracts change.
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

@@ -101,13 +101,27 @@ Requires **Python 3.11+** (`pyproject.toml`).
 .cursor/skills/    procedural workflows (CI, phases, safety audit, TUI, packaging)
 ```
 
-Phase-driven workflow skills:
+Phase-driven workflow skills (use these for architecture roadmap work):
 
 - `execute-current-phase` — implement and validate the current architecture phase
 - `apply-phase-fixes` — correct owner-listed defects without advancing the roadmap
 - `advance-current-phase` — mark an approved phase complete (owner command only)
 - `architecture-refactor` — architecture migration with safety and guard updates
 - `diagnostics-change` — structured events, logging, and privacy changes
+
+Other skills:
+
+- `spell-sync-ci` — focused validation then final CI / evidence on committed HEAD
+- `select-and-run-tests` — smallest non-duplicated focused test plan and execution
+- `run-time-controlled-command` — run registered expensive commands under budget control
+- `mutation-safety-audit` — audit Pull/Push/Recovery/lock/journal mutation invariants
+- `tui-flow` — add or change TUI screens, navigation, and related tests
+- `add-target` — add a new application custom-dictionary target
+- `platform-validation` — record real-application validation on a specific OS
+- `installed-wheel-smoke` — verify an installed wheel outside the source checkout
+- `release-candidate` — prepare a release candidate without publishing
+- `privacy-export` — scan artifacts and repo content before publication or sharing
+- `project-environment` — bootstrap/sync/check maintainer Python environment lifecycle
 
 Architecture tracker: `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` (`[architecture-status:start]` block).
 

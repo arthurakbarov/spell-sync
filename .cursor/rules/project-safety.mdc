@@ -25,7 +25,7 @@ alwaysApply: true
 ## Engineering discipline
 
 - Minimal diff — no drive-by refactors or parallel reimplementations of existing paths
-- Run focused tests for changed scope; assess CI necessity before full `scripts/ci.sh`
+- Focused tests and CI necessity: see `test-efficiency` rule.
 - Do not stop on red tests; do not mask failures with meaningless coverage tests
 - Update `scripts/check_architecture.py` expectations when public application exports change
 

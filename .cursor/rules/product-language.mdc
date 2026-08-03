@@ -31,3 +31,5 @@ behavior across applications.
 ## Command naming
 
 Use **Pull** and **Push** — not sync, apply, import, or merge in user-facing text.
+TUI may use Collect/Update labels from `product_concepts.py` alongside Pull/Push; do not invent
+other synonyms (sync/apply/import/merge).

@@ -122,6 +122,17 @@ FOCUSED_SKILL_FORBIDDEN_CI = re.compile(
 SNAPSHOT_FORCE_REQUIRED = re.compile(r"--force")
 SNAPSHOT_REPORT_FOOTER = re.compile(r"CODE_ARCHIVE")
 
+PYTHON311_PATTERN = re.compile(r"python3\.11")
+BARE_PYTHON_SCRIPTS = re.compile(r"(?<![\w.])python scripts/")
+BARE_PYTHON_BACKTICK_CMD = re.compile(r"`python\s")
+HYPHENATED_CHECK_TOKEN = re.compile(r"`(check-[a-z0-9-]+(?:\.[a-z0-9-]+)*)`")
+ALLOWED_HYPHENATED_CHECK_TOKENS = frozenset(
+    {
+        "check-docs-style.sh",
+    }
+)
+SNAPSHOT_EVIDENCE_REQUIRED = "check_ci_evidence"
+
 SNAPSHOT_FINALIZATION_MARKER = "Finalize workspace snapshot"
 
 TIMESTAMPED_ARCHIVE_PATTERN = re.compile(
@@ -375,6 +386,19 @@ def check_modifying_skill_validation(root: Path) -> list[str]:
     return errors
 
 
+def _snapshot_section(text: str) -> str | None:
+    marker = SNAPSHOT_FINALIZATION_MARKER
+    if marker not in text:
+        return None
+    start = text.index(marker)
+    rest = text[start:]
+    # section runs until next markdown H2 or EOF
+    nxt = re.search(r"\n## ", rest[len(marker) :])
+    if nxt:
+        return rest[: len(marker) + nxt.start()]
+    return rest
+
+
 def check_snapshot_finalization_skills(root: Path) -> list[str]:
     errors: list[str] = []
     skills = root / ".cursor" / "skills"
@@ -384,23 +408,29 @@ def check_snapshot_finalization_skills(root: Path) -> list[str]:
             continue
         text = skill_file.read_text(encoding="utf-8")
         rel = skill_file.relative_to(root)
-        if SNAPSHOT_FINALIZATION_MARKER not in text:
+        section = _snapshot_section(text)
+        if section is None:
             errors.append(
                 f"[SNAPSHOT-001] {rel}: modifying skill missing "
                 f"'{SNAPSHOT_FINALIZATION_MARKER}' section"
             )
             continue
-        if not SNAPSHOT_FORCE_REQUIRED.search(text):
+        if SNAPSHOT_EVIDENCE_REQUIRED not in section:
+            errors.append(
+                f"[SNAPSHOT-008] {rel}: snapshot finalization must reference "
+                "check_ci_evidence before snapshot"
+            )
+        if not SNAPSHOT_FORCE_REQUIRED.search(section):
             errors.append(
                 f"[SNAPSHOT-002] {rel}: snapshot finalization must require "
                 "create-code-snapshot --force"
             )
-        if not SNAPSHOT_REPORT_FOOTER.search(text):
+        if not SNAPSHOT_REPORT_FOOTER.search(section):
             errors.append(
                 f"[SNAPSHOT-003] {rel}: snapshot finalization must require "
                 "CODE_ARCHIVE report footer"
             )
-        if "when recreation was required" in text.lower():
+        if "when recreation was required" in section.lower():
             errors.append(
                 f"[SNAPSHOT-004] {rel}: do not gate snapshot on optional recreation; "
                 "always before report"
@@ -486,12 +516,62 @@ def check_final_ci_lifecycle(root: Path) -> list[str]:
     return errors
 
 
+def check_cursor_command_hygiene(root: Path) -> list[str]:
+    """Reject stale interpreters and hyphenated check-* script aliases in Cursor config."""
+    errors: list[str] = []
+    cursor = root / ".cursor"
+    if not cursor.is_dir():
+        return errors
+    paths = sorted(list(cursor.rglob("*.md")) + list(cursor.rglob("*.mdc")))
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root)
+        if PYTHON311_PATTERN.search(text):
+            errors.append(f"[AGENT-CMD-001] {rel}: forbidden python3.11; use python3")
+        if BARE_PYTHON_SCRIPTS.search(text):
+            errors.append(
+                f"[AGENT-CMD-002] {rel}: bare 'python scripts/...' forbidden; use python3"
+            )
+        if BARE_PYTHON_BACKTICK_CMD.search(text):
+            errors.append(
+                f"[AGENT-CMD-003] {rel}: bare '`python ...' command forbidden; use python3"
+            )
+        for match in HYPHENATED_CHECK_TOKEN.finditer(text):
+            token = match.group(1)
+            if token in ALLOWED_HYPHENATED_CHECK_TOKENS:
+                continue
+            if token.endswith(".sh"):
+                continue
+            errors.append(
+                f"[AGENT-CMD-004] {rel}: hyphenated check token `{token}` forbidden; "
+                "use python3 scripts/check_*.py"
+            )
+    return errors
+
+
+def check_agents_skill_index(root: Path) -> list[str]:
+    """Require AGENTS.md to mention each .cursor/skills/ directory."""
+    errors: list[str] = []
+    skills = root / ".cursor" / "skills"
+    agents = root / "AGENTS.md"
+    if not skills.is_dir() or not agents.is_file():
+        return errors
+    text = agents.read_text(encoding="utf-8")
+    for skill_dir in sorted(p for p in skills.iterdir() if p.is_dir()):
+        name = skill_dir.name
+        if name not in text:
+            errors.append(f"[AGENT-SKILL-INDEX-001] AGENTS.md must mention skill `{name}`")
+    return errors
+
+
 def validate_agent_config(root: Path) -> list[str]:
     errors: list[str] = []
     errors.extend(check_test_efficiency_contract(root))
     errors.extend(check_modifying_skill_validation(root))
     errors.extend(check_snapshot_finalization_skills(root))
     errors.extend(check_final_ci_lifecycle(root))
+    errors.extend(check_cursor_command_hygiene(root))
+    errors.extend(check_agents_skill_index(root))
     cursor = root / ".cursor"
     rules = cursor / "rules"
     skills = cursor / "skills"

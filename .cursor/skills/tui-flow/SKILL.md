@@ -33,8 +33,8 @@ description: >-
 ## Tests
 
 ```bash
-python3.11 -m pytest tests/tui/test_<screen>.py -q
-python3.11 -m pytest tests/tui/test_architecture.py -q
+python3 -m pytest tests/tui/test_<screen>.py -q
+python3 -m pytest tests/tui/test_architecture.py -q
 ```
 
 - Ordinary flows: `tests/tui/fake_service.py`
@@ -55,4 +55,7 @@ python3.11 -m pytest tests/tui/test_architecture.py -q
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

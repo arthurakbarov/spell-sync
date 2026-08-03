@@ -1,6 +1,6 @@
 ---
 description: Wheel/sdist packaging, source export, and privacy boundaries
-globs: pyproject.toml,README.md,docs/MANUAL_TESTING.md,scripts/**/*
+globs: pyproject.toml,README.md,docs/MANUAL_TESTING.md
 alwaysApply: false
 ---
 
@@ -24,7 +24,7 @@ alwaysApply: false
 
 ## Publication
 
-- Package publication, tagging, and remote push only on explicit owner request
+- No push/tag/publish without explicit owner request: see `project-safety` rule.
 - Pre-publication: run `privacy-export` skill checklist and full CI
 
 Manual testing reference: `@docs/MANUAL_TESTING.md`

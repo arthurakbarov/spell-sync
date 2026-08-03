@@ -235,3 +235,92 @@ def test_persistent_git_stash_fails(validator, tmp_path: Path) -> None:
     subprocess.run(["git", "stash", "push", "-m", "wip"], cwd=repo, check=True)
     errors = validator.check_persistent_git_stash(repo)
     assert errors == ["[AGENT-WORKFLOW-GIT-004] persistent Git stash remains after task completion"]
+
+
+def test_python311_in_skill_fails(validator, tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".cursor" / "skills" / "demo"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: demo\ndescription: demo\n---\n"
+        "# Demo\n\n## When to use\nx\n\n## Do not use\ny\n\n"
+        "python3.11 scripts/check_agent_config.py\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".cursor" / "rules").mkdir(exist_ok=True)
+    (tmp_path / "spell_sync").mkdir()
+    (tmp_path / "spell_sync" / "cli.py").write_text(
+        "COMMANDS = {'init': None}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text(
+        "## CLI commands (1)\n```text agent-config-cli-commands\n`init`\n```\n",
+        encoding="utf-8",
+    )
+
+    errors = validator.validate_agent_config(tmp_path)
+    assert any("python3.11" in err for err in errors)
+
+
+def test_bare_python_scripts_fails(validator, tmp_path: Path) -> None:
+    rules = tmp_path / ".cursor" / "rules"
+    rules.mkdir(parents=True)
+    (rules / "bad.mdc").write_text(
+        "---\ndescription: bad\nalwaysApply: true\n---\nRun python scripts/foo.py\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".cursor" / "skills").mkdir()
+    (tmp_path / "spell_sync").mkdir()
+    (tmp_path / "spell_sync" / "cli.py").write_text(
+        "COMMANDS = {'init': None}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text(
+        "## CLI commands (1)\n```text agent-config-cli-commands\n`init`\n```\n",
+        encoding="utf-8",
+    )
+
+    errors = validator.validate_agent_config(tmp_path)
+    assert any("AGENT-CMD-002" in err for err in errors)
+
+
+def test_hyphenated_check_token_detected(validator) -> None:
+    text = "when `check-ci-necessity` requires it"
+    match = validator.HYPHENATED_CHECK_TOKEN.search(text)
+    assert match is not None
+    assert match.group(1) == "check-ci-necessity"
+    assert match.group(1) not in validator.ALLOWED_HYPHENATED_CHECK_TOKENS
+
+
+def test_hyphenated_check_sh_allowed(validator, tmp_path: Path) -> None:
+    rules = tmp_path / ".cursor" / "rules"
+    rules.mkdir(parents=True)
+    (rules / "ok.mdc").write_text(
+        "---\ndescription: ok\nalwaysApply: true\n---\nRun `check-docs-style.sh` when needed.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".cursor" / "skills").mkdir()
+    errors = validator.check_cursor_command_hygiene(tmp_path)
+    assert errors == []
+
+
+def test_snapshot_section_requires_check_ci_evidence(validator, tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".cursor" / "skills" / "tui-flow"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: tui-flow\ndescription: demo\n---\n"
+        "# Demo\n\n## When to use\nx\n\n## Do not use\ny\n\n"
+        "## Finalize workspace snapshot\n\n"
+        "skill create-code-snapshot with --force; footer CODE_ARCHIVE\n",
+        encoding="utf-8",
+    )
+    errors = validator.check_snapshot_finalization_skills(tmp_path)
+    assert any("SNAPSHOT-008" in err for err in errors)
+
+
+def test_agents_skill_index_requires_all_skills(validator, tmp_path: Path) -> None:
+    skills = tmp_path / ".cursor" / "skills"
+    (skills / "alpha").mkdir(parents=True)
+    (skills / "beta").mkdir(parents=True)
+    (tmp_path / "AGENTS.md").write_text("Mentions alpha only\n", encoding="utf-8")
+    errors = validator.check_agents_skill_index(tmp_path)
+    assert any("beta" in err for err in errors)

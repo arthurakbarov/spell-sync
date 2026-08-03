@@ -25,7 +25,7 @@ description: Perform an architecture migration while preserving safety contracts
 6. **Docs and ADR** — update `docs/architecture/`, `docs/PROJECT_MAP.md`, and `docs/decisions/` when decisions change.
 7. **Pre-final checks** — `python3 scripts/run_pre_final_checks.py` before commits.
 8. **Commits and clean tree** — local commits; `git status --short` clean before final CI.
-9. **Full CI once** — `scripts/ci.sh` on committed HEAD when `check-ci-necessity` requires it.
+9. **Full CI once** — `scripts/ci.sh` on committed HEAD when `python3 scripts/check_ci_necessity.py --explain` requires it.
 10. **Final evidence** — `python3 scripts/check_ci_evidence.py`.
 11. **Installed-wheel smoke** — when package boundaries or entry points change (included in full CI).
 
@@ -43,4 +43,7 @@ description: Perform an architecture migration while preserving safety contracts
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — before the final report: skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

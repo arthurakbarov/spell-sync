@@ -40,8 +40,8 @@ Working tree should be clean before starting.
 14. Verify `python3 scripts/check_ci_evidence.py` (`CI_EVIDENCE_RESULT=success`).
 15. On CI failure after commit: fix; focused failed-check validation; new corrective commit;
     clean tree; reassess necessity. Do not amend if a new commit preserves evidence more clearly.
-14. Leave current phase at `awaiting-approval`.
-15. Return a defect-by-defect report and stop.
+16. Leave current phase at `awaiting-approval`.
+17. Return a defect-by-defect report and stop.
 
 ## Validation
 
@@ -50,7 +50,7 @@ diagnosis. Do not run full CI after each individual defect.
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`: skill
-`create-code-snapshot` in spell-sync-dev with `--force`, then `--check`; re-verify evidence
-and clean trees; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
-SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
+skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
+footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

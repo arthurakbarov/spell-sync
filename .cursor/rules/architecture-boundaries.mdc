@@ -16,7 +16,7 @@ alwaysApply: false
 - Focused services under `application/services/` own inspection, sync, recovery, setup, diagnostics
 - `RuntimeResolver` resolves explicit runtime; no production `ContextVar` for settings or validated runtime
 - Core and `project_setup` must not import `spell_sync.application`
-- TUI must not import dictionary writers, journal internals, snapshot writers, or config writers
+- TUI service boundary: see `tui` rule.
 
 ## Diagnostics
 
