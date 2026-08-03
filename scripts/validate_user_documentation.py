@@ -40,7 +40,18 @@ def main() -> int:
             "getting-started-cli-bridge",
             "spell-sync pull" in GETTING_STARTED
             and "spell-sync init" in GETTING_STARTED
-            and "config-check" in GETTING_STARTED,
+            and "doctor" in GETTING_STARTED,
+        ),
+        (
+            "getting-started-beginner-path",
+            "The problem" in GETTING_STARTED
+            and "Start here" in GETTING_STARTED
+            and "Review and update" in GETTING_STARTED
+            and "Fastest path" in GETTING_STARTED,
+        ),
+        (
+            "readme-beginner-pointer",
+            "Getting Started" in README and "Start here" in README,
         ),
         (
             "troubleshooting-config-check",

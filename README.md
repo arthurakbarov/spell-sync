@@ -6,9 +6,9 @@
 [![License](https://img.shields.io/github/license/arthurakbarov/spell-sync)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-You add a word in a browser, editor, or system spell checker — then on another computer or
-in another app it is underlined again. **Spell Sync** stores those personal words in **one
-private word list** and safely synchronizes them with supported applications.
+You teach a browser or editor a personal word — then another app has it underlined again.
+**Spell Sync** stores those words in **one private list** on your computer and helps you
+copy them into supported apps' **custom** dictionaries.
 
 ```text
 Collect words:   your apps → your word list   (Pull)
@@ -21,12 +21,14 @@ You always see a **preview** before anything changes.
 - **Update apps** may remove custom words that are no longer in your personal list.
 - **Built-in dictionaries are never changed.**
 
-**[Get started →](docs/GETTING_STARTED.md)** · [Supported apps](docs/SUPPORTED_APPS.md) ·
-[Personal workspace](docs/PERSONAL_WORKSPACE.md)
+**New here?** Follow **[Getting Started](docs/GETTING_STARTED.md)** — folder → `spell-sync` →
+**Start here** → **Review and update**. No Git or programming required.
 
-Git is optional. Spell Sync works with a local folder just as well as a private Git-tracked
-project. Maintainer-only release tooling is kept separately and is **not** required to use
+[Supported apps](docs/SUPPORTED_APPS.md) · [Personal workspace](docs/PERSONAL_WORKSPACE.md)
+
+Git is optional. Maintainer-only release tooling is separate and is **not** required to use
 Spell Sync.
+
 
 ## What the personal word list contains
 
@@ -156,10 +158,14 @@ Requires **Python 3.11+**. Python **3.11** and **3.12** are currently tested.
 
 ## Quick start
 
-Run `spell-sync` in an empty directory (or use `spell-sync init` for a non-interactive bootstrap).
+**Beginner path:** create a folder, run `spell-sync`, press **Start here**, then use
+**Review and update** on the dashboard. Details: [Getting Started](docs/GETTING_STARTED.md).
+
+Or use commands:
 
 | Situation | Command |
 |-----------|---------|
+| First setup (non-interactive) | `spell-sync init` |
 | Added a word in an app | `spell-sync pull` then commit `wordlist.txt` if you use Git |
 | New machine / after `git pull` | `spell-sync push` |
 | Delete a word everywhere | Remove from wordlist → `spell-sync push` (not pull) |

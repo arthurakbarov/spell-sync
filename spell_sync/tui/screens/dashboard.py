@@ -16,6 +16,7 @@ from ...application.product_concepts import (
     COLLECT_WORDS_TECHNICAL,
     DASHBOARD_WORDLIST_LABEL,
     DASHBOARD_WORDLIST_SUBTITLE,
+    REVIEW_AND_UPDATE_LABEL,
     UPDATE_APPS_TECHNICAL,
 )
 from ...application.reports import DashboardSeverity
@@ -58,11 +59,16 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         yield Static(id="dashboard-summary")
         yield Static(id="dashboard-issues")
         with Vertical(id="action-grid"):
-            yield Button(CHECK_APPS_LABEL, id="btn-status", variant="primary")
+            yield Static("Usual path", classes="section-label")
+            yield Button(
+                REVIEW_AND_UPDATE_LABEL,
+                id="btn-review-update",
+                variant="primary",
+            )
+            yield Static("Single steps", classes="section-label")
             yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
             yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
-            yield Static("More actions", classes="section-label")
-            yield Button("Review and update", id="btn-review-update")
+            yield Button(CHECK_APPS_LABEL, id="btn-status")
             yield Button(
                 "Review recovery",
                 id="btn-recovery",

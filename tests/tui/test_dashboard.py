@@ -190,8 +190,8 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-review-update")
             await pilot.pause()
             self.assertIsInstance(app.screen, ReviewUpdateScreen)
-            body = await wait_for_text(pilot, "#review-body", "Start review")
-            self.assertIn("Nothing changes without confirmation", str(body.render()))
+            body = await wait_for_text(pilot, "#review-body", "Nothing changes until you confirm")
+            self.assertIn("usual path after setup", str(body.render()))
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
@@ -286,7 +286,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_navigation(self):
         controller = TuiController(fake_service(pending_recovery=True), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#blocking-banner", "Recovery required")
             await pilot.click("#btn-recovery")
             await pilot.pause()

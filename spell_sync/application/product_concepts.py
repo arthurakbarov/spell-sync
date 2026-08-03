@@ -53,15 +53,29 @@ PUSH_REDUNDANCY_PREVIEW_NOTICE = (
     "redundantly in a custom dictionary; this is expected."
 )
 
-WELCOME_INTRO = (
-    "Spell Sync keeps the personal words you add to browsers, editors, and system "
-    "spell checkers in one private word list."
+USER_PROBLEM_STATEMENT = (
+    "You teach a browser or editor a personal word — a name, product term, or "
+    "abbreviation — then open another app and it is marked as misspelled again."
 )
 
-USER_PROBLEM_STATEMENT = (
-    "You add a word in one app, but on another computer or in another app it is "
-    "marked as misspelled again. Spell Sync stores those personal words in one place "
-    "and safely syncs them between supported applications."
+WELCOME_INTRO = (
+    "Spell Sync keeps those personal words in one private list on your computer "
+    "and helps you copy them into the custom dictionaries of supported apps."
+)
+
+WELCOME_WHAT_YOU_DO = (
+    "You only need to: choose a folder for your list, pick which apps to include, "
+    "then use Review and update when you want changes. Every change shows a preview "
+    "first — nothing runs by itself."
+)
+
+SETUP_START_BUTTON_LABEL = "Start here"
+
+REVIEW_AND_UPDATE_LABEL = "Review and update"
+
+REVIEW_AND_UPDATE_HELP = (
+    "Guided path: collect new words from your apps, then update app dictionaries. "
+    "You confirm each step after a preview."
 )
 
 COLLECT_WORDS_LABEL = "Collect my words"
@@ -126,9 +140,11 @@ PULL_PREVIEW_EMPTY = (
 )
 
 REVIEW_START_BODY = (
-    "Spell Sync will review application custom dictionaries first,\n"
-    "then prepare a fresh wordlist-to-applications preview.\n"
-    "Nothing changes without confirmation."
+    "This is the usual path after setup.\n\n"
+    "1. Look for new personal words in your apps (Collect).\n"
+    "2. Optionally add them to your list after you confirm the preview.\n"
+    "3. Prepare an Update preview for your apps, then confirm if you want it.\n\n"
+    "Nothing changes until you confirm. Built-in dictionaries are never touched."
 )
 
 CLI_ROOT_DESCRIPTION = (

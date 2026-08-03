@@ -48,9 +48,10 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             body = await wait_for_text(
                 pilot,
                 "#review-body",
-                "Nothing changes without confirmation",
+                "Nothing changes until you confirm",
             )
-            self.assertIn("review application custom dictionaries", str(body.render()))
+            self.assertIn("usual path after setup", str(body.render()))
+            self.assertIn("Collect", str(body.render()))
             self.assertIsInstance(app.screen, ReviewStartScreen)
             self.assertIsNone(controller.review_session())
 

@@ -7,12 +7,11 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Static
 
 from ...application.product_concepts import (
-    COLLECT_WORDS_TECHNICAL,
-    PULL_DIRECTION_LABEL,
-    PUSH_DIRECTION_LABEL,
-    UPDATE_APPS_TECHNICAL,
+    SETUP_START_BUTTON_LABEL,
+    USER_PROBLEM_STATEMENT,
     WELCOME_BUILT_IN_EXCLUSION,
     WELCOME_INTRO,
+    WELCOME_WHAT_YOU_DO,
     WORDLIST_SETUP_HEADING,
     WORDLIST_SETUP_REDUNDANCY_NOTE,
     WORDLIST_SETUP_WHAT_BELONGS,
@@ -31,8 +30,8 @@ class SetupWelcomeScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(id="welcome-content")
-        yield Button("Set up a project", id="btn-setup", variant="primary")
-        yield Button("Open existing project", id="btn-open")
+        yield Button(SETUP_START_BUTTON_LABEL, id="btn-setup", variant="primary")
+        yield Button("Open existing word list", id="btn-open")
         yield Button("Quit", id="btn-quit")
         yield Footer()
 
@@ -42,15 +41,13 @@ class SetupWelcomeScreen(Screen[None]):
                 [
                     "Welcome to Spell Sync",
                     "",
+                    USER_PROBLEM_STATEMENT,
+                    "",
                     WELCOME_INTRO,
                     "",
+                    WELCOME_WHAT_YOU_DO,
+                    "",
                     WELCOME_BUILT_IN_EXCLUSION,
-                    "",
-                    COLLECT_WORDS_TECHNICAL,
-                    PULL_DIRECTION_LABEL,
-                    "",
-                    UPDATE_APPS_TECHNICAL,
-                    PUSH_DIRECTION_LABEL,
                 ]
             )
         )
@@ -76,7 +73,7 @@ class SetupOpenProjectScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Open existing project\n\nPath to wordlist.txt:")
+        yield Static("Open existing word list\n\nPath to wordlist.txt:")
         yield Input(placeholder="~/spell-words/wordlist.txt", id="wordlist-input")
         yield Button("Continue", id="btn-continue", variant="primary")
         yield Button("Back", id="btn-back")

@@ -15,6 +15,7 @@ from ...application.product_concepts import (
     PUSH_DIRECTION_LABEL,
     PUSH_FILTERING_NOTICE,
     PUSH_REDUNDANCY_PREVIEW_NOTICE,
+    REVIEW_AND_UPDATE_LABEL,
     REVIEW_START_BODY,
     pull_preview_additions_line,
 )
@@ -88,7 +89,7 @@ class ReviewStartScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Review and update", id="review-title")
+        yield Static(REVIEW_AND_UPDATE_LABEL, id="review-title")
         yield Static(id="review-body")
         yield Button("Start review", id="btn-start", variant="primary")
         yield Button("Back", id="btn-back")

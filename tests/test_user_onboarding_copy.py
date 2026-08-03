@@ -19,4 +19,12 @@ def test_safety_copy() -> None:
 
 
 def test_problem_statement() -> None:
-    assert "personal words" in pc.USER_PROBLEM_STATEMENT.lower()
+    assert "misspelled" in pc.USER_PROBLEM_STATEMENT.lower()
+    assert "personal word" in pc.USER_PROBLEM_STATEMENT.lower()
+
+
+def test_beginner_welcome_and_primary_path() -> None:
+    assert pc.SETUP_START_BUTTON_LABEL == "Start here"
+    assert "Review and update" in pc.REVIEW_AND_UPDATE_LABEL
+    assert "preview" in pc.WELCOME_WHAT_YOU_DO.lower()
+    assert "confirm" in pc.REVIEW_START_BODY.lower()
