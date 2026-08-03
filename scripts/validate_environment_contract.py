@@ -311,7 +311,7 @@ def _check_project_environment_probe() -> list[str]:
 
 def _check_ci_evidence_environment() -> list[str]:
     errors: list[str] = []
-    evidence_script = ROOT / "scripts/check-ci-evidence.py"
+    evidence_script = ROOT / "scripts/check_ci_evidence.py"
     conftest = ROOT / "tests/conftest_execution.py"
     if evidence_script.is_file():
         text = _read(evidence_script)

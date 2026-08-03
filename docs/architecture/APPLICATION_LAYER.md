@@ -61,7 +61,7 @@ core / project_setup
   ✗ must not import spell_sync.application
 ```
 
-Enforced by `scripts/check-architecture.py` (`architecture.boundaries` CI check).
+Enforced by `scripts/check_architecture.py` (`architecture.boundaries` CI check).
 
 ## Presentation
 

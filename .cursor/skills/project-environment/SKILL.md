@@ -96,11 +96,11 @@ python scripts/project_environment.py clean    # delete .venv + environment evid
 
 ## Evidence mismatch
 
-If `check-ci-evidence.py` reports `ci-evidence.environment-mismatch`:
+If `check_ci_evidence.py` reports `ci-evidence.environment-mismatch`:
 
 1. `python scripts/project_environment.py check`
 2. If check passes, re-run full CI once at clean exact HEAD
-3. Re-verify: `python scripts/check-ci-evidence.py`
+3. Re-verify: `python scripts/check_ci_evidence.py`
 
 Do not hand-edit `.artifacts/environment/environment.json` or `.venv/.spell-sync-environment.json`.
 
@@ -115,7 +115,7 @@ After importing owner archive from **`$HOME/code.zip`** (canonical location only
 
 ## Modifying-task snapshot finalization
 
-After final CI and `python scripts/check-ci-evidence.py` success:
+After final CI and `python scripts/check_ci_evidence.py` success:
 
 ```bash
 python3 "$SPELL_SYNC_DEV/scripts/create-code-snapshot.py" \

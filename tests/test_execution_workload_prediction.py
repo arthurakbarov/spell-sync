@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 from scripts.execution_control.context import build_context  # noqa: E402
 from scripts.execution_control.gate_admission import assess_gate_admission  # noqa: E402
-from scripts.execution_control.gate_flow import preview_focused_child_plans  # noqa: E402
+from scripts.execution_control.gate_previews import preview_focused_child_plans  # noqa: E402
 from scripts.execution_control.models import AdmissionDecision  # noqa: E402
 from scripts.execution_control.prediction import predict_thresholds  # noqa: E402
 from scripts.execution_control.registry import profile_for_execution_id  # noqa: E402

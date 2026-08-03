@@ -31,10 +31,10 @@ Read:
 ## Step 2 — verify baseline
 
 - `git status --short` must be clean before starting a **new phase implementation**
-- run `python3 scripts/check-agent-config.py`
-- run `python3 scripts/check-docs-contract.py`
+- run `python3 scripts/check_agent_config.py`
+- run `python3 scripts/check_docs_contract.py`
 - reuse existing full CI evidence when the tree is clean and
-  `python3 scripts/check-ci-evidence.py` succeeds (matching `ciInputDigest`; exact HEAD
+  `python3 scripts/check_ci_evidence.py` succeeds (matching `ciInputDigest`; exact HEAD
   optional for non-CI commits)
 - run baseline full CI only when necessity is `full-required`, evidence is missing or
   failed, or the owner explicitly requests it; otherwise use lightweight validators and
@@ -108,7 +108,7 @@ Create one logical local commit (or a short sequence if clearly separated). Do n
 Assess necessity on the committed HEAD:
 
 ```bash
-python3 scripts/check-ci-necessity.py --explain
+python3 scripts/check_ci_necessity.py --explain
 ```
 
 When `CI_NECESSITY_RESULT=full-required`, run full CI **once**:
@@ -132,7 +132,7 @@ Read `CI_RESULT`, `CI_EXIT`, `CI_SUMMARY`, `CI_LOG`, and `CI_FAILED_ID` on failu
 ## Step 12 — verify final evidence
 
 ```bash
-python3 scripts/check-ci-evidence.py
+python3 scripts/check_ci_evidence.py
 ```
 
 Require `CI_EVIDENCE_RESULT=success`. After success, do not modify tracked repository files.
@@ -144,6 +144,6 @@ Return the final report contract from `docs/AGENT_DEVELOPMENT.md`. Stop. Do not 
 ## Finalize workspace snapshot
 
 Modifying tasks only — after step 12 evidence verification: skill `create-code-snapshot` in
-spell-sync-dev with `--force`, then `--check`; re-run `python3 scripts/check-ci-evidence.py`
+spell-sync-dev with `--force`, then `--check`; re-run `python3 scripts/check_ci_evidence.py`
 and `git status --short`; canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` /
 `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

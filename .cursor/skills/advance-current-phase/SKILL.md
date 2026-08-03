@@ -28,8 +28,8 @@ description: Mark an explicitly approved phase complete and make the next planne
 1. Confirm owner approval in the session request.
 2. Verify clean tree: `git status --short`
 3. Run lightweight validators:
-   - `python3 scripts/check-agent-config.py`
-   - `python3 scripts/check-docs-contract.py`
+   - `python3 scripts/check_agent_config.py`
+   - `python3 scripts/check_docs_contract.py`
 4. In `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`:
    - set current phase: `awaiting-approval` → `complete`
    - set next planned phase: `current` and `not-started`

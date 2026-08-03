@@ -38,7 +38,7 @@ See skill `project-environment`.
 3. Assess necessity:
 
 ```bash
-python3 scripts/check-ci-necessity.py --explain
+python3 scripts/check_ci_necessity.py --explain
 ```
 
 4. When `CI_NECESSITY_RESULT=full-required`, run full CI **once** on committed HEAD through
@@ -60,7 +60,7 @@ python3 scripts/run_lightweight_validation.py
 6. Verify final evidence:
 
 ```bash
-python3 scripts/check-ci-evidence.py
+python3 scripts/check_ci_evidence.py
 ```
 
 Expect `CI_EVIDENCE_MATCH=exact-head` or `CI_EVIDENCE_MATCH=reused-non-ci-change`.
@@ -80,7 +80,7 @@ count.
 Release, publication, and signed artifact workflows require exact-head evidence:
 
 ```bash
-python3 scripts/check-ci-evidence.py --release
+python3 scripts/check_ci_evidence.py --release
 ```
 
 ## What ci.sh enforces
@@ -122,7 +122,7 @@ List check ids: `scripts/ci.sh --list-checks`
 ## Stop conditions
 
 - Stop when final `scripts/ci.sh` exits **0** with `finalEvidence=true` and
-  `python3 scripts/check-ci-evidence.py` reports `CI_EVIDENCE_RESULT=success`
+  `python3 scripts/check_ci_evidence.py` reports `CI_EVIDENCE_RESULT=success`
 - Stop and report if a failure requires an architectural decision
 - Do not mask failures or weaken coverage gates
 - After successful final evidence, do not modify tracked repository files
@@ -136,7 +136,7 @@ List check ids: `scripts/ci.sh --list-checks`
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after `python3 scripts/check-ci-evidence.py` success: skill
+Modifying tasks only — after `python3 scripts/check_ci_evidence.py` success: skill
 `create-code-snapshot` in spell-sync-dev with `--output "$HOME/code.zip"` (home directory only,
 never under the workspace tree), `--force`, then `--check`; re-verify evidence; report §14 and
 footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

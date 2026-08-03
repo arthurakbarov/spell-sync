@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 from scripts.execution_control.gate_controller import GateController  # noqa: E402
-from scripts.execution_control.gate_flow import (  # noqa: E402
+from scripts.execution_control.gate_previews import (  # noqa: E402
     open_gate_after_previews,
     preview_focused_child_plans,
     run_bounded_planner,

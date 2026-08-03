@@ -33,11 +33,11 @@ description: Change structured technical events, logging, history presentation, 
 ```bash
 python3 scripts/run_focused_tests.py tests/test_technical_logging.py tests/test_diagnostic_redaction.py
 python3 -m pytest tests/tui/test_logs_screen.py -q
-python3 scripts/check-architecture.py --check
+python3 scripts/check_architecture.py --check
 ```
 
 Assess CI necessity; run full `scripts/ci.sh` on committed HEAD when required. Verify
-`python3 scripts/check-ci-evidence.py`.
+`python3 scripts/check_ci_evidence.py`.
 
 Update `docs/architecture/DIAGNOSTICS.md` and ADR `docs/decisions/0004-structured-technical-events.md`
 when contracts change.

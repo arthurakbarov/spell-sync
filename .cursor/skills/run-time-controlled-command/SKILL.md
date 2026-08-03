@@ -25,7 +25,7 @@ description: >-
 1. **Assess necessity** — when the command is part of final validation:
 
 ```bash
-python3 scripts/check-ci-necessity.py --explain
+python3 scripts/check_ci_necessity.py --explain
 ```
 
 Skip execution when result is `no-action` and the command is not required.

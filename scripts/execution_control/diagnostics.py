@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from .models import ExecutionPlan
-from .paths import timeout_bundle_dir
 from .privacy import sanitize_text, workspace_roots
 from .process_tree import ProcessResult, collect_descendants
+from .state_paths import timeout_bundle_dir
 
 
 @dataclass(frozen=True, slots=True)

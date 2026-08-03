@@ -22,7 +22,7 @@ description: Select the smallest sufficient non-duplicated validation set for th
 Assess CI necessity before expensive commands:
 
 ```bash
-python3 scripts/check-ci-necessity.py --explain
+python3 scripts/check_ci_necessity.py --explain
 ```
 
 When result is `no-action`, skip redundant validation. Integrated runners apply execution

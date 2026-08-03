@@ -11,14 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.execution_control.gate_flow import (  # noqa: E402
+from scripts.execution_control.gate_previews import (  # noqa: E402
     gate_controller_for,
     open_gate_after_previews,
     preview_snapshot_child_plans,
     registry_for,
 )
 from scripts.execution_control.models import ExecutionStatus  # noqa: E402
-from scripts.execution_control.workspace_paths import (  # noqa: E402
+from scripts.execution_control.snapshot_workspace import (  # noqa: E402
     resolve_snapshot_workspace_layout,
     validate_snapshot_workspace,
 )

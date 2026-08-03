@@ -49,7 +49,7 @@ Update manual rows only after owner-approved testing on throwaway profiles. See
 
 These do not mutate real dictionaries:
 
-- `python3 scripts/check-target-capabilities.py --check`
+- `python3 scripts/check_target_capabilities.py --check`
 - `spell-sync doctor --targets`
 - TUI Targets → Details / automated validation display
 - Installed-wheel smoke with synthetic HOME
@@ -57,8 +57,8 @@ These do not mutate real dictionaries:
 ## Maintainer commands
 
 ```bash
-python3 scripts/check-target-capabilities.py --check
-python3 scripts/check-target-capabilities.py --write   # regenerate bundled JSON when matrix changes
+python3 scripts/check_target_capabilities.py --check
+python3 scripts/check_target_capabilities.py --write   # regenerate bundled JSON when matrix changes
 ```
 
 Skill: `.cursor/skills/platform-validation/SKILL.md` (maintainer workspace).

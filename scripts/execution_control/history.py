@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 from .models import SpanRecord
-from .paths import HISTORY_SCHEMA_VERSION, history_database_path
+from .state_paths import HISTORY_SCHEMA_VERSION, history_database_path
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_meta (

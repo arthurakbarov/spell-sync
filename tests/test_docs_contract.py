@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -35,15 +34,11 @@ MINIMAL_REPO = {
 
 
 def _load_docs_contract():
-    spec = importlib.util.spec_from_file_location(
-        "check_docs_contract",
-        ROOT / "scripts" / "check-docs-contract.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from scripts import check_docs_contract
+
+    return check_docs_contract
 
 
 def _init_synthetic_repo(
@@ -75,7 +70,7 @@ def _init_synthetic_repo(
 class TestDocsContract(unittest.TestCase):
     def test_docs_contract_script_passes(self) -> None:
         proc = subprocess.run(
-            [sys.executable, "scripts/check-docs-contract.py"],
+            [sys.executable, "scripts/check_docs_contract.py"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -87,7 +82,7 @@ class TestDocsContract(unittest.TestCase):
         )
 
     def test_validator_has_no_hardcoded_phase_gate(self) -> None:
-        text = (ROOT / "scripts" / "check-docs-contract.py").read_text(encoding="utf-8")
+        text = (ROOT / "scripts" / "check_docs_contract.py").read_text(encoding="utf-8")
         self.assertNotIn(
             "Phase 3 must not be started",
             text,

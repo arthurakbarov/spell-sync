@@ -52,7 +52,7 @@ def _load_evidence_mod():
         sys.path.insert(0, str(ROOT))
     spec = importlib.util.spec_from_file_location(
         "scripts.check_ci_evidence",
-        ROOT / "scripts" / "check-ci-evidence.py",
+        ROOT / "scripts" / "check_ci_evidence.py",
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

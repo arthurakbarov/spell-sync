@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -15,15 +14,9 @@ if str(ROOT) not in sys.path:
 
 
 def _load_necessity_mod():
-    spec = importlib.util.spec_from_file_location(
-        "scripts.check_ci_necessity",
-        ROOT / "scripts" / "check-ci-necessity.py",
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    from scripts import check_ci_necessity
+
+    return check_ci_necessity
 
 
 def test_assess_ci_necessity_uses_injected_paths_not_production_evidence(tmp_path: Path) -> None:

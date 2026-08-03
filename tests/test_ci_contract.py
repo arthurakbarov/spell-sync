@@ -82,8 +82,8 @@ def _seed_execution_control(root: Path) -> None:
         shutil.copytree(execution_control_src, dest)
     for script in (
         "validate_execution_budget.py",
-        "check-ci-necessity.py",
-        "check-ci-evidence.py",
+        "check_ci_necessity.py",
+        "check_ci_evidence.py",
         "ci_input_state.py",
         "documentation_state.py",
     ):
@@ -109,10 +109,10 @@ def _make_test_root(tmp: Path) -> tuple[Path, Path]:
     (root / "scripts" / "check-docs-style.sh").write_text("#!/bin/sh\nexit 0\n")
     (root / "scripts" / "check-docs-style.sh").chmod(0o755)
     for name in (
-        "check-docs-contract.py",
-        "check-architecture.py",
-        "check-agent-config.py",
-        "check-target-capabilities.py",
+        "check_docs_contract.py",
+        "check_architecture.py",
+        "check_agent_config.py",
+        "check_target_capabilities.py",
         "validate_test_impact.py",
         "validate_ci_impact.py",
         "validate_execution_budget.py",
@@ -143,10 +143,10 @@ def _is_validator_script(argv: list[str]) -> bool:
         marker in text
         for marker in (
             "check-docs-style.sh",
-            "check-docs-contract.py",
-            "check-architecture.py",
-            "check-agent-config.py",
-            "check-target-capabilities.py",
+            "check_docs_contract.py",
+            "check_architecture.py",
+            "check_agent_config.py",
+            "check_target_capabilities.py",
             "validate_test_impact.py",
             "validate_ci_impact.py",
             "validate_execution_budget.py",
@@ -288,7 +288,7 @@ class TestCiContract(unittest.TestCase):
         def fake_run(argv: list[str], *, cwd=None, env=None):
             if _is_python_version_probe(argv):
                 return 0, "3.11\n"
-            if "check-docs-contract.py" in _argv_text(argv):
+            if "check_docs_contract.py" in _argv_text(argv):
                 return 2, "docs contract failed\n"
             return _success_run(self.root, argv, cwd=cwd or self.root, env=env)
 
@@ -452,10 +452,10 @@ class TestCiContract(unittest.TestCase):
         (pip_root / "scripts").mkdir()
         for name in (
             "check-docs-style.sh",
-            "check-docs-contract.py",
-            "check-architecture.py",
-            "check-agent-config.py",
-            "check-target-capabilities.py",
+            "check_docs_contract.py",
+            "check_architecture.py",
+            "check_agent_config.py",
+            "check_target_capabilities.py",
             "validate_test_impact.py",
             "validate_ci_impact.py",
         ):

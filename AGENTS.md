@@ -22,7 +22,7 @@ TUI controller   → typed application requests
 - **Explicit runtime:** `RuntimeResolver`; no production `ContextVar` for settings or validated runtime
 - **Thin facade:** `SpellSyncService` delegates to focused services under `application/services/`
 - **Structured diagnostics:** typed `EventId` / `TechnicalEvent`; JSON Lines technical log; presentation at CLI/TUI only
-- **Architecture guards:** `scripts/check-architecture.py` (`architecture.boundaries` in CI)
+- **Architecture guards:** `scripts/check_architecture.py` (`architecture.boundaries` in CI)
 
 ## CLI commands (12)
 
@@ -62,12 +62,12 @@ Central product copy lives in `spell_sync/application/product_concepts.py`.
 ```bash
 python3 scripts/test_plan.py
 python3 scripts/run_focused_tests.py
-python3 scripts/check-architecture.py --check
-python3 scripts/check-docs-contract.py
-python3 scripts/check-agent-config.py
-python3 scripts/check-ci-necessity.py --explain
+python3 scripts/check_architecture.py --check
+python3 scripts/check_docs_contract.py
+python3 scripts/check_agent_config.py
+python3 scripts/check_ci_necessity.py --explain
 scripts/ci.sh
-python3 scripts/check-ci-evidence.py
+python3 scripts/check_ci_evidence.py
 ```
 
 `scripts/ci.sh` is the single CI entry point. On completion it prints `CI_RESULT`, `CI_EXIT`,
@@ -136,7 +136,7 @@ Modifying tasks finalize per `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot b
 | Target settings | `tests/test_target_settings.py` |
 | Installed wheel | `tests/test_installed_workflow.py` |
 
-Prefer focused tests first, then assess CI necessity (`python3 scripts/check-ci-necessity.py`).
+Prefer focused tests first, then assess CI necessity (`python3 scripts/check_ci_necessity.py`).
 
 Execution time control bounds registered development and CI commands through
 `scripts/execution_control/`. Product Pull/Push/Recovery paths are not wrapped. See

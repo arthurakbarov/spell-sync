@@ -18,8 +18,8 @@ agentPaths = [
 ciScriptPaths = [
   "scripts/ci.sh",
   "scripts/ci_runner.py",
-  "scripts/check-agent-config.py",
-  "scripts/check-docs-contract.py",
+  "scripts/check_agent_config.py",
+  "scripts/check_docs_contract.py",
   "scripts/test_plan.py",
   "scripts/run_focused_tests.py",
   "scripts/test_selection/",
@@ -211,7 +211,7 @@ clusterTests = [
   "tests/test_environment_dependency_report.py",
 ]
 validators = [
-  "scripts/check-target-capabilities.py --check",
+  "scripts/check_target_capabilities.py --check",
   "scripts/validate_dependency_groups.py",
 ]
 staticTargets = [
@@ -223,8 +223,8 @@ production = [
   ".cursor/",
   "AGENTS.md",
   "docs/AGENT_DEVELOPMENT.md",
-  "scripts/check-agent-config.py",
-  "scripts/check-docs-contract.py",
+  "scripts/check_agent_config.py",
+  "scripts/check_docs_contract.py",
   "scripts/ci_runner.py",
   "scripts/test_plan.py",
   "scripts/run_focused_tests.py",
@@ -245,8 +245,8 @@ clusterTests = [
   "tests/test_test_efficiency_contract.py",
 ]
 validators = [
-  "scripts/check-agent-config.py",
-  "scripts/check-docs-contract.py",
+  "scripts/check_agent_config.py",
+  "scripts/check_docs_contract.py",
 ]
 
 [clusters.documentation]
@@ -259,7 +259,7 @@ moduleTests = []
 clusterTests = []
 validators = [
   "scripts/check-docs-style.sh",
-  "scripts/check-docs-contract.py",
+  "scripts/check_docs_contract.py",
 ]
 
 [clusters.diagnostics-events]
@@ -298,7 +298,7 @@ production = [
   "scripts/test_groups.py",
   "ci/test-groups.toml",
   "scripts/execution_budget_report.py",
-  "scripts/execution_control/budget_report.py",
+  "scripts/execution_control/budget_analysis.py",
   "tests/execution-budget.toml",
 ]
 moduleTests = [
@@ -412,5 +412,5 @@ clusterTests = [
   "tests/test_test_efficiency_contract.py",
 ]
 validators = [
-  "scripts/check-agent-config.py",
+  "scripts/check_agent_config.py",
 ]

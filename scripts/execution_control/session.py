@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from .paths import state_root
+from .state_paths import state_root
 
 
 @dataclass(frozen=True, slots=True)

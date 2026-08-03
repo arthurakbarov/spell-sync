@@ -54,7 +54,7 @@ Run the structural validator — it checks exact forbidden root/state paths with
 substring false positives:
 
 ```bash
-python3.11 scripts/check-agent-config.py
+python3.11 scripts/check_agent_config.py
 ```
 
 Policy summary:

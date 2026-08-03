@@ -10,7 +10,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 
 from scripts.execution_control.gate_admission import assess_gate_admission  # noqa: E402
-from scripts.execution_control.gate_flow import preview_focused_child_plans  # noqa: E402
+from scripts.execution_control.gate_previews import preview_focused_child_plans  # noqa: E402
 from scripts.execution_control.models import AdmissionDecision  # noqa: E402
 from scripts.execution_control.registry import profile_for_execution_id  # noqa: E402
 from tests.conftest_execution import echo_command  # noqa: E402
@@ -93,7 +93,7 @@ def test_small_focused_plan_runs(registry, history_store):
 def test_required_final_gate_remains_allowed(registry, history_store):
     profile = profile_for_execution_id(registry, "gate:full-ci")
     from scripts.ci_runner import _full_ci_preview_steps
-    from scripts.execution_control.gate_flow import preview_ci_child_plans
+    from scripts.execution_control.gate_previews import preview_ci_child_plans
 
     child_plans = preview_ci_child_plans(
         ROOT,

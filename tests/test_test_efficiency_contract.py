@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -11,25 +10,20 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-
-def _load_validator(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from scripts import check_agent_config, check_docs_contract  # noqa: E402
 
 
 @pytest.fixture(scope="module")
 def agent_config():
-    return _load_validator("check_agent_config", ROOT / "scripts" / "check-agent-config.py")
+    return check_agent_config
 
 
 @pytest.fixture(scope="module")
 def docs_contract():
-    return _load_validator("check_docs_contract", ROOT / "scripts" / "check-docs-contract.py")
+    return check_docs_contract
 
 
 def test_test_efficiency_rule_exists() -> None:

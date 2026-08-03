@@ -78,7 +78,9 @@ Stdlib-only package under `scripts/execution_control/`:
 
 | Module | Role |
 |--------|------|
-| `models.py` | `ExecutionPlan`, `SpanRecord`, status and admission enums |
+| `models.py` | `ExecutionPlan`, `ExecutionRunResult`, `SpanRecord`, status and admission enums |
+| `state_paths.py` | Local execution-control state and artifact paths |
+| `snapshot_workspace.py` | Snapshot workspace layout resolution |
 | `registry.py` | Load and validate `tests/execution-budget.toml` |
 | `identity.py` | Workload and policy fingerprints, normalized signature |
 | `context.py` | Platform, Python, workload bucket, coverage/TUI/packaging flags |
@@ -91,13 +93,14 @@ Stdlib-only package under `scripts/execution_control/`:
 | `diagnostics.py` | Bounded timeout investigation bundles |
 | `controller.py` | Immutable plan, run, classify, persist span |
 | `gate_controller.py` | Parent gate lifecycle, linked child spans, wall duration |
-| `preview.py` | Pure child `ExecutionPlan` preview without subprocess or lease |
+| `plan_preview.py` | Pure child `ExecutionPlan` preview without subprocess or lease |
 | `aggregate_plan.py` | Parent expected/soft/hard from concrete child plan sums |
 | `gate_admission.py` | Aggregate admission after child previews |
-| `gate_flow.py` | Bounded planner → previews → aggregate gate open |
+| `gate_previews.py` | Bounded planner → previews → aggregate gate open |
 | `planning_supervisor.py` | Bounded planner execution without parent gate lease |
 | `reporting.py` | Machine-readable `EXECUTION_*` stdout lines |
 | `session.py` | Edit-loop test-time share and regression warnings |
+| `budget_analysis.py` | History/registry report payload for CLI reporting |
 | `mappings.py` | Stable execution IDs for CI checks and gates |
 
 CLI entry points:
@@ -355,7 +358,7 @@ Overhead target for commands ≥ 1 s: `≤ max(100 ms, 2%)`.
 
 ## Admission
 
-`scripts/execution_control/admission.py` integrates with `scripts/check-ci-necessity.py`.
+`scripts/execution_control/admission.py` integrates with `scripts/check_ci_necessity.py`.
 
 Admission decisions:
 
@@ -486,7 +489,7 @@ contracts, Pull/Push/Recovery semantics, or functional test outcomes. Validation
 remains authoritative via:
 
 ```bash
-python3 scripts/check-ci-evidence.py
+python3 scripts/check_ci_evidence.py
 ```
 
 Dynamic CI run identifiers belong in generated artifacts only — not in tracked documentation.

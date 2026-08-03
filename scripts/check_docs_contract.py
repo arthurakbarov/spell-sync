@@ -448,7 +448,7 @@ def _check_phase_tracker_readiness(root: Path) -> list[ContractViolation]:
         tip_ssot = (
             "Tip HEAD and exact-head CI" in baseline_body
             and "authoritative via" in baseline_body
-            and "check-ci-evidence.py" in baseline_body
+            and "check_ci_evidence.py" in baseline_body
         )
         head_chase = bool(
             re.search(
@@ -603,13 +603,13 @@ def _check_agent_workflow_docs(root: Path) -> list[ContractViolation]:
             continue
         text = path.read_text(encoding="utf-8")
         if rel.endswith("AGENT_DEVELOPMENT.md"):
-            if "check-ci-evidence.py" not in text:
+            if "check_ci_evidence.py" not in text:
                 violations.append(
                     ContractViolation(
                         "AGENT-006",
                         path,
                         None,
-                        "missing check-ci-evidence.py reference",
+                        "missing check_ci_evidence.py reference",
                         "document final evidence verification after full CI on committed HEAD",
                     )
                 )
@@ -628,7 +628,7 @@ def _check_agent_workflow_docs(root: Path) -> list[ContractViolation]:
                         None,
                         "workflow documents full CI before commit",
                         "commit tracked changes before final full CI; "
-                        "verify with check-ci-evidence.py",
+                        "verify with check_ci_evidence.py",
                     )
                 )
         lines = text.splitlines()

@@ -20,10 +20,10 @@ alwaysApply: true
 11. `--lf`, `--ff`, `-x` are diagnostic only; follow with the normal selected suite.
 12. Do not run packaging or wheel smoke in focused loops unless package boundaries changed.
 13. Commit tracked changes; verify clean tree before final validation.
-14. Assess necessity: `python3 scripts/check-ci-necessity.py --explain`.
+14. Assess necessity: `python3 scripts/check_ci_necessity.py --explain`.
 15. Run full `scripts/ci.sh` when necessity is `full-required` (once on committed HEAD).
 16. When necessity is `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py`.
-17. Verify `python3 scripts/check-ci-evidence.py` before workspace snapshot.
+17. Verify `python3 scripts/check_ci_evidence.py` before workspace snapshot.
 18. On final CI failure, rerun only the failed check while fixing; commit fix; clean tree; reassess necessity.
 19. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
 
@@ -34,7 +34,7 @@ Exact Git HEAD matching remains required for release, publication, and signed ar
 
 - Plan: `python3 scripts/test_plan.py`
 - Run: `python3 scripts/run_focused_tests.py`
-- Necessity: `python3 scripts/check-ci-necessity.py`
+- Necessity: `python3 scripts/check_ci_necessity.py`
 - Lightweight: `python3 scripts/run_lightweight_validation.py`
 - Strategy: `docs/TESTING_STRATEGY.md`
 - Registry: `tests/test-impact.toml`, `ci/ci-impact.toml`

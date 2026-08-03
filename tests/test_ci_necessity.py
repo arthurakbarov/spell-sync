@@ -16,17 +16,9 @@ if str(ROOT) not in sys.path:
 
 
 def _load_necessity_mod():
-    import importlib.util
+    from scripts import check_ci_necessity
 
-    spec = importlib.util.spec_from_file_location(
-        "scripts.check_ci_necessity",
-        ROOT / "scripts" / "check-ci-necessity.py",
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return check_ci_necessity
 
 
 @pytest.fixture(scope="module")

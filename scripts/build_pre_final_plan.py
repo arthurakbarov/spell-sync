@@ -56,10 +56,10 @@ def _build_steps(changed: list[str], plan, *, py: str) -> list[dict[str, object]
         steps.append((f"mypy:{module}", [py, "-m", "mypy", mypy_target]))
     docs_validators = [
         "scripts/check-docs-style.sh",
-        "scripts/check-docs-contract.py",
+        "scripts/check_docs_contract.py",
     ]
     if any(path.startswith(".cursor/") or "AGENT" in path.upper() for path in changed):
-        docs_validators.append("scripts/check-agent-config.py")
+        docs_validators.append("scripts/check_agent_config.py")
     for validator in docs_validators:
         if validator.endswith(".sh"):
             steps.append((validator, ["bash", validator]))

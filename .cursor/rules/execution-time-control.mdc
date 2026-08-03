@@ -8,7 +8,7 @@ alwaysApply: true
 Always-on contract for expensive development commands. SSOT: `docs/EXECUTION_TIME_CONTROL.md`.
 
 1. Registered expensive commands do not run directly — use the execution controller or integrated runners (`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`, `run_with_budget.py`).
-2. CI necessity and admission run before execution (`check-ci-necessity.py`, admission planner).
+2. CI necessity and admission run before execution (`check_ci_necessity.py`, admission planner).
 3. Immutable budget is fixed before subprocess start (`ExecutionPlan` persisted and printed).
 4. The running plan is never recalculated mid-execution.
 5. Parent and child invocations each have separate hard bounds and own plans.

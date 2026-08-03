@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.execution_control.workspace_paths import resolve_spell_sync_dev_root
+from scripts.execution_control.snapshot_workspace import resolve_spell_sync_dev_root
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DEV_ROOT = Path("/Users/arthurakbarov/code/spell-sync-dev")

@@ -11,7 +11,7 @@ from scripts.execution_control.aggregate_plan import (  # noqa: E402
     orchestration_overhead_seconds,
     summarize_child_plans,
 )
-from scripts.execution_control.preview import preview_execution_plan  # noqa: E402
+from scripts.execution_control.plan_preview import preview_execution_plan  # noqa: E402
 from tests.conftest_execution import echo_command  # noqa: E402
 
 

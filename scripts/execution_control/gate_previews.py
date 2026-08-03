@@ -7,8 +7,8 @@ from pathlib import Path
 from .gate_controller import ActiveGate, GateController
 from .mappings import ci_check_execution_id, snapshot_step_execution_id
 from .models import ExecutionPlan
+from .plan_preview import preview_execution_plan
 from .planning_supervisor import run_planning_supervisor
-from .preview import preview_execution_plan
 from .registry import ExecutionBudgetRegistry, load_registry, profile_for_execution_id
 
 FOCUSED_STEP_EXECUTION_IDS: dict[str, str] = {

@@ -1,8 +1,7 @@
-"""Tests for scripts/check-target-capabilities.py marker and write behavior."""
+"""Tests for scripts/check_target_capabilities.py marker and write behavior."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import subprocess
 import sys
@@ -11,7 +10,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts" / "check-target-capabilities.py"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts import check_target_capabilities  # noqa: E402
+
+SCRIPT = ROOT / "scripts" / "check_target_capabilities.py"
 SUPPORTED_DOC = ROOT / "docs" / "SUPPORTED_TARGETS.md"
 VALIDATION_FILE = ROOT / "docs" / "target-validation.json"
 START_MARKER = "[target-capabilities:start]"
@@ -20,11 +24,7 @@ LEGACY_MARKER = "```text target-capabilities-matrix"
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("check_target_capabilities", SCRIPT)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return check_target_capabilities
 
 
 def _run_script(*args: str) -> subprocess.CompletedProcess[str]:

@@ -43,7 +43,7 @@ phase-10: awaiting-approval
 
 | Repository | Role | Notes |
 |------------|------|-------|
-| spell-sync | product | Tip HEAD and exact-head CI: authoritative via `python3 scripts/check-ci-evidence.py` and owner-decision `FINAL_STATE.json` / `OWNER_DECISION_MANIFEST.json`. |
+| spell-sync | product | Tip HEAD and exact-head CI: authoritative via `python3 scripts/check_ci_evidence.py` and owner-decision `FINAL_STATE.json` / `OWNER_DECISION_MANIFEST.json`. |
 | spell-sync-dev | maintainer tooling | Tip HEAD via `git -C ../spell-sync-dev rev-parse HEAD` (layout-dependent); owner dossier records maintainerHead. |
 | spell-words | private data | Unchanged by this readiness cycle unless noted in dossier. |
 
@@ -399,7 +399,7 @@ generated test-group coverage for safe, incremental changes.
 
 ### Delivered
 
-- `scripts/check-architecture.py` — AST-based dependency guards, request/event export checks,
+- `scripts/check_architecture.py` — AST-based dependency guards, request/event export checks,
   project map heading sync, generated test-group section validation
 - `docs/PROJECT_MAP.md` — ownership map with generated test suites by responsibility
 - CI check `architecture.boundaries` wired into `scripts/ci_runner.py`
@@ -446,14 +446,14 @@ Documentation describes the current system — not prompt history or implementat
 - Updated `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/MANUAL_TESTING.md`
 - Normalized ADR status sections in `docs/decisions/0002`–`0004`
 - Removed obsolete `docs/UX_0_2_IMPLEMENTATION.md` and `docs/platform-validation-readiness.md`
-- `scripts/check-docs-contract.py` historical doc list updated
+- `scripts/check_docs_contract.py` historical doc list updated
 
 ### Phase-specific validation (passed)
 
 ```text
-python3 scripts/check-docs-contract.py
+python3 scripts/check_docs_contract.py
 python3 scripts/check-docs-style.sh
-python3 scripts/check-agent-config.py
+python3 scripts/check_agent_config.py
 full final CI on committed clean HEAD 9a08a7e
 ```
 
@@ -478,14 +478,14 @@ architecture without handoff or reviewer-specific workflow language.
 - `AGENTS.md` — current architecture map, services, explicit runtime, diagnostics, validation commands
 - Updated rules: `architecture-boundaries`, `project-safety`, `tui`, `tests-fixtures`, `packaging-privacy`
 - New skill `diagnostics-change`; updated `architecture-refactor`
-- `scripts/check-agent-config.py` — requires `diagnostics-change`, bans stale runtime and handoff terms
+- `scripts/check_agent_config.py` — requires `diagnostics-change`, bans stale runtime and handoff terms
 
 ### Phase-specific validation (passed)
 
 ```text
-python3 scripts/check-agent-config.py
-python3 scripts/check-docs-contract.py
-python3 scripts/check-architecture.py --check
+python3 scripts/check_agent_config.py
+python3 scripts/check_docs_contract.py
+python3 scripts/check_architecture.py --check
 full final CI on committed clean HEAD 3c6bc35
 ```
 
@@ -513,10 +513,10 @@ only — no automated deletion.
 ### Phase-specific validation (passed)
 
 ```text
-python3 scripts/check-agent-config.py
-python3 scripts/check-docs-contract.py
+python3 scripts/check_agent_config.py
+python3 scripts/check_docs_contract.py
 python3 scripts/run_lightweight_validation.py
-python3 scripts/check-ci-evidence.py
+python3 scripts/check_ci_evidence.py
 ```
 
 ### Owner acceptance (recorded)
@@ -539,13 +539,13 @@ No tag, release, or publication in this phase.
 
 - `pyproject.toml` and `uv.lock` — `0.3.0`
 - Compatibility and installed-wheel tests aligned; `run_compatibility_checks.py` reads version from `pyproject.toml`
-- `check-docs-contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
+- `check_docs_contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
 
 ### Phase-specific validation (passed)
 
 ```text
-python3 scripts/check-docs-contract.py
-python3 scripts/check-agent-config.py
+python3 scripts/check_docs_contract.py
+python3 scripts/check_agent_config.py
 full final CI on committed clean HEAD e46ce45
 spell-sync version → 0.3.0
 CI_EVIDENCE_MATCH=exact-head

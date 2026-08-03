@@ -156,3 +156,23 @@ class SpanRecord:
     quarantine_reason: str | None
     diagnostic_bundle: str | None
     environment_signature: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionRunResult:
+    """In-process execution outcome. Raw tails never belong in retained artifacts."""
+
+    exit_code: int
+    raw_stdout_tail: str
+    raw_stderr_tail: str
+    sanitized_stdout_tail: str
+    sanitized_stderr_tail: str
+    timing: dict[str, Any]
+
+    @property
+    def raw_output(self) -> str:
+        return self.raw_stdout_tail + self.raw_stderr_tail
+
+    @property
+    def sanitized_output(self) -> str:
+        return self.sanitized_stdout_tail + self.sanitized_stderr_tail

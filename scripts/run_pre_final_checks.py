@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci_history import summarize_ci_history  # noqa: E402
-from scripts.execution_control.gate_flow import (  # noqa: E402
+from scripts.execution_control.gate_previews import (  # noqa: E402
     gate_controller_for,
     open_gate_after_previews,
     preview_pre_final_child_plans,

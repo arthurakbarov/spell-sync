@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from scripts.execution_control.budget_report import build_execution_budget_report  # noqa: E402
+from scripts.execution_control.budget_analysis import build_execution_budget_report  # noqa: E402
 from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.models import SpanRecord  # noqa: E402
 from scripts.execution_control.session import SessionTotals, build_edit_loop_summary  # noqa: E402

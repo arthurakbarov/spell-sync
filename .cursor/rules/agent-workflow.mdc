@@ -12,10 +12,10 @@ alwaysApply: true
    (`execute-current-phase`, `spell-sync-ci`, `select-and-run-tests`, etc.) —
    do not load every skill up front.
 3. Implement **only** the current architecture phase (or the explicit fix scope).
-4. Run focused pytest; run `python3 scripts/check-architecture.py --check` when
+4. Run focused pytest; run `python3 scripts/check_architecture.py --check` when
    boundaries change.
 5. Commit tracked changes and verify clean trees before final full CI.
-6. Verify `python3 scripts/check-ci-evidence.py` after final CI; snapshot only after
+6. Verify `python3 scripts/check_ci_evidence.py` after final CI; snapshot only after
    evidence success.
 7. Read `CI_SUMMARY` and `CI_LOG`; fix failures without asking the owner to grep logs.
 8. Update tests, docs, contracts, and ADRs together with code changes.

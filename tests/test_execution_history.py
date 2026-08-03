@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from scripts.execution_control.history import HistoryStore
 from scripts.execution_control.models import SpanRecord
-from scripts.execution_control.paths import history_database_path
+from scripts.execution_control.state_paths import history_database_path
 from tests.conftest_execution import sqlite_preflight_probe
 
 

@@ -79,7 +79,7 @@ class AdmissionPlan:
 def _load_ci_necessity(root: Path):
     spec = importlib.util.spec_from_file_location(
         "check_ci_necessity",
-        root / "scripts" / "check-ci-necessity.py",
+        root / "scripts" / "check_ci_necessity.py",
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

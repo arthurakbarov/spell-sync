@@ -37,7 +37,7 @@ from scripts.test_selection.tree_state import (  # noqa: E402
     is_digest_excluded,
 )
 
-EVIDENCE_SCRIPT = Path(__file__).resolve().parent / "check-ci-evidence.py"
+EVIDENCE_SCRIPT = Path(__file__).resolve().parent / "check_ci_evidence.py"
 
 
 @dataclass(frozen=True, slots=True)

@@ -32,7 +32,7 @@ alwaysApply: false
 
 ## Validation
 
-- Run `python3 scripts/check-architecture.py --check` when boundaries change
+- Run `python3 scripts/check_architecture.py --check` when boundaries change
 - Extend architecture tests in the same change
 
 ## Canonical references

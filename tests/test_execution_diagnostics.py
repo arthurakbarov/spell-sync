@@ -7,8 +7,8 @@ from pathlib import Path
 
 from scripts.execution_control.diagnostics import _redact, collect_timeout_bundle
 from scripts.execution_control.models import ExecutionPlan
-from scripts.execution_control.paths import timeout_bundle_dir
 from scripts.execution_control.process_tree import ProcessResult
+from scripts.execution_control.state_paths import timeout_bundle_dir
 
 
 def _plan(**overrides) -> ExecutionPlan:

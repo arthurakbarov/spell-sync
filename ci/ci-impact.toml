@@ -55,8 +55,8 @@ patterns = [
   "scripts/environment_contract/**",
   "scripts/run_compatibility_checks.py",
   "scripts/ci_history.py",
-  "scripts/check-ci-evidence.py",
-  "scripts/check-ci-necessity.py",
+  "scripts/check_ci_evidence.py",
+  "scripts/check_ci_necessity.py",
   "scripts/ci_input_state.py",
   "scripts/documentation_state.py",
   "scripts/run_lightweight_validation.py",
@@ -88,10 +88,10 @@ patterns = [
 
 [classes.validators]
 patterns = [
-  "scripts/check-agent-config.py",
-  "scripts/check-architecture.py",
-  "scripts/check-docs-contract.py",
-  "scripts/check-target-capabilities.py",
+  "scripts/check_agent_config.py",
+  "scripts/check_architecture.py",
+  "scripts/check_docs_contract.py",
+  "scripts/check_target_capabilities.py",
   "scripts/check-docs-style.sh",
   "scripts/validate_*.py",
 ]

@@ -430,10 +430,10 @@ def check_snapshot_finalization_skills(root: Path) -> list[str]:
 
 def check_final_ci_lifecycle(root: Path) -> list[str]:
     errors: list[str] = []
-    evidence_script = root / "scripts" / "check-ci-evidence.py"
+    evidence_script = root / "scripts" / "check_ci_evidence.py"
     if not evidence_script.is_file():
         errors.append(
-            "[CI-LIFECYCLE-001] missing scripts/check-ci-evidence.py final evidence verifier"
+            "[CI-LIFECYCLE-001] missing scripts/check_ci_evidence.py final evidence verifier"
         )
     plan_steps = root / "scripts" / "test_selection" / "plan_steps.py"
     if not plan_steps.is_file():
@@ -455,10 +455,10 @@ def check_final_ci_lifecycle(root: Path) -> list[str]:
             continue
         text = skill_file.read_text(encoding="utf-8")
         rel = skill_file.relative_to(root)
-        if "check-ci-evidence.py" not in text:
+        if "check_ci_evidence.py" not in text:
             errors.append(
                 f"[CI-LIFECYCLE-004] {rel}: modifying lifecycle skill must reference "
-                "python3 scripts/check-ci-evidence.py"
+                "python3 scripts/check_ci_evidence.py"
             )
         if STALE_CI_THEN_COMMIT.search(text):
             errors.append(
@@ -473,10 +473,10 @@ def check_final_ci_lifecycle(root: Path) -> list[str]:
     agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if agent_dev.is_file():
         text = agent_dev.read_text(encoding="utf-8")
-        if "check-ci-evidence.py" not in text:
+        if "check_ci_evidence.py" not in text:
             errors.append(
                 "[CI-LIFECYCLE-007] docs/AGENT_DEVELOPMENT.md must document "
-                "scripts/check-ci-evidence.py"
+                "scripts/check_ci_evidence.py"
             )
         if "committed HEAD" not in text and "committed head" not in text.lower():
             errors.append(

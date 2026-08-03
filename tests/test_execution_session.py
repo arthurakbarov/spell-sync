@@ -5,8 +5,8 @@ from __future__ import annotations
 import itertools
 import json
 
-from scripts.execution_control.paths import state_root
 from scripts.execution_control.session import record_session_event
+from scripts.execution_control.state_paths import state_root
 
 
 class _FakeClock:

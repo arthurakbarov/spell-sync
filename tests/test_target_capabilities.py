@@ -154,7 +154,7 @@ def test_supported_targets_matrix_not_stale() -> None:
 
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [sys.executable, str(root / "scripts" / "check-target-capabilities.py"), "--check"],
+        [sys.executable, str(root / "scripts" / "check_target_capabilities.py"), "--check"],
         cwd=root,
         capture_output=True,
         text=True,

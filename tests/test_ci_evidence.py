@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Tests for scripts/check-ci-evidence.py."""
+"""Tests for scripts/check_ci_evidence.py."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 import shutil
@@ -25,15 +24,9 @@ if str(ROOT) not in sys.path:
 def _load_module():
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    spec = importlib.util.spec_from_file_location(
-        "scripts.check_ci_evidence",
-        ROOT / "scripts" / "check-ci-evidence.py",
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    from scripts import check_ci_evidence
+
+    return check_ci_evidence
 
 
 @pytest.fixture(scope="module")

@@ -38,7 +38,7 @@ from scripts.environment_contract.paths import (  # noqa: E402
 )
 from scripts.execution_control.controller import run_monitored_command  # noqa: E402
 from scripts.execution_control.gate_controller import ActiveGate, GateController  # noqa: E402
-from scripts.execution_control.gate_flow import (  # noqa: E402
+from scripts.execution_control.gate_previews import (  # noqa: E402
     gate_controller_for,
     open_gate_after_previews,
     preview_ci_child_plans,
@@ -147,10 +147,10 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
-        ("docs.contract", [py, "scripts/check-docs-contract.py"]),
-        ("architecture.boundaries", [py, "scripts/check-architecture.py", "--check"]),
-        ("agent.config", [py, "scripts/check-agent-config.py"]),
-        ("targets.capabilities", [py, "scripts/check-target-capabilities.py", "--check"]),
+        ("docs.contract", [py, "scripts/check_docs_contract.py"]),
+        ("architecture.boundaries", [py, "scripts/check_architecture.py", "--check"]),
+        ("agent.config", [py, "scripts/check_agent_config.py"]),
+        ("targets.capabilities", [py, "scripts/check_target_capabilities.py", "--check"]),
         ("ruff.check", [py, "-m", "ruff", "check", "spell_sync", "tests", "scripts"]),
         (
             "ruff.format",

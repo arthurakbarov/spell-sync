@@ -10,11 +10,16 @@ from pathlib import Path
 from typing import Any
 
 from .controller import ExecutionController
-from .execution_result import ControlledExecutionResult
 from .gate_admission import assess_gate_admission, emit_narrow_replacement
 from .history import HistoryStore
-from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
-from .preview import preview_execution_plan
+from .models import (
+    AdmissionDecision,
+    ExecutionPlan,
+    ExecutionRunResult,
+    ExecutionStatus,
+    SpanRecord,
+)
+from .plan_preview import preview_execution_plan
 from .registry import (
     REGISTRY_REL_PATH,
     load_registry,
@@ -200,7 +205,7 @@ class GateController(ExecutionController):
         command: list[str],
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-    ) -> tuple[int, ControlledExecutionResult | None]:
+    ) -> tuple[int, ExecutionRunResult | None]:
         if gate.finalized or gate.stopped:
             return gate.terminal_exit_code or 1, None
         if self._parent_expired(gate):
@@ -264,7 +269,7 @@ class GateController(ExecutionController):
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
         **kwargs: Any,
-    ) -> tuple[int, ControlledExecutionResult | None]:
+    ) -> tuple[int, ExecutionRunResult | None]:
         if gate.finalized or gate.stopped:
             return gate.terminal_exit_code or 1, None
         if self._parent_expired(gate):

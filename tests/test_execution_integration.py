@@ -15,8 +15,8 @@ from scripts.execution_control.mappings import (
     ci_check_execution_id,
 )
 from scripts.execution_control.models import ExecutionStatus
-from scripts.execution_control.paths import history_database_path, state_root
 from scripts.execution_control.registry import profile_for_execution_id
+from scripts.execution_control.state_paths import history_database_path, state_root
 
 ROOT = Path(__file__).resolve().parents[1]
 

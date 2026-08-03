@@ -8,7 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from scripts.execution_control.budget_report import (  # noqa: E402
+from scripts.execution_control.budget_analysis import (  # noqa: E402
     REPORT_SCHEMA_VERSION,
     build_execution_budget_report,
     render_text_report,

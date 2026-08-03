@@ -58,11 +58,11 @@ def _commands_for_classes(classes: set[ChangeClass]) -> list[list[str]]:
         commands.extend(
             [
                 ["bash", "scripts/check-docs-style.sh"],
-                [py, "scripts/check-docs-contract.py"],
+                [py, "scripts/check_docs_contract.py"],
             ]
         )
     if ChangeClass.AGENT_WORKFLOW in classes:
-        commands.append([py, "scripts/check-agent-config.py"])
+        commands.append([py, "scripts/check_agent_config.py"])
     if ChangeClass.REPOSITORY_METADATA in classes:
         commands.append([py, "scripts/validate_ci_impact.py"])
     if ChangeClass.VALIDATOR in classes:

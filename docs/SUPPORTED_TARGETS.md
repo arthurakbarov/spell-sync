@@ -60,7 +60,7 @@ Vivaldi | windows | Yes | Yes | full | multi-profile | not-required | pass | not
 Windows Spelling | windows | Yes | Yes | locale-specific | system-managed | not-required | pass | not-run | —
 [target-capabilities:end]
 
-Run `python3.11 scripts/check-target-capabilities.py --write` to regenerate after updating
+Run `python3.11 scripts/check_target_capabilities.py --write` to regenerate after updating
 validation data.
 
 ## Platform validation status
@@ -81,6 +81,6 @@ pass` only.
 1. Follow the `platform-validation` Cursor skill in `.cursor/skills/platform-validation/`.
 2. Use a dedicated throwaway profile when possible and obtain owner permission before mutating real dictionaries.
 3. Record results in `docs/target-validation.json` with `application_version`, `tested_on`, and repository-relative `evidence`.
-4. Run `python3.11 scripts/check-target-capabilities.py --write` and `scripts/ci.sh`.
+4. Run `python3.11 scripts/check_target_capabilities.py --write` and `scripts/ci.sh`.
 
 Do not mark manual pass without a real test date and application version.

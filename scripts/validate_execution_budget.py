@@ -12,12 +12,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.execution_control.identity import build_workload_payload  # noqa: E402
-from scripts.execution_control.paths import history_database_path, state_root  # noqa: E402
 from scripts.execution_control.registry import (  # noqa: E402
     REGISTRY_REL_PATH,
     load_registry,
     validate_registry,
 )
+from scripts.execution_control.state_paths import history_database_path, state_root  # noqa: E402
 
 MONITORED_FILES = (
     "scripts/ci_runner.py",
@@ -353,8 +353,8 @@ def _check_aggregate_admission() -> list[str]:
     for rel in (
         "scripts/execution_control/gate_admission.py",
         "scripts/execution_control/aggregate_plan.py",
-        "scripts/execution_control/preview.py",
-        "scripts/execution_control/gate_flow.py",
+        "scripts/execution_control/plan_preview.py",
+        "scripts/execution_control/gate_previews.py",
     ):
         if not (ROOT / rel).is_file():
             errors.append(f"[EXECUTION-CONTROL-ADMISSION-003] missing aggregate module {rel}")
@@ -495,7 +495,7 @@ def _check_hermetic_snapshot_tests() -> list[str]:
 def _check_snapshot_workspace_root_flag() -> list[str]:
     errors: list[str] = []
     runner = _read(ROOT / "scripts/run_snapshot_tests.py")
-    workspace_paths = _read(ROOT / "scripts/execution_control/workspace_paths.py")
+    workspace_paths = _read(ROOT / "scripts/execution_control/snapshot_workspace.py")
     if "--workspace-root" not in runner:
         errors.append(
             "[EXECUTION-CONTROL-SNAPSHOT-004] run_snapshot_tests.py must accept --workspace-root"
@@ -650,7 +650,7 @@ def _check_snapshot_integration() -> list[str]:
         )
         return errors
     text = _read(runner)
-    workspace_paths = _read(ROOT / "scripts/execution_control/workspace_paths.py")
+    workspace_paths = _read(ROOT / "scripts/execution_control/snapshot_workspace.py")
     tokens = (
         "gate:snapshot-tests",
         "archive-create",
@@ -666,7 +666,7 @@ def _check_snapshot_integration() -> list[str]:
                 "remediation: wire workspace-aware snapshot workflow"
             )
     if "snapshot-tests:pytest" not in text and "snapshot_step_execution_id" not in text:
-        gate_flow = _read(ROOT / "scripts/execution_control/gate_flow.py")
+        gate_flow = _read(ROOT / "scripts/execution_control/gate_previews.py")
         missing_pytest_map = (
             "snapshot-tests:pytest" not in gate_flow
             and "snapshot_step_execution_id" not in gate_flow
@@ -714,10 +714,8 @@ def _check_functional_output_separation() -> list[str]:
     errors: list[str] = []
     controller = _read(ROOT / "scripts/execution_control/controller.py")
     ci = _read(ROOT / "scripts/ci_runner.py")
-    if "ControlledExecutionResult" not in controller:
-        errors.append(
-            "[EXECUTION-CONTROL-OUTPUT-001] controller must return ControlledExecutionResult"
-        )
+    if "ExecutionRunResult" not in controller:
+        errors.append("[EXECUTION-CONTROL-OUTPUT-001] controller must return ExecutionRunResult")
     if "raw_stdout_tail" not in controller:
         errors.append("[EXECUTION-CONTROL-OUTPUT-001] controller must retain raw stdout in-process")
     if (
@@ -828,7 +826,7 @@ def _check_non_vacuous_snapshot_tests() -> list[str]:
 
 def _check_ci_evidence_on_failure() -> list[str]:
     errors: list[str] = []
-    evidence = _read(ROOT / "scripts/check-ci-evidence.py")
+    evidence = _read(ROOT / "scripts/check_ci_evidence.py")
     if "CI_EVIDENCE_RESULT=success" not in evidence:
         errors.append("[EXECUTION-CONTROL-EVIDENCE-001] check-ci-evidence must emit success marker")
     ci = _read(ROOT / "scripts/ci_runner.py")
@@ -862,10 +860,10 @@ def _check_environment_integration() -> list[str]:
             errors.append(
                 f"[EXECUTION-ENVIRONMENT-002] ci_runner.py must record {token} in CI summary"
             )
-    evidence = _read(ROOT / "scripts/check-ci-evidence.py")
+    evidence = _read(ROOT / "scripts/check_ci_evidence.py")
     if "ci-evidence.environment-mismatch" not in evidence:
         errors.append(
-            "[EXECUTION-ENVIRONMENT-002] check-ci-evidence.py must reject environment mismatch"
+            "[EXECUTION-ENVIRONMENT-002] check_ci_evidence.py must reject environment mismatch"
         )
     probe = _read(ROOT / "scripts/environment_contract/probe.py")
     if "run_interpreter_probe" not in probe:
@@ -878,8 +876,8 @@ def _check_environment_integration() -> list[str]:
             "[EXECUTION-ENVIRONMENT-003] project_environment must build metadata from probe result"
         )
     for consumer in (
-        "scripts/check-ci-evidence.py",
-        "scripts/check-ci-necessity.py",
+        "scripts/check_ci_evidence.py",
+        "scripts/check_ci_necessity.py",
         "scripts/run_lightweight_validation.py",
         "scripts/ci_runner.py",
     ):

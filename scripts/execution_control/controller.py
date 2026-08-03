@@ -11,10 +11,14 @@ from pathlib import Path
 
 from .admission import assess_admission, narrow_replacement_plan
 from .diagnostics import collect_timeout_bundle
-from .execution_result import ControlledExecutionResult
 from .history import HistoryStore
-from .models import AdmissionDecision, ExecutionPlan, ExecutionStatus, SpanRecord
-from .paths import plan_artifact_path
+from .models import (
+    AdmissionDecision,
+    ExecutionPlan,
+    ExecutionRunResult,
+    ExecutionStatus,
+    SpanRecord,
+)
 from .privacy import sanitize_text, workspace_roots
 from .process_tree import ProcessResult, run_owned_command
 from .progress import create_tracker
@@ -26,6 +30,7 @@ from .registry import (
 )
 from .reporting import print_plan, print_result
 from .session import check_performance_regression, record_session_event
+from .state_paths import plan_artifact_path
 
 
 @dataclass
@@ -165,7 +170,7 @@ class ExecutionController:
         release_lease: bool = True,
         parent_deadline_monotonic: float | None = None,
         hard_seconds_override: float | None = None,
-    ) -> ControlledExecutionResult:
+    ) -> ExecutionRunResult:
         tracker = create_tracker(plan.progress_contract_id)
         effective_hard = (
             hard_seconds_override if hard_seconds_override is not None else plan.hard_seconds
@@ -292,7 +297,7 @@ class ExecutionController:
             "spanId": record.span_id,
             "parentSpanId": parent_span_id,
         }
-        return ControlledExecutionResult(
+        return ExecutionRunResult(
             exit_code=result.exit_code,
             raw_stdout_tail=result.stdout_tail,
             raw_stderr_tail=result.stderr_tail,

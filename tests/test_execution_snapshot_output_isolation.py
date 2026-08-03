@@ -18,7 +18,7 @@ SUBPROCESS_GATE = pytest.mark.skipif(
     reason="full snapshot gate subprocess runs via scripts/run_snapshot_tests.py",
 )
 
-from scripts.execution_control.workspace_paths import resolve_spell_sync_dev_root  # noqa: E402
+from scripts.execution_control.snapshot_workspace import resolve_spell_sync_dev_root  # noqa: E402
 
 _dev = resolve_spell_sync_dev_root(ROOT)
 REAL_DEV_ROOT = _dev if _dev is not None else Path("/nonexistent")

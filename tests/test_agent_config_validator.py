@@ -1,8 +1,7 @@
-"""Behavioral tests for scripts/check-agent-config.py."""
+"""Behavioral tests for scripts/check_agent_config.py."""
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -10,21 +9,17 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VALIDATOR_PATH = REPO_ROOT / "scripts" / "check-agent-config.py"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
+from scripts import check_agent_config  # noqa: E402
 
-def _load_validator_module():
-    spec = importlib.util.spec_from_file_location("check_agent_config", VALIDATOR_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+VALIDATOR_PATH = REPO_ROOT / "scripts" / "check_agent_config.py"
 
 
 @pytest.fixture(scope="module")
 def validator():
-    return _load_validator_module()
+    return check_agent_config
 
 
 def test_current_public_configuration_passes(validator) -> None:

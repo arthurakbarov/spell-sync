@@ -28,16 +28,8 @@ def environment_paths(tmp_path):
 @pytest.fixture
 def isolated_ci_paths(environment_paths, monkeypatch):
     """Inject temporary EnvironmentPaths into CI necessity assessment."""
-    import importlib.util
+    from scripts import check_ci_necessity as necessity_module
 
-    spec = importlib.util.spec_from_file_location(
-        "check_ci_necessity_isolated",
-        ROOT / "scripts" / "check-ci-necessity.py",
-    )
-    assert spec and spec.loader
-    necessity_module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = necessity_module
-    spec.loader.exec_module(necessity_module)
     original = necessity_module.assess_ci_necessity
 
     def _assess(root, **kwargs):

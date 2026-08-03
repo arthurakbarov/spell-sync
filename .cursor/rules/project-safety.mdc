@@ -27,6 +27,6 @@ alwaysApply: true
 - Minimal diff — no drive-by refactors or parallel reimplementations of existing paths
 - Run focused tests for changed scope; assess CI necessity before full `scripts/ci.sh`
 - Do not stop on red tests; do not mask failures with meaningless coverage tests
-- Update `scripts/check-architecture.py` expectations when public application exports change
+- Update `scripts/check_architecture.py` expectations when public application exports change
 
 Recovery protocol details: `@docs/RECOVERY.md`

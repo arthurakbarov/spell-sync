@@ -13,7 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from scripts.execution_control.workspace_paths import resolve_spell_sync_dev_root  # noqa: E402
+from scripts.execution_control.snapshot_workspace import resolve_spell_sync_dev_root  # noqa: E402
 
 _dev = resolve_spell_sync_dev_root(ROOT)
 REAL_DEV_ROOT = _dev if _dev is not None else Path("/nonexistent")
@@ -126,12 +126,12 @@ def test_snapshot_gate_runs_in_non_home_workspace(isolated_state_dir, tmp_path):
 def test_hermetic_snapshot_gate_parent_child_preview(isolated_state_dir, tmp_path):
     del isolated_state_dir
     workspace = _build_hermetic_workspace(tmp_path)
-    from scripts.execution_control.gate_flow import (
+    from scripts.execution_control.gate_previews import (
         open_gate_after_previews,
         preview_snapshot_child_plans,
         registry_for,
     )
-    from scripts.execution_control.workspace_paths import resolve_snapshot_workspace_layout
+    from scripts.execution_control.snapshot_workspace import resolve_snapshot_workspace_layout
 
     layout = resolve_snapshot_workspace_layout(workspace)
     assert layout is not None
@@ -160,7 +160,7 @@ def test_hermetic_snapshot_gate_parent_child_preview(isolated_state_dir, tmp_pat
     )
     assert len(child_plans) == 2
     gate_controller = __import__(
-        "scripts.execution_control.gate_flow", fromlist=["gate_controller_for"]
+        "scripts.execution_control.gate_previews", fromlist=["gate_controller_for"]
     ).gate_controller_for(ROOT)
     gate, state, _, parent_plan = open_gate_after_previews(
         gate_controller,
