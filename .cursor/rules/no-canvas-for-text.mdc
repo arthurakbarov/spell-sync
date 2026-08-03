@@ -1,0 +1,15 @@
+---
+description: Never use Cursor Canvas for text, reviews, or tables — reply in chat
+alwaysApply: true
+---
+
+# No Canvas for text or tables
+
+Do **not** create or use a Cursor Canvas (`.canvas.tsx`) for reviews, status reports,
+dossiers, prose, or tabular data. Put that content in the **chat reply** as markdown.
+
+Canvas only if the user explicitly asks for one, or the deliverable is inherently
+visual (interactive charts / live diagrams) and chat text would be clearly worse.
+
+SSOT for this preference also lives in the global Cursor rule
+`~/.cursor/rules/no-canvas-for-text.mdc`.
