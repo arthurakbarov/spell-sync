@@ -101,7 +101,7 @@ def _static_targets_for_changed_files(changed_files: list[str]) -> list[str]:
 def _pytest_command(targets: list[str], python: str = "python3") -> tuple[str, ...]:
     if not targets:
         return ()
-    return (python, "-m", "pytest", *targets, "-q")
+    return (python, "-m", "pytest", *targets, "-q", "--durations=10")
 
 
 def _clusters_from_changes(changed_files: list[str], registry: Registry) -> set[str]:

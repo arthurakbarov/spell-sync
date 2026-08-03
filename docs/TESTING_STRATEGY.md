@@ -108,12 +108,14 @@ scripts/ci.sh
 | Level | Typical target |
 |-------|----------------|
 | Level 0 | seconds |
-| Level 1 | under ~30 seconds where practical |
-| Level 2 | under a few minutes |
-| Level 3 | full repository time |
+| Level 1 | module: typically ≤45s expected (registry `focused-module`) |
+| Level 2 | cluster: typically ≤120s expected; if plan prediction exceeds `editLoopBudgetSeconds` (120), optional scope may narrow |
+| Level 3 | full CI: once per stable tip (~10 min today; improve via profiling, not by skipping) |
 
-If Level 1 routinely exceeds a few minutes, reduce fixture overhead (session-scoped
-immutable setup, smaller synthetic repos) rather than skipping safety coverage.
+Keep most edit-session runs focused so mean wall time stays around 2 minutes. If Level 1
+routinely exceeds the focused-module expectation, reduce fixture overhead (session-scoped
+immutable setup, smaller synthetic repos) rather than skipping safety coverage. Required
+safety clusters are never dropped for budget reasons.
 
 ## Planner and runner
 

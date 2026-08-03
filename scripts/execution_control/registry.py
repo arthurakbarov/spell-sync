@@ -272,7 +272,7 @@ def load_registry(path: Path) -> ExecutionBudgetRegistry:
         schema_version=int(schema_version),
         path=path,
         global_hard_cap_seconds=float(meta.get("globalHardCapSeconds", 1800)),
-        edit_loop_budget_seconds=float(meta.get("editLoopBudgetSeconds", 900)),
+        edit_loop_budget_seconds=float(meta.get("editLoopBudgetSeconds", 120)),
         session_window_seconds=int(meta.get("sessionWindowSeconds", 1800)),
         session_test_time_share_warn=float(meta.get("sessionTestTimeShareWarn", 0.6)),
         history_window=int(meta.get("historyWindow", 30)),

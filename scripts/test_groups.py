@@ -200,7 +200,7 @@ def pytest_command_for_group(
     files = group_files(group_id, root=root)
     if not files:
         return [py, "-m", "pytest", "-q", "--collect-only"]
-    command = [py, "-m", "pytest", *files, "-q"]
+    command = [py, "-m", "pytest", *files, "-q", "--durations=10"]
     if with_coverage:
         command.extend(
             [

@@ -3,7 +3,9 @@ schemaVersion = 1
 [meta]
 registryPath = "tests/execution-budget.toml"
 globalHardCapSeconds = 1800
-editLoopBudgetSeconds = 900
+# Optional focused scope may narrow/defer when predicted cost exceeds this;
+# required safety clusters are never dropped.
+editLoopBudgetSeconds = 120
 sessionWindowSeconds = 1800
 sessionTestTimeShareWarn = 0.6
 historyWindow = 30

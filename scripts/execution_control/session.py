@@ -120,10 +120,21 @@ def build_edit_loop_summary(
 ) -> dict[str, object]:
     """Aggregate edit-loop timing from session totals and optional history."""
     focused_runs = 0
+    pre_final_runs = 0
+    full_ci_runs = 0
+    evidence_reuses = 0
+    plans_deferred = 0
+    plans_narrowed = 0
     if history is not None and hasattr(history, "count_gate_runs"):
         focused_runs = int(history.count_gate_runs("gate:focused-module")) + int(
             history.count_gate_runs("gate:focused-cluster")
         )
+        pre_final_runs = int(history.count_gate_runs("gate:pre-final"))
+        full_ci_runs = int(history.count_gate_runs("gate:full-ci"))
+    if history is not None and hasattr(history, "count_spans_with_status"):
+        evidence_reuses = int(history.count_spans_with_status("reused"))
+        plans_deferred = int(history.count_spans_with_status("defer-to-pre-final"))
+        plans_narrowed = int(history.count_spans_with_status("narrow"))
     test_seconds = (
         totals.focused_seconds
         + totals.pre_final_seconds
@@ -138,8 +149,8 @@ def build_edit_loop_summary(
     return {
         "sessionCount": 1 if totals.edit_seconds > 0 else 0,
         "focusedRunCount": focused_runs,
-        "preFinalRunCount": 0,
-        "fullCiRunCount": 0,
+        "preFinalRunCount": pre_final_runs,
+        "fullCiRunCount": full_ci_runs,
         "focusedSeconds": round(totals.focused_seconds, 2),
         "preFinalSeconds": round(totals.pre_final_seconds, 2),
         "fullCiSeconds": round(totals.full_ci_seconds, 2),
@@ -147,9 +158,9 @@ def build_edit_loop_summary(
         "nonTestSeconds": round(non_test_seconds, 2),
         "testTimeShare": round(test_share, 4),
         "duplicateRunsBlocked": 0,
-        "plansNarrowed": 0,
-        "plansDeferred": 0,
-        "evidenceReuses": 0,
+        "plansNarrowed": plans_narrowed,
+        "plansDeferred": plans_deferred,
+        "evidenceReuses": evidence_reuses,
         "estimatedSecondsAvoided": round(estimated_avoided, 2),
         "estimatedSecondsAvoidedFormula": (
             "reuse: sum(expectedSeconds) for spans with status=reused; "

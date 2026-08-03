@@ -336,6 +336,21 @@ class HistoryStore:
             return 0
         return int(row["total"]) if row else 0
 
+    def count_spans_with_status(self, status: str) -> int:
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT COUNT(*) AS total FROM spans
+                    WHERE status = ?
+                    """,
+                    (status,),
+                ).fetchone()
+        except sqlite3.Error:
+            self.degraded = True
+            return 0
+        return int(row["total"]) if row else 0
+
     def acquire_lease(
         self,
         *,

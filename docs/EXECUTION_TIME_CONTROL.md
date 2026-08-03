@@ -376,9 +376,10 @@ Rules:
 
 ### Edit-loop budget
 
-Registry meta `editLoopBudgetSeconds` (default 900 s). When predicted optional focused cost
-exceeds the budget, admission narrows scope and explains the decision. The final required
-gate is never skipped for budget reasons alone.
+Registry meta `editLoopBudgetSeconds` (default 120 s). When predicted optional focused cost
+exceeds the budget, admission may narrow or defer optional scope and explains the decision.
+Required safety clusters are never dropped for budget reasons. The final required gate is
+never skipped for budget reasons alone.
 
 ### Session cost accounting
 
