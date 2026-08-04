@@ -271,6 +271,15 @@ def cmd_check(root: Path) -> CommandResult:
     code, _ = _run([str(venv_py), "-m", "pytest", "--version"])
     if code != 0:
         return CommandResult(1, "environment.dependencies-mismatch", "pytest unavailable")
+    fingerprint = resolve_project_environment_fingerprint(root, uv_version=actual_uv)
+    if fingerprint is not None:
+        write_environment_evidence(
+            root,
+            fingerprint=fingerprint,
+            repository_head=_git_head(root),
+            check_exit=0,
+            lock_exit=0,
+        )
     return CommandResult(0)
 
 

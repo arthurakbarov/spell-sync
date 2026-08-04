@@ -57,7 +57,7 @@ Release: **not performed** (no tag, no GitHub Release, no package publish).
 Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD.
 
 Last recorded exact-head CI snapshot in this file (may lag tip by at most one docs-sync commit; tip evidence is authoritative):
-`cca3c84`, run `20260804T061239.056921Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=2c19f452…`.
+`61316f1`, run `20260804T210635.756072Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=20285407…`.
 
 Open engineering residuals (not release blockers if previously accepted):
 
