@@ -11,12 +11,14 @@ from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import Worker, WorkerState
 
 from ...application.product_concepts import (
+    COLLECT_WORDS_LABEL,
     PULL_DIRECTION_LABEL,
     PUSH_DIRECTION_LABEL,
     PUSH_FILTERING_NOTICE,
     PUSH_REDUNDANCY_PREVIEW_NOTICE,
     REVIEW_AND_UPDATE_LABEL,
     REVIEW_START_BODY,
+    UPDATE_APPS_LABEL,
     pull_preview_additions_line,
 )
 from ...application.reports import OperationOutcome, OperationReport, PullPreview, PushPreview
@@ -27,9 +29,9 @@ from ..workers import LoadTokenMixin
 
 def _format_pull_preview(preview: PullPreview) -> str:
     if preview.wordlist_error is not None or preview.prepare_error is not None:
-        return "× Pull preview unavailable."
+        return f"× {COLLECT_WORDS_LABEL} preview unavailable."
     lines = [
-        "Pull review",
+        f"{COLLECT_WORDS_LABEL} review",
         "",
         PULL_DIRECTION_LABEL,
         "",
@@ -37,7 +39,6 @@ def _format_pull_preview(preview: PullPreview) -> str:
         f"Sources ready: {len(preview.sources_used)}",
         f"Sources skipped: {len(preview.sources_skipped)}",
         f"Wordlist: {preview.wordlist_path}",
-        f"Plan id: {preview.plan_identifier}",
     ]
     if preview.warnings:
         lines.append("")
@@ -47,7 +48,7 @@ def _format_pull_preview(preview: PullPreview) -> str:
 
 def _format_push_preview(preview: PushPreview) -> str:
     if preview.wordlist_error is not None:
-        return f"× Push preview unavailable (exit {int(preview.wordlist_error)})"
+        return f"× {UPDATE_APPS_LABEL} preview unavailable (exit {int(preview.wordlist_error)})"
     if preview.prepare_error is not None:
         return f"× Push preview blocked (exit {int(preview.prepare_error)})"
     lines = [
@@ -55,7 +56,6 @@ def _format_push_preview(preview: PushPreview) -> str:
         "",
         PUSH_DIRECTION_LABEL,
         "",
-        f"Plan id: {preview.plan_identifier}",
         f"Targets to update: {preview.targets_to_update}",
         f"Total additions: {preview.additions}",
         f"Total removals: {preview.removals}",
@@ -122,8 +122,8 @@ class ReviewPullScreen(LoadTokenMixin, Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(id="review-pull-content")
-        yield Button("Pull words", id="btn-pull", variant="primary")
-        yield Button("Skip Pull", id="btn-skip")
+        yield Button(COLLECT_WORDS_LABEL, id="btn-pull", variant="primary")
+        yield Button("Skip collect", id="btn-skip")
         yield Button("View additions", id="btn-additions")
         yield Button("Back", id="btn-back")
         yield Footer()
@@ -132,7 +132,9 @@ class ReviewPullScreen(LoadTokenMixin, Screen[None]):
         try:
             self._render_preview(self._controller.prepare_review_pull())
         except Exception:
-            self.query_one("#review-pull-content", Static).update("× Pull preview load failed.")
+            self.query_one("#review-pull-content", Static).update(
+                f"× {COLLECT_WORDS_LABEL} preview load failed."
+            )
 
     def _render_preview(self, preview: PullPreview) -> None:
         self._preview = preview
@@ -147,9 +149,9 @@ class ReviewPullScreen(LoadTokenMixin, Screen[None]):
         )
         pull_btn.disabled = blocked or preview.additions == 0 or self._starting
         if preview.additions > 0:
-            pull_btn.label = f"Pull {preview.additions} words"
+            pull_btn.label = f"{COLLECT_WORDS_LABEL} (+{preview.additions})"
         else:
-            pull_btn.label = "Pull words"
+            pull_btn.label = COLLECT_WORDS_LABEL
         skip_btn.disabled = blocked or self._starting
 
     def action_run_pull(self) -> None:
@@ -277,8 +279,8 @@ class ReviewPushScreen(LoadTokenMixin, Screen[None]):
         yield Static(id="review-push-content")
         yield DataTable(id="review-push-table")
         yield Button("View removals", id="btn-view-removals")
-        yield Button("Push changes", id="btn-push", variant="primary")
-        yield Button("Finish without Push", id="btn-finish")
+        yield Button(UPDATE_APPS_LABEL, id="btn-push", variant="primary")
+        yield Button("Finish without update", id="btn-finish")
         yield Button("Back", id="btn-back")
         yield Footer()
 
@@ -593,7 +595,3 @@ class ReviewSessionReportScreen(LoadTokenMixin, Screen[None]):
         screen = self.app.screen
         if isinstance(screen, DashboardScreen):
             screen.action_refresh_dashboard()
-
-
-# Backward-compatible alias for dashboard imports.
-ReviewUpdateScreen = ReviewStartScreen

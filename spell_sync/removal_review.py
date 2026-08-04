@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import sys
 
-from .application.reports import PushPreview
 from .config import CONFIRM_YES
 from .log import log
+from .operation_reports import PushPreview
 from .sync_run import DictionaryDiff
 
 

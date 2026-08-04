@@ -99,7 +99,7 @@ After setup, on the sectioned dashboard:
 - [ ] Summary shows canonical wordlist path (with `~` when under home), word count, and target
   counts (ready / needs attention / disabled / unavailable).
 - [ ] **Review and update** is the primary action.
-- [ ] Direct actions: **Pull new words**, **Push wordlist**.
+- [ ] Direct actions: **Collect my words (Pull)**, **Update my apps (Push)**.
 - [ ] Manage: **Targets**. Support: **Health**, **History**.
 - [ ] Status available via `s` hotkey (not a dashboard button).
 - [ ] Last operation summary appears when history exists (counts only, no words).
@@ -129,28 +129,28 @@ From Dashboard → **Targets**:
 
 From Dashboard → **Review and update**:
 
-- [ ] Start screen explains Pull-then-Push flow; nothing runs without confirmation.
-- [ ] Pull review shows additions count and direction (applications → wordlist).
-- [ ] **Pull words** opens confirm screen; cancel returns without changes.
-- [ ] After Pull, **Pull complete** screen appears when wordlist changed.
-- [ ] Fresh Push preview loads (never reuses pre-Pull preview).
-- [ ] **Push changes** requires confirm (and typed **`PUSH`** if removals).
+- [ ] Start screen explains Collect-then-Update flow; nothing runs without confirmation.
+- [ ] Collect review shows additions count and direction (applications → wordlist).
+- [ ] **Collect my words** opens confirm screen; cancel returns without changes.
+- [ ] After collect, complete screen appears when wordlist changed.
+- [ ] Fresh Update my apps preview loads (never reuses pre-collect preview).
+- [ ] **Update my apps** requires confirm (and typed **`PUSH`** if removals).
 - [ ] Session report summarizes what ran; Dashboard reachable from report.
-- [ ] Failed or recovery-required Pull/Push ends session with clear note.
+- [ ] Failed or recovery-required Collect/Update ends session with clear note.
 
-### Pull skip
+### Collect skip
 
 - [ ] Start review with synthetic words only in targets (not yet in wordlist).
-- [ ] On Pull review, choose **Skip Pull**.
-- [ ] Fresh Push preview still builds.
-- [ ] Wordlist bytes unchanged; Push preview reflects current wordlist vs targets.
+- [ ] On Collect review, choose **Skip collect**.
+- [ ] Fresh Update my apps preview still builds.
+- [ ] Wordlist bytes unchanged; Update preview reflects current wordlist vs targets.
 
-### Push skip
+### Update skip
 
-- [ ] Complete Pull in review (or skip Pull with divergent targets).
-- [ ] On Push review, choose **Finish without Push**.
-- [ ] Session report shows Pull outcome only; target files unchanged by Push.
-- [ ] History records Pull if executed; no Push record for skipped Push.
+- [ ] Complete Collect in review (or skip collect with divergent targets).
+- [ ] On Update review, choose **Finish without update**.
+- [ ] Session report shows Collect outcome only; target files unchanged by Update.
+- [ ] History records Collect if executed; no Push record for skipped Update.
 
 ## Status and Health
 

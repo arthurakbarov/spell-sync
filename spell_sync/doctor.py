@@ -8,7 +8,6 @@ from .application import SpellSyncService
 from .cli_options import CliOptions
 from .cli_request_adapter import doctor_request
 from .command_helpers import quiet_json_output
-from .dictionary_hints import warn_missing_optional_apps
 from .exit_codes import ExitCode
 from .health import (
     CliStatus,
@@ -31,7 +30,6 @@ __all__ = [
     "build_doctor_report",
     "cmd_doctor",
     "doctor_payload",
-    "warn_missing_optional_apps",
 ]
 
 _SERVICE = SpellSyncService(enable_file_logging=False)

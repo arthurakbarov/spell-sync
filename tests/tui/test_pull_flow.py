@@ -13,7 +13,7 @@ from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.dashboard import DashboardScreen
 from spell_sync.tui.screens.pull_screen import PullScreen
 from tests.tui.fake_service import fake_service, sample_pull_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestPullFlow(unittest.IsolatedAsyncioTestCase):
@@ -30,7 +30,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Sources ready: 2", text)
             self.assertIn("Sources skipped: 1", text)
             await pilot.click("#btn-refresh")
-            await wait_for_text(pilot, "#pull-content", "Plan id: pull-")
+            await wait_for_text(pilot, "#pull-content", "Created:")
             self.assertGreaterEqual(service.pull_counter, 2)
 
     async def test_confirmation_and_success_report(self):
@@ -43,7 +43,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-run")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "Pull completed")
+            await wait_for_operation_report(pilot, "Pull completed")
             self.assertEqual(service.execute_pull_calls, 1)
 
     async def test_cancel_before_execution(self):
@@ -78,7 +78,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-run")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "Pull failed")
+            await wait_for_operation_report(pilot, "Pull failed")
 
     async def test_back_navigation(self):
         controller = TuiController(fake_service(), CliOptions())

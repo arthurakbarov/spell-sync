@@ -90,7 +90,6 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
         yield ScrollableContainer(id="history-list")
         yield Button("Refresh", id="btn-refresh")
         yield Button("Clear operation history", id="btn-clear")
-        yield Button("Technical log", id="btn-tech-log")
         yield Button("Back", id="btn-back")
         yield Footer()
 
@@ -210,9 +209,6 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
             return
         if event.button.id == "btn-clear":
             self.app.push_screen(ClearHistoryConfirmScreen(self._controller, self))
-            return
-        if event.button.id == "btn-tech-log":
-            self.app.push_screen(TechnicalLogScreen(self._controller))
             return
         if event.button.id and event.button.id.startswith("history-row-"):
             index = int(event.button.id.rsplit("-", 1)[-1])

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -119,9 +120,11 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         from textual.widgets import Button
 
         controller = TuiController(fake_service(), CliOptions())
+        release = threading.Event()
 
         def slow_export(**kwargs: object) -> Path:
-            time.sleep(0.15)
+            # Block until the test observes the disabled button (deterministic under CI load).
+            assert release.wait(timeout=2.0)
             return Path("/tmp/support-reports/support-report-test.json")
 
         controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
@@ -133,11 +136,12 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             screen = app.screen
             assert isinstance(screen, DoctorScreen)
             btn = screen.query_one("#btn-export-support", Button)
-            for _ in range(30):
+            for _ in range(50):
                 if btn.disabled:
                     break
                 await pilot.pause()
             self.assertTrue(btn.disabled)
+            release.set()
             await wait_for_text(pilot, "#doctor-export-status", "Report saved")
             self.assertFalse(btn.disabled)
             controller.export_support_report.assert_called_once()

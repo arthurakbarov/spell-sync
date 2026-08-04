@@ -43,8 +43,7 @@ class PushConfirmScreen(ModalScreen[bool]):
                 "The exact removals shown in the preview will be used.\n"
                 "Type PUSH to continue.\n\n"
                 f"{preview.additions} additions\n"
-                f"{preview.removals} removals\n"
-                f"Plan id: {preview.plan_identifier}"
+                f"{preview.removals} removals"
             )
             self.query_one("#btn-run", Button).disabled = True
         else:
@@ -52,8 +51,7 @@ class PushConfirmScreen(ModalScreen[bool]):
                 f"{PUSH_PREVIEW_SAFETY}\n\n"
                 f"Update {targets} app dictionaries from your personal word list?\n\n"
                 f"{preview.additions} additions\n"
-                f"{preview.removals} removals\n"
-                f"Plan id: {preview.plan_identifier}"
+                f"{preview.removals} removals"
             )
         self.query_one("#confirm-summary", Static).update(text)
 

@@ -33,8 +33,8 @@ from spell_sync.push_journal import (
     RecoverResult,
     plan_recovery_from_journal,
 )
+from spell_sync.resolved_runtime import ResolvedRuntime
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
-from spell_sync.validated_runtime import ValidatedRuntime
 from tests.journal_test_utils import write_restore_scenario_journal, write_test_journal
 from tests.tui.fake_service import sample_recovery_preview
 
@@ -53,7 +53,7 @@ def _recovery_scope(
         journal=journal,
         detail=None,
     )
-    validated = MagicMock(spec=ValidatedRuntime)
+    validated = MagicMock(spec=ResolvedRuntime)
     validated.context = ctx
     validated.journal_result = journal_result
     return validated
@@ -271,7 +271,7 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             wordlist.write_text("alpha\n", encoding="utf-8")
             ctx = MagicMock()
             ctx.wordlist_file = wordlist
-            absent = ValidatedRuntime(
+            absent = ResolvedRuntime(
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.ABSENT, None),

@@ -59,7 +59,7 @@ doctor, logs, and post-setup target settings.
 |---------|---------|
 | Summary | Canonical wordlist path, word count, target counts, overall state, last operation |
 | Primary | **Review and update** (guided flow); **Review recovery** when pending |
-| Direct actions | Pull new words, Push wordlist |
+| Direct actions | Collect my words (Pull), Update my apps (Push) |
 | Manage | Targets |
 | Support | Health (doctor), History (operation log) |
 | Exit | Quit |
@@ -89,17 +89,17 @@ In-memory session on `TuiController` — not persisted as a history record.
 | Screen | Module | Primary actions |
 |--------|--------|-----------------|
 | Review start | `review_update_screen.py` | Start review, Back |
-| Pull review | `review_update_screen.py` | Pull words, Skip Pull, View additions, Back |
+| Pull review | `review_update_screen.py` | Collect my words, Skip collect, View additions, Back |
 | Pull confirm | `pull_confirm_screen.py` | Confirm, Back |
 | Pull operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
 | Pull complete | `review_update_screen.py` | Build push preview |
-| Push review | `review_update_screen.py` | Push changes, Finish without Push, View removals, Back |
+| Push review | `review_update_screen.py` | Update my apps, Finish without update, View removals, Back |
 | Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
 | Push operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
 | Session report | `review_update_screen.py` | Dashboard |
 
-Fresh `PushPreview` is always built after Pull or Skip Pull. Pull and Push remain separate
-operations with existing confirm/execute paths.
+Fresh `PushPreview` is always built after Collect or Skip collect. Collect and Update remain
+separate operations with existing confirm/execute paths.
 
 ### Direct Pull and Push
 
@@ -121,9 +121,9 @@ explanations for skipped targets and sources.
 | Screen | Module | Primary actions |
 |--------|--------|-----------------|
 | Status | `status_screen.py` | Back |
-| Health | `doctor_screen.py` | Back |
-| History | `logs_screen.py` | Filters, Clear, Technical log, Back |
-| Technical log | `logs_screen.py` | Back |
+| Health | `doctor_screen.py` | Export support report, Technical details (support), Back |
+| History | `logs_screen.py` | Filters, Clear, Back |
+| Technical log | `logs_screen.py` | Back (opened from Health only) |
 | Recovery | `recovery_screen.py` | Recover, Discard, Back |
 | Recovery confirm | `recovery_confirm_screen.py` | Type RECOVER, Run, Back |
 
@@ -143,7 +143,7 @@ Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work o
 
 ### Safety
 
-- Config loaded and validated before mutating operations (`ValidatedRuntime`, `config_blocks_mutating`).
+- Config loaded and validated before mutating operations (`ResolvedRuntime`, `config_blocks_mutating`).
 - Corrupt or unsupported dictionaries are not overwritten.
 - Operation lock (`.spell-sync.lock`) prevents parallel mutating commands.
 - Preview and execution share one immutable plan — no silent replan after confirmation.
@@ -204,11 +204,15 @@ non-blocking warning. Errors go to the technical log only (no traceback in TUI).
 
 ## Testing
 
-Headless Textual tests live in `tests/tui/`. Run:
+Headless Textual tests live in `tests/tui/`. Prefer focused selection first:
 
 ```bash
-python3 -m pytest tests/tui -q
-scripts/ci.sh
+python3 scripts/test_plan.py --files spell_sync/tui/
+python3 scripts/run_focused_tests.py
+python3 scripts/check_ci_necessity.py --explain
 ```
 
-Coverage policy: 100% line coverage on `spell_sync`, ≥96% branch coverage.
+Run full `scripts/ci.sh` only when necessity is `full-required` (or the owner asks).
+
+Coverage policy: L2 publish CI enforces 100% line and ≥96% branch coverage on `spell_sync/`.
+Local L0/L1 edit loops do not run coverage.

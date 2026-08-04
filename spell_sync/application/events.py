@@ -13,10 +13,8 @@ from ..diagnostics.technical_event_model import (
     EventSeverity,
     OperationKind,
     TechnicalEvent,
+    TechnicalEventSink,
 )
-
-# Backward-compatible alias used by presentation consumers.
-EventLevel = EventSeverity
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,10 +33,6 @@ class PresentedEvent:
 
 class PresentationEventSink(Protocol):
     def __call__(self, event: PresentedEvent) -> None: ...
-
-
-class TechnicalEventSink(Protocol):
-    def __call__(self, event: TechnicalEvent) -> None: ...
 
 
 # Public alias: CLI/TUI pass a presentation sink.
@@ -76,7 +70,6 @@ __all__ = [
     "EventCategory",
     "EventEmitter",
     "EventId",
-    "EventLevel",
     "EventPhase",
     "EventReason",
     "EventSeverity",

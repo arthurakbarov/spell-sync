@@ -66,17 +66,17 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
             content = app.screen.query_one("#removals-content")
             self.assertIn("word0", str(content.render()))
 
-    async def test_refresh_creates_new_plan_id(self):
-        controller = TuiController(fake_service(), CliOptions())
+    async def test_refresh_creates_new_preview(self):
+        service = fake_service()
+        controller = TuiController(service, CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            summary = await wait_for_text(pilot, "#preview-content", "Plan id:")
-            first = str(summary.render())
+            await wait_for_text(pilot, "#preview-content", "Total additions")
+            first_counter = service.preview_counter
             await pilot.click("#btn-refresh-preview")
-            summary = await wait_for_text(pilot, "#preview-content", "Plan id:")
-            second = str(summary.render())
-            self.assertNotEqual(first, second)
+            await wait_for_text(pilot, "#preview-content", "Total additions")
+            self.assertGreater(service.preview_counter, first_counter)
 
     async def test_unchanged_target(self):
         preview = sample_preview(

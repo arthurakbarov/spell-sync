@@ -16,6 +16,7 @@ from ...application.product_concepts import (
     PUSH_PREVIEW_SAFETY,
     PUSH_REDUNDANCY_PREVIEW_NOTICE,
     PUSH_SCOPE_NOTICE,
+    UPDATE_APPS_LABEL,
 )
 from ...application.reports import PushPreview
 from ..controller import TuiController
@@ -108,13 +109,12 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
             return
 
         lines = [
-            "Update apps preview (no writes)",
+            f"{UPDATE_APPS_LABEL} preview (no writes)",
             "",
             PUSH_PREVIEW_SAFETY,
             "",
             PUSH_DIRECTION_LABEL,
             "",
-            f"Plan id: {preview.plan_identifier}",
             f"Created: {preview.created_at}",
             f"Total additions: {preview.additions}",
             f"Total removals: {preview.removals}",

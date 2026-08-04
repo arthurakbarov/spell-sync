@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 
 from .application import SpellSyncService
-from .application.reports import RecoveryStatus
 from .cli_options import CliOptions
 from .cli_request_adapter import recovery_request
 from .command_helpers import quiet_json_output
@@ -13,6 +12,7 @@ from .config import CONFIRM_YES
 from .exit_codes import ExitCode
 from .json_output import base_payload, emit_json
 from .log import log
+from .operation_reports import RecoveryStatus
 from .push_journal import RecoverResult
 
 _SERVICE = SpellSyncService(enable_file_logging=False)

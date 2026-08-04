@@ -77,6 +77,11 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             )
             yield Static("Manage", classes="section-label")
             yield Button("Targets", id="btn-targets")
+            yield Button("Change word list location", id="btn-change-wordlist")
+            yield Static(
+                "Points Spell Sync at another wordlist.txt; does not move files.",
+                id="change-wordlist-hint",
+            )
             yield Static("Support", classes="section-label")
             yield Button("Health", id="btn-health")
             yield Button("History", id="btn-history")
@@ -266,11 +271,18 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
             self.app.push_screen(LogsScreen(self._controller))
         elif button_id == "btn-targets":
             self.action_open_targets()
+        elif button_id == "btn-change-wordlist":
+            self.action_change_wordlist()
 
     def action_open_targets(self) -> None:
         from .target_settings_screen import TargetSettingsScreen
 
         self.app.push_screen(TargetSettingsScreen(self._controller))
+
+    def action_change_wordlist(self) -> None:
+        from .setup_welcome_screen import ChangeWordlistScreen
+
+        self.app.push_screen(ChangeWordlistScreen(self._controller))
 
     def action_refresh_dashboard(self) -> None:
         self._refresh_layout_warning()

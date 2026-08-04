@@ -18,6 +18,7 @@ _MESSAGES: dict[EventId, str] = {
     EventId.PULL_RUNTIME_CHANGED: _RUNTIME_CHANGED_MESSAGE,
     EventId.PULL_WORDLIST_MISMATCH: "Preview wordlist path mismatch",
     EventId.PULL_PLAN_VERIFIED: "Verifying prepared pull plan",
+    EventId.PULL_SOURCE_STARTED: "Merging dictionary source",
     EventId.PULL_WRITE_STARTED: "Writing canonical wordlist",
     EventId.PULL_WORDLIST_CHANGED: "Wordlist changed after preview",
     EventId.PULL_WRITE_FAILED: "Pull write failed",
@@ -89,6 +90,8 @@ def present_event(event: TechnicalEvent) -> PresentedEvent:
         message = f"{event.target_id.value} changed after preview"
     elif event.event_id is EventId.PUSH_TARGET_STARTED and event.target_id:
         message = f"Updating {event.target_id.value}"
+    elif event.event_id is EventId.PULL_SOURCE_STARTED and event.target_id:
+        message = f"Merging {event.target_id.value}"
     elif event.event_id is EventId.RECOVERY_TARGET_RESTORE_STARTED and event.target_id:
         message = f"Recovering {event.target_id.value}"
     elif event.event_id is EventId.RECOVERY_TARGET_REMOVE_STARTED and event.target_id:

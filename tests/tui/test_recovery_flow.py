@@ -12,7 +12,7 @@ from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.recovery_confirm_screen import RecoveryConfirmScreen
 from spell_sync.tui.screens.recovery_screen import RecoveryScreen
 from tests.tui.fake_service import fake_service, sample_recovery_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
@@ -49,7 +49,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             confirm_input.value = "RECOVER"
             screen.on_input_changed(Input.Changed(confirm_input, "RECOVER"))
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "Recovery completed")
+            await wait_for_operation_report(pilot, "Recovery completed")
             self.assertEqual(service.execute_recovery_calls, 1)
 
     async def test_dashboard_recovery_enabled(self):

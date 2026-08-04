@@ -23,7 +23,7 @@ from spell_sync.tui.screens.review_update_screen import (
     ReviewStartScreen,
 )
 from tests.tui.fake_service import fake_service, sample_preview, sample_pull_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import dismiss_operation_linger, wait_for_text
 
 
 class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
@@ -37,7 +37,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def _open_review_push(self, pilot, controller):
         await self._open_review_pull(pilot, controller)
         await pilot.click("#btn-skip")
-        await wait_for_text(pilot, "#review-push-content", "Plan id:")
+        await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
 
     async def test_review_start_screen(self):
         controller = TuiController(fake_service(), CliOptions())
@@ -68,6 +68,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             await wait_for_text(pilot, "#review-pull-complete", "Pull completed")
             self.assertEqual(service.execute_pull_calls, 1)
             await pilot.click("#btn-build-push")
@@ -87,7 +88,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             rendered = str(content.render())
             self.assertIn("All readable words from enabled custom dictionaries", rendered)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
 
     async def test_skip_pull_builds_fresh_push_preview(self):
         service = fake_service()
@@ -98,7 +99,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             before = service.preview_counter
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             self.assertGreater(service.preview_counter, before)
             session = controller.review_session()
             assert session is not None
@@ -118,9 +119,10 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             preview_before_push = service.preview_counter
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             await wait_for_text(pilot, "#review-pull-complete", "Build Push preview")
             await pilot.click("#btn-build-push")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             self.assertGreater(service.preview_counter, preview_before_push)
             session = controller.review_session()
             assert session is not None
@@ -146,6 +148,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             report = await wait_for_text(pilot, "#review-session-report", "Pull: Failed")
             self.assertIn("Review complete", str(report.render()))
 
@@ -175,7 +178,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             await pilot.click("#btn-finish")
             report = await wait_for_text(pilot, "#review-session-report", "Push: Skipped")
             self.assertIn("No recovery is required", str(report.render()))
@@ -198,6 +201,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             confirm_input.value = "PUSH"
             screen.on_input_changed(Input.Changed(confirm_input, "PUSH"))
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             report = await wait_for_text(pilot, "#review-session-report", "Push: Completed")
             self.assertEqual(service.execute_push_calls, 1)
             self.assertIn("Pull: Skipped", str(report.render()))
@@ -220,10 +224,11 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id")
+            await wait_for_text(pilot, "#review-push-content", "Total additions")
             await pilot.click("#btn-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             report = await wait_for_text(pilot, "#review-session-report", "Push: Stopped safely")
             self.assertIn("Pull: Skipped", str(report.render()))
 
@@ -245,10 +250,11 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id")
+            await wait_for_text(pilot, "#review-push-content", "Total additions")
             await pilot.click("#btn-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             report = await wait_for_text(
                 pilot,
                 "#review-session-report",
@@ -262,7 +268,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             await pilot.click("#btn-finish")
             await wait_for_text(pilot, "#review-session-report", "Review complete")
             await pilot.click("#btn-dashboard")
@@ -324,7 +330,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             await pilot.click("#btn-finish")
             await wait_for_text(pilot, "#review-session-report", "Review complete")
             self.assertEqual(service.execute_pull_calls, 0)
@@ -350,12 +356,14 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#confirm-summary", "Add 17 words")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             await wait_for_text(pilot, "#review-pull-complete", "Build Push preview")
             await pilot.click("#btn-build-push")
-            await wait_for_text(pilot, "#review-push-content", "Plan id")
+            await wait_for_text(pilot, "#review-push-content", "Total additions")
             await pilot.click("#btn-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
+            await dismiss_operation_linger(pilot)
             report = await wait_for_text(pilot, "#review-session-report", "Pull: Completed")
             text = str(report.render())
             self.assertIn("Push: Completed", text)
@@ -395,7 +403,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, ReviewPullScreen)
@@ -406,7 +414,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
-            await wait_for_text(pilot, "#review-push-content", "Plan id:")
+            await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
             await pilot.click("#btn-finish")
             await wait_for_text(pilot, "#review-session-report", "Review complete")
             await pilot.click("#btn-history")

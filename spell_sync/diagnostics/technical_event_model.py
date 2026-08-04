@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -50,6 +51,7 @@ class EventId(str, Enum):
     PULL_RUNTIME_CHANGED = "pull.runtime_changed"
     PULL_WORDLIST_MISMATCH = "pull.wordlist_mismatch"
     PULL_PLAN_VERIFIED = "pull.plan_verified"
+    PULL_SOURCE_STARTED = "pull.source_started"
     PULL_WRITE_STARTED = "pull.write_started"
     PULL_WORDLIST_CHANGED = "pull.wordlist_changed"
     PULL_WRITE_FAILED = "pull.write_failed"
@@ -127,3 +129,6 @@ class TechnicalEvent:
     outcome: TerminalOutcome | None = None
     completed: int | None = None
     total: int | None = None
+
+
+TechnicalEventSink = Callable[[TechnicalEvent], None]

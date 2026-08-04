@@ -13,6 +13,7 @@ from spell_sync.application import SpellSyncService
 from spell_sync.application.events import EventId, PresentedEvent
 from spell_sync.application.reports import (
     DashboardSeverity,
+    OperationOutcome,
     PullPreview,
     PushPreview,
     StatusSnapshot,
@@ -657,11 +658,12 @@ class TestServiceFacadePaths(unittest.TestCase):
             locked = service.execute_push_dry_run(_push(), preview)
         self.assertEqual(locked.result, ExitCode.PUSH_ABORT)
 
-        run = MagicMock()
+        prepared.runtime_identity = MagicMock()
         with patch.object(
             service._sync, "_execute_push_for_run", return_value=PushResult(1, ("a",), ())
         ):
-            execution = service._sync._run_push_for_run(run, prepared, dry_run=True)
+            with _patch_mutation_scope(_push_scope(prepared.runtime_identity)):
+                execution = service.execute_push_dry_run(_push(), preview)
         self.assertEqual(execution.result.word_count, 1)
 
     def test_prepare_pull_add_from_paths(self):
@@ -766,6 +768,16 @@ class TestServiceFacadePaths(unittest.TestCase):
         )
         self.assertIsInstance(push_execution.result, PushResult)
         self.assertIsNone(push_execution.push_preview)
+
+        failed = service.push_execution_from_result(bad_prepared, ExitCode.PUSH_ABORT)
+        self.assertEqual(failed.result, ExitCode.PUSH_ABORT)
+        self.assertEqual(failed.outcome, OperationOutcome.FAILED)
+
+        warned = service.push_execution_from_result(
+            bad_prepared,
+            PushResult(1, ("a",), ("skip-reason",)),
+        )
+        self.assertEqual(warned.outcome, OperationOutcome.COMPLETED_WITH_WARNINGS)
 
 
 if __name__ == "__main__":

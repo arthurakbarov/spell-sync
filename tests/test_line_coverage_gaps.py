@@ -35,13 +35,13 @@ from spell_sync.push_journal import (
     _snapshot_is_valid,
     plan_recovery_from_journal,
 )
+from spell_sync.resolved_runtime import ResolvedRuntime
 from spell_sync.settings import ConfigLoadResult, ConfigStatus
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.operation_screen import OperationScreen
 from spell_sync.tui.screens.recovery_confirm_screen import RecoveryConfirmScreen
 from spell_sync.tui.screens.recovery_screen import RecoveryScreen
-from spell_sync.validated_runtime import ValidatedRuntime
 from tests.journal_test_utils import (
     journal_target_from_file,
     write_restore_scenario_journal,
@@ -50,7 +50,7 @@ from tests.journal_test_utils import (
 from tests.runtime_helpers import make_sync_run
 from tests.test_phase4_facade_coverage import _pull_scope
 from tests.tui.fake_service import fake_service, sample_recovery_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestLineCoverageGaps(unittest.TestCase):
@@ -294,7 +294,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             journal.targets = [target]
             ctx = MagicMock()
             ctx.wordlist_file = wordlist
-            validated = ValidatedRuntime(
+            validated = ResolvedRuntime(
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
@@ -336,7 +336,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             dict_path.write_text("external\n", encoding="utf-8")
             ctx = MagicMock()
             ctx.wordlist_file = wordlist
-            validated = ValidatedRuntime(
+            validated = ResolvedRuntime(
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
@@ -371,7 +371,7 @@ class TestLineCoverageGaps(unittest.TestCase):
             Path(journal.targets[0].backup_path).unlink()
             ctx = MagicMock()
             ctx.wordlist_file = wordlist
-            validated = ValidatedRuntime(
+            validated = ResolvedRuntime(
                 context=ctx,
                 config_result=ConfigLoadResult(ConfigStatus.VALID, {}, ()),
                 journal_result=JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal),
@@ -590,7 +590,7 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
             app.push_screen(
                 OperationScreen(controller, operation="cleanup", recovery_preview=preview)
             )
-            await wait_for_text(pilot, "#report-content", "cleanup")
+            await wait_for_operation_report(pilot, "cleanup")
 
     async def test_recovery_screen_worker_poll_paths(self):
         preview = sample_recovery_preview(

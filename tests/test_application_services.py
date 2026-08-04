@@ -12,7 +12,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from spell_sync.application.reports import OperationOutcome
 from spell_sync.application.service import SpellSyncService
 from spell_sync.application.services import (
     DiagnosticsService,
@@ -23,9 +22,6 @@ from spell_sync.application.services import (
 from spell_sync.application.services.context import ApplicationContext
 from spell_sync.diagnostics.history_store import OperationHistoryStore
 from spell_sync.diagnostics.paths import resolve_app_state_paths
-from spell_sync.exit_codes import ExitCode
-from spell_sync.push_prepared import PreparedPush
-from spell_sync.sync_models import PushResult
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _APPLICATION = _REPO_ROOT / "spell_sync" / "application"
@@ -258,26 +254,6 @@ class TestApplicationServiceArchitecture(unittest.TestCase):
         source = inspect.getsource(DiagnosticsService.finalize_report)
         self.assertIn("build_history_record", source)
         self.assertIn("history_store.append", source)
-
-    def test_sync_run_push_for_run_outcome_branches(self) -> None:
-        service = SpellSyncService(enable_file_logging=False)
-        sync = service._sync  # noqa: SLF001 — focused service behavior check
-        prepared = MagicMock(spec=PreparedPush)
-        run = MagicMock()
-        with patch.object(
-            sync,
-            "_execute_push_for_run",
-            return_value=ExitCode.PUSH_ABORT,
-        ):
-            failed = sync._run_push_for_run(run, prepared, dry_run=False)
-        self.assertEqual(failed.outcome, OperationOutcome.FAILED)
-        with patch.object(
-            sync,
-            "_execute_push_for_run",
-            return_value=PushResult(word_count=1, written=("a",), skipped=("b",)),
-        ):
-            warned = sync._run_push_for_run(run, prepared, dry_run=False)
-        self.assertEqual(warned.outcome, OperationOutcome.COMPLETED_WITH_WARNINGS)
 
 
 if __name__ == "__main__":

@@ -41,6 +41,7 @@ _EXECUTING_EVENT_IDS = frozenset(
     {
         EventId.PULL_LOCK_ACQUIRED,
         EventId.PULL_PLAN_VERIFIED,
+        EventId.PULL_SOURCE_STARTED,
         EventId.PULL_WRITE_STARTED,
         EventId.PUSH_LOCK_ACQUIRED,
         EventId.PUSH_PLAN_VERIFIED,
@@ -102,6 +103,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._events_lock = threading.Lock()
         self._stage_lines: list[str] = []
         self._finished = False
+        self._dismissed = False
         self._mutating = False
         self._active_token = 0
         self._report: OperationReport | None = None
@@ -201,6 +203,7 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             line = f"{prefix} {event.message} ({event.target_id})"
         self._stage_lines.append(line)
         self.query_one("#operation-stages", Static).update("\n".join(self._stage_lines[-12:]))
+        self.query_one("#operation-details", Static).update(event.message)
         if event.completed is not None and event.total:
             progress = self.query_one("#operation-progress", ProgressBar)
             progress.update(total=event.total, progress=event.completed)
@@ -283,13 +286,30 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._controller.invalidate_recovery_preview()
         if self._flush_timer is not None:
             self._flush_timer.stop()
+        outcome_line = report.summary or report.title
+        self.query_one("#operation-details", Static).update(
+            f"{outcome_line}\n\nPress any key or Close to continue"
+        )
+        self.query_one("#btn-close", Button).disabled = False
+
+    def _dismiss_to_result(self) -> None:
+        if self._dismissed or not self._finished:
+            return
+        self._dismissed = True
+        if self._report is None:
+            self.app.pop_screen()
+            return
         if self._on_complete is not None:
             self.app.pop_screen()
-            self._on_complete(report)
+            self._on_complete(self._report)
             return
         from .report_screen import ReportScreen
 
-        self.app.push_screen(ReportScreen(self._controller, report))
+        self.app.push_screen(ReportScreen(self._controller, self._report))
+
+    def on_key(self, event) -> None:
+        if self._finished and not self._dismissed:
+            self._dismiss_to_result()
 
     def _finish_failed(self, message: str) -> None:
         self.phase = OperationPhase.FAILED
@@ -302,14 +322,14 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close" and self._finished:
-            self.app.pop_screen()
+            self._dismiss_to_result()
 
     def action_safe_back(self) -> None:
         if self._mutating and not self._finished:
             self.notify(_CANCELLATION_POLICY, severity="warning")
             return
         if self._finished:
-            self.app.pop_screen()
+            self._dismiss_to_result()
 
     def action_safe_quit(self) -> None:
         if self._mutating and not self._finished:

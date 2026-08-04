@@ -9,7 +9,6 @@ from typing import Iterator
 
 from .application.mutation_scope import mutation_scope_for
 from .application.project_resolution import resolve_project_wordlist
-from .application.reports import PushPreview
 from .application.requests import ProjectRef
 from .cli_options import CliOptions
 from .config import CONFIRM_YES, push_max_removals_without_confirm
@@ -25,6 +24,7 @@ from .log import log
 from .mutation_guards import (
     operation_lock_scope_for,
 )
+from .operation_reports import PushPreview
 from .push_journal import (
     JournalLoadResult,
     JournalLoadStatus,
@@ -33,7 +33,7 @@ from .push_journal import (
 from .resolved_runtime import ResolvedRuntime
 from .runtime_settings import RuntimeSettings
 from .settings import config_blocks_mutating
-from .sync_run import DictionaryDiff, PushResult, SyncRun  # noqa: F401
+from .sync_run import DictionaryDiff, PushResult, SyncRun
 
 
 def invalid_config_exit_from_result(

@@ -1,7 +1,8 @@
-"""Compatibility re-exports for report DTOs.
+"""Application-facing report DTOs.
 
 Canonical definitions live in ``spell_sync.operation_reports`` so core diagnostics
-can import them without depending on the application layer.
+can import them without depending on the application layer. This module re-exports
+those types as the stable import surface for ``application`` and ``tui``.
 """
 
 from __future__ import annotations
@@ -17,13 +18,11 @@ from ..operation_reports import (
     OperationOutcome,
     OperationPhase,
     OperationReport,
-    ProjectSetupExecutionView,
     PullExecution,
     PullPreview,
     PullSourcePreview,
     PushExecution,
     PushPreview,
-    PushPreviewSnapshot,
     RecoveryExecution,
     RecoveryItemPreview,
     RecoveryOutcome,
@@ -47,13 +46,11 @@ __all__ = [
     "OperationOutcome",
     "OperationPhase",
     "OperationReport",
-    "ProjectSetupExecutionView",
     "PullExecution",
     "PullPreview",
     "PullSourcePreview",
     "PushExecution",
     "PushPreview",
-    "PushPreviewSnapshot",
     "RecoveryExecution",
     "RecoveryItemPreview",
     "RecoveryOutcome",

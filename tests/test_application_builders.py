@@ -335,7 +335,7 @@ class TestDashboardBuilders(unittest.TestCase):
         ):
             state = build_dashboard_state(validated, snapshot, lock_info=None)
         self.assertEqual(state.targets_ready, 1)
-        self.assertEqual(state.targets_needs_attention, 2)
+        self.assertEqual(state.targets_needs_attention, 3)
         self.assertEqual(state.targets_disabled, 1)
         self.assertEqual(state.targets_unavailable, 1)
 

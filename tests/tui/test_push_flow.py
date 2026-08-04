@@ -15,7 +15,7 @@ from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.preview_screen import PreviewScreen
 from spell_sync.tui.screens.push_confirm_screen import PushConfirmScreen
 from tests.tui.fake_service import fake_service, sample_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestPushFlow(unittest.IsolatedAsyncioTestCase):
@@ -29,7 +29,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             summary = await wait_for_text(pilot, "#confirm-summary", "additions")
             self.assertIn("0 removals", str(summary.render()))
@@ -41,7 +41,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             screen = app.screen
@@ -69,7 +69,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             preview = app.screen._preview
             assert preview is not None
             await pilot.click("#btn-continue-push")
@@ -83,7 +83,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
             confirm.on_input_changed(Input.Changed(confirm_input, "PUSH"))
             await pilot.pause()
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "Push completed")
+            await wait_for_operation_report(pilot, "Push completed")
             self.assertIs(service.last_executed_prepared, preview.prepared)
             self.assertEqual(service.execute_push_calls, 1)
 
@@ -105,14 +105,14 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
-            report = await wait_for_text(pilot, "#report-content", "Preview is stale")
+            report = await wait_for_operation_report(pilot, "Preview is stale")
             self.assertIn("no conflicting file was overwritten", str(report.render()).lower())
             await pilot.click("#btn-rebuild")
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
 
     async def test_recovery_required_report(self):
         preview = sample_preview(removals=0, plan_identifier="recover-plan")
@@ -132,11 +132,11 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "requires recovery")
+            await wait_for_operation_report(pilot, "requires recovery")
 
     async def test_partial_success(self):
         preview = sample_preview(removals=0, plan_identifier="partial-plan")
@@ -160,11 +160,11 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "warnings")
+            await wait_for_operation_report(pilot, "warnings")
 
     async def test_old_preview_invalidated_on_refresh(self):
         service = fake_service()
@@ -172,12 +172,12 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id:")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             old = app.screen._preview
             assert old is not None
             old_id = old.plan_identifier
             await pilot.click("#btn-refresh-preview")
-            await wait_for_text(pilot, "#preview-content", "Plan id:")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             new = app.screen._preview
             assert new is not None
             self.assertNotEqual(old_id, new.plan_identifier)

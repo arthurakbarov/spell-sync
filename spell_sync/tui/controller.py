@@ -195,6 +195,7 @@ class TuiController:
         self._active_pull_preview: PullPreview | None = None
         self._active_recovery_preview: RecoveryPreview | None = None
         self._setup_wordlist: Path | None = None
+        self._setup_storage_strategy: str | None = None
         self._setup_discovery: SetupTargetDiscovery | None = None
         self._setup_selection: SetupSelection | None = None
         self._setup_prepared: PreparedProjectSetup | None = None
@@ -230,6 +231,10 @@ class TuiController:
 
     def set_project_wordlist(self, path: Path) -> None:
         self._project = replace(self._project, wordlist=path)
+
+    @property
+    def project_wordlist(self) -> Path | None:
+        return self._project.wordlist
 
     @property
     def setup_selected_targets(self) -> tuple[str, ...]:
@@ -412,8 +417,31 @@ class TuiController:
     def inspect_project_setup(self) -> ProjectSetupState:
         return self._service.inspect_project_setup(self._setup_request())
 
+    def setup_wordlist_presets(self) -> tuple[tuple[str, Path], ...]:
+        home = Path.home()
+        return (
+            ("Documents", home / "Documents" / "Spell Sync" / "wordlist.txt"),
+            ("Home", home / "Spell Sync" / "wordlist.txt"),
+            ("Desktop", home / "Desktop" / "Spell Sync" / "wordlist.txt"),
+        )
+
     def setup_wordlist_default(self) -> Path:
-        return Path.home() / "spell-words" / "wordlist.txt"
+        return self.setup_wordlist_presets()[0][1]
+
+    def setup_storage_strategy(self) -> str | None:
+        return self._setup_storage_strategy
+
+    def set_setup_storage_strategy(self, strategy: str) -> None:
+        from ..application.product_concepts import (
+            STORAGE_STRATEGY_CLOUD,
+            STORAGE_STRATEGY_GIT,
+            STORAGE_STRATEGY_LOCAL,
+        )
+
+        allowed = {STORAGE_STRATEGY_LOCAL, STORAGE_STRATEGY_CLOUD, STORAGE_STRATEGY_GIT}
+        if strategy not in allowed:
+            raise ValueError(f"unknown storage strategy: {strategy}")
+        self._setup_storage_strategy = strategy
 
     def validate_setup_wordlist(self, raw_path: str) -> tuple[Path, str | None]:
         return self._service.validate_setup_wordlist(raw_path)

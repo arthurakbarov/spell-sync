@@ -34,7 +34,7 @@ from spell_sync.tui.screens.pull_screen import PullScreen
 from spell_sync.tui.screens.push_confirm_screen import PushConfirmScreen
 from spell_sync.tui.screens.report_screen import ReportScreen
 from tests.tui.fake_service import fake_service, sample_preview, sample_pull_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
@@ -46,7 +46,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             preview = sample_pull_preview()
             screen = OperationScreen(controller, operation="pull", pull_preview=preview)
             app.push_screen(screen)
-            await wait_for_text(pilot, "#report-content", "Pull completed")
+            await wait_for_operation_report(pilot, "Pull completed")
             await pilot.click("#btn-dashboard")
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
 
@@ -138,7 +138,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-details")
             await pilot.pause()
             await pilot.click("#btn-rebuild")
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
 
     async def test_report_recovery_required(self):
         controller = TuiController(fake_service(), CliOptions())
@@ -230,7 +230,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             screen = app.screen
@@ -245,7 +245,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             screen.on_input_changed(Input.Changed(confirm_input, "PUSH"))
             await pilot.pause()
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "Push completed")
+            await wait_for_operation_report(pilot, "Push completed")
             self.assertEqual(service.execute_push_calls, 1)
 
     async def test_operation_worker_poll_error(self):
@@ -385,7 +385,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             screen = app.screen
             assert isinstance(screen, PreviewScreen)
             screen._worker = SimpleNamespace(state=WorkerState.ERROR, result=None)
@@ -510,7 +510,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
                         worker=SimpleNamespace(result=execution),
                     )
                 )
-                await wait_for_text(pilot, "#report-content", "Pull completed")
+                await wait_for_operation_report(pilot, "Pull completed")
 
     async def test_pull_worker_exception_and_token_mismatch(self):
         service = fake_service()
@@ -567,7 +567,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Plan id")
+            await wait_for_text(pilot, "#preview-content", "Total additions")
             preview = app.screen
             assert isinstance(preview, PreviewScreen)
             preview._active_token = -1

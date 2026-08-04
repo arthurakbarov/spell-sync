@@ -1140,6 +1140,12 @@ class TestPhase2BCliCoverage(unittest.TestCase):
             format=DictionaryFormat.TEXT,
         )
         self.assertEqual(discovery_module._family_id(macos_dict), "macos_spelling")
+        classic = Dictionary(
+            name="macos",
+            path="/tmp/LocalDictionary",
+            format=DictionaryFormat.TEXT,
+        )
+        self.assertEqual(discovery_module.dictionary_family_id(classic.name), "macos_spelling")
         self.assertFalse(
             discovery_module._target_selectable(
                 identifier="sublime",

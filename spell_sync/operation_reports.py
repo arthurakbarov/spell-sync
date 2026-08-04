@@ -150,15 +150,6 @@ class DoctorTargetsSnapshot:
     targets: tuple[DoctorTargetView, ...]
 
 
-@dataclass(frozen=True)
-class PushPreviewSnapshot:
-    """Deprecated alias kept for transitional imports."""
-
-    diffs: tuple[DictionaryDiff, ...]
-    plan_result: PushResult | ExitCode | None = None
-    wordlist_error: ExitCode | None = None
-
-
 class OperationOutcome(str, Enum):
     COMPLETED = "completed"
     COMPLETED_WITH_WARNINGS = "completed_with_warnings"
@@ -326,16 +317,3 @@ class RecoveryExecution:
     skipped: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
     failed: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class ProjectSetupExecutionView:
-    prepared_setup_id: str
-    outcome: str
-    message: str
-    created_files: tuple[str, ...] = ()
-    warnings: tuple[str, ...] = ()
-    wordlist_path: str = ""
-    config_path: str = ""
-    enabled_targets: tuple[str, ...] = ()
-    existing_wordlist_kept: bool = False

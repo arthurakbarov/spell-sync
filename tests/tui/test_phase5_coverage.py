@@ -17,7 +17,7 @@ from spell_sync.tui.screens.operation_screen import OperationScreen
 from spell_sync.tui.screens.recovery_confirm_screen import RecoveryConfirmScreen
 from spell_sync.tui.screens.recovery_screen import RecoveryScreen
 from tests.tui.fake_service import fake_service, sample_recovery_preview
-from tests.tui.test_helpers import wait_for_text
+from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
@@ -47,7 +47,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
             screen.query_one("#confirm-input", Input).value = "DISCARD"
             screen.on_input_changed(Input.Changed(Input(), "DISCARD"))
             await pilot.click("#btn-run")
-            await wait_for_text(pilot, "#report-content", "discarded")
+            await wait_for_operation_report(pilot, "discarded")
 
     async def test_recovery_cleanup_pending_labels(self):
         preview = sample_recovery_preview(
@@ -168,7 +168,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
             app.push_screen(
                 OperationScreen(controller, operation="recover", recovery_preview=preview)
             )
-            await wait_for_text(pilot, "#report-content", "Recovery completed")
+            await wait_for_operation_report(pilot, "Recovery completed")
             self.assertEqual(service.execute_recovery_calls, 1)
 
 

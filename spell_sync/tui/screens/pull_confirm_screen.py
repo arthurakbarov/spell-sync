@@ -31,8 +31,7 @@ class PullConfirmScreen(ModalScreen[bool]):
         self.query_one("#confirm-summary", Static).update(
             f"{PULL_PREVIEW_SAFETY}\n\n"
             f"Add {preview.additions} words to your personal word list?\n\n"
-            f"Wordlist: {preview.wordlist_path}\n"
-            f"Plan id: {preview.plan_identifier}"
+            f"Wordlist: {preview.wordlist_path}"
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

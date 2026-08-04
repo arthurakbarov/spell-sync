@@ -208,14 +208,21 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             await self._wait_for_rows(pilot, app)
             await pilot.click("#btn-refresh")
             await pilot.pause()
-            await pilot.click("#btn-tech-log")
-            await pilot.pause()
-            self.assertIsInstance(app.screen, TechnicalLogScreen)
-            await pilot.click("#btn-back")
-            await pilot.pause()
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, LogsScreen)
+
+    async def test_doctor_opens_technical_log(self):
+        from spell_sync.tui.screens.doctor_screen import DoctorScreen
+
+        controller = self._controller()
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 40)) as pilot:
+            app.push_screen(DoctorScreen(controller))
+            await pilot.pause()
+            await pilot.click("#btn-tech-log")
+            await pilot.pause()
+            self.assertIsInstance(app.screen, TechnicalLogScreen)
 
     async def test_outcome_filter_reload(self):
         from textual.widgets import Select
@@ -287,6 +294,21 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
             content = str(app.screen.query_one("#tech-log-content").render())
             self.assertIn("Technical log", content)
+
+    async def test_technical_log_back_button_pops_screen(self):
+        controller = self._controller()
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 40)) as pilot:
+            app.push_screen(LogsScreen(controller))
+            await self._wait_for_rows(pilot, app)
+            app.push_screen(TechnicalLogScreen(controller))
+            for _ in range(10):
+                await pilot.pause()
+            self.assertIsInstance(app.screen, TechnicalLogScreen)
+            await pilot.click("#btn-back")
+            for _ in range(5):
+                await pilot.pause()
+            self.assertIsInstance(app.screen, LogsScreen)
 
     def test_summary_line_default_detail(self):
         line = _summary_line(_record(operation="doctor", outcome="failed", updated_targets=0))

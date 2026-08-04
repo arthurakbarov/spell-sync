@@ -12,6 +12,7 @@ from ..health.types import DoctorAction, DoctorCheck, DoctorReport
 from ..operation_lock import OperationLockInfo
 from ..project_setup.discovery import (
     _CONFIG_TARGET_IDS,
+    dictionary_family_id,
     discover_setup_targets,
 )
 from ..push_journal import (
@@ -23,11 +24,11 @@ from ..push_journal import (
 )
 from ..push_prepared import PreparedPush
 from ..read_outcome import ReadStatus, dictionary_read_result
+from ..resolved_runtime import ResolvedRuntime
 from ..runtime_identity import build_runtime_identity
 from ..settings import ConfigStatus, load_config_result
 from ..sync_models import PushResult
 from ..sync_run import SyncRun
-from ..validated_runtime import ValidatedRuntime
 from .operation_explanations import (
     build_push_target_updates,
     format_pull_planned_actual_lines,
@@ -86,7 +87,7 @@ def _dashboard_notice_text(code: str, *, detail: str | None = None) -> tuple[str
 
 
 def build_dashboard_issues(
-    validated: ValidatedRuntime,
+    validated: ResolvedRuntime,
     snapshot: StatusSnapshot,
     *,
     lock_info: OperationLockInfo | None,
@@ -216,17 +217,11 @@ def build_dashboard_issues(
 
 
 def _target_family_id(name: str) -> str:
-    if name.startswith("macos-"):
-        return "macos_spelling"
-    if name.startswith("win-"):
-        return "win_spelling"
-    if ":" in name:
-        return name.split(":", 1)[0]
-    return name
+    return dictionary_family_id(name)
 
 
 def _compute_application_counts(
-    validated: ValidatedRuntime,
+    validated: ResolvedRuntime,
     snapshot: StatusSnapshot,
 ) -> tuple[int, int, int, int]:
     settings = validated.context.settings
@@ -281,7 +276,7 @@ def format_dashboard_last_operation(record: object) -> str:
 
 
 def build_dashboard_state(
-    validated: ValidatedRuntime,
+    validated: ResolvedRuntime,
     snapshot: StatusSnapshot,
     *,
     lock_info: OperationLockInfo | None,
@@ -983,7 +978,7 @@ def _empty_recovery_preview(
     )
 
 
-def build_recovery_preview(validated: ValidatedRuntime) -> RecoveryPreview:
+def build_recovery_preview(validated: ResolvedRuntime) -> RecoveryPreview:
     wordlist_path = str(validated.context.wordlist_file)
     journal_result = validated.journal_result
     status = journal_result.status

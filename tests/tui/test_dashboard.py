@@ -15,7 +15,7 @@ from spell_sync.tui.controller import TuiController
 from spell_sync.tui.screens.dashboard import DashboardScreen
 from spell_sync.tui.screens.doctor_screen import DoctorScreen
 from spell_sync.tui.screens.logs_screen import LogsScreen
-from spell_sync.tui.screens.review_update_screen import ReviewUpdateScreen
+from spell_sync.tui.screens.review_update_screen import ReviewStartScreen
 from tests.tui.fake_service import fake_service, sample_dashboard
 from tests.tui.test_helpers import wait_for_text
 
@@ -189,7 +189,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-review-update")
             await pilot.pause()
-            self.assertIsInstance(app.screen, ReviewUpdateScreen)
+            self.assertIsInstance(app.screen, ReviewStartScreen)
             body = await wait_for_text(pilot, "#review-body", "Nothing changes until you confirm")
             self.assertIn("usual path after setup", str(body.render()))
             await pilot.click("#btn-back")

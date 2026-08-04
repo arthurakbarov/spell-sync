@@ -36,6 +36,7 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
         yield Static(id="doctor-content")
         yield Button("Run again", id="btn-run-doctor", variant="primary")
         yield Button("Export support report", id="btn-export-support")
+        yield Button("Technical details (support)", id="btn-tech-log")
         yield Static(id="doctor-export-status")
         yield Footer()
 
@@ -124,6 +125,10 @@ class DoctorScreen(LoadTokenMixin, Screen[None]):
             self.action_run_doctor()
         elif event.button.id == "btn-export-support":
             self._export_support_report()
+        elif event.button.id == "btn-tech-log":
+            from .logs_screen import TechnicalLogScreen
+
+            self.app.push_screen(TechnicalLogScreen(self._controller))
 
     def _begin_export(self) -> int:
         self._export_generation += 1

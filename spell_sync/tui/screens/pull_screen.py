@@ -11,6 +11,7 @@ from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.product_concepts import (
+    COLLECT_WORDS_LABEL,
     PULL_DIRECTION_LABEL,
     PULL_PREVIEW_SAFETY,
     PULL_SCOPE_NOTICE,
@@ -62,7 +63,7 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             run_btn.disabled = True
             return
         lines = [
-            "Collect words preview (no writes)",
+            f"{COLLECT_WORDS_LABEL} preview (no writes)",
             "",
             PULL_PREVIEW_SAFETY,
             "",
@@ -72,7 +73,6 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             f"Sources ready: {len(preview.sources_used)}",
             f"Sources skipped: {len(preview.sources_skipped)}",
             f"Wordlist: {preview.wordlist_path}",
-            f"Plan id: {preview.plan_identifier}",
             f"Created: {preview.created_at}",
             "",
             PULL_SCOPE_NOTICE,
