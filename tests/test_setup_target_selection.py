@@ -340,6 +340,88 @@ def test_multiple_ok_dictionaries_not_ambiguous() -> None:
     assert chrome.selectable is True
 
 
+def test_classic_macos_name_maps_to_spelling_family() -> None:
+    from spell_sync.project_setup.discovery import dictionary_family_id
+
+    assert dictionary_family_id("macos") == "macos_spelling"
+    assert dictionary_family_id("macos-applespell") == "macos_spelling"
+
+
+def test_macos_ok_plus_unreadable_sibling_is_selectable() -> None:
+    from unittest.mock import MagicMock, patch
+
+    from spell_sync.project_setup import discovery as discovery_mod
+    from spell_sync.read_outcome import ReadStatus
+
+    dictionaries = [
+        MagicMock(path="/classic", format=MagicMock(value="text")),
+        MagicMock(path="/applespell", format=MagicMock(value="text")),
+    ]
+    dictionaries[0].name = "macos"
+    dictionaries[1].name = "macos-applespell"
+    with patch.object(discovery_mod, "is_macos", return_value=True):
+        with patch.object(discovery_mod, "is_windows", return_value=False):
+            with patch.object(discovery_mod, "discover_dictionaries", return_value=dictionaries):
+                with patch.object(
+                    discovery_mod,
+                    "dictionary_read_result",
+                    side_effect=[
+                        MagicMock(status=ReadStatus.OK, words=["a", "b"], detail=None),
+                        MagicMock(status=ReadStatus.UNREADABLE, words=None, detail="unreadable"),
+                    ],
+                ):
+                    rows = discovery_mod.discover_setup_targets().targets
+    macos = next(row for row in rows if row.identifier == "macos_spelling")
+    assert macos.selectable is True
+    assert macos.status == ReadStatus.OK.value
+    assert macos.word_count == 2
+    assert any(row.identifier == "macos" for row in rows) is False
+
+
+def test_discovery_ignores_selected_targets_gating() -> None:
+    from unittest.mock import MagicMock, patch
+
+    from spell_sync.project_setup import discovery as discovery_mod
+    from spell_sync.read_outcome import ReadStatus
+
+    dictionary = MagicMock(path="/a", format=MagicMock(value="text"))
+    dictionary.name = "chrome:Default"
+    with patch.object(
+        discovery_mod, "discover_dictionaries", return_value=[dictionary]
+    ) as discover:
+        with patch.object(
+            discovery_mod,
+            "dictionary_read_result",
+            return_value=MagicMock(status=ReadStatus.OK, words=["a"], detail=None),
+        ):
+            rows = discovery_mod.discover_setup_targets(
+                selected_targets=("editors",),
+                enabled_targets=frozenset({"editors"}),
+            ).targets
+    chrome = next(row for row in rows if row.identifier == "chrome")
+    assert chrome.selectable is True
+    assert chrome.enabled is False
+    # Discovery must probe with all families enabled, not only selected_targets.
+    settings = discover.call_args.args[0]
+    assert settings.dictionaries.chrome is True
+    assert settings.dictionaries.macos_spelling is True
+
+
+def test_win_spelling_empty_group_on_windows(monkeypatch) -> None:
+    from unittest.mock import patch
+
+    from spell_sync.project_setup import discovery as discovery_mod
+
+    monkeypatch.setattr(discovery_mod, "is_macos", lambda: False)
+    monkeypatch.setattr(discovery_mod, "is_windows", lambda: True)
+    with patch.object(discovery_mod, "discover_dictionaries", return_value=[]):
+        rows = discovery_mod.discover_setup_targets().targets
+    win = next(row for row in rows if row.identifier == "win_spelling")
+    assert win.detected is False
+    assert win.selectable is False
+    assert win.supported is True
+
+
 def test_controller_selection_helpers() -> None:
     from unittest.mock import MagicMock
 

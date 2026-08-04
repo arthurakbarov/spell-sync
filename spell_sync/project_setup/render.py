@@ -18,6 +18,8 @@ _ALL_DICTIONARY_FLAGS = (
     "hunspell",
     "obsidian",
     "libreoffice",
+    "macos_spelling",
+    "win_spelling",
 )
 
 

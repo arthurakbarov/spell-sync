@@ -46,12 +46,42 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 36)) as pilot:
             await pilot.click("#btn-setup")
-            content = await wait_for_text(pilot, "#wordlist-content", "What belongs here")
+            await wait_for_text(pilot, "#storage-content", "How will you keep")
+            await pilot.click("#btn-continue")
+            content = await wait_for_text(pilot, "#wordlist-content", "What belongs")
             text = str(content.render()).lower()
             self.assertIn("personal", text)
             self.assertIn("built-in", text)
+
+    async def test_storage_strategy_screen_offers_three_approaches(self):
+        missing = ProjectSetupState(
+            status=ProjectSetupStatus.MISSING_PROJECT,
+            effective_wordlist=None,
+            project_dir=None,
+            config_path=None,
+            can_start_wizard=True,
+            detail=None,
+        )
+        controller = TuiController(fake_service(setup_state=missing), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 36)) as pilot:
+            await pilot.click("#btn-setup")
+            content = await wait_for_text(pilot, "#storage-content", "How will you keep")
+            text = str(content.render()).lower()
+            self.assertIn("sync", text)
+            hint = await wait_for_text(pilot, "#storage-hint", "Simplest")
+            self.assertIn("computer", str(hint.render()).lower())
+            await pilot.click("#storage-cloud")
+            cloud_hint = await wait_for_text(pilot, "#storage-hint", "Dropbox")
+            self.assertIn("icloud", str(cloud_hint.render()).lower())
+            await pilot.click("#storage-git")
+            git_hint = await wait_for_text(pilot, "#storage-hint", "GitHub")
+            self.assertIn("private", str(git_hint.render()).lower())
+            await pilot.click("#btn-continue")
+            self.assertEqual(controller.setup_storage_strategy(), "git_remote")
+            await wait_for_text(pilot, "#wordlist-content", "What belongs")
 
     async def test_targets_screen_scope_notice(self):
         missing = ProjectSetupState(
@@ -116,9 +146,11 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(72, 24)) as pilot:
+        async with app.run_test(size=(72, 28)) as pilot:
             await pilot.click("#btn-setup")
-            content = await wait_for_text(pilot, "#wordlist-content", "What belongs here")
+            await wait_for_text(pilot, "#storage-content", "How will you keep")
+            await pilot.click("#btn-continue")
+            content = await wait_for_text(pilot, "#wordlist-content", "What belongs")
             self.assertGreater(len(str(content.render())), 40)
 
 

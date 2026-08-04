@@ -6,10 +6,14 @@ configuration there. It is separate from the Spell Sync program itself.
 ## Recommended location
 
 ```text
-~/spell-words/
+~/Documents/Spell Sync/
 ```
 
 Any writable folder works. Spell Sync does not require this exact path.
+
+During first-time setup, the TUI asks **how** you will keep the list, then offers common
+locations (Documents, Home, Desktop) or a custom path. The `~/spell-words/` layout some
+maintainers use is an optional convention — convenient, but not required.
 
 ## What Spell Sync stores
 
@@ -21,23 +25,43 @@ Any writable folder works. Spell Sync does not require this exact path.
 Spell Sync may also create **application-managed** data (journals, locks, recovery snapshots)
 next to your word list. You normally do not edit those by hand.
 
-## Backup options
+Because `spell-sync.toml` lives beside `wordlist.txt`, any method that syncs the folder also
+syncs target choices. That is usually convenient; disable apps that do not exist on a given
+machine under **Dictionary targets**.
 
-- Copy the folder to a backup drive
-- Keep it in a **private** Git repository
-- Sync via a private cloud folder
+## How to keep the list (choose one)
+
+Spell Sync does **not** sync over the network by itself. Pick one approach:
+
+| Approach | What you get | What to watch |
+|----------|--------------|---------------|
+| **This computer only** | Simplest. Folder stays on one machine. | Copy or move the folder yourself for backup or a second computer. |
+| **Synced folder** (Dropbox, iCloud Drive, Yandex Disk, OneDrive, …) | The sync app copies the folder between machines — same outcome as a remote repo, without Git. | Pause sync if two computers might edit during a Push. Conflict copies from the sync app are outside Spell Sync. |
+| **Private Git remote** (GitHub or any Git host) | You own the history; clone on each machine. | Keep the repository **private**. Spell Sync never commits or pushes for you. |
 
 Git is **optional**. Spell Sync works without version control.
 
+For a ready GitHub private-repo recipe, see [Personal Git remote](PERSONAL_GIT_REMOTE.md).
+
+## Moving later (change approach)
+
+You can switch approaches without reinstalling Spell Sync:
+
+1. Copy, move, or clone the folder to the new place (cloud folder or Git clone).
+2. In Spell Sync, open **Change word list location** and point at the new `wordlist.txt`.
+3. On another computer: open that same folder, then **Review and update** (or Check my apps,
+   then preview Update).
+
+Repoint does **not** move files — you move the folder yourself first.
+
 ## More than one computer
 
-1. Sync the personal folder through your chosen private method.
-2. Open Spell Sync on the other computer.
+1. Keep the personal folder private through your chosen method (synced folder or Git).
+2. Open Spell Sync on the other computer and select the same `wordlist.txt`.
 3. Run **Check my apps**.
 4. Preview **Update my apps** before confirming.
 
-Spell Sync does not provide automatic network sync between computers.
-
 ## Privacy
 
-Your word list can reveal names, project terms, and personal vocabulary. Keep the folder private.
+Your word list can reveal names, project terms, and personal vocabulary. Keep the folder and
+any remote repository private. Do not publish a personal word list unless you intend to share it.

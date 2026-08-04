@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from ..io import atomic_write
 from ..operation_lock import OperationLocked, acquire_operation_lock
@@ -20,10 +20,8 @@ if TYPE_CHECKING:
         EventId,
         EventPhase,
         EventSeverity,
-        TechnicalEvent,
+        TechnicalEventSink,
     )
-
-EventSink = Callable[["TechnicalEvent"], None]
 
 
 class ProjectSetupOutcome(str, Enum):
@@ -50,7 +48,7 @@ def _fingerprint_matches(path: Path, fingerprint: str | None) -> bool:
 
 
 def _emit_setup_event(
-    event_sink: EventSink | None,
+    event_sink: TechnicalEventSink | None,
     *,
     setup_id: str,
     event_id: "EventId",
@@ -93,7 +91,7 @@ def _emit_setup_event(
 
 
 def _return_with_terminal(
-    event_sink: EventSink | None,
+    event_sink: TechnicalEventSink | None,
     *,
     setup_id: str,
     execution: ProjectSetupExecution,
@@ -119,7 +117,7 @@ def execute_project_setup(
     prepared: PreparedProjectSetup,
     *,
     confirmed_setup_id: str,
-    event_sink: EventSink | None = None,
+    event_sink: TechnicalEventSink | None = None,
 ) -> ProjectSetupExecution:
     from ..diagnostics.event_metadata import EventReason
     from ..diagnostics.technical_event_model import (

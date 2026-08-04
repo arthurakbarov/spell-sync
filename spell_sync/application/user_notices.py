@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from ..project_setup.discovery import dictionary_family_id
 from .reports import DashboardIssue, DashboardSeverity
 
 
@@ -251,10 +252,4 @@ def _target_ids_from_detail(detail: str) -> str | None:
 
 
 def _target_family(name: str) -> str:
-    if name.startswith("macos-"):
-        return "macos_spelling"
-    if name.startswith("win-"):
-        return "win_spelling"
-    if ":" in name:
-        return name.split(":", 1)[0]
-    return name
+    return dictionary_family_id(name)

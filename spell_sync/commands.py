@@ -277,6 +277,10 @@ def cmd_init(opts: CliOptions) -> int:
             log.info("nothing to create — project files already exist.")
         else:
             log.info("next: edit wordlist.txt, then spell-sync pull or spell-sync push")
+            log.info(
+                "optional: keep the folder local, in a synced cloud directory, "
+                "or a private Git remote — see docs/PERSONAL_WORKSPACE.md"
+            )
         return int(ExitCode.OK)
 
 

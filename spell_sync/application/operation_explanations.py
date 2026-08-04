@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..project_setup.discovery import target_display_name
+from ..project_setup.discovery import dictionary_family_id, target_display_name
 from ..sync_models import PushResult
 from .reports import (
     OperationOutcome,
@@ -26,7 +26,7 @@ from .user_notices import (
 
 
 def dictionary_display_name(name: str) -> str:
-    family = _target_family(name)
+    family = dictionary_family_id(name)
     return target_display_name(family)
 
 
@@ -257,10 +257,4 @@ def _planned_target_updates(preview: PushPreview) -> tuple[TargetUpdateReport, .
 
 
 def _target_family(name: str) -> str:
-    if name.startswith("macos-"):
-        return "macos_spelling"
-    if name.startswith("win-"):
-        return "win_spelling"
-    if ":" in name:
-        return name.split(":", 1)[0]
-    return name
+    return dictionary_family_id(name)

@@ -18,12 +18,16 @@ touches each app's **custom** word list — never the built-in dictionary that s
 with the app.
 
 You do **not** need Git, programming experience, or a special maintainer repository.
+Git and cloud sync folders are **optional** ways to keep the same list on more than one
+computer — see [Personal Workspace](PERSONAL_WORKSPACE.md).
 
 ## What you need
 
 - A Mac, Linux, or Windows computer
 - Spell Sync installed ([README → Install](../README.md#install))
-- An empty folder for your private word list (Spell Sync creates the files)
+- An empty folder for your private word list (Spell Sync creates the files). Where that
+  folder lives is your storage choice: this computer only, a synced cloud folder, or a
+  private Git remote.
 
 ## Fastest path (terminal UI)
 
@@ -34,18 +38,21 @@ This is the usual non-technical path.
 **macOS or Linux**
 
 ```bash
-mkdir -p ~/spell-words
-cd ~/spell-words
+mkdir -p ~/Documents/Spell\ Sync
+cd ~/Documents/Spell\ Sync
 spell-sync
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-mkdir $HOME\spell-words
-cd $HOME\spell-words
+mkdir $HOME\Documents\Spell Sync
+cd $HOME\Documents\Spell Sync
 spell-sync
 ```
+
+If you already use Dropbox, iCloud Drive, or Yandex Disk, create the folder **inside**
+that synced area instead (for example `~/Library/CloudStorage/…` or your Dropbox path).
 
 ### 2. First launch — Start here
 
@@ -53,9 +60,10 @@ On the welcome screen:
 
 1. Read the short problem summary.
 2. Press **Start here**.
-3. Accept or choose the folder for your word list.
-4. Pick which apps to include (you can change this later under **Targets**).
-5. Confirm setup.
+3. Answer **How will you keep this word list?** (this computer / synced folder / private Git).
+4. Accept or choose the folder for your word list.
+5. Pick which apps to include (you can change this later under **Targets**).
+6. Confirm setup.
 
 You do not need to create `wordlist.txt` by hand.
 
@@ -82,16 +90,28 @@ If you prefer commands (or have no interactive terminal):
 | Non-interactive setup | `spell-sync init` |
 | Collect my words | `spell-sync pull` |
 | Preview before update | `spell-sync status` or `spell-sync plan` |
-| Update apps | `spell-sync push` |
+| Update my apps | `spell-sync push` |
 | Check health | `spell-sync doctor` |
 
 Full list: [README → CLI](../README.md#cli).
 
+After `init`, read [Personal Workspace](PERSONAL_WORKSPACE.md) if you want the same list on
+another computer (synced folder or private Git).
+
 ## Optional: second computer
 
-Keep your personal folder private (backup drive, private Git, private cloud). On the other
-computer open the same folder in Spell Sync, then **Review and update** (or Check my apps
-and preview Update). Spell Sync does not sync over the network by itself.
+Spell Sync does not sync over the network by itself. Choose one private method:
+
+| Method | Idea |
+|--------|------|
+| Synced folder | Keep the folder in Dropbox / iCloud / Yandex Disk / … on both machines |
+| Private Git | Clone your private repo on each machine ([Personal Git remote](PERSONAL_GIT_REMOTE.md)) |
+| Manual copy | Copy the folder on a drive when needed |
+
+On the other computer open the same folder in Spell Sync, then **Review and update**
+(or Check my apps and preview Update).
+
+To switch methods later: move or clone the folder, then **Change word list location**.
 
 **Do not publish a personal word list unless you intend to share it.**
 

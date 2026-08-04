@@ -24,6 +24,8 @@ _CONFIG_TARGET_IDS = frozenset(
         "hunspell",
         "obsidian",
         "libreoffice",
+        "macos_spelling",
+        "win_spelling",
     }
 )
 
@@ -70,14 +72,23 @@ _DISPLAY_NAMES = {
 }
 
 
-def _family_id(dictionary: Dictionary) -> str:
-    if dictionary.name.startswith("macos-"):
+def dictionary_family_id(name: str) -> str:
+    """Map a discovered dictionary name to its config / setup family id."""
+    # Classic LocalDictionary is named "macos"; Sonoma+ AppleSpell uses "macos-*".
+    if name == "macos" or name.startswith("macos-"):
         return "macos_spelling"
-    if dictionary.name.startswith("win-"):
+    if name.startswith("win-"):
         return "win_spelling"
-    if ":" in dictionary.name:
-        return dictionary.name.split(":", 1)[0]
-    return dictionary.name
+    if ":" in name:
+        return name.split(":", 1)[0]
+    return name
+
+
+def _family_id(dictionary: Dictionary) -> str:
+    return dictionary_family_id(dictionary.name)
+
+
+_PLATFORM_FAMILY_IDS = frozenset({"macos_spelling", "win_spelling"})
 
 
 def _iter_target_groups(
@@ -86,7 +97,7 @@ def _iter_target_groups(
     groups: list[tuple[str, list[Dictionary]]] = []
     for target_id in sorted(grouped):
         items = grouped[target_id]
-        if not items and target_id not in {"macos_spelling"}:
+        if not items and target_id not in _PLATFORM_FAMILY_IDS:
             continue
         groups.append((target_id, items))
     return groups
@@ -103,7 +114,9 @@ def _platform_supported(identifier: str) -> bool:
 def _ambiguous_discovery(items: list[Dictionary], statuses: set[ReadStatus]) -> bool:
     if len(items) <= 1:
         return False
-    blocking = {ReadStatus.CORRUPT, ReadStatus.UNREADABLE, ReadStatus.UNSUPPORTED}
+    # Unreadable siblings (e.g. AppleSpell without Full Disk Access) must not
+    # block a family that also has a readable path. Corrupt/unsupported do.
+    blocking = {ReadStatus.CORRUPT, ReadStatus.UNSUPPORTED}
     if statuses & blocking and ReadStatus.OK in statuses:
         return True
     if ReadStatus.CORRUPT in statuses and ReadStatus.UNREADABLE in statuses:
@@ -129,10 +142,7 @@ def _target_selectable(
         return False
     if not available or not readable:
         return False
-    if identifier not in _CONFIG_TARGET_IDS and identifier not in {
-        "macos_spelling",
-        "win_spelling",
-    }:
+    if identifier not in _CONFIG_TARGET_IDS:
         return False
     return True
 
@@ -160,7 +170,11 @@ def discover_setup_targets(
     selected_targets: tuple[str, ...] | None = None,
     enabled_targets: frozenset[str] | None = None,
 ) -> SetupTargetDiscovery:
-    config = _default_discovery_config(selected_targets or ())
+    # Always probe every configurable family so Setup / Dictionary targets can
+    # show and re-enable currently disabled entries. ``selected_targets`` is kept
+    # for call-site compatibility and does not gate discovery.
+    _ = selected_targets
+    config = _default_discovery_config(())
     dictionaries = discover_dictionaries(RuntimeSettings.from_config_dict(config))
     grouped: dict[str, list[Dictionary]] = {}
     for dictionary in dictionaries:
@@ -168,6 +182,8 @@ def discover_setup_targets(
 
     if is_macos():
         grouped.setdefault("macos_spelling", [])
+    if is_windows():
+        grouped.setdefault("win_spelling", [])
     rows: list[SetupTarget] = []
     default_enabled: list[str] = []
     for target_id, items in _iter_target_groups(grouped):
@@ -189,20 +205,26 @@ def discover_setup_targets(
                 available = True
                 best_status = ReadStatus.OK
                 word_count = (word_count or 0) + len(result.words)
+                if dictionary.path:
+                    sample_path = Path(dictionary.path)
+                    sample_format = dictionary.format.value
             elif result.status is ReadStatus.MISSING:
                 if best_status is ReadStatus.MISSING:
                     best_status = ReadStatus.MISSING
             elif result.status in (ReadStatus.CORRUPT, ReadStatus.UNSUPPORTED):
-                best_status = result.status
-                if result.detail:
-                    detail = result.detail
+                if best_status not in (ReadStatus.OK, ReadStatus.EMPTY):
+                    best_status = result.status
+                    if result.detail:
+                        detail = result.detail
             elif result.status is ReadStatus.UNREADABLE:
-                best_status = ReadStatus.UNREADABLE
-                detail = result.detail or "Unreadable dictionary"
+                if best_status not in (ReadStatus.OK, ReadStatus.EMPTY):
+                    best_status = ReadStatus.UNREADABLE
+                    detail = result.detail or "Unreadable dictionary"
             elif result.status is ReadStatus.EMPTY and best_status not in (
                 ReadStatus.CORRUPT,
                 ReadStatus.UNREADABLE,
                 ReadStatus.UNSUPPORTED,
+                ReadStatus.OK,
             ):
                 best_status = ReadStatus.EMPTY
                 available = True
@@ -225,6 +247,13 @@ def discover_setup_targets(
             detail = detail or "Not found"
         if best_status is ReadStatus.CORRUPT and not detail:
             detail = "Corrupt dictionary · cannot be enabled safely"
+        if (
+            target_id == "macos_spelling"
+            and ReadStatus.OK in seen_statuses
+            and ReadStatus.UNREADABLE in seen_statuses
+            and detail is None
+        ):
+            detail = "AppleSpell path unreadable · classic LocalDictionary is usable"
         rows.append(
             SetupTarget(
                 identifier=target_id,
@@ -247,9 +276,8 @@ def discover_setup_targets(
 
 
 def config_draft_from_targets(selected_targets: tuple[str, ...]) -> ProjectConfigDraft:
-    allowed = _CONFIG_TARGET_IDS | {"macos_spelling", "win_spelling"}
     for target in selected_targets:
-        if target not in allowed:
+        if target not in _CONFIG_TARGET_IDS:
             raise ValueError(f"Unknown setup target identifier: {target}")
     enabled = tuple(target for target in selected_targets if target in _CONFIG_TARGET_IDS)
     return ProjectConfigDraft(

@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..diagnostics.event_metadata import EventReason
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
         EventId,
         EventPhase,
         EventSeverity,
-        TechnicalEvent,
+        TechnicalEventSink,
     )
 
 from ..io import atomic_write
@@ -77,11 +77,8 @@ class TargetSettingsExecution:
     warnings: tuple[str, ...] = ()
 
 
-EventSink = Callable[["TechnicalEvent"], None]
-
-
 def _emit_targets_event(
-    event_sink: EventSink | None,
+    event_sink: TechnicalEventSink | None,
     *,
     update_id: str,
     event_id: "EventId",
@@ -120,7 +117,7 @@ def _emit_targets_event(
 
 
 def _return_with_terminal(
-    event_sink: EventSink | None,
+    event_sink: TechnicalEventSink | None,
     *,
     update_id: str,
     execution: TargetSettingsExecution,
@@ -228,7 +225,6 @@ def load_target_settings_snapshot(*, wordlist: Path) -> TargetSettingsSnapshot:
     config = config_result.config or {}
     previous = _enabled_from_loaded_config(config)
     discovery = discover_setup_targets(
-        selected_targets=tuple(sorted(previous)),
         enabled_targets=previous,
     )
     return TargetSettingsSnapshot(
@@ -294,7 +290,6 @@ def prepare_target_settings_update(
     config = config_result.config or {}
     previous = _enabled_from_loaded_config(config)
     discovery = discover_setup_targets(
-        selected_targets=tuple(sorted(previous)),
         enabled_targets=previous,
     )
     known_ids = {target.identifier for target in discovery.targets}
@@ -349,7 +344,7 @@ def execute_target_settings_update(
     prepared: PreparedTargetSettingsUpdate,
     *,
     confirmed_update_id: str,
-    event_sink: EventSink | None = None,
+    event_sink: TechnicalEventSink | None = None,
 ) -> TargetSettingsExecution:
     from ..diagnostics.event_metadata import EventReason
     from ..diagnostics.technical_event_model import (

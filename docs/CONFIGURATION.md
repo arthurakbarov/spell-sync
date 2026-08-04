@@ -3,6 +3,10 @@
 `spell-sync.toml` lives beside `wordlist.txt` (project config) or at
 `~/.config/spell-sync/spell-sync.toml` (user defaults). Project config wins when both exist.
 
+If you keep the personal folder in a synced cloud directory or a Git remote, target
+toggles in `spell-sync.toml` travel with the folder across machines. Adjust per machine
+under **Dictionary targets** when an app is missing on that computer.
+
 Copy from [`spell_sync/bundled/spell-sync.toml.example`](../spell_sync/bundled/spell-sync.toml.example)
 or run `spell-sync init`.
 
@@ -30,6 +34,10 @@ built-in dictionaries.
 | `hunspell` | Hunspell `.dic` user files |
 | `obsidian` | Obsidian custom dictionary |
 | `libreoffice` | LibreOffice user dictionary |
+| `macos_spelling` | macOS AppleSpell / classic custom words (`macos`, `macos-*`); default `true`; only meaningful on macOS. Toggle in TUI **Dictionary targets** like other families. |
+| `win_spelling` | Windows locale custom spelling files (`win-en`, `win-en-gb`, `win-ru`); default `true`; only meaningful on Windows. Toggle in TUI **Dictionary targets** like other families. |
+
+Platform-specific keys default to `true` but are ignored on other operating systems.
 
 spell-sync **never creates** custom dictionary files except via push when the target format
 allows it; many targets must exist first (see `spell-sync doctor --targets`).

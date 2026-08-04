@@ -64,9 +64,10 @@ WELCOME_INTRO = (
 )
 
 WELCOME_WHAT_YOU_DO = (
-    "You only need to: choose a folder for your list, pick which apps to include, "
-    "then use Review and update when you want changes. Every change shows a preview "
-    "first — nothing runs by itself."
+    "You only need to: choose how to keep your list (this computer, a synced folder, "
+    "or a private Git remote), pick the folder, pick which apps to include, then use "
+    "Review and update when you want changes. Every change shows a preview first — "
+    "nothing runs by itself."
 )
 
 SETUP_START_BUTTON_LABEL = "Start here"
@@ -111,10 +112,10 @@ BUILTIN_DICTIONARY_GUARANTEE = (
 
 WELCOME_BUILT_IN_EXCLUSION = BUILTIN_DICTIONARY_GUARANTEE
 
-WORDLIST_SETUP_HEADING = "Choose the canonical personal wordlist"
+WORDLIST_SETUP_HEADING = "Choose the folder for your personal word list"
 
 WORDLIST_SETUP_WHAT_BELONGS = (
-    "What belongs here?\n\n"
+    "What belongs in the list?\n\n"
     "Names, technical terms, abbreviations, project-specific words, and other "
     "personal words you want enabled applications to recognize."
 )
@@ -124,6 +125,65 @@ WORDLIST_SETUP_REDUNDANCY_NOTE = (
     "built-in dictionaries. Keeping them here is harmless and keeps your personal "
     "wordlist consistent across enabled applications."
 )
+
+# Storage strategy ids used by setup UI (not filesystem paths).
+STORAGE_STRATEGY_LOCAL = "local"
+STORAGE_STRATEGY_CLOUD = "cloud_folder"
+STORAGE_STRATEGY_GIT = "git_remote"
+
+STORAGE_SETUP_HEADING = "How will you keep this word list?"
+
+STORAGE_SETUP_INTRO = (
+    "Spell Sync does not sync over the network by itself. Pick one approach now — "
+    "you can move the folder later with Change word list location."
+)
+
+STORAGE_STRATEGY_LABELS: dict[str, str] = {
+    STORAGE_STRATEGY_LOCAL: "This computer only",
+    STORAGE_STRATEGY_CLOUD: "Synced folder (Dropbox, iCloud, Yandex Disk, …)",
+    STORAGE_STRATEGY_GIT: "Private Git remote (GitHub or other)",
+}
+
+STORAGE_STRATEGY_HINTS: dict[str, str] = {
+    STORAGE_STRATEGY_LOCAL: (
+        "Simplest. Use a normal folder on this machine. Copy or move the folder "
+        "yourself if you later want another computer or a sync app."
+    ),
+    STORAGE_STRATEGY_CLOUD: (
+        "Put the folder inside Dropbox, iCloud Drive, Yandex Disk, OneDrive, or "
+        "similar. Those apps sync files between machines — same idea as a remote "
+        "repo, without Git. Pause sync while confirming a Push if two computers "
+        "might edit at once. Target choices in spell-sync.toml travel with the folder."
+    ),
+    STORAGE_STRATEGY_GIT: (
+        "Store the folder in your own private Git repository (GitHub is common; "
+        "any Git host works). Commit and push/pull the folder yourself — Spell Sync "
+        "never pushes for you. Keep the repository private: a word list can reveal "
+        "names and project terms."
+    ),
+}
+
+WORDLIST_SETUP_STORAGE_REMINDER = (
+    "This path is only the folder on disk. Network sync (if any) comes from your "
+    "cloud app or Git remote — not from Spell Sync."
+)
+
+CHANGE_WORDLIST_HEADING = "Change word list location"
+
+CHANGE_WORDLIST_BODY = (
+    "Points Spell Sync at another wordlist.txt; does not move or copy files.\n\n"
+    "To switch approaches (local ↔ synced folder ↔ Git):\n"
+    "1. Copy or move the folder yourself (or clone the repo).\n"
+    "2. Enter the new path to wordlist.txt here.\n"
+    "3. On another computer: open the same folder, then Review and update.\n\n"
+    "Path to wordlist.txt:"
+)
+
+STORAGE_PREVIEW_LABELS: dict[str, str] = {
+    STORAGE_STRATEGY_LOCAL: "This computer only (no automatic network sync)",
+    STORAGE_STRATEGY_CLOUD: "Synced folder (Dropbox / iCloud / Yandex Disk / …)",
+    STORAGE_STRATEGY_GIT: "Private Git remote (you commit and push/pull)",
+}
 
 TARGETS_SCOPE_NOTICE = (
     "Targets are application custom dictionaries. "
@@ -141,9 +201,9 @@ PULL_PREVIEW_EMPTY = (
 
 REVIEW_START_BODY = (
     "This is the usual path after setup.\n\n"
-    "1. Look for new personal words in your apps (Collect).\n"
+    "1. Look for new personal words in your apps (Collect my words).\n"
     "2. Optionally add them to your list after you confirm the preview.\n"
-    "3. Prepare an Update preview for your apps, then confirm if you want it.\n\n"
+    "3. Prepare an Update my apps preview, then confirm if you want it.\n\n"
     "Nothing changes until you confirm. Built-in dictionaries are never touched."
 )
 
