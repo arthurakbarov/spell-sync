@@ -36,13 +36,18 @@ ALLOWED_COVERAGE_NAMED_FILES = frozenset(
     }
 )
 
-# Ceiling includes this policy module's own tests once collected elsewhere —
-# count only def test_ inside ALLOWED_COVERAGE_NAMED_FILES.
-MAX_COVERAGE_NAMED_TEST_DEFS = 373
+# Count only def test_ inside ALLOWED_COVERAGE_NAMED_FILES.
+MAX_COVERAGE_NAMED_TEST_DEFS = 372
+
+
+def _looks_like_padding(path: Path) -> bool:
+    """Legacy padding suites: *_coverage.py or *coverage_gaps*.py — not policy tests."""
+    name = path.name
+    return name.endswith("_coverage.py") or "coverage_gaps" in name
 
 
 def _coverage_named_files() -> list[Path]:
-    return sorted(path for path in TESTS.rglob("*coverage*.py") if path.is_file())
+    return sorted(path for path in TESTS.rglob("*.py") if path.is_file() and _looks_like_padding(path))
 
 
 def test_coverage_named_files_are_frozen() -> None:

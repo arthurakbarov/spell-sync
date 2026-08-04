@@ -99,10 +99,10 @@ def evaluate_coverage_payload(payload: dict[str, object]) -> list[FileVerdict]:
     verdicts: list[FileVerdict] = []
     for raw_path, entry in sorted(files.items()):
         if not isinstance(entry, dict):
-            continue
+            raise ValueError(f"malformed coverage entry for {raw_path}")
         summary = entry.get("summary")
         if not isinstance(summary, dict):
-            continue
+            raise ValueError(f"coverage entry missing summary for {raw_path}")
         path = _normalize_path(str(raw_path))
         if not path.startswith("spell_sync/"):
             continue
@@ -133,6 +133,8 @@ def evaluate_coverage_payload(payload: dict[str, object]) -> list[FileVerdict]:
                 detail="; ".join(problems),
             )
         )
+    if not verdicts:
+        raise ValueError("no spell_sync package files evaluated")
     return verdicts
 
 
@@ -153,7 +155,7 @@ def evaluate_coverage_json(path: Path) -> tuple[int, str]:
         for item in failures[:40]:
             lines.append(f"  [{item.tier}] {item.path}: {item.detail}")
         if len(failures) > 40:
-            lines.append(f"  … and {len(failures) - 40} more")
+            lines.append(f"  ... and {len(failures) - 40} more")
         return 1, "\n".join(lines)
 
     by_tier: dict[str, int] = {}

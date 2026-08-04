@@ -123,6 +123,18 @@ class TestPushSafetyEdges(unittest.TestCase):
         self.assertTrue(is_readable_for_union(ReadStatus.EMPTY))
         self.assertFalse(is_readable_for_union(ReadStatus.UNREADABLE))
 
+    def test_fingerprint_conflict_detects_missing_target_appearance(self):
+        from spell_sync.push_plan import fingerprint_conflict
+        from spell_sync.read_outcome import DictionaryReadResult
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "new-dict.txt"
+            dictionary = Dictionary("editor:new", str(path), DictionaryFormat.TEXT)
+            missing = DictionaryReadResult(ReadStatus.MISSING, frozenset(), None, None)
+            self.assertFalse(fingerprint_conflict(dictionary, missing))
+            path.write_text("appeared\n", encoding="utf-8")
+            self.assertTrue(fingerprint_conflict(dictionary, missing))
+
     def test_json_null_added_words_corrupt(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "prefs.json"

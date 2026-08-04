@@ -147,6 +147,13 @@ class RecoveryService:
                     outcome=RecoveryOutcome.FAILED,
                     message="Recovery journal is no longer in progress.",
                 )
+            if journal_result.content_digest != preview.preview_fingerprint:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Recovery journal changed after preview.",
+                )
             journal = journal_result.journal
             assert journal is not None
             if journal.transaction_id != preview.transaction_id:
@@ -386,6 +393,22 @@ class RecoveryService:
                     outcome=RecoveryOutcome.FAILED,
                     message="Completed journal is no longer present.",
                 )
+            if journal_result.content_digest != preview.preview_fingerprint:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Completed journal changed after preview.",
+                )
+            journal = journal_result.journal
+            assert journal is not None
+            if journal.transaction_id != preview.transaction_id:
+                return RecoveryExecution(
+                    preview=preview,
+                    result=ExitCode.PUSH_ABORT,
+                    outcome=RecoveryOutcome.FAILED,
+                    message="Completed journal changed after preview.",
+                )
             discard_result = _operation_deps.discard_completed_journal(wordlist)
             if not discard_result.ok:
                 return RecoveryExecution(
@@ -459,7 +482,36 @@ class RecoveryService:
                     message="Discard could not acquire a safe execution context.",
                 )
             wordlist = scope.context.wordlist_file
+            journal_result = scope.journal_result
             if preview.status is RecoveryStatus.CORRUPT_JOURNAL:
+                if journal_result.status is JournalLoadStatus.ABSENT:
+                    _emit_recovery_terminal(
+                        emitter,
+                        correlation_id=correlation_id,
+                        event_id=EventId.RECOVERY_DISCARDED,
+                        severity=EventSeverity.SUCCESS,
+                        outcome=RecoveryOutcome.DISCARDED,
+                    )
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.OK,
+                        outcome=RecoveryOutcome.DISCARDED,
+                        message="Recovery metadata discarded.",
+                    )
+                if journal_result.status is not JournalLoadStatus.CORRUPT:
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.PUSH_ABORT,
+                        outcome=RecoveryOutcome.FAILED,
+                        message="Corrupt journal is no longer present as reviewed.",
+                    )
+                if journal_result.content_digest != preview.preview_fingerprint:
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.PUSH_ABORT,
+                        outcome=RecoveryOutcome.FAILED,
+                        message="Corrupt journal changed after preview.",
+                    )
                 journal_ok, detail = _operation_deps.safe_discard_journal_file(wordlist)
                 if not journal_ok:
                     return RecoveryExecution(
@@ -469,6 +521,16 @@ class RecoveryService:
                         message=detail or "Discard could not remove recovery metadata.",
                     )
             else:
+                if (
+                    journal_result.status is not JournalLoadStatus.VALID_COMPLETED
+                    or journal_result.content_digest != preview.preview_fingerprint
+                ):
+                    return RecoveryExecution(
+                        preview=preview,
+                        result=ExitCode.PUSH_ABORT,
+                        outcome=RecoveryOutcome.FAILED,
+                        message="Completed journal changed after preview.",
+                    )
                 discard_result = _operation_deps.discard_completed_journal(wordlist)
                 if not discard_result.ok:
                     return RecoveryExecution(

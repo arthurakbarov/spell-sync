@@ -44,14 +44,21 @@ def _recovery_scope(
     *,
     journal_status: JournalLoadStatus = JournalLoadStatus.VALID_IN_PROGRESS,
     journal=None,
+    content_digest: str | None = None,
 ):
     ctx = MagicMock()
     ctx.wordlist_file = wordlist
     ctx.wordlist_str = str(wordlist)
+    digest = content_digest
+    if digest is None and journal is not None:
+        tid = getattr(journal, "transaction_id", None)
+        if isinstance(tid, str):
+            digest = tid
     journal_result = JournalLoadResult(
         status=journal_status,
         journal=journal,
         detail=None,
+        content_digest=digest,
     )
     validated = MagicMock(spec=ResolvedRuntime)
     validated.context = ctx
@@ -224,7 +231,8 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
             scope = _recovery_scope(
                 wordlist,
                 journal_status=JournalLoadStatus.VALID_COMPLETED,
-                journal=MagicMock(),
+                journal=MagicMock(transaction_id=cleanup_preview.transaction_id),
+                content_digest=cleanup_preview.preview_fingerprint,
             )
             with patch(
                 "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
@@ -251,7 +259,11 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
-            mutating.return_value.__enter__.return_value = _recovery_scope(Path("/tmp/w.txt"))
+            mutating.return_value.__enter__.return_value = _recovery_scope(
+                Path("/tmp/w.txt"),
+                journal_status=JournalLoadStatus.CORRUPT,
+                content_digest=discard_preview.preview_fingerprint,
+            )
             mutating.return_value.__exit__.return_value = False
             with patch(
                 "spell_sync.application._operation_deps.safe_discard_journal_file",

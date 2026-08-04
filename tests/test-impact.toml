@@ -33,6 +33,7 @@ ciScriptPaths = [
   "scripts/check_ci_evidence.py",
   "scripts/check_ci_necessity.py",
   "scripts/check_target_capabilities.py",
+  "scripts/coverage_policy.py",
   "scripts/run_dev_loop.py",
   "scripts/run_focused_tests.py",
   "scripts/run_lightweight_validation.py",
@@ -322,8 +323,12 @@ production = [
   "scripts/check_docs_contract.py",
   "scripts/ci_input_state.py",
   "scripts/ci_runner.py",
+  "scripts/coverage_policy.py",
   "scripts/documentation_state.py",
   "scripts/lib/git-commit.sh",
+  "scripts/validate_dev_commands.py",
+  "config/dev-commands.json",
+  "config/dev-surface.json",
 ]
 moduleTests = [
   "tests/test_agent_config_validator.py",
@@ -332,6 +337,7 @@ moduleTests = [
   "tests/test_docs_contract.py",
   "tests/test_ci_impact.py",
   "tests/test_ci_necessity.py",
+  "tests/test_coverage_policy.py",
   "tests/test_run_dev_loop_budget.py",
 ]
 clusterTests = [
@@ -345,6 +351,7 @@ clusterTests = [
   "tests/test_ci_necessity.py",
   "tests/test_ci_history.py",
   "tests/test_ci_evidence_reuse.py",
+  "tests/test_coverage_policy.py",
   "tests/test_run_dev_loop_budget.py",
 ]
 validators = [

@@ -81,6 +81,7 @@ patterns = [
   "scripts/build_pre_final_plan.py",
   "scripts/test_groups.py",
   "scripts/audit_dead_code.py",
+  "scripts/coverage_policy.py",
   "ci/**",
   ".github/workflows/**",
 ]

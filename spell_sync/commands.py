@@ -259,18 +259,20 @@ def cmd_init(opts: CliOptions) -> int:
             confirmed_setup_id=prepared.setup_id,
         )
         service.build_setup_report(execution)
+        ok = execution.outcome.value == "completed"
+        exit_code = int(ExitCode.OK if ok else ExitCode.PUSH_ABORT)
         if opts.json_output:
             emit_json(
                 {
-                    **base_payload("init", exit=int(ExitCode.OK)),
+                    **base_payload("init", exit=exit_code),
                     "created": list(execution.created_files),
                     "outcome": execution.outcome.value,
                 }
             )
-            return int(ExitCode.OK)
-        if execution.outcome.value != "completed":
+            return exit_code
+        if not ok:
             log.error(execution.message)
-            return int(ExitCode.PUSH_ABORT)
+            return exit_code
         for name in execution.created_files:
             log.done(f"created {name}")
         if not execution.created_files:
@@ -281,7 +283,7 @@ def cmd_init(opts: CliOptions) -> int:
                 "optional: keep the folder local, in a synced cloud directory, "
                 "or a private Git remote — see docs/PERSONAL_WORKSPACE.md"
             )
-        return int(ExitCode.OK)
+        return exit_code
 
 
 def cmd_lint(opts: CliOptions) -> int:

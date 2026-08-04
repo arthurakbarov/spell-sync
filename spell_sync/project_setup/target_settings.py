@@ -415,8 +415,28 @@ def execute_target_settings_update(
         )
 
     try:
-        emit(EventId.TARGETS_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
         with acquire_operation_lock(prepared.wordlist_path, "targets"):
+            emit(EventId.TARGETS_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
+            from ..push_journal import JournalLoadStatus, load_journal_result
+
+            journal_result = load_journal_result(prepared.wordlist_path)
+            if journal_result.status not in (
+                JournalLoadStatus.ABSENT,
+                JournalLoadStatus.VALID_COMPLETED,
+            ):
+                return _return_with_terminal(
+                    event_sink,
+                    update_id=update_id,
+                    execution=TargetSettingsExecution(
+                        prepared=prepared,
+                        outcome=TargetSettingsOutcome.STOPPED_SAFELY,
+                        message="Pending recovery blocks configuration updates.",
+                        warnings=prepared.warnings,
+                    ),
+                    event_id=EventId.TARGETS_STOPPED_SAFELY,
+                    reason=EventReason.EXECUTION_BLOCKED,
+                    severity=EventSeverity.WARNING,
+                )
             emit(EventId.TARGETS_CONFLICTS_CHECKED, phase=EventPhase.EXECUTING)
             if not _fingerprint_matches(prepared.config_path, prepared.config_fingerprint_before):
                 return _return_with_terminal(

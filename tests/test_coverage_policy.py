@@ -97,3 +97,19 @@ def test_branch_floor_applies_to_all_tiers(tmp_path: Path) -> None:
     code, message = evaluate_coverage_json(path)
     assert code == 1
     assert "branches" in message
+
+
+def test_malformed_entries_fail_closed() -> None:
+    try:
+        evaluate_coverage_payload({"files": {"spell_sync/words.py": "bad"}})
+        raise AssertionError("expected ValueError")
+    except ValueError as exc:
+        assert "malformed" in str(exc)
+
+
+def test_empty_spell_sync_evaluation_fails() -> None:
+    try:
+        evaluate_coverage_payload({"files": {"tests/other.py": _file(statements=1, covered=1)}})
+        raise AssertionError("expected ValueError")
+    except ValueError as exc:
+        assert "no spell_sync" in str(exc)

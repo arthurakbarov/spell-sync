@@ -384,6 +384,30 @@ def test_execute_pending_recovery_blocks(
     assert prepared.can_execute is False
 
 
+def test_execute_rechecks_pending_recovery_under_lock(
+    tmp_path: Path,
+    service: SpellSyncService,
+    mock_targets,
+) -> None:
+    """Journal appearing after prepare must stop settings write under the lock."""
+    wordlist, _config = _write_config(tmp_path, enabled=("chrome",))
+    with mock_targets(frozenset({"chrome", "edge"})):
+        prepared = service.prepare_target_settings_update(
+            PrepareTargetSettingsUpdateRequest(
+                project=ProjectRef(wordlist=wordlist),
+                selected_target_ids=frozenset({"chrome", "edge"}),
+            )
+        )
+    assert prepared.can_execute is True
+    write_test_journal(wordlist, wordlist_write_started=True)
+    execution = service.execute_target_settings_update(
+        prepared,
+        confirmed_update_id=prepared.update_id,
+    )
+    assert execution.outcome is TargetSettingsOutcome.STOPPED_SAFELY
+    assert "recovery" in execution.message.lower()
+
+
 def test_resolve_enabled_skips_non_config_target_ids() -> None:
     unknown = _target("sublime", selectable=True)
     enabled = resolve_enabled_targets(

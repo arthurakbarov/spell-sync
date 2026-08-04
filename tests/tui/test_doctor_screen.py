@@ -165,7 +165,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
 
     async def test_export_support_report_ignores_stale_result(self):
         controller = TuiController(fake_service(), CliOptions())
-        completed = asyncio.Event()
+        completed = threading.Event()
 
         def slow_export(**kwargs: object) -> Path:
             completed.wait(timeout=1)

@@ -140,6 +140,7 @@ def build_dashboard_issues(
     elif journal.status in (
         JournalLoadStatus.CORRUPT,
         JournalLoadStatus.UNSUPPORTED_SCHEMA,
+        JournalLoadStatus.UNSAFE_ARTIFACT,
     ):
         detail = journal.detail or journal.status.value
         title, explanation, action = _dashboard_notice_text("corrupt_journal", detail=detail)
@@ -955,6 +956,7 @@ def _empty_recovery_preview(
     wordlist_path: str,
     detail: str | None = None,
     can_discard: bool = False,
+    preview_fingerprint: str = "absent",
 ) -> RecoveryPreview:
     return RecoveryPreview(
         status=status,
@@ -973,7 +975,7 @@ def _empty_recovery_preview(
         can_discard=can_discard,
         can_cleanup=False,
         snapshots_valid=True,
-        preview_fingerprint="absent",
+        preview_fingerprint=preview_fingerprint,
         detail=detail,
     )
 
@@ -995,16 +997,27 @@ def build_recovery_preview(validated: ResolvedRuntime) -> RecoveryPreview:
             wordlist_path=wordlist_path,
             detail=journal_result.detail or status.value,
             can_discard=True,
+            preview_fingerprint=journal_result.content_digest or "corrupt",
+        )
+    if status is JournalLoadStatus.UNSAFE_ARTIFACT:
+        return _empty_recovery_preview(
+            status=RecoveryStatus.CORRUPT_JOURNAL,
+            wordlist_path=wordlist_path,
+            detail=journal_result.detail or status.value,
+            can_discard=False,
+            preview_fingerprint=journal_result.content_digest or "unsafe",
         )
     if status is JournalLoadStatus.UNSUPPORTED_SCHEMA:
         return _empty_recovery_preview(
             status=RecoveryStatus.UNSUPPORTED_SCHEMA,
             wordlist_path=wordlist_path,
             detail=journal_result.detail or status.value,
+            preview_fingerprint=journal_result.content_digest or "unsupported",
         )
 
     journal = journal_result.journal
     assert journal is not None
+    content_fingerprint = journal_result.content_digest or journal.transaction_id
     if status is JournalLoadStatus.VALID_COMPLETED:
         return RecoveryPreview(
             status=RecoveryStatus.COMPLETED_CLEANUP_PENDING,
@@ -1023,7 +1036,7 @@ def build_recovery_preview(validated: ResolvedRuntime) -> RecoveryPreview:
             can_discard=True,
             can_cleanup=True,
             snapshots_valid=True,
-            preview_fingerprint=journal.transaction_id,
+            preview_fingerprint=content_fingerprint,
             journal_summary=journal_payload(journal),
             detail="Only cleanup is required.",
         )
@@ -1085,7 +1098,7 @@ def build_recovery_preview(validated: ResolvedRuntime) -> RecoveryPreview:
         can_discard=False,
         can_cleanup=False,
         snapshots_valid=snapshots_valid,
-        preview_fingerprint=journal.transaction_id,
+        preview_fingerprint=content_fingerprint,
         journal_summary=journal_payload(journal),
     )
 

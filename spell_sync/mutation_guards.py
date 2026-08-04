@@ -108,8 +108,13 @@ def unfinished_journal_exit_from_result_for(
     if result.status in (
         JournalLoadStatus.CORRUPT,
         JournalLoadStatus.UNSUPPORTED_SCHEMA,
+        JournalLoadStatus.UNSAFE_ARTIFACT,
     ):
-        reason = "corrupt_journal"
+        reason = (
+            "unsafe_journal_artifact"
+            if result.status is JournalLoadStatus.UNSAFE_ARTIFACT
+            else "corrupt_journal"
+        )
         detail = result.detail or result.status.value
         if json_output:
             emit_json(
@@ -121,11 +126,18 @@ def unfinished_journal_exit_from_result_for(
             )
         else:
             wl = wordlist if wordlist is not None else wordlist_path()
-            log.abort(
-                "operation aborted — push journal is corrupt or unsupported "
-                f"({detail}). Inspect or remove "
-                f"{wl.resolve().parent / '.spell-sync.journal.json'} carefully."
-            )
+            if result.status is JournalLoadStatus.UNSAFE_ARTIFACT:
+                log.abort(
+                    "operation aborted — push journal artifact is unsafe "
+                    f"({detail}). Inspect "
+                    f"{wl.resolve().parent / '.spell-sync.journal.json'} carefully."
+                )
+            else:
+                log.abort(
+                    "operation aborted — push journal is corrupt or unsupported "
+                    f"({detail}). Inspect or remove "
+                    f"{wl.resolve().parent / '.spell-sync.journal.json'} carefully."
+                )
         return int(ExitCode.PUSH_ABORT)
     journal = result.journal
     assert journal is not None

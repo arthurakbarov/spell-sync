@@ -123,7 +123,9 @@ def max_removals_in_plan(plan: PushPlan) -> int:
 
 
 def fingerprint_conflict(dictionary: Dictionary, read_result: DictionaryReadResult) -> bool:
-    """True when on-disk content no longer matches the plan parse fingerprint."""
-    if read_result.fingerprint is None:
-        return False
+    """True when on-disk content no longer matches the plan parse fingerprint.
+
+    A missing-at-plan target (``fingerprint is None``) conflicts when the path
+    appears before write — ``fingerprint_matches`` verifies continued absence.
+    """
     return not fingerprint_matches(Path(dictionary.path), read_result.fingerprint)

@@ -25,10 +25,13 @@ alwaysApply: false
 
 ## Coverage policy
 
-- `scripts/ci.sh` enforces **100% line** and **≥96% branch** coverage on `spell_sync/`
+- Publish CI uses tiered coverage (`scripts/coverage_policy.py`): **100% lines** on
+  `application/` + mutation/recovery/setup modules; **≥98% lines** on TUI/presentation
+  and remainder; **≥96% branches** everywhere under `spell_sync/`
 - Prefer behavior and invariant tests over line-execution padding
-- Do not create `coverage_gaps` files or weaken safety suites
-- Preserve strict safety coverage: `test_transaction_safety`, `test_pull_safety`, `test_tui_mutation_safety`, `test_tui_recovery_safety`
+- Do not grow frozen `*coverage*` padding inventories; shrink only (residual R-PWR)
+- Preserve strict safety coverage: `test_transaction_safety`, `test_pull_safety`,
+  `test_tui_mutation_safety`, `test_tui_recovery_safety`
 - Diagnostics changes require privacy tests (`test_technical_logging`, `test_diagnostic_redaction`)
 
 ## Architecture tests

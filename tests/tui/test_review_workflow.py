@@ -504,7 +504,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(controller.export_review_session_report.call_count, 1)
 
     async def test_save_session_report_ignores_stale_result(self):
-        import asyncio
+        import threading
         from pathlib import Path
         from unittest.mock import MagicMock
 
@@ -516,7 +516,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         assert session is not None
         session.pull_skipped = True
         session.push_skipped = True
-        completed = asyncio.Event()
+        completed = threading.Event()
 
         def slow_export(**kwargs: object) -> Path:
             completed.wait(timeout=1)

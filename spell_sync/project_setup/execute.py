@@ -172,52 +172,81 @@ def execute_project_setup(
         )
 
     emit(EventId.SETUP_VALIDATING, phase=EventPhase.PREPARING)
-    for item in prepared.files:
-        if item.action is SetupFileAction.CONFLICT:
+
+    def _preflight_stop() -> ProjectSetupExecution | None:
+        from ..push_journal import JournalLoadStatus, load_journal_result
+
+        journal_result = load_journal_result(prepared.wordlist_path)
+        if journal_result.status not in (
+            JournalLoadStatus.ABSENT,
+            JournalLoadStatus.VALID_COMPLETED,
+        ):
             return _return_with_terminal(
                 event_sink,
                 setup_id=setup_id,
                 execution=ProjectSetupExecution(
                     prepared=prepared,
                     outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                    message=f"Conflict detected: {item.relative_name}",
+                    message="Pending recovery blocks project setup.",
                 ),
                 event_id=EventId.SETUP_STOPPED_SAFELY,
-                reason=EventReason.CONFLICT_DETECTED,
+                reason=EventReason.EXECUTION_BLOCKED,
                 severity=EventSeverity.WARNING,
             )
-        if item.action is SetupFileAction.KEEP and item.fingerprint is not None:
-            if not _fingerprint_matches(item.path, item.fingerprint):
+        for item in prepared.files:
+            if item.action is SetupFileAction.CONFLICT:
                 return _return_with_terminal(
                     event_sink,
                     setup_id=setup_id,
                     execution=ProjectSetupExecution(
                         prepared=prepared,
                         outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                        message=f"{item.relative_name} changed after preview.",
+                        message=f"Conflict detected: {item.relative_name}",
                     ),
                     event_id=EventId.SETUP_STOPPED_SAFELY,
-                    reason=EventReason.FILE_CHANGED_AFTER_PREVIEW,
+                    reason=EventReason.CONFLICT_DETECTED,
                     severity=EventSeverity.WARNING,
                 )
-        if item.action is SetupFileAction.CREATE and item.path.exists():
-            return _return_with_terminal(
-                event_sink,
-                setup_id=setup_id,
-                execution=ProjectSetupExecution(
-                    prepared=prepared,
-                    outcome=ProjectSetupOutcome.STOPPED_SAFELY,
-                    message=f"{item.relative_name} appeared after preview.",
-                ),
-                event_id=EventId.SETUP_STOPPED_SAFELY,
-                reason=EventReason.FILE_APPEARED_AFTER_PREVIEW,
-                severity=EventSeverity.WARNING,
-            )
+            if item.action is SetupFileAction.KEEP and item.fingerprint is not None:
+                if not _fingerprint_matches(item.path, item.fingerprint):
+                    return _return_with_terminal(
+                        event_sink,
+                        setup_id=setup_id,
+                        execution=ProjectSetupExecution(
+                            prepared=prepared,
+                            outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                            message=f"{item.relative_name} changed after preview.",
+                        ),
+                        event_id=EventId.SETUP_STOPPED_SAFELY,
+                        reason=EventReason.FILE_CHANGED_AFTER_PREVIEW,
+                        severity=EventSeverity.WARNING,
+                    )
+            if item.action is SetupFileAction.CREATE and item.path.exists():
+                return _return_with_terminal(
+                    event_sink,
+                    setup_id=setup_id,
+                    execution=ProjectSetupExecution(
+                        prepared=prepared,
+                        outcome=ProjectSetupOutcome.STOPPED_SAFELY,
+                        message=f"{item.relative_name} appeared after preview.",
+                    ),
+                    event_id=EventId.SETUP_STOPPED_SAFELY,
+                    reason=EventReason.FILE_APPEARED_AFTER_PREVIEW,
+                    severity=EventSeverity.WARNING,
+                )
+        return None
+
+    early_stop = _preflight_stop()
+    if early_stop is not None:
+        return early_stop
 
     created: list[Path] = []
     try:
-        emit(EventId.SETUP_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
         with acquire_operation_lock(prepared.wordlist_path, "setup"):
+            emit(EventId.SETUP_LOCK_ACQUIRED, phase=EventPhase.EXECUTING)
+            locked_stop = _preflight_stop()
+            if locked_stop is not None:
+                return locked_stop
             emit(EventId.SETUP_CONFLICTS_CHECKED, phase=EventPhase.EXECUTING)
             for directory in prepared.directories_to_create:
                 emit(

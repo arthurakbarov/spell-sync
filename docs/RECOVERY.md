@@ -54,14 +54,16 @@ spell-sync recover --json
 
 Recovery compares on-disk file hashes to journal `hash_before` / `hash_after`:
 
-- Existing file matches **post-image** → already OK
-- Existing file matches **pre-image** → skip (unchanged since transaction)
-- Missing or matching snapshot → restore from snapshot
+- Existing file matches **pre-image** (`hash_before`) → skip (unchanged since transaction)
+- Existing file matches **post-image** (`hash_after`) → restore snapshot (roll back the write)
+- Destination missing with a valid snapshot → restore from snapshot
+- Created-during-transaction file still matching `hash_after` → remove it
 - Otherwise → **conflict** (manual fix required)
 
 ## Lock file
 
-`.spell-sync.lock` uses kernel `flock`. Only one mutating command per wordlist project at a time.
+`.spell-sync.lock` uses an exclusive project lock (`flock` on Unix; `msvcrt.locking` on
+Windows). Only one mutating command per wordlist project at a time.
 Stale PID metadata does not override a free lock.
 
 The lock path is opened through `secure_artifacts`: symlinks, junctions, and reparse points are

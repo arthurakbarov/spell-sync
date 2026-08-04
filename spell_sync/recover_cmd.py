@@ -12,7 +12,7 @@ from .config import CONFIRM_YES
 from .exit_codes import ExitCode
 from .json_output import base_payload, emit_json
 from .log import log
-from .operation_reports import RecoveryStatus
+from .operation_reports import RecoveryOutcome, RecoveryStatus
 from .push_journal import RecoverResult
 
 _SERVICE = SpellSyncService(enable_file_logging=False)
@@ -39,6 +39,25 @@ def _emit_recover_text(result: RecoverResult, *, dry_run: bool) -> int:
     return int(ExitCode.OK)
 
 
+def _exit_from_recovery_execution(execution: object) -> int:
+    result = getattr(execution, "result", None)
+    outcome = getattr(execution, "outcome", None)
+    if isinstance(result, ExitCode):
+        return int(result)
+    if isinstance(result, RecoverResult):
+        if result.failed or result.conflicts:
+            return int(ExitCode.PUSH_ABORT)
+        return int(ExitCode.OK)
+    if outcome in (
+        RecoveryOutcome.RECOVERED,
+        RecoveryOutcome.RECOVERED_WITH_WARNINGS,
+        RecoveryOutcome.CLEANUP_COMPLETED,
+        RecoveryOutcome.DISCARDED,
+    ):
+        return int(ExitCode.OK)
+    return int(ExitCode.PUSH_ABORT)
+
+
 def cmd_recover(opts: CliOptions) -> int:
     with quiet_json_output(opts):
         dry_run = opts.dry_run
@@ -63,26 +82,44 @@ def cmd_recover(opts: CliOptions) -> int:
             return int(ExitCode.OK)
 
         if preview.status is RecoveryStatus.COMPLETED_CLEANUP_PENDING:
+            if dry_run:
+                if opts.json_output:
+                    emit_json(
+                        {
+                            **base_payload("recover", exit=int(ExitCode.OK)),
+                            "dry_run": True,
+                            "action": "cleanup",
+                            "restored": [],
+                            "skipped": [],
+                            "failed": [],
+                        }
+                    )
+                log.detail("recover: completed journal would be cleaned up")
+                return int(ExitCode.OK)
+            execution = _SERVICE.execute_recovery_cleanup(
+                request,
+                preview,
+                confirmed_transaction_id=preview.preview_fingerprint,
+            )
+            _SERVICE.build_recovery_report(execution)
+            exit_code = _exit_from_recovery_execution(execution)
             if opts.json_output:
                 emit_json(
                     {
-                        **base_payload("recover", exit=int(ExitCode.OK)),
-                        "dry_run": dry_run,
+                        **base_payload("recover", exit=exit_code),
+                        "dry_run": False,
                         "action": "cleanup",
                         "restored": [],
                         "skipped": [],
                         "failed": [],
+                        "outcome": execution.outcome.value,
                     }
                 )
-            if not dry_run:
-                execution = _SERVICE.execute_recovery_cleanup(
-                    request,
-                    preview,
-                    confirmed_transaction_id=preview.preview_fingerprint,
-                )
-                _SERVICE.build_recovery_report(execution)
-            log.detail("recover: completed journal cleaned up")
-            return int(ExitCode.OK)
+            if exit_code == int(ExitCode.OK):
+                log.detail("recover: completed journal cleaned up")
+            else:
+                log.abort(execution.message or "recover cleanup failed.")
+            return exit_code
 
         if preview.status in (RecoveryStatus.CORRUPT_JOURNAL, RecoveryStatus.UNSUPPORTED_SCHEMA):
             detail = preview.detail or preview.status.value
@@ -93,17 +130,22 @@ def cmd_recover(opts: CliOptions) -> int:
                     confirmed_transaction_id=preview.preview_fingerprint,
                 )
                 _SERVICE.build_recovery_report(execution)
+                exit_code = _exit_from_recovery_execution(execution)
                 if opts.json_output:
                     emit_json(
                         {
-                            **base_payload("recover", exit=int(ExitCode.OK)),
+                            **base_payload("recover", exit=exit_code),
                             "dry_run": dry_run,
                             "action": "discarded_corrupt_journal",
                             "detail": detail,
+                            "outcome": execution.outcome.value,
                         }
                     )
-                log.warn(f"recover: discarded corrupt journal ({detail})")
-                return int(ExitCode.OK)
+                if exit_code == int(ExitCode.OK):
+                    log.warn(f"recover: discarded corrupt journal ({detail})")
+                else:
+                    log.abort(execution.message or "recover discard failed.")
+                return exit_code
             if opts.json_output:
                 emit_json(
                     {
@@ -173,8 +215,7 @@ def cmd_recover(opts: CliOptions) -> int:
             _SERVICE.build_recovery_report(execution)
 
         result = execution.result
-        incomplete = isinstance(result, RecoverResult) and bool(result.failed or result.conflicts)
-        exit_code = int(ExitCode.PUSH_ABORT if incomplete else ExitCode.OK)
+        exit_code = _exit_from_recovery_execution(execution)
 
         if opts.json_output:
             payload: dict[str, object] = {
@@ -195,6 +236,6 @@ def cmd_recover(opts: CliOptions) -> int:
         if isinstance(result, RecoverResult):
             return _emit_recover_text(result, dry_run=dry_run)
         if isinstance(result, ExitCode):
-            log.abort("recover aborted.")
+            log.abort(execution.message or "recover aborted.")
             return int(result)
         return exit_code

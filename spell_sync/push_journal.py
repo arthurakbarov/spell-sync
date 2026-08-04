@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -89,6 +90,7 @@ class JournalLoadResult:
     status: JournalLoadStatus
     journal: PushJournal | None
     detail: str | None = None
+    content_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -418,6 +420,9 @@ def load_journal_result(
     validate_wordlist: bool = False,
 ) -> JournalLoadResult:
     path = journal_path_for_wordlist(wordlist)
+    if not path.parent.exists():
+        # Setup may run before the project directory exists; no journal can be present.
+        return JournalLoadResult(JournalLoadStatus.ABSENT, None)
     root = trusted_project_root(wordlist)
     try:
         raw_bytes = read_trusted_regular_file(path, root=root)
@@ -427,28 +432,43 @@ def load_journal_result(
         return JournalLoadResult(JournalLoadStatus.UNSAFE_ARTIFACT, None, exc.detail)
     except OSError as exc:
         return JournalLoadResult(JournalLoadStatus.CORRUPT, None, str(exc))
+    content_digest = hashlib.sha256(raw_bytes).hexdigest()
     try:
         raw = json.loads(raw_bytes.decode("utf-8"))
     except (json.JSONDecodeError, TypeError, ValueError, UnicodeDecodeError) as exc:
-        return JournalLoadResult(JournalLoadStatus.CORRUPT, None, str(exc))
+        return JournalLoadResult(
+            JournalLoadStatus.CORRUPT, None, str(exc), content_digest=content_digest
+        )
     if not isinstance(raw, dict):
-        return JournalLoadResult(JournalLoadStatus.CORRUPT, None, "journal root must be object")
+        return JournalLoadResult(
+            JournalLoadStatus.CORRUPT,
+            None,
+            "journal root must be object",
+            content_digest=content_digest,
+        )
     schema = raw.get("schema_version")
     if schema not in SUPPORTED_SCHEMA_VERSIONS:
         return JournalLoadResult(
             JournalLoadStatus.UNSUPPORTED_SCHEMA,
             None,
             f"unsupported schema_version={schema!r}",
+            content_digest=content_digest,
         )
     try:
         expected = wordlist if validate_wordlist else None
         journal = _parse_journal_dict(raw, expected_wordlist=expected)
     except JournalParseError as exc:
-        return JournalLoadResult(JournalLoadStatus.CORRUPT, None, str(exc))
+        return JournalLoadResult(
+            JournalLoadStatus.CORRUPT, None, str(exc), content_digest=content_digest
+        )
 
     if journal.state == JOURNAL_STATE_COMPLETED:
-        return JournalLoadResult(JournalLoadStatus.VALID_COMPLETED, journal)
-    return JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
+        return JournalLoadResult(
+            JournalLoadStatus.VALID_COMPLETED, journal, content_digest=content_digest
+        )
+    return JournalLoadResult(
+        JournalLoadStatus.VALID_IN_PROGRESS, journal, content_digest=content_digest
+    )
 
 
 def load_push_journal(wordlist: Path) -> PushJournal | None:
@@ -668,9 +688,27 @@ def recover_from_journal(journal: PushJournal, *, dry_run: bool = False) -> Reco
             return
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            temp = destination.with_suffix(destination.suffix + ".recover-tmp")
-            shutil.copy2(backup, temp)
-            os.replace(temp, destination)
+            # Unique no-collision temp in the destination directory; never follow a
+            # predictable recover-tmp symlink into another file.
+            fd, temp_name = tempfile.mkstemp(
+                prefix=destination.name + ".",
+                suffix=".recover-tmp",
+                dir=str(destination.parent),
+            )
+            os.close(fd)
+            temp = Path(temp_name)
+            try:
+                shutil.copy2(backup, temp)
+                with open(temp, "rb+") as handle:
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temp, destination)
+            except OSError:
+                try:
+                    temp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise
             restored.append(label)
         except OSError:
             failed.append(label)
