@@ -35,6 +35,13 @@ PRIVATE_PATH_PATTERNS = [
     re.compile(r"spell-words\.git"),
     re.compile(r"arthurakbarov/spell-words"),
 ]
+# Absolute maintainer-home paths must not appear in tracked scripts/tests (privacy fixtures
+# may use generic /Users/… names; only the maintainer identity is forbidden).
+_MAINTAINER_USER = "arthur" + "akbarov"
+MAINTAINER_ABSOLUTE_PATH_PATTERNS = [
+    re.compile(rf"/Users/{re.escape(_MAINTAINER_USER)}\b"),
+    re.compile(rf"/home/{re.escape(_MAINTAINER_USER)}\b"),
+]
 PUBLISH_PATTERN = re.compile(
     r"\b(git push|force-push|force push|gh release|twine upload|PyPI publish|tag v?\d)"
     r"|push to (origin|public|upstream|remote)",
@@ -77,6 +84,11 @@ REQUIRED_SKILLS = (
     "spell-sync-ci",
     "mutation-safety-audit",
     "select-and-run-tests",
+    "autonomous-work",
+    "project-development",
+    "repository-workflow",
+    "git-change-management",
+    "security-audit",
 )
 
 BANNED_WORKFLOW_TERMS = [
@@ -132,6 +144,7 @@ ALLOWED_HYPHENATED_CHECK_TOKENS = frozenset(
     }
 )
 SNAPSHOT_EVIDENCE_REQUIRED = "check_ci_evidence"
+SNAPSHOT_L1_TOKENS = ("run_dev_loop", "commit-gate", "L1", "purpose local")
 
 SNAPSHOT_FINALIZATION_MARKER = "Finalize workspace snapshot"
 
@@ -239,6 +252,31 @@ def scan_private_paths(text: str) -> list[str]:
             hits.append("private path or topology reference")
             break
     return hits
+
+
+def scan_maintainer_absolute_paths(text: str) -> list[str]:
+    hits: list[str] = []
+    for pattern in MAINTAINER_ABSOLUTE_PATH_PATTERNS:
+        if pattern.search(text):
+            hits.append("maintainer absolute path")
+            break
+    return hits
+
+
+def check_scripts_and_tests_maintainer_paths(root: Path) -> list[str]:
+    errors: list[str] = []
+    for base_name in ("scripts", "tests"):
+        base = root / base_name
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            text = path.read_text(encoding="utf-8")
+            rel = path.relative_to(root).as_posix()
+            for label in scan_maintainer_absolute_paths(text):
+                errors.append(f"{rel}: contains {label}")
+    return errors
 
 
 def scan_stale(text: str) -> list[str]:
@@ -415,10 +453,12 @@ def check_snapshot_finalization_skills(root: Path) -> list[str]:
                 f"'{SNAPSHOT_FINALIZATION_MARKER}' section"
             )
             continue
-        if SNAPSHOT_EVIDENCE_REQUIRED not in section:
+        if SNAPSHOT_EVIDENCE_REQUIRED not in section and not any(
+            token in section for token in SNAPSHOT_L1_TOKENS
+        ):
             errors.append(
                 f"[SNAPSHOT-008] {rel}: snapshot finalization must reference "
-                "check_ci_evidence before snapshot"
+                "L1/run_dev_loop or check_ci_evidence (when L2 ran)"
             )
         if not SNAPSHOT_FORCE_REQUIRED.search(section):
             errors.append(
@@ -485,20 +525,24 @@ def check_final_ci_lifecycle(root: Path) -> list[str]:
             continue
         text = skill_file.read_text(encoding="utf-8")
         rel = skill_file.relative_to(root)
-        if "check_ci_evidence.py" not in text:
+        if "check_ci_evidence.py" not in text and "check_ci_necessity.py" not in text:
             errors.append(
                 f"[CI-LIFECYCLE-004] {rel}: modifying lifecycle skill must reference "
-                "python3 scripts/check_ci_evidence.py"
+                "check_ci_necessity.py and/or check_ci_evidence.py"
             )
         if STALE_CI_THEN_COMMIT.search(text):
             errors.append(
                 f"[CI-LIFECYCLE-005] {rel}: full CI must not precede commit "
                 "(remove 'After green CI' then commit ordering)"
             )
-        if CI_BEFORE_COMMIT_PATTERN.search(text) and "committed HEAD" not in text:
+        if (
+            "scripts/ci.sh" in text
+            and "committed HEAD" not in text
+            and "--purpose publish" not in text
+        ):
             errors.append(
                 f"[CI-LIFECYCLE-006] {rel}: run full CI only on committed HEAD "
-                "after clean verification"
+                "after clean verification (L2 / --purpose publish)"
             )
     agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if agent_dev.is_file():
@@ -508,10 +552,10 @@ def check_final_ci_lifecycle(root: Path) -> list[str]:
                 "[CI-LIFECYCLE-007] docs/AGENT_DEVELOPMENT.md must document "
                 "scripts/check_ci_evidence.py"
             )
-        if "committed HEAD" not in text and "committed head" not in text.lower():
+        if "--purpose local" not in text or "--purpose publish" not in text:
             errors.append(
-                "[CI-LIFECYCLE-008] docs/AGENT_DEVELOPMENT.md must require final CI on "
-                "committed HEAD"
+                "[CI-LIFECYCLE-008] docs/AGENT_DEVELOPMENT.md must document "
+                "check_ci_necessity --purpose local|publish (L2 only for publish)"
             )
     return errors
 
@@ -727,6 +771,7 @@ def validate_agent_config(root: Path) -> list[str]:
         errors.append("missing AGENTS.md")
 
     errors.extend(check_persistent_git_stash(root))
+    errors.extend(check_scripts_and_tests_maintainer_paths(root))
 
     return errors
 

@@ -1,44 +1,44 @@
 ---
-description: Require minimal non-duplicated validation during development and one final full CI run.
+description: Require local minimal validation; full CI only for publish/release.
 alwaysApply: true
 ---
 
 # Test efficiency
 
-## During development
+## During development (local minimal)
 
-1. Start from the smallest failing test (Level 0).
+1. Start from the smallest failing test (edit loop).
 2. Do not run an entire module when one test function suffices.
-3. After local pass, run affected module tests once (Level 1).
-4. After module pass, run the relevant risk cluster once (Level 2).
-5. Do not run another cluster without dependency or risk reason.
+3. Default edit runner: `python3 scripts/run_dev_loop.py` (no coverage).
+4. After commit: `python3 scripts/run_dev_loop.py --commit-gate` (≤120s / affected + 1 min).
+   Edit loop ≤60s. Budget exceed → shrink scope (`DEV_LOOP_BUDGET_STATUS=exceeded`).
+5. Do not run another cluster without dependency or safety reason.
 6. Do not run full CI in the middle of a normal edit loop.
 7. Do not repeat an identical successful command on an unchanged tree.
-8. Before running tests, use `scripts/test_plan.py` or document the exact manual reason.
-9. Do not use `pytest --lf` as final evidence.
-10. Do not use `pytest -x` as final cluster evidence.
-11. `--lf`, `--ff`, `-x` are diagnostic only; follow with the normal selected suite.
-12. Do not run packaging or wheel smoke in focused loops unless package boundaries changed.
-13. Commit tracked changes; verify clean tree before final validation.
-14. Assess necessity: `python3 scripts/check_ci_necessity.py --explain`.
-15. Run full `scripts/ci.sh` when necessity is `full-required` (once on committed HEAD).
-16. When necessity is `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py`.
-17. Verify `python3 scripts/check_ci_evidence.py` before workspace snapshot.
-18. On final CI failure, rerun only the failed check while fixing; commit fix; clean tree; reassess necessity.
-19. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
+8. Before selecting tests, use `scripts/test_plan.py --dev-scope` or document why.
+9. Do not use `pytest --lf` or `pytest -x` as local minimal or full CI evidence.
+10. Do not run packaging or wheel smoke in local minimal unless package boundaries changed.
+11. Assess local necessity: `python3 scripts/check_ci_necessity.py --purpose local --explain`.
+12. When result is `commit-gate-sufficient`, `lightweight-sufficient`, or `no-action`:
+    **do not** run `scripts/ci.sh`.
+13. Do not weaken tests, remove regression coverage, or skip safety clusters for mutation code.
 
-Full CI evidence is bound to CI-relevant inputs (`ciInputDigest`), not merely to Git HEAD.
-Exact Git HEAD matching remains required for release, publication, and signed artifact workflows.
+## Publish / release (full CI only)
+
+1. `python3 scripts/check_ci_necessity.py --purpose publish --explain`
+2. When `full-required`: run `scripts/ci.sh` once on committed HEAD (hard wall ≤1200s).
+3. Verify `python3 scripts/check_ci_evidence.py` (use `--release` for tag/publish).
+4. Exact Git HEAD matching remains required for release, publication, and signed artifacts.
 
 ## Tools
 
-- Plan: `python3 scripts/test_plan.py`
-- Run: `python3 scripts/run_focused_tests.py`
-- Necessity: `python3 scripts/check_ci_necessity.py`
+- Edit/commit: `python3 scripts/run_dev_loop.py` / `--commit-gate`
+- Plan: `python3 scripts/test_plan.py --dev-scope`
+- Necessity: `python3 scripts/check_ci_necessity.py --purpose local|publish`
 - Lightweight: `python3 scripts/run_lightweight_validation.py`
 - Strategy: `docs/TESTING_STRATEGY.md`
-- Registry: `tests/test-impact.toml`, `ci/ci-impact.toml`
+- Registry: `tests/test-impact.toml`, `ci/ci-impact.toml`, `ci/test-groups.toml`
 
 ## Reporting
 
-Show skipped duplicate commands and reused run keys in the final report.
+Show mode used (edit / commit gate / full), skipped duplicates, and whether full CI was deferred.

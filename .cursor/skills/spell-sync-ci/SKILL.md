@@ -1,130 +1,108 @@
 ---
 name: spell-sync-ci
 description: >-
-  Run and fix spell-sync CI for a changed scope. Use when implementing features,
-  fixing test failures, or verifying work before commit. Starts with
-  select-and-run-tests, then one final full scripts/ci.sh on committed HEAD.
+  Validate spell-sync changes. Default is local minimal (edit + commit gate). Full scripts/ci.sh
+  runs only for --purpose publish (push/release) or explicit owner final request.
 ---
 
 # spell-sync CI
 
 ## When to use
 
-- Before declaring a modifying task complete (final full CI once on committed HEAD)
-- When CI or coverage failures need diagnosis and fix
-- To rerun a **single failed gate** during fix loops
+- During modifying tasks: local minimal only
+- Before push / tag / release / explicit “final”: full CI on committed HEAD
+- To rerun a **single failed full CI gate** while fixing
 
 ## Do not use
 
+- To run full CI after every polish commit
 - As a substitute for reading failing test output and fixing root causes
 - To add meaningless tests solely to hit coverage lines
-- To run full CI on every tiny edit
 - To repeat full CI without file changes after a failure
-- Before local commits on a modifying task (final CI binds to committed HEAD)
 
-## Workflow
+## Local workflow (default)
 
-0. Ensure project environment is valid **before** Python work:
+0. Environment:
 
 ```bash
 python3 scripts/project_environment.py check
 ```
 
-If missing `.venv` or metadata, run `python3 scripts/project_environment.py sync` (not raw `uv sync`).
-See skill `project-environment`.
-
-1. During development use skill `select-and-run-tests` (Levels 0–2).
-2. Commit all tracked changes; verify clean working tree.
-3. Assess necessity:
+1. Local minimal via skill `select-and-run-tests` / `run_dev_loop.py`
+   (strict budgets: edit ≤60s, commit gate ≤120s; report `DEV_LOOP_BUDGET_*`).
+2. Commit tracked changes; verify clean working tree.
+3. Assess **local** necessity:
 
 ```bash
-python3 scripts/check_ci_necessity.py --explain
+python3 scripts/check_ci_necessity.py --purpose local --explain
 ```
 
-4. When `CI_NECESSITY_RESULT=full-required`, run full CI **once** on committed HEAD through
-   the execution controller (integrated in `ci_runner.py`):
-
-```bash
-scripts/ci.sh
-```
-
-Do not pipe CI through `tail`, `tee`, or other wrappers — hard bounds and
-`CI_TIMEOUT_CHECK_ID` depend on direct runner output.
-
-5. When `CI_NECESSITY_RESULT=lightweight-sufficient`:
+4. When `commit-gate-sufficient`: stop (no full CI).
+5. When `lightweight-sufficient`:
 
 ```bash
 python3 scripts/run_lightweight_validation.py
 ```
 
-6. Verify final evidence:
+6. When `no-action`: skip redundant validation.
+
+## Publish / final workflow (full CI only)
+
+Use when the owner requests push, tag, release, or explicit final validation:
 
 ```bash
+python3 scripts/check_ci_necessity.py --purpose publish --explain
+scripts/ci.sh
 python3 scripts/check_ci_evidence.py
 ```
 
-Expect `CI_EVIDENCE_MATCH=exact-head` or `CI_EVIDENCE_MATCH=reused-non-ci-change`.
+Full CI hard safety wall **≤1200s (20 min)**. Compare planned expected/soft vs actual wall
+(`EXECUTION_*` / CI summary timing). Report status
+`within-expected` | `soft-exceeded` | `hard-bound` if the safety hard cap fired.
+Do not fail full CI solely for exceeding expected — only for functional/safety failure or
+hard-cap termination.
 
-7. On failure, fix and rerun only the failed check:
+Do not pipe CI through `tail`, `tee`, or other wrappers.
 
-```bash
-scripts/ci.sh --only ruff.format
-```
-
-8. After the fix changes CI-relevant files, commit, verify clean tree, reassess necessity, then run one new full CI when required.
-
-Diagnostic modes (`--only`, `--from`, `--resume-failed`) do **not** count as final CI
-evidence. Only `mode=full` with `finalEvidence=true` and `CI_EVIDENCE_RESULT=success`
-count.
-
-Release, publication, and signed artifact workflows require exact-head evidence:
+Release / signed artifacts:
 
 ```bash
 python3 scripts/check_ci_evidence.py --release
 ```
 
-## What ci.sh enforces
+On full CI failure, fix and rerun only the failed check:
 
-`scripts/ci.sh` is the single CI entry point (via `scripts/ci_runner.py`). Gate ids are
-not duplicated here — list the current set with:
+```bash
+scripts/ci.sh --only ruff.format
+```
+
+Then commit, clean tree, reassess with `--purpose publish`, and run one new full CI when required.
+
+Diagnostic modes (`--only`, `--from`, `--resume-failed`) do **not** count as publish
+evidence. Only `mode=full` with `finalEvidence=true` and `CI_EVIDENCE_RESULT=success`
+count for publish evidence.
+
+## What ci.sh enforces (full CI)
+
+`scripts/ci.sh` is the single full-CI entry point. List checks with:
 
 ```bash
 scripts/ci.sh --list-checks
 ```
 
-Grouped coverage typically includes docs style/contract, agent config, architecture and
-target capability checks, ruff, mypy, grouped pytest with coverage policy, packaging
-(build/twine/wheel-smoke), and headless smoke scenarios. Treat `--list-checks` as SSOT
-for exact check ids.
+Includes docs/agent/architecture validators, ruff, mypy, grouped pytest **with coverage**,
+packaging, wheel-smoke, and smokes.
 
-## Common fixes
+## Related
 
-| Failure | Action |
-|---------|--------|
-| Coverage gap | Add behavior tests in existing modules |
-| mypy | Fix types in `spell_sync/` |
-| Docs style | Remove `---` horizontal rules |
-| Agent config | Fix `.cursor/` issues flagged by validator |
-| Docs contract | Fix stale claims flagged by validator |
-
-## Stop conditions
-
-- Stop when final `scripts/ci.sh` exits **0** with `finalEvidence=true` and
-  `python3 scripts/check_ci_evidence.py` reports `CI_EVIDENCE_RESULT=success`
-- Stop and report if a failure requires an architectural decision
-- Do not mask failures or weaken coverage gates
-- After successful final evidence, do not modify tracked repository files
-
-## Final report
-
-- Focused commands from `select-and-run-tests` (including skipped duplicates)
-- Full CI runs attempted and reason for any extra run
-- `CI_SUMMARY`, `CI_LOG`, and `CI_EVIDENCE_*` paths/values
-- `CI_FAILED_ID` when CI failed
+- Strategy: `docs/TESTING_STRATEGY.md`
+- Skill: `select-and-run-tests`, `release-candidate`
+- Necessity: `scripts/check_ci_necessity.py --purpose local|publish`
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
-skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
-re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
-footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks — after commit gate (`run_dev_loop.py --commit-gate`) and local necessity.
+When this skill ran full CI, require `python3 scripts/check_ci_evidence.py` success first.
+Then skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
+SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

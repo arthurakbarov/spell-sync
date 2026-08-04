@@ -29,28 +29,26 @@ Working tree should be clean before starting.
 4. Do not refactor unrelated code.
 5. Do not start the next phase.
 6. Update docs/ADR only when factual contracts change.
-7. After all defects in a cluster are fixed, run `select-and-run-tests` once for the
-   combined affected clusters — not after every single defect.
-8. Run `python3 scripts/run_pre_final_checks.py` before commits.
-9. Set phase status to `awaiting-approval`; create corrective local commit(s). Do not push.
+7. After all defects in a cluster are fixed, run `select-and-run-tests` / `run_dev_loop.py`
+   once for the combined affected clusters — not after every single defect.
+8. Set phase status to `awaiting-approval`; create corrective local commit(s). Do not push.
+9. Run L1: `python3 scripts/run_dev_loop.py --commit-gate`.
 10. Verify clean working trees (`git status --short`).
-11. Assess necessity: `python3 scripts/check_ci_necessity.py --explain`.
-12. When `full-required`, run `scripts/ci.sh` **once** on the committed HEAD (final evidence).
-13. When `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py`.
-14. Verify `python3 scripts/check_ci_evidence.py` (`CI_EVIDENCE_RESULT=success`).
-15. On CI failure after commit: fix; focused failed-check validation; new corrective commit;
-    clean tree; reassess necessity. Do not amend if a new commit preserves evidence more clearly.
-16. Leave current phase at `awaiting-approval`.
-17. Return a defect-by-defect report and stop.
+11. Assess local necessity: `python3 scripts/check_ci_necessity.py --purpose local --explain`.
+12. When `commit-gate-sufficient` / `lightweight-sufficient` / `no-action`: do **not** run full CI.
+13. Run L2 (`scripts/ci.sh` + `check_ci_evidence.py`) only for `--purpose publish` or owner final.
+14. Leave current phase at `awaiting-approval`.
+15. Return a defect-by-defect report and stop.
 
 ## Validation
 
-Use `select-and-run-tests` during the fix loop. Use `spell-sync-ci` only for final full CI
-diagnosis. Do not run full CI after each individual defect.
+Use `select-and-run-tests` / `run_dev_loop.py` during the fix loop. Use `spell-sync-ci` L2
+only for publish/final. Do not run full CI after each individual defect.
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
-skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
-re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
-footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks — after L1 (`run_dev_loop.py --commit-gate`). When L2 ran, require
+`python3 scripts/check_ci_evidence.py` success first.
+Skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
+SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

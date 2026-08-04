@@ -1,0 +1,54 @@
+---
+description: Comment style for Python, shell, and TOML in spell-sync
+globs:
+  - "spell_sync/**/*.py"
+  - "scripts/**/*.py"
+  - "scripts/**/*.sh"
+  - "tests/**/*.py"
+  - "*.toml"
+alwaysApply: false
+---
+
+# Comments
+
+Comment **why**, not **what**. No decorative banners.
+
+## File header
+
+At most one line when purpose is not obvious from the path:
+
+```py
+"""Resolve CI necessity for local vs publish purposes."""
+```
+
+Skip headers on tiny helpers whose name is the contract.
+
+## Sections
+
+Blank line + short lowercase label. No `# ---` or `====` banners:
+
+```py
+# admission
+
+def admit(...):
+    ...
+```
+
+## Inline
+
+Never trailing `# comment` on code lines. Put the comment on the line above.
+
+## When to comment
+
+- Sync points (impact registry <-> runners, request DTOs <-> CLI)
+- Platform quirks and intentional non-obvious choices
+- Privacy / mutation safety gotchas
+
+Do not restate identifiers or add category labels (`# helpers`, `# utils`).
+
+## Format
+
+- ASCII `-` in comments that mirror user-facing harness strings
+- Agent prose in `.cursor/` may use em dash for readability
+- Max ~100 columns; wrap on phrase boundaries
+- Same indent as the block below; no column-pretty alignment games

@@ -8,7 +8,9 @@ description: >-
 
 # Project environment
 
-Use this skill before any maintainer Python work (tests, CI, validators, packaging).
+Shared contract: `.cursor/README.md` § Shared contract.
+
+Use before any maintainer Python work (tests, CI, validators, packaging).
 
 ## When to use
 
@@ -23,121 +25,57 @@ Use this skill before any maintainer Python work (tests, CI, validators, packagi
 - Raw `uv sync` without `project_environment.py sync` (skips metadata and evidence)
 - Ambient Python for environment metadata or CI evidence identity
 - Hand-editing `.venv/.spell-sync-environment.json` or `.artifacts/environment/environment.json`
-- Run raw `uv sync` then `check` without sync subcommand (metadata/evidence missing)
-- Use ambient `python`/`platform.*` for environment evidence
 - Mutate owner `.venv` in ordinary unit tests (use `tmp_path` repos)
 
-## Preconditions
+## Loop (edit)
 
-- `uv` on PATH at contract-pinned version (`0.11.21`)
-- Canonical maintainer Python `3.12.13` (see `.python-version` and `config/environment-contract.toml`)
+```bash
+python3 scripts/project_environment.py check
+# if needed:
+python3 scripts/project_environment.py sync
+```
 
-## Commands (in order)
+Preconditions: `uv` `0.11.21` on PATH; Python `3.12.13`
+(`.python-version`, `config/environment-contract.toml`).
 
-### info
+## Checkpoint
 
-Inspect current state without mutation:
+```bash
+python3 scripts/project_environment.py check
+python3 scripts/run_dev_loop.py --commit-gate
+```
+
+After dependency edits: edit `pyproject.toml` → `uv lock` → `sync` → `check`.
+
+## Full gate (owner push / publish / final only)
+
+```bash
+python3 scripts/project_environment.py check
+scripts/ci.sh
+python3 scripts/check_ci_evidence.py
+```
+
+On `ci-evidence.environment-mismatch`: `check` → one full CI at clean HEAD → re-verify.
+Do not hand-edit environment evidence JSON.
+
+## Related
 
 ```bash
 python3 scripts/project_environment.py info
 python3 scripts/project_environment.py info --json
-```
-
-### bootstrap
-
-First-time Python install (maintainer machine only):
-
-```bash
 python3 scripts/project_environment.py bootstrap --allow-python-download
+python3 scripts/project_environment.py recreate
+python3 scripts/project_environment.py clean
 ```
 
-### sync (canonical)
+Failure IDs: `environment.venv-stale`, `environment.manual-mutation-detected`,
+`environment.venv-python-mismatch`.
 
-**Always** use this instead of raw `uv sync`:
+Python/uv bump: update contract + `.python-version` → recreate → validators + one full CI.
 
-```bash
-python3 scripts/project_environment.py sync
-```
+Snapshot restore from `$HOME/code.zip`: `sync` + `check`; never copy `.venv` from archive.
+Modifying-task snapshot: skill `create-code-snapshot` in spell-sync-dev after evidence success.
 
-Performs: `uv lock --check` → `uv sync` → `.venv` probe → metadata → `check` → environment evidence.
-
-### check (read-only)
-
-```bash
-python3 scripts/project_environment.py check
-```
-
-Failure IDs:
-
-| ID | Meaning |
-|----|---------|
-| `environment.venv-stale` | Declaration/metadata drift |
-| `environment.manual-mutation-detected` | Extra/missing/wrong distribution |
-| `environment.venv-python-mismatch` | Wrong `.venv` Python patch |
-
-### recreate / clean
-
-```bash
-python3 scripts/project_environment.py recreate   # delete .venv, sync
-python3 scripts/project_environment.py clean    # delete .venv + environment evidence
-```
-
-## Dependency mutation workflow
-
-1. Edit `pyproject.toml` / groups
-2. `uv lock` (commit `uv.lock`)
-3. `python3 scripts/project_environment.py sync`
-4. `python3 scripts/project_environment.py check`
-5. Run focused tests, then pre-final
-
-## Python or uv update
-
-1. Update `config/environment-contract.toml`, `.python-version`, `[tool.uv] required-version`
-2. Regenerate lock if needed
-3. `python3 scripts/project_environment.py recreate`
-4. Validators + full CI (one final run at exact HEAD)
-
-## Evidence mismatch
-
-If `check_ci_evidence.py` reports `ci-evidence.environment-mismatch`:
-
-1. `python3 scripts/project_environment.py check`
-2. If check passes, re-run full CI once at clean exact HEAD
-3. Re-verify: `python3 scripts/check_ci_evidence.py`
-
-Do not hand-edit `.artifacts/environment/environment.json` or `.venv/.spell-sync-environment.json`.
-
-## Snapshot restoration
-
-After importing owner archive from **`$HOME/code.zip`** (canonical location only):
-
-1. Confirm snapshot manifest `environment` block matches extracted declarations
-2. `python3 scripts/project_environment.py sync` (fresh `.venv` from lock)
-3. `python3 scripts/project_environment.py check`
-4. Do **not** copy `.venv` from archive (excluded by policy)
-
-## Modifying-task snapshot finalization
-
-After final CI and `python3 scripts/check_ci_evidence.py` success:
-
-```bash
-python3 "$SPELL_SYNC_DEV/scripts/create-code-snapshot.py" \
-  --workspace "$HOME/code" \
-  --output "$HOME/code.zip" \
-  --force
-python3 "$SPELL_SYNC_DEV/scripts/create-code-snapshot.py" \
-  --workspace "$HOME/code" \
-  --output "$HOME/code.zip" \
-  --check
-```
-
-Do **not** write `code.zip` under the workspace tree. Report footer uses resolved `$HOME/code.zip`
-only. See `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
-
-## Integration points
-
-- CI: workflow runs `project_environment.py sync` before `ci_runner.py`
-- Execution control: workload identity includes `environmentSignature`
-- CI summary schema v5: `environmentFingerprintBefore/After` must match
-- Tests: pass `EnvironmentPaths` from `test_environment_paths()` for isolation
+- CI runs `project_environment.py sync` before `ci_runner.py`
+- Tests: `EnvironmentPaths` via `test_environment_paths()` for isolation
 

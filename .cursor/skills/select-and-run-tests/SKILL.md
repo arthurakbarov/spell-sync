@@ -1,79 +1,53 @@
 ---
 name: select-and-run-tests
-description: Select the smallest sufficient non-duplicated validation set for the current changes, execute it, and record reusable evidence.
+description: Select the smallest local minimal validation set for current changes, execute without coverage, and defer full CI to publish.
 ---
 
 # Select and run tests
 
+Shared contract: `.cursor/README.md` § Shared contract.
+
 ## When to use
 
 - After implementation chunks during modifying tasks
-- Before declaring focused validation complete
+- Before declaring local minimal validation complete
 - When choosing pytest targets for a changed scope
 
 ## Do not use
 
-- As a substitute for final full CI (`spell-sync-ci` skill)
+- As a substitute for full publish CI (`spell-sync-ci` with `--purpose publish`)
 - With `--force` in normal agent workflows
-- To skip safety clusters after mutation-path changes
+- To skip safety clusters after mutation-path changes (commit gate adds them)
 
-## Step 0 — admission
-
-Assess CI necessity before expensive commands:
+## Loop (edit)
 
 ```bash
-python3 scripts/check_ci_necessity.py --explain
+python3 scripts/check_ci_necessity.py --purpose local --explain
+python3 scripts/test_plan.py --dev-scope --explain
+python3 scripts/run_dev_loop.py
 ```
 
-When result is `no-action`, skip redundant validation. Integrated runners apply execution
-admission and may print `EXECUTION_RESULT=reused` without subprocess start.
+Skip when necessity is `no-action`. Prefer exact failing nodes when reproducing a defect.
 
-## Step 1 — classify change
-
-Determine changed files, behavior, risk level, and relevant clusters:
+## Checkpoint
 
 ```bash
-python3 scripts/test_plan.py --explain
+python3 scripts/run_dev_loop.py --commit-gate
 ```
 
-## Step 2 — Level 0 (defect reproduction)
+Adds safety cluster tests when mutation paths change. Wall budget **120s**.
 
-When a specific failure exists, run the exact test until green. Do not run the full
-cluster after every edit.
-
-## Step 3 — Level 1 (module validation)
-
-When implementation is stable for the touched module:
+When application boundaries change:
 
 ```bash
-python3 scripts/run_focused_tests.py
+python3 scripts/check_architecture.py --check
 ```
 
-## Step 4 — Level 2 (risk cluster)
+## Full gate (owner push / publish / final only)
 
-When Level 1 is green, run the deduplicated cluster once if not already covered by Step 3.
+Does **not** run full CI. Owner publish uses skill `spell-sync-ci`.
 
-## Step 5 — static focused validation
+## Related
 
-For changed Python files only:
-
-```bash
-python3 -m ruff check <changed-python-files>
-python3 -m ruff format --check <changed-python-files>
-```
-
-Run mypy on changed production modules when types changed. Full mypy remains in final CI.
-
-Do not run full-repository Ruff after every small edit.
-
-## Step 6 — return evidence
-
-Report:
-
-- selected files and clusters
-- commands and durations
-- skipped duplicate commands (`TEST_RUN_REASON=already-passed-for-current-state`)
-- execution reuse skips (`EXECUTION_RESULT=reused`)
-- remaining final gates (full CI once)
-
-This skill does not run full CI.
+Report mode, selected clusters, `DEV_LOOP_*` budget lines, and that full CI was deferred
+unless the owner requested publish.

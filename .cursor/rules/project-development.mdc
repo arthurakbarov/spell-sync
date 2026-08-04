@@ -1,0 +1,37 @@
+---
+description: Thin always-on project invariants - discipline, surfaces, ASCII CLI
+alwaysApply: true
+---
+
+# Project development (spell-sync)
+
+Entry: `AGENTS.md`, `docs/AGENT_DEVELOPMENT.md`. Loop: `agent-workflow.mdc` +
+skill `select-and-run-tests`. Arc: skill `repository-workflow`. Safety:
+`project-safety.mdc`. Shared map: `.cursor/README.md`.
+
+## Change discipline
+
+- Smallest correct diff; match existing helpers
+- Local commits anytime; push / tag / publish only on explicit owner request
+- Edit loop: `python3 scripts/run_dev_loop.py`; checkpoint: `--commit-gate`
+- Full CI (`scripts/ci.sh`) only on owner push / publish / final
+
+## Surfaces
+
+- Command SSOT: `config/dev-commands.json` + `config/dev-surface.json`
+- Inspect first: `python3 scripts/agent_context.py` (optional `--json`)
+- Triage: `python3 scripts/dev_runs.py failures` / `show <run-id>`
+- Done: `docs/ENGINEERING_COMPLETION.md` + `docs/PRODUCT_COMPLETION.md`
+
+## User-visible maintainer CLI
+
+- ASCII only in harness / script stdout meant for terminals (no unicode ellipsis,
+  em dash, or `==>` arrows; use `...` / ` - `)
+- Product TUI / user copy follows `product-language.mdc` (separate from harness)
+- Do not pipe CI through `tail` / `tee`
+
+## Related
+
+- Phrase map: skills `autonomous-work` / `project-development`
+- Comments: `comments.mdc`
+- Git: `git-change-management.mdc`

@@ -7,6 +7,8 @@ description: >-
 
 # Run time-controlled command
 
+Shared contract: `.cursor/README.md` § Shared contract.
+
 ## When to use
 
 - Running an expensive command outside integrated runners
@@ -20,52 +22,39 @@ description: >-
 - To bypass CI necessity or functional evidence checks
 - With `--force` to ignore duplicate-active protection without cause
 
-## Workflow
+## Loop (edit)
 
-1. **Assess necessity** — when the command is part of final validation:
-
-```bash
-python3 scripts/check_ci_necessity.py --explain
-```
-
-Skip execution when result is `no-action` and the command is not required.
-
-2. **Choose execution ID** — use stable IDs from `tests/execution-budget.toml` and
-   `scripts/execution_control/mappings.py`:
-
-| Context | Example ID |
-|---------|------------|
-| Focused module gate | `gate:focused-module` |
-| Focused cluster gate | `gate:focused-cluster` |
-| Pre-final gate | `gate:pre-final` |
-| Full CI gate | `gate:full-ci` |
-| CI check child | `ci:pytest`, `ci:mypy`, … |
-| Unknown fallback | `gate:unknown` |
-
-Prefer integrated runners when available:
+Prefer integrated runners:
 
 ```bash
+python3 scripts/run_dev_loop.py
 python3 scripts/run_focused_tests.py
-python3 scripts/run_pre_final_checks.py
-scripts/ci.sh
 ```
 
-3. **Run through controller** — direct invocation:
+Direct one-off:
 
 ```bash
 python3 scripts/run_with_budget.py \
-  --execution-id <id> \
-  [--mode module|cluster|full-ci] \
-  [--required] \
-  [--test-files N] \
-  [--test-nodes N] \
-  [--coverage] [--tui] [--packaging] \
+  --execution-id gate:focused-module \
+  --mode module \
   -- <command...>
 ```
 
-4. **Read plan output** — before execution starts, confirm:
+Stable IDs: `tests/execution-budget.toml`, `scripts/execution_control/mappings.py`
+(`gate:focused-module`, `gate:focused-cluster`, `gate:pre-final`, `gate:full-ci`,
+`ci:pytest`, …).
+
+## Checkpoint
+
+```bash
+python3 scripts/check_ci_necessity.py --purpose local --explain
+python3 scripts/run_dev_loop.py --commit-gate
+```
+
+Skip when necessity is `no-action`. Confirm plan lines before work starts:
 
 ```text
+eta: expected ~…
 EXECUTION_ID=...
 EXECUTION_EXPECTED_SECONDS=...
 EXECUTION_SOFT_SECONDS=...
@@ -73,40 +62,26 @@ EXECUTION_HARD_SECONDS=...
 EXECUTION_ADMISSION_DECISION=run|reuse|...
 ```
 
-When `EXECUTION_ADMISSION_DECISION=reuse` or `EXECUTION_RESULT=reused`, do not treat the
-run as new functional evidence.
+Interactive prompts: `--prompts N` on `run_with_budget.py` (each +5s to ETA/wall only).
 
-5. **Read result** — after completion:
+## Full gate (owner push / publish / final only)
 
-```text
-EXECUTION_RESULT=success|success-slow|failed|timeout-hard|...
-EXECUTION_DURATION_SECONDS=...
-EXECUTION_LEARNING_ACCEPTED=true|false
+```bash
+python3 scripts/run_with_budget.py --execution-id gate:full-ci --mode full-ci --required -- scripts/ci.sh
+# or: scripts/ci.sh
+python3 scripts/check_ci_evidence.py
 ```
 
-6. **Handle timeout** — on `timeout-hard` or `timeout-stall`:
+## Related
 
-- Read `CI_TIMEOUT_CHECK_ID` or `EXECUTION_ACTIVE_CHILD` when present
-- Inspect bundle under `$XDG_STATE_HOME/spell-sync/execution-control/timeouts/<run-id>/`
-- Run at most one narrow diagnostic retry (`diagnosticRetries ≤ 1`)
-- Do not automatically retry the broad parent gate
+On `timeout-hard` / `timeout-stall`: at most one diagnostic retry; inspect
+`$XDG_STATE_HOME/spell-sync/execution-control/timeouts/<run-id>/`. Do not auto-retry
+the broad parent gate.
 
-7. **Handle duplicate block** — when `EXECUTION_RESULT=blocked` and
-   `EXECUTION_FAILED_ID=execution.duplicate-active`, wait for the owner or investigate the
-   active PID; do not start a parallel duplicate.
+On `execution.duplicate-active`: do not start a parallel duplicate.
 
-8. **Report** — include execution ID, admission decision, durations, reuse skips, and
-   duplicate blocks in the task report.
-
-## Stop conditions
-
-- Stop when `EXECUTION_RESULT` is terminal and exit code matches expectation
-- Stop and report on `blocked-duplicate` without forcing parallel execution
-- Stop after one diagnostic retry on timeout; fix root cause before the next final gate
-
-## See also
+Report `EXECUTION_*` lines, reuse skips, and duplicate blocks.
 
 - Rule: `.cursor/rules/execution-time-control.mdc`
 - Doc: `docs/EXECUTION_TIME_CONTROL.md`
-- CI skill: `spell-sync-ci`
-- Test selection: `select-and-run-tests`
+- Skills: `spell-sync-ci`, `select-and-run-tests`

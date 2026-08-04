@@ -1,0 +1,53 @@
+---
+description: Validation ladder after editing spell-sync sources
+globs:
+  - scripts/**
+  - spell_sync/**
+  - docs/**
+  - tests/**
+  - config/**
+  - ci/**
+  - ".cursor/**"
+  - "*.toml"
+  - "*.md"
+alwaysApply: false
+---
+
+# After every change
+
+SSOT: `docs/AGENT_DEVELOPMENT.md`. Efficiency: `test-efficiency.mdc`.
+
+## Edit loop
+
+```bash
+python3 scripts/agent_context.py
+python3 scripts/test_plan.py --dev-scope --explain
+python3 scripts/run_dev_loop.py
+```
+
+Habitual agent check: `run_dev_loop.py` (≤60s). Checkpoint: `--commit-gate` (≤120s).
+
+## Do not (during edits)
+
+- `scripts/ci.sh` after every small edit or every «продолжи»
+- Pipe CI through `tail` / `tee`
+- Skip safety clusters after mutation-path changes (commit gate adds them)
+
+## Domain extras
+
+| Touched | Also |
+|---------|------|
+| `spell_sync/application/` or architecture scripts | `python3 scripts/check_architecture.py --check` |
+| Mutation paths (Pull/Push/Recovery/lock) | skill `mutation-safety-audit` |
+| TUI screens / controller | skill `tui-flow` |
+| Diagnostics / redaction | skill `diagnostics-change` |
+| Packaging / wheel | skill `installed-wheel-smoke` when packaging changed |
+
+## Full CI (owner publish / final only)
+
+```bash
+scripts/ci.sh
+python3 scripts/check_ci_evidence.py
+```
+
+On failure: `python3 scripts/dev_runs.py failures`, `CI_SUMMARY` / `CI_LOG`.

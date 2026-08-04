@@ -10,7 +10,7 @@ reporting.
 | Role | Owns |
 |------|------|
 | Repository owner | Intent, scope approval, phase acceptance, release/push policy |
-| Cursor Agent | Code changes, focused validation, full CI, log analysis, docs/contracts sync |
+| Cursor Agent | Code changes, **local commits anytime on any branch**, local minimal validation, full CI only before push/release, docs/contracts sync |
 | Repository automation | Static checks, tests, coverage, packaging, machine-readable CI summary |
 
 The owner is not expected to grep CI logs, run individual test modules manually, fix
@@ -39,35 +39,38 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 1. Read `AGENTS.md` and applicable `.cursor/rules/**` / `.cursor/skills/**`.
 2. Read the architecture status block in `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
 3. Capture Git baseline for all three workspace repositories (`HEAD`, branch, `git status --porcelain=v2 --untracked-files=all`).
-4. Identify affected architecture boundaries (CLI, application, core, TUI).
-5. Read implementation code and existing tests for the changed scope.
-6. Make the smallest coherent change for the **current phase only**.
-7. Run focused tests via `select-and-run-tests` / `scripts/run_focused_tests.py`.
-8. Run architecture guards when application boundaries change.
-9. Run pre-final checks (`scripts/run_pre_final_checks.py`) before commits.
-10. Set phase status to `awaiting-approval` when implementation is complete; commit all tracked changes locally.
-11. Verify clean working trees (`git status --short`) in every affected repository.
-12. Final task state: `git stash list` must be empty in the public spell-sync repository.
+4. Inspect rollup: `python3 scripts/agent_context.py` (optional `--json`) for product
+   branch/dirty/necessity/suggested runners and sibling workspace repos when present
+   (`spell-words`, `spell-sync-dev` via env or conventional layout).
+5. Identify affected architecture boundaries (CLI, application, core, TUI).
+6. Read implementation code and existing tests for the changed scope.
+7. Make the smallest coherent change for the **current phase only**.
+8. Run **edit loop** validation: `python3 scripts/run_dev_loop.py` (no coverage).
+9. Run architecture guards when application boundaries change.
+10. Set phase status to `awaiting-approval` when implementation is complete; commit all tracked changes locally (local commits do not require owner approval).
+11. Run **commit gate**: `python3 scripts/run_dev_loop.py --commit-gate` (≤120s).
+12. Verify clean working trees (`git status --short`) in every affected repository.
+13. Final task state: `git stash list` must be empty in the public spell-sync repository.
     Do not hide unfinished work in persistent Git stash between phases; preserve separate WIP
     on a named local branch with a normal commit instead.
-13. Assess final validation need on the committed HEAD: `python3 scripts/check_ci_necessity.py --explain`.
-14. Run full `scripts/ci.sh` **once** when necessity is `full-required` (final evidence on committed HEAD).
-15. When necessity is `lightweight-sufficient`, run `python3 scripts/run_lightweight_validation.py` on committed HEAD.
-16. Verify final evidence: `python3 scripts/check_ci_evidence.py` (`CI_EVIDENCE_RESULT=success`).
-17. On failure: read `CI_LOG` and `CI_SUMMARY`; fix; focused rerun of failed gate; new corrective commit; clean tree; reassess necessity.
-18. Update every affected document, test, and contract in the same task (before step 10).
-19. On modifying tasks: workspace snapshot **after** successful evidence verification (see **Workspace snapshot**).
-20. Re-verify `git status --short` and `python3 scripts/check_ci_evidence.py` after snapshot.
+14. Assess local necessity: `python3 scripts/check_ci_necessity.py --purpose local --explain`.
+15. When result is `commit-gate-sufficient` or `lightweight-sufficient` / `no-action`: **do not**
+    run full CI. Use lightweight validation only when `lightweight-sufficient`.
+16. Run **full CI** (`scripts/ci.sh`) only for `--purpose publish` (`full-required`), explicit
+    owner “final/push/release”, or `release-candidate` workflows.
+17. Verify `python3 scripts/check_ci_evidence.py` **only** after full CI (or when reusing valid
+    publish evidence). Ordinary polish tasks may finish without new full-CI evidence.
+18. On full CI failure: read `CI_LOG` / `CI_SUMMARY`; fix; focused failed-gate rerun; new commit;
+    clean tree; reassess with `--purpose publish`.
+19. Update every affected document, test, and contract in the same task (before step 10).
+20. On modifying tasks: workspace snapshot after commit gate success (and full CI evidence when full CI ran).
 21. Produce an evidence-based report (see **Final report contract** below).
 
-After successful final CI and evidence verification, do not modify tracked repository files
-(ignored CI artifacts, owner snapshot outside repositories, and read-only inspection only).
+Staged validation modes: `docs/TESTING_STRATEGY.md` (local minimal + full CI).
 
-Staged validation levels and deduplication rules: `docs/TESTING_STRATEGY.md`.
-
-Execution time control (admission, immutable timing plans, bounded subprocess runs):
-`docs/EXECUTION_TIME_CONTROL.md`. Registered expensive commands run through the execution
-controller or integrated runners — not as unbounded direct subprocess calls. Rule:
+Execution time control (admission, immutable timing plans, bounded subprocess runs) applies to
+full CI and registered expensive commands: `docs/EXECUTION_TIME_CONTROL.md`. Local minimal
+`run_dev_loop.py` is outside edit-loop admission so micro validation is not blocked. Rule:
 `.cursor/rules/execution-time-control.mdc`. Skill: `run-time-controlled-command`.
 
 ## Current-phase lifecycle
@@ -200,7 +203,8 @@ Every completed phase or corrective task returns:
 
 ## Test selection
 - changed scope, clusters, skipped duplicate commands, reused run keys
-- full CI runs attempted (expected: 1) and reason for any additional run
+- Local minimal budget: wall vs 60s/120s (`DEV_LOOP_BUDGET_STATUS`); full CI: expected/soft vs actual
+- full CI runs attempted (expected: 0 for polish, 1 before push/release) and reason for any additional run
 
 ## 7. Full CI
 - CI_RESULT, CI_EXIT, CI_FAILED_ID, CI_SUMMARY, CI_LOG
@@ -267,14 +271,19 @@ must finalize the owner workspace snapshot **before** the final user report.
 
 Procedure — skill `create-code-snapshot` in spell-sync-dev:
 
-1. After commits, clean trees, final full CI, and `python3 scripts/check_ci_evidence.py` success: `--force`, then `--check`.
-2. Re-run `git status --short` and `python3 scripts/check_ci_evidence.py`; both must stay green.
-3. Canonical path: **`$HOME/code.zip` only** — the archive must live in the owner home
+1. After commits and clean trees: run commit gate (`run_dev_loop.py --commit-gate`) and
+   `python3 scripts/check_ci_necessity.py --purpose local --explain`. Ordinary polish tasks
+   may snapshot without a new full CI. When the owner requested push/release (full CI), require
+   successful `scripts/ci.sh` evidence and `python3 scripts/check_ci_evidence.py` first.
+2. Create snapshot with `--force`, then `--check`.
+3. Re-run `git status --short` (must stay clean). Re-run `check_ci_evidence.py` only when
+   full CI was part of this task.
+4. Canonical path: **`$HOME/code.zip` only** — the archive must live in the owner home
    directory (`Path.home() / "code.zip"`), not under the workspace tree. Do **not** use paths
    such as `$SPELL_SYNC_WORKSPACE/code.zip`, `~/code/code.zip`, or any repository parent
    directory. Prefer explicit `--output "$HOME/code.zip"` or omit `--output` (script default).
    No timestamped alternates; no hash sidecar file (`code.zip.sha256`) on disk.
-4. Read-only tasks: skip recreation; report §14 with `result: skipped`.
+5. Read-only tasks: skip recreation; report §14 with `result: skipped`.
 
 Report footer:
 

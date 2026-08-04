@@ -31,13 +31,14 @@ description: Change structured technical events, logging, history presentation, 
 ## Validation
 
 ```bash
-python3 scripts/run_focused_tests.py --cluster diagnostics-events
+python3 scripts/run_dev_loop.py --cluster diagnostics-events --commit-gate
 python3 -m pytest tests/tui/test_logs_screen.py -q
 python3 scripts/check_architecture.py --check
+python3 scripts/check_ci_necessity.py --purpose local --explain
 ```
 
-Assess CI necessity; run full `scripts/ci.sh` on committed HEAD when required. Verify
-`python3 scripts/check_ci_evidence.py`.
+Do not run full CI for ordinary diagnostics edits. L2 (`scripts/ci.sh` + `check_ci_evidence.py`)
+only for `--purpose publish` / owner final.
 
 Update `docs/architecture/DIAGNOSTICS.md` and ADR `docs/decisions/0004-structured-technical-events.md`
 when contracts change.
@@ -46,11 +47,12 @@ when contracts change.
 
 - `mutation-safety-audit` — when diagnostics touch mutation paths
 - `tui-flow` — Logs screen or operation progress UI
-- `spell-sync-ci` — final CI and evidence
+- `spell-sync-ci` — L2 publish CI and evidence
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
-skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
-re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
-footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks — after L1 (`run_dev_loop.py --commit-gate`). When L2 ran, require
+`python3 scripts/check_ci_evidence.py` success first.
+Skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
+SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.

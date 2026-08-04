@@ -1,0 +1,51 @@
+---
+description: Git branch, index, commit, and push policy for spell-sync
+alwaysApply: true
+---
+
+# Git change management
+
+Detail: skill `git-change-management`. Snapshot: `docs/AGENT_DEVELOPMENT.md`
+§ Workspace snapshot.
+
+## Local commits (no owner approval)
+
+The agent **may and should** create local commits on any local branch (including
+`main`) at any time during modifying work — checkpoints, WIP, and completed chunks
+— **without** waiting for operator approval.
+
+- Prefer small coherent commits after validation (`run_dev_loop.py` / `--commit-gate`)
+- Do not hide unfinished work in persistent `git stash`; use normal local commits
+  (or a named branch + WIP commit) instead
+
+## Commit shape (required)
+
+- One concern per commit (product vs tooling vs agent-config vs docs-only)
+- Subject: imperative mood, present tense, ~50–72 chars, ends with `.`
+- Subject says **why** / user-visible outcome — not a file list
+- Optional body: 1–3 lines of why/context; no bullet dumps of paths
+- Do **not** use Conventional Commit type prefixes (`feat:`, `fix:`, `docs:`)
+- Do **not** use wave/phase labels in the subject (`Wave E:`, `Phase 10:`)
+- Do **not** create empty “sync tracker to tip HEAD” commits; fold evidence notes
+  into the commit that produced the evidence
+
+## Still owner-gated
+
+- No `git push`, force-push, tag, GitHub Release, or package publish without an
+  explicit owner request
+- Never force-push `main` / `master`
+- Never stage personal wordlists, local `spell-sync.toml`, credentials, or
+  maintainer home paths
+- No history rewrite (`reset --hard`, `clean -fd`, rebase rewrite) without an
+  explicit owner request
+
+## Before a local commit
+
+1. `python3 scripts/agent_context.py` (optional `--json`) then `git status` / `git diff`.
+2. Validation appropriate to the boundary (edit loop or `--commit-gate`).
+3. Subject + optional body per **Commit shape** above.
+
+## Project note (vs nix-darwin)
+
+Local commits anywhere are allowed here without operator approval. Remote push
+remains owner-gated.

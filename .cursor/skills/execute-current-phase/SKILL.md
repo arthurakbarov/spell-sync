@@ -33,12 +33,8 @@ Read:
 - `git status --short` must be clean before starting a **new phase implementation**
 - run `python3 scripts/check_agent_config.py`
 - run `python3 scripts/check_docs_contract.py`
-- reuse existing full CI evidence when the tree is clean and
-  `python3 scripts/check_ci_evidence.py` succeeds (matching `ciInputDigest`; exact HEAD
-  optional for non-CI commits)
-- run baseline full CI only when necessity is `full-required`, evidence is missing or
-  failed, or the owner explicitly requests it; otherwise use lightweight validators and
-  phase-specific focused tests via skill `select-and-run-tests`
+- reuse existing publish CI evidence when available; do **not** start with full CI
+- use L0/L1 via skill `select-and-run-tests` / `run_dev_loop.py`
 
 ## Step 3 — start phase
 
@@ -73,12 +69,11 @@ Before edits, record:
 
 ## Step 6 — validate incrementally
 
-After logical chunks use skill `select-and-run-tests` (Levels 0–2). Do not run full CI
+After logical chunks use skill `select-and-run-tests` (L0). Do not run full CI
 during the edit loop.
 
-- focused pytest via `python3 scripts/run_focused_tests.py`
-- architecture tests when application boundaries change
-- changed-file Ruff only: `python3 -m ruff check <changed-python-files>`
+- `python3 scripts/run_dev_loop.py`
+- architecture check when application boundaries change
 - `git diff --check`
 
 ## Step 7 — update repository knowledge
@@ -90,60 +85,50 @@ Update in the same task when facts change:
 - agent rules/skills only when workflow or boundaries change
 - tests and documentation contracts
 
-## Step 8 — pre-final checks
-
-Run `python3 scripts/run_pre_final_checks.py` on the final uncommitted tree before commits.
-
-## Step 9 — awaiting approval and commits
+## Step 8 — commit and L1
 
 Set current phase status to `awaiting-approval` in the architecture status block.
 Create one logical local commit (or a short sequence if clearly separated). Do not push.
 
-## Step 10 — clean verification
-
-`git status --short` must be clean in every affected repository before final CI.
-
-## Step 11 — final validation
-
-Assess necessity on the committed HEAD:
-
 ```bash
-python3 scripts/check_ci_necessity.py --explain
+python3 scripts/run_dev_loop.py --commit-gate
 ```
 
-When `CI_NECESSITY_RESULT=full-required`, run full CI **once**:
+Pre-final polish (`run_pre_final_checks.py`) is optional for local work; it is not required
+before every commit.
+
+## Step 9 — clean verification
+
+`git status --short` must be clean in every affected repository.
+
+## Step 10 — local necessity (not full CI)
 
 ```bash
+python3 scripts/check_ci_necessity.py --purpose local --explain
+```
+
+When `commit-gate-sufficient` / `lightweight-sufficient` / `no-action`: do **not** run
+`scripts/ci.sh`. Run lightweight validation only when `lightweight-sufficient`.
+
+## Step 11 — L2 only on owner publish/final request
+
+Full CI is not part of ordinary phase completion. When the owner explicitly requests
+push/release/final, run L2 on committed HEAD:
+
+```bash
+python3 scripts/check_ci_necessity.py --purpose publish --explain
 scripts/ci.sh
-```
-
-When `CI_NECESSITY_RESULT=lightweight-sufficient`:
-
-```bash
-python3 scripts/run_lightweight_validation.py
-```
-
-On failure after full CI: diagnose failed check; fix files; focused failed-check validation;
-new corrective commit; clean tree; reassess necessity. Do not leave uncommitted fixes before
-final validation.
-
-Read `CI_RESULT`, `CI_EXIT`, `CI_SUMMARY`, `CI_LOG`, and `CI_FAILED_ID` on failure.
-
-## Step 12 — verify final evidence
-
-```bash
 python3 scripts/check_ci_evidence.py
 ```
 
-Require `CI_EVIDENCE_RESULT=success`. After success, do not modify tracked repository files.
-
-## Step 13 — report and stop
+## Step 12 — report and stop
 
 Return the final report contract from `docs/AGENT_DEVELOPMENT.md`. Stop. Do not start the next phase.
 
 ## Finalize workspace snapshot
 
-Modifying tasks only — after successful `python3 scripts/check_ci_evidence.py`:
-skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
-re-verify evidence and clean trees; canonical `$HOME/code.zip`; report §14 and
-footer `CODE_ARCHIVE` / `SHA256`. SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
+Modifying tasks — after L1 success (`run_dev_loop.py --commit-gate` / purpose local).
+When L2 ran, also require `python3 scripts/check_ci_evidence.py` success first.
+Then skill `create-code-snapshot` in spell-sync-dev with `--force`, then `--check`;
+canonical `$HOME/code.zip`; report §14 and footer `CODE_ARCHIVE` / `SHA256`.
+SSOT: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
