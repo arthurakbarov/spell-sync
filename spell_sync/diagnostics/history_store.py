@@ -8,7 +8,7 @@ import sys
 from contextlib import contextmanager
 from typing import Iterator
 
-from ..application.reports import OperationOutcome
+from ..operation_reports import OperationOutcome
 from .history_record import OperationHistoryRecord
 from .path_guard import (
     PathCheckResult,

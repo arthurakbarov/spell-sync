@@ -15,7 +15,7 @@ from .technical_event_model import (
 )
 
 if TYPE_CHECKING:
-    from ..application.reports import OperationOutcome, RecoveryOutcome
+    from ..operation_reports import OperationOutcome, RecoveryOutcome
     from ..project_setup.execute import ProjectSetupOutcome
     from ..project_setup.target_settings import TargetSettingsOutcome
 
@@ -33,7 +33,7 @@ def parse_target(value: str | None) -> TargetId | None:
 
 
 def operation_outcome_to_terminal(outcome: OperationOutcome) -> TerminalOutcome:
-    from ..application.reports import OperationOutcome as Outcome
+    from ..operation_reports import OperationOutcome as Outcome
 
     mapping = {
         Outcome.COMPLETED: TerminalOutcome.COMPLETED,
@@ -46,7 +46,7 @@ def operation_outcome_to_terminal(outcome: OperationOutcome) -> TerminalOutcome:
 
 
 def recovery_outcome_to_terminal(outcome: RecoveryOutcome) -> TerminalOutcome:
-    from ..application.reports import RecoveryOutcome as Outcome
+    from ..operation_reports import RecoveryOutcome as Outcome
 
     mapping = {
         Outcome.RECOVERED: TerminalOutcome.RECOVERED,
@@ -125,7 +125,7 @@ def build_technical_event(
     )
     parsed_outcome = outcome if isinstance(outcome, TerminalOutcome) or outcome is None else None
     if parsed_outcome is None and outcome is not None:
-        from ..application.reports import OperationOutcome, RecoveryOutcome
+        from ..operation_reports import OperationOutcome, RecoveryOutcome
 
         if isinstance(outcome, OperationOutcome):
             parsed_outcome = operation_outcome_to_terminal(outcome)

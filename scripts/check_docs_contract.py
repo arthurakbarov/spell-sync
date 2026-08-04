@@ -60,9 +60,7 @@ HISTORICAL_DOC_PATHS = frozenset(
         "docs/MANUAL_TESTING.md",
     }
 )
-PINNED_PYTHON_EXEMPT_PREFIXES = (
-    "docs/decisions/",
-)
+PINNED_PYTHON_EXEMPT_PREFIXES = ("docs/decisions/",)
 PRIVATE_PATH_DOC_PATTERNS = (
     re.compile(r"~/code(?:/|\b)"),
     re.compile(r"/Users/[A-Za-z0-9._-]+/"),

@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 
-from ..application.reports import (
+from ..operation_reports import (
     OperationReport,
     PullExecution,
     RecoveryExecution,

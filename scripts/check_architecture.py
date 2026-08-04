@@ -116,15 +116,6 @@ DEP_ALLOWED_APPLICATION_IMPORTERS = frozenset(
         "support_report_cmd.py",
     }
 )
-# Documented layering inversion: diagnostics history/types depend on application report DTOs.
-DEP_KNOWN_APPLICATION_EXCEPTIONS = frozenset(
-    {
-        "diagnostics/history_builder.py",
-        "diagnostics/history_store.py",
-        "diagnostics/technical_event_builder.py",
-        "diagnostics/types.py",
-    }
-)
 DEP_EXEMPT_PACKAGES = frozenset({"application", "tui"})
 RT_CONTEXTVAR_EXEMPT_PACKAGES = frozenset({"bundled"})
 
@@ -445,7 +436,7 @@ def _check_application_exports() -> list[ArchitectureViolation]:
 def _check_core_does_not_import_application() -> list[ArchitectureViolation]:
     violations: list[ArchitectureViolation] = []
     spell_sync = ROOT / "spell_sync"
-    allowed = DEP_ALLOWED_APPLICATION_IMPORTERS | DEP_KNOWN_APPLICATION_EXCEPTIONS
+    allowed = DEP_ALLOWED_APPLICATION_IMPORTERS
     for path in sorted(spell_sync.rglob("*.py")):
         rel = path.relative_to(spell_sync)
         if rel.parts and rel.parts[0] in DEP_EXEMPT_PACKAGES:

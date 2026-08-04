@@ -47,14 +47,21 @@ post-0.3-ops: in-progress
 Public version: `0.3.0` (`pyproject.toml`).
 
 Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-CON).
-Phase 10 is **complete**. Current tracker focus: `post-0.3-ops` (not started).
+Phase 10 is **complete**. Current tracker focus: `post-0.3-ops` (**in progress**).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
 
 Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD.
 
 Last recorded exact-head CI snapshot in this file (may lag tip by at most one docs-sync commit; tip evidence is authoritative):
-`03adfea`, run `20260803T233156.787500Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=791d2bdc…`.
+`6d525ec`, run `20260804T002345.002669Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=f4b4d3f5…`.
+
+Open engineering residuals (not release blockers if previously accepted):
+
+- Real-application manual validation: **0/35** (`docs/target-validation.json`)
+- Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
+- Legacy `*coverage*` padding inventory frozen at ≤373 `def test_` (see
+  `tests/test_padding_inventory_policy.py`) — do not grow; shrink only with coverage-preserving refactors
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -576,6 +583,11 @@ Delivered in this cycle (engineering polish, not release):
 - AGENT_DEVELOPMENT phase boundaries updated past Phase 3
 - Single shared coverage policy script in `ci_runner.py`
 - Docs contract hygiene: no `python3.N` commands and no maintainer topology paths in public docs
+- Canonical `spell_sync/operation_reports.py` — diagnostics no longer depends on application
+- Coverage-padding inventory frozen (`tests/test_padding_inventory_policy.py`)
+
+Open residuals: manual target validation 0/35; Windows hardware R1–R7; gradual retirement of
+legacy coverage-padding suites without weakening the 100%/96% CI gate.
 
 Not an architecture migration phase. Do not publish without an explicit owner command.
 
@@ -691,8 +703,9 @@ Summary:
 ## Last validation
 
 ```text
-Phase 10 (complete, owner-approved with residuals): HEAD 03adfea; CI 20260803T233156.787500Z; exact-head;
-  R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
+Phase 10 (complete, owner-approved with residuals): tip evidence authoritative via check-ci-evidence;
+  last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
+Post-0.3 ops (in progress): operation_reports extraction; coverage-padding freeze; docs/meta hygiene
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
@@ -704,8 +717,9 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-0.3 architecture migration **complete**. Current: `post-0.3-ops` (not started). Release/tag/
-publication and real-app manual validation remain owner-initiated only.
+0.3 architecture migration **complete**. Current: `post-0.3-ops` (**in progress**). Release/tag/
+publication, real-app manual validation, and Windows hardware adversarial evidence remain
+owner-initiated only.
 
 ## Deferred work
 

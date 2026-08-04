@@ -64,8 +64,9 @@ core / project_setup
 `scripts/check_architecture.py` (`ARCH-DEP-001`) resolves relative imports and allows only the
 CLI entry surface (`cli.py`, `cli_request_adapter.py`, `commands.py`, `*_cmd.py`,
 `command_helpers.py`, `doctor.py`, `removal_review.py`) plus `application/` and `tui/`.
-`spell_sync/diagnostics/` currently imports `application.reports` DTOs — recorded as a
-temporary known exception until shared outcome types move below application.
+Shared operation result DTOs live in `spell_sync/operation_reports.py` so diagnostics can
+import them without depending on the application layer; `application/reports.py` re-exports
+for compatibility.
 
 `ARCH-RT-001` forbids `ContextVar` anywhere under `spell_sync/` (except `bundled/`).
 

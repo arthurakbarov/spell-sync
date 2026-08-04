@@ -83,7 +83,9 @@ python3 scripts/check_architecture.py --check
 python3 scripts/check_agent_config.py
 ```
 
-Coverage gate (full CI): 100% lines, ≥96% branches on `spell_sync/`.
+Coverage gate (full CI): 100% lines, ≥96% branches on `spell_sync/`. Prefer behavior and
+invariant tests over line-execution padding. Legacy `*coverage*` padding suites are frozen
+by `tests/test_padding_inventory_policy.py` and must not grow.
 
 ## JSON output
 

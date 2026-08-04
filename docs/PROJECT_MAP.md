@@ -69,7 +69,8 @@ Immutable DTOs in `spell_sync/application/requests.py`:
 | `application/services/target_settings.py` | Target settings load and update |
 
 Presentation helpers: `application/builders.py`, `application/event_presenter.py`,
-`application/reports.py`, `application/runtime_resolver.py`.
+`application/reports.py` (compat re-export), `operation_reports.py` (canonical DTOs),
+`application/runtime_resolver.py`.
 
 ## Core mutation modules
 
