@@ -73,6 +73,30 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(default, presets[0][1])
         self.assertEqual(presets[0][0], "Documents")
 
+    def test_set_setup_storage_strategy_rejects_unknown(self):
+        from spell_sync.application.product_concepts import STORAGE_STRATEGY_LOCAL
+
+        controller = TuiController(fake_service(), CliOptions())
+        with self.assertRaisesRegex(ValueError, "unknown storage strategy"):
+            controller.set_setup_storage_strategy("not-a-strategy")
+        controller.set_setup_storage_strategy(STORAGE_STRATEGY_LOCAL)
+        self.assertEqual(controller.setup_storage_strategy(), STORAGE_STRATEGY_LOCAL)
+
+    async def test_storage_strategy_ignores_unknown_radio(self):
+        from spell_sync.application.product_concepts import STORAGE_STRATEGY_LOCAL
+
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            app.push_screen(SetupStorageStrategyScreen(controller))
+            await pilot.pause()
+            screen = app.screen
+            assert isinstance(screen, SetupStorageStrategyScreen)
+            pressed = MagicMock()
+            pressed.id = "storage-unknown"
+            screen.on_radio_set_changed(MagicMock(pressed=pressed))
+            self.assertEqual(screen._selected, STORAGE_STRATEGY_LOCAL)
+
     async def test_welcome_shown_when_project_missing(self):
         missing = ProjectSetupState(
             status=ProjectSetupStatus.MISSING_PROJECT,
