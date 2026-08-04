@@ -29,9 +29,9 @@ Documented and accepted for initial release; follow-up on second machine or late
 
 | ID | Topic |
 |----|-------|
-| R-WIN | Windows real-hardware adversarial validation (reparse/junction) |
+| R-WIN | Windows real-hardware adversarial validation (reparse/junction) — **not runnable on this macOS host** |
 | R-PWR | Legacy coverage padding inventory (frozen; shrink only; tiered gate allows ≥98% on TUI/presentation) |
-| R-CON | Real-application manual validation coverage (see `docs/target-validation.json`) |
+| R-CON | Real-application manual validation coverage (see `docs/target-validation.json`) — **partial**: chrome/macos + macos_spelling/macos recorded 2026-08-05 (read-only); Firefox + mutation samples still open |
 
 ## Second-machine follow-up
 

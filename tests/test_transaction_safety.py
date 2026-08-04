@@ -815,6 +815,20 @@ class TestCrashRecoveryMatrix(unittest.TestCase):
                 ),
             ),
             (
+                "target_write_started_not_completed",
+                lambda wl, dp: write_restore_scenario_journal(
+                    wl,
+                    dp,
+                    current_wordlist="old\n",
+                    backup_wordlist="old\n",
+                    current_dict="new\n",
+                    backup_dict="old\n",
+                    target_write_completed=False,
+                    wordlist_write_started=False,
+                    wordlist_write_completed=False,
+                ),
+            ),
+            (
                 "rollback_incomplete",
                 lambda wl, _dp: write_test_journal(
                     wl,
@@ -830,17 +844,21 @@ class TestCrashRecoveryMatrix(unittest.TestCase):
                     wordlist.write_text("old\n", encoding="utf-8")
                     dict_path.write_text("old\n", encoding="utf-8")
                     journal = setup(wordlist, dict_path)
-                    if label == "existing_dict_post_image":
+                    if label in {
+                        "existing_dict_post_image",
+                        "target_write_started_not_completed",
+                    }:
                         result = recover_from_journal(journal)
                         self.assertIn("d", result.restored)
                         self.assertEqual(dict_path.read_text(encoding="utf-8"), "old\n")
-                        cleanup_after_successful_recovery(journal)
-                        self.assertFalse(
-                            push_tx_mod.txn_snapshot_root(
-                                wordlist,
-                                journal.transaction_id,
-                            ).exists()
-                        )
+                        if label == "existing_dict_post_image":
+                            cleanup_after_successful_recovery(journal)
+                            self.assertFalse(
+                                push_tx_mod.txn_snapshot_root(
+                                    wordlist,
+                                    journal.transaction_id,
+                                ).exists()
+                            )
                     elif label == "wordlist_before_replace":
                         result = recover_from_journal(journal)
                         self.assertNotIn("wordlist", result.conflicts)

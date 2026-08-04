@@ -50,11 +50,11 @@
       "platform": "macos",
       "implementation": "implemented",
       "automated_validation": "pass",
-      "manual_validation": "not-run",
-      "application_version": null,
-      "tested_on": null,
-      "notes": null,
-      "evidence": null
+      "manual_validation": "pass",
+      "application_version": "Google Chrome 151.0.7922.72",
+      "tested_on": "2026-08-05",
+      "notes": "Read-only sample on maintainer macOS 26.5.2: doctor discovery (chrome:Default read_status=ok), status, and push plan --json dry-run. No Pull/Push execution and no primary-profile mutation.",
+      "evidence": "platform-validation skill; dry-run only"
     },
     {
       "target_id": "chrome",
@@ -270,11 +270,11 @@
       "platform": "macos",
       "implementation": "implemented",
       "automated_validation": "pass",
-      "manual_validation": "not-run",
-      "application_version": null,
-      "tested_on": null,
-      "notes": null,
-      "evidence": null
+      "manual_validation": "pass",
+      "application_version": "macOS 26.5.2 LocalDictionary",
+      "tested_on": "2026-08-05",
+      "notes": "Read-only sample: doctor discovery (macos read_status=ok; macos-applespell unreadable/TCC as expected), status, push plan dry-run. No dictionary mutation.",
+      "evidence": "platform-validation skill; dry-run only"
     },
     {
       "target_id": "neovim",

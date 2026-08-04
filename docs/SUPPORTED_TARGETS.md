@@ -27,7 +27,7 @@ Brave | linux | Yes | Yes | full | multi-profile | not-required | pass | not-run
 Brave | macos | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Brave | windows | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Chrome | linux | Yes | Yes | full | multi-profile | block-if-running | pass | not-run | —
-Chrome | macos | Yes | Yes | full | multi-profile | block-if-running | pass | not-run | —
+Chrome | macos | Yes | Yes | full | multi-profile | block-if-running | pass | pass | 2026-08-05
 Chrome | windows | Yes | Yes | full | multi-profile | block-if-running | pass | not-run | —
 Edge | linux | Yes | Yes | full | multi-profile | block-if-running | pass | not-run | —
 Edge | macos | Yes | Yes | full | multi-profile | block-if-running | pass | not-run | —
@@ -47,7 +47,7 @@ JetBrains | windows | Yes | Yes | full | multi-profile | not-required | pass | n
 LibreOffice | linux | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 LibreOffice | macos | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 LibreOffice | windows | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
-macOS Spelling | macos | Yes | Yes | full | system-managed | not-required | pass | not-run | —
+macOS Spelling | macos | Yes | Yes | full | system-managed | not-required | pass | pass | 2026-08-05
 Neovim | linux | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Neovim | macos | Yes | Yes | full | multi-profile | not-required | pass | not-run | —
 Neovim | windows | Yes | Yes | full | multi-profile | not-required | pass | not-run | —

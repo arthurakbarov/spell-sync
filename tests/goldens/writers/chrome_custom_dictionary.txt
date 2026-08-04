@@ -1,0 +1,4 @@
+alpha
+Beta
+слово
+checksum_v1 = 8e8480275be39a563117a85d40ea6874

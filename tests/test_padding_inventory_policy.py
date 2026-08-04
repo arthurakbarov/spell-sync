@@ -47,7 +47,9 @@ def _looks_like_padding(path: Path) -> bool:
 
 
 def _coverage_named_files() -> list[Path]:
-    return sorted(path for path in TESTS.rglob("*.py") if path.is_file() and _looks_like_padding(path))
+    return sorted(
+        path for path in TESTS.rglob("*.py") if path.is_file() and _looks_like_padding(path)
+    )
 
 
 def test_coverage_named_files_are_frozen() -> None:

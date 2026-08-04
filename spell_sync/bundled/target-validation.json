@@ -46,13 +46,24 @@
       "tested_on": null
     },
     {
+      "application_version": "Google Chrome 151.0.7922.72",
+      "automated_validation": "pass",
+      "evidence": "platform-validation skill; dry-run only",
+      "implementation": "implemented",
+      "manual_validation": "pass",
+      "notes": "Read-only sample on maintainer macOS 26.5.2: doctor discovery (chrome:Default read_status=ok), status, and push plan --json dry-run. No Pull/Push execution and no primary-profile mutation.",
+      "platform": "macos",
+      "target_id": "chrome",
+      "tested_on": "2026-08-05"
+    },
+    {
       "application_version": null,
       "automated_validation": "pass",
       "evidence": null,
       "implementation": "implemented",
       "manual_validation": "not-run",
       "notes": null,
-      "platform": "macos",
+      "platform": "windows",
       "target_id": "chrome",
       "tested_on": null
     },
@@ -63,17 +74,6 @@
       "implementation": "implemented",
       "manual_validation": "not-run",
       "notes": null,
-      "platform": "windows",
-      "target_id": "chrome",
-      "tested_on": null
-    },
-    {
-      "application_version": null,
-      "automated_validation": "pass",
-      "evidence": null,
-      "implementation": "implemented",
-      "manual_validation": "not-run",
-      "notes": null,
       "platform": "linux",
       "target_id": "edge",
       "tested_on": null
@@ -266,15 +266,15 @@
       "tested_on": null
     },
     {
-      "application_version": null,
+      "application_version": "macOS 26.5.2 LocalDictionary",
       "automated_validation": "pass",
-      "evidence": null,
+      "evidence": "platform-validation skill; dry-run only",
       "implementation": "implemented",
-      "manual_validation": "not-run",
-      "notes": null,
+      "manual_validation": "pass",
+      "notes": "Read-only sample: doctor discovery (macos read_status=ok; macos-applespell unreadable/TCC as expected), status, push plan dry-run. No dictionary mutation.",
       "platform": "macos",
       "target_id": "macos_spelling",
-      "tested_on": null
+      "tested_on": "2026-08-05"
     },
     {
       "application_version": null,

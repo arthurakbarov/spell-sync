@@ -68,6 +68,9 @@ def write_restore_scenario_journal(
     backup_wordlist: str = "old\n",
     current_dict: str = "new\n",
     backup_dict: str = "old\n",
+    target_write_completed: bool = True,
+    wordlist_write_started: bool = True,
+    wordlist_write_completed: bool = True,
 ) -> PushJournal:
     wordlist.write_text(current_wordlist, encoding="utf-8")
     dict_path.write_text(current_dict, encoding="utf-8")
@@ -93,8 +96,8 @@ def write_restore_scenario_journal(
         wordlist_hash_before=hash_before_wl,
         wordlist_hash_after=hash_after_wl,
         wordlist_backup_path=str(wl_backup),
-        wordlist_write_started=True,
-        wordlist_write_completed=True,
+        wordlist_write_started=wordlist_write_started,
+        wordlist_write_completed=wordlist_write_completed,
         snapshot_dir=str(snap),
         targets=[
             JournalTarget(
@@ -105,7 +108,7 @@ def write_restore_scenario_journal(
                 backup_path=str(dict_backup),
                 existed_before=True,
                 write_started=True,
-                write_completed=True,
+                write_completed=target_write_completed,
             ),
         ],
     )

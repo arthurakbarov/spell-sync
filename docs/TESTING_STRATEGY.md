@@ -21,12 +21,26 @@ with explicit owner approval (see `tests/test_padding_inventory_policy.py`, resi
 coverage into behavioral modules and delete padding tests so the ceiling can drop later.
 
 **Property tests:** `tests/test_sync_invariants_property.py` (Hypothesis) covers casefold
-Pull union absorption/commutativity and Push subset idempotence. Keep examples bounded;
-do not replace safety integration tests.
+Pull union absorption/commutativity/associativity, Push subset filters, and synthetic
+Pull → Push → Pull stability. Keep examples bounded; do not replace safety integration tests.
+
+**Writer goldens:** `tests/test_writer_goldens.py` + `tests/goldens/writers/` snapshot Chrome,
+Firefox/text, Hunspell, JetBrains XML, and Sublime JSON outputs. Update goldens only when
+writer format intentionally changes.
+
+**CLI startup budget:** `tests/test_cli_import_surface.py` asserts Textual stays unloaded on
+`import spell_sync.cli` and cold `status --json` stays under catastrophic budgets (750ms /
+2500ms).
+
+**Crash mid-journal:** `TestCrashRecoveryMatrix` includes target `write_started` without
+`write_completed` (post-image → restore). Do not grow coverage-padding for more crash points.
 
 **Publish sampling (R-CON):** before owner publish, record at least three real-application
 manual validations on the primary maintainer OS (recommended first sample: Chrome, Firefox,
-system spelling) via skill `platform-validation`. Synthetic CI is not a substitute.
+system spelling) via skill `platform-validation`. Synthetic CI is not a substitute. Current
+sample includes chrome/macos and macos_spelling/macos (read-only discovery + push plan).
+
+**Windows adversarial (R-WIN):** R1–R7 remain owner hardware only — not simulated in CI.
 
 **History compaction tests** use the shared `history_record_cap` fixture
 (`tests/history_test_utils.py`) so full CI does not spend seconds writing 500+ JSONL rows

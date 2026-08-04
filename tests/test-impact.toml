@@ -113,6 +113,7 @@ production = [
 moduleTests = [
   "tests/test_pull_safety.py",
   "tests/test_sync_invariants_property.py",
+  "tests/test_writer_goldens.py",
 ]
 clusterTests = [
   "tests/test_dry_run.py",
@@ -121,6 +122,7 @@ clusterTests = [
   "tests/test_symlinks.py",
   "tests/test_sync_run.py",
   "tests/test_sync_invariants_property.py",
+  "tests/test_writer_goldens.py",
   "tests/tui/test_pull_flow.py",
 ]
 validators = [
@@ -255,6 +257,7 @@ production = [
 moduleTests = [
   "tests/test_json_contract.py",
   "tests/test_application_requests.py",
+  "tests/test_cli_import_surface.py",
 ]
 clusterTests = [
   "tests/test_cli.py",
@@ -262,6 +265,7 @@ clusterTests = [
   "tests/test_json_contract.py",
   "tests/test_json_output.py",
   "tests/test_application_requests.py",
+  "tests/test_cli_import_surface.py",
 ]
 validators = []
 
