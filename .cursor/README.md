@@ -54,7 +54,7 @@ keeps feature-branch + explicit-commit policy.
 | `project-safety.mdc` | Mutation + release/privacy invariants |
 | `git-change-management.mdc` | Local commits anytime; push/tag/publish owner-gated |
 | `karpathy-guidelines.mdc` | Simplicity / surgical diffs |
-| `no-canvas-for-text.mdc` | Prefer prose over canvas for short text |
+| `no-canvas-for-text.mdc` | Never use Canvas for text/tables — reply in chat |
 
 ## On-edit rules (globs)
 
