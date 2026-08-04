@@ -27,6 +27,7 @@ from spell_sync.tui.screens.setup_welcome_screen import (
     ChangeWordlistScreen,
     SetupOpenProjectScreen,
     SetupPreviewScreen,
+    SetupStorageStrategyScreen,
     SetupWelcomeScreen,
     SetupWordlistScreen,
 )
@@ -43,6 +44,25 @@ def _missing_project_state() -> ProjectSetupState:
         can_start_wizard=True,
         detail=None,
     )
+
+
+async def _advance_to_wordlist(pilot, app: SpellSyncApp) -> None:
+    """Welcome -> storage strategy -> wordlist."""
+    await wait_for_text(pilot, "#welcome-content", "Welcome")
+    await pilot.click("#btn-setup")
+    await pilot.pause()
+    assert isinstance(app.screen, SetupStorageStrategyScreen)
+    await pilot.click("#btn-continue")
+    await pilot.pause()
+    assert isinstance(app.screen, SetupWordlistScreen)
+
+
+async def _advance_to_targets(pilot, app: SpellSyncApp) -> None:
+    """Welcome -> storage -> wordlist -> targets."""
+    await _advance_to_wordlist(pilot, app)
+    await pilot.click("#btn-continue")
+    await pilot.pause()
+    assert isinstance(app.screen, SetupTargetsScreen)
 
 
 class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
@@ -100,10 +120,10 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
-            await wait_for_text(pilot, "#welcome-content", "Welcome")
-            await pilot.click("#btn-setup")
+            await _advance_to_wordlist(pilot, app)
+            await pilot.click("#btn-back")
             await pilot.pause()
-            self.assertIsInstance(app.screen, SetupWordlistScreen)
+            self.assertIsInstance(app.screen, SetupStorageStrategyScreen)
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, SetupWelcomeScreen)
@@ -152,12 +172,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
-            await wait_for_text(pilot, "#welcome-content", "Welcome")
-            await pilot.click("#btn-setup")
-            await pilot.pause()
-            await pilot.click("#btn-continue")
-            await pilot.pause()
-            self.assertIsInstance(app.screen, SetupTargetsScreen)
+            await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
             app.screen.on_button_pressed(event)
@@ -196,8 +211,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
-            await pilot.click("#btn-setup")
-            await pilot.pause()
+            await _advance_to_wordlist(pilot, app)
             app.screen.query_one("#wordlist-input").value = "   "
             await pilot.click("#btn-continue")
             await pilot.pause()
@@ -215,14 +229,12 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
-            await pilot.click("#btn-setup")
-            await pilot.pause()
-            await pilot.click("#btn-continue")
-            await pilot.pause()
+            await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
             app.screen.on_button_pressed(event)
             await pilot.pause()
+            self.assertIsInstance(app.screen, SetupPreviewScreen)
             await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, SetupTargetsScreen)
@@ -253,14 +265,12 @@ class TestSetupPreviewScreen(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
-            await pilot.click("#btn-setup")
-            await pilot.pause()
-            await pilot.click("#btn-continue")
-            await pilot.pause()
+            await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
             app.screen.on_button_pressed(event)
             await pilot.pause()
+            self.assertIsInstance(app.screen, SetupPreviewScreen)
             await pilot.click("#btn-create")
             await pilot.pause()
             await pilot.pause()

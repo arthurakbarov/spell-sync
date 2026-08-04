@@ -93,7 +93,7 @@ keeps feature-branch + explicit-commit policy.
 | `add-target` / `platform-validation` | Application dictionary targets |
 | `spell-sync-ci` / `release-candidate` / `installed-wheel-smoke` | Publish CI + packaging |
 | `privacy-export` | Public artifact scan (pairs with `security-audit`) |
-| `project-safety` / packaging-privacy / product-language | Product invariants |
+| `project-safety` / packaging-privacy / product-language | Product invariants (rules) |
 | Workspace snapshot | Three-repo maintainer topology via spell-sync-dev |
 
 ## Surfaces

@@ -45,11 +45,12 @@ rg -i 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_' .
 
 ## Full gate (owner push / publish / final only)
 
-From maintainer workspace when the owner asked to publish:
+From the **spell-sync-dev** maintainer workspace when the owner asked to publish
+(`$SPELL_SYNC_DEV`, typically alongside this repo under `$HOME/code/`):
 
 ```bash
-scripts/preflight-publish.sh
-python3 scripts/create-tool-evidence-archive.py --force
+"$SPELL_SYNC_DEV/scripts/preflight-publish.sh"
+python3 "$SPELL_SYNC_DEV/scripts/create-tool-evidence-archive.py" --force
 ```
 
 ## Related
