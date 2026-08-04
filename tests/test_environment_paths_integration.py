@@ -75,7 +75,7 @@ def test_assess_ci_necessity_requires_full_ci_when_temp_paths_have_no_summary(
     )
     assert not temp_paths.ci_summary_path.is_file()
 
-    result = assess_ci_necessity(repo, paths=temp_paths)
+    result = assess_ci_necessity(repo, paths=temp_paths, purpose="publish")
     assert result.result == "full-required"
     assert result.result != "no-action"
     assert result.reason in {"missing-valid-evidence", "run-head-unavailable", "ci-input-mismatch"}

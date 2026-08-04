@@ -22,11 +22,11 @@ preview (immutable prepared plan + RuntimeIdentity)
 |------|--------|
 | No stale preview execution | Changed runtime or fingerprint after preview → safe stop |
 | No automatic replan | User must run preview again |
-| Pending Recovery blocks writes | New Pull/Push/Recovery blocked until resolved |
+| Pending Recovery blocks new writes | New Pull/Push blocked until Recovery resolves the pending journal; Recovery itself is allowed |
 | Operation lock | One mutating operation per project at a time |
-| Internal artifact containment | `.spell-sync.lock`, journal, and `.spell-sync.txn` paths reject symlinks/reparse points and stay under the project root via `secure_artifacts` |
+| Internal artifact containment | `.spell-sync.lock`, journal, and `.spell-sync.txn` paths reject symlinks/reparse points and stay under the project root via `secure_artifacts` (best-effort on Windows reparse/junction — see R-WIN) |
 | Rollback precedence | Incomplete rollback preserves journal and snapshots regardless of journal update or cleanup errors |
-| Durability | Journal publication fsyncs temp file and parent directory (POSIX best effort); see ADR 0005 |
+| Durability | Journal publication fsyncs temp file and parent directory (POSIX best effort); physical power-loss proof not claimed (R-PWR) |
 | Atomic dictionary writes | Snapshots + journal v2 + rollback paths |
 | Privacy | User words never stored in history or technical logs |
 | TUI boundary | No subprocess CLI; no direct dictionary/journal writers |

@@ -40,8 +40,8 @@ Optional typed metadata on `TechnicalEvent`:
 | `outcome` | `TerminalOutcome` |
 | `completed`, `total` | non-negative integers with `completed <= total` when both set |
 
-No arbitrary key/value bags. `EventLevel` remains a backward-compatible alias for
-`EventSeverity`.
+No arbitrary key/value bags. Presentation uses `EventSeverity` directly (the former
+`EventLevel` alias was removed after Phase 10).
 
 ### 2. Stable event IDs
 

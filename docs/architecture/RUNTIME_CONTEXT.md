@@ -10,7 +10,7 @@ ProjectRef / request
   → RuntimeResolver
   → ResolvedRuntime (config + journal + RuntimeIdentity)
   → RuntimeContext (wordlist, RuntimeSettings, dictionaries, strict_push)
-  → sync_run / push_* / pull / setup / diagnostics
+  → sync_run / push_* / project_setup / diagnostics
 ```
 
 `_runtime_factory` is private to resolution paths. CLI and TUI do not construct runtime

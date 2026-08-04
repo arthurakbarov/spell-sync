@@ -12,13 +12,13 @@ copy them into supported apps' **custom** dictionaries.
 
 ```text
 Collect my words:   your apps → your word list   (Pull)
-Update apps:     your word list → your apps   (Push)
+Update my apps:     your word list → your apps   (Push)
 ```
 
 You always see a **preview** before anything changes.
 
 - **Collect my words** never removes words from your personal list.
-- **Update apps** may remove custom words that are no longer in your personal list.
+- **Update my apps** may remove custom words that are no longer in your personal list.
 - **Built-in dictionaries are never changed.**
 
 **New here?** Follow **[Getting Started](docs/GETTING_STARTED.md)** — folder → `spell-sync` →

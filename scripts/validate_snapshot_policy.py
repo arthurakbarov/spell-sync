@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
-import os
 import re
+import sys
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SNAPSHOT_POLICY = Path("/Users/arthurakbarov/code/spell-sync-dev/snapshot-policy.toml")
-DEFAULT_SNAPSHOT_SCRIPT = Path(
-    "/Users/arthurakbarov/code/spell-sync-dev/scripts/create-code-snapshot.py"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.execution_control.snapshot_workspace import (  # noqa: E402
+    resolve_spell_sync_dev_root,
 )
 
 DOC_PATHS = (
@@ -30,26 +32,14 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _resolve_snapshot_dev_paths() -> tuple[Path, Path]:
-    env_root = os.environ.get("SPELL_SYNC_DEV_ROOT", "").strip()
-    if env_root:
-        dev_root = Path(env_root).expanduser().resolve()
-        return (
-            dev_root / "snapshot-policy.toml",
-            dev_root / "scripts" / "create-code-snapshot.py",
-        )
-    if DEFAULT_SNAPSHOT_POLICY.is_file() and DEFAULT_SNAPSHOT_SCRIPT.is_file():
-        return DEFAULT_SNAPSHOT_POLICY, DEFAULT_SNAPSHOT_SCRIPT
-    candidates = (
-        ROOT.parent.parent / "spell-sync-dev",
-        ROOT.parent / "spell-sync-dev",
+def _resolve_snapshot_dev_paths() -> tuple[Path, Path] | None:
+    dev_root = resolve_spell_sync_dev_root(ROOT)
+    if dev_root is None:
+        return None
+    return (
+        (dev_root / "snapshot-policy.toml").resolve(),
+        (dev_root / "scripts" / "create-code-snapshot.py").resolve(),
     )
-    for candidate in candidates:
-        policy = candidate / "snapshot-policy.toml"
-        script = candidate / "scripts" / "create-code-snapshot.py"
-        if policy.is_file() and script.is_file():
-            return policy.resolve(), script.resolve()
-    return DEFAULT_SNAPSHOT_POLICY, DEFAULT_SNAPSHOT_SCRIPT
 
 
 def _check_snapshot_policy(policy_path: Path) -> list[str]:
@@ -256,10 +246,17 @@ def _check_docs_no_tmp_workaround() -> list[str]:
 
 
 def main() -> int:
-    policy_path, script_path = _resolve_snapshot_dev_paths()
+    resolved = _resolve_snapshot_dev_paths()
     errors: list[str] = []
-    errors.extend(_check_snapshot_policy(policy_path))
-    errors.extend(_check_snapshot_script(script_path))
+    if resolved is None:
+        errors.append(
+            "[SNAPSHOT-POLICY-008] spell-sync-dev root not found; "
+            "remediation: set SPELL_SYNC_DEV_ROOT or place spell-sync-dev next to the workspace"
+        )
+    else:
+        policy_path, script_path = resolved
+        errors.extend(_check_snapshot_policy(policy_path))
+        errors.extend(_check_snapshot_script(script_path))
     errors.extend(_check_docs_home_snapshot_path())
     errors.extend(_check_docs_no_tmp_workaround())
 

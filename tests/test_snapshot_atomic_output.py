@@ -13,13 +13,10 @@ import pytest
 from scripts.execution_control.snapshot_workspace import resolve_spell_sync_dev_root
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DEV_ROOT = Path("/Users/arthurakbarov/code/spell-sync-dev")
 
 
 def _load_snapshot_module():
     dev_root = resolve_spell_sync_dev_root(ROOT)
-    if dev_root is None and DEFAULT_DEV_ROOT.is_dir():
-        dev_root = DEFAULT_DEV_ROOT
     if dev_root is None:
         pytest.skip("spell-sync-dev create-code-snapshot.py unavailable")
     script = dev_root / "scripts" / "create-code-snapshot.py"
@@ -61,7 +58,9 @@ def test_should_skip_path_excludes_dot_venv_from_archive_walk(tmp_path: Path) ->
 
 def test_create_snapshot_uses_beside_output_candidate_name() -> None:
     snapshot = _load_snapshot_module()
-    dev_root = resolve_spell_sync_dev_root(ROOT) or DEFAULT_DEV_ROOT
+    dev_root = resolve_spell_sync_dev_root(ROOT)
+    if dev_root is None:
+        pytest.skip("spell-sync-dev create-code-snapshot.py unavailable")
     text = (dev_root / "scripts" / "create-code-snapshot.py").read_text(encoding="utf-8")
     assert ".code.zip.tmp-" in text
     assert "os.replace(" in text

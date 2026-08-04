@@ -20,12 +20,6 @@ REQUIRED_DOC_SECTIONS = (
     "## Upgrade policies",
 )
 
-CANONICAL_JOB_MARKERS = (
-    "ubuntu-latest",
-    "3.12.13",
-    "scripts/ci_runner.py",
-)
-
 COMPATIBILITY_EXPECTATIONS = (
     ("ubuntu-latest", "3.11"),
     ("macos-latest", "3.12"),

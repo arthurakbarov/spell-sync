@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (corrective work, phase-10 awaiting approval)
+Accepted (corrective work completed with phase-10)
 
 ## Context
 

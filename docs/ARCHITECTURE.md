@@ -61,7 +61,7 @@ immutable application request
     ↓
 SpellSyncService
     ↓
-ValidatedRuntime (config + journal, under lock)
+ResolvedRuntime (config + journal, under lock)
     ↓
 SyncRun / command logic
     ↓
@@ -96,7 +96,7 @@ validated before serialization. See ADR `docs/decisions/0004-structured-technica
 | `application/service.py` | Facade for CLI and TUI |
 | `commands.py` | `pull`, `push`, `status`, `init`, `lint` |
 | `sync_context.py` | `RuntimeContext` — wordlist, config, dictionaries |
-| `validated_runtime.py` | Single config/journal load under lock |
+| `resolved_runtime.py` | Resolved runtime (config + journal) under lock |
 | `sync_run.py` | Dictionary reads, diffs, push/pull orchestration |
 | `push_prepared.py` | Immutable `PreparedPush` plan |
 | `push_render.py` | Pre-compute `hash_after` payloads |
@@ -131,8 +131,9 @@ Envelope `schema_version: 1` on all `--json` output. Journal internal schema is 
 
 ## Testing
 
-100% line coverage on `spell_sync/` enforced in CI. Regression tests for transaction safety live
-in `tests/test_transaction_safety.py` and `tests/test_push_safety_coverage.py`.
+L2 publish CI (`scripts/ci.sh`) enforces 100% line and ≥96% branch coverage on `spell_sync/`.
+Ordinary edit cycles use L0/L1 (`run_dev_loop.py`) without coverage. Regression tests for
+transaction safety live in `tests/test_transaction_safety.py` and `tests/test_push_safety_coverage.py`.
 
 ## Further reading
 

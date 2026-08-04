@@ -47,6 +47,6 @@ def test_arbitrary_module_name_uses_temporary_evidence_root(tmp_path: Path) -> N
     temp_paths = environment_paths_module.test_environment_paths(
         tmp_path / "home", project_root=repo
     )
-    result = _load_necessity_mod().assess_ci_necessity(repo, paths=temp_paths)
+    result = _load_necessity_mod().assess_ci_necessity(repo, paths=temp_paths, purpose="publish")
     assert result.result == "full-required"
     assert not temp_paths.ci_summary_path.exists()

@@ -61,12 +61,15 @@ core / project_setup
   ✗ must not import spell_sync.application (absolute or relative)
 ```
 
-`scripts/check_architecture.py` (`ARCH-DEP-001`) resolves relative imports and allows only the
-CLI entry surface (`cli.py`, `cli_request_adapter.py`, `commands.py`, `*_cmd.py`,
-`command_helpers.py`, `doctor.py`, `removal_review.py`) plus `application/` and `tui/`.
+`scripts/check_architecture.py` emits violation IDs with prefix `ARCH` (for example
+`ARCH-DEP-001` for dependency direction, `ARCH-RT-001` for `ContextVar` bans). It resolves
+relative imports and allows only the
+CLI entry surface (`cli.py`, `cli_request_adapter.py`, `commands.py`, `command_helpers.py`,
+`doctor.py`, `plan_cmd.py`, `recover_cmd.py`, `support_report_cmd.py`) plus `application/` and
+`tui/`.
 Shared operation result DTOs live in `spell_sync/operation_reports.py` so diagnostics can
 import them without depending on the application layer; `application/reports.py` re-exports
-for compatibility.
+them as the stable application/TUI import surface.
 
 `ARCH-RT-001` forbids `ContextVar` anywhere under `spell_sync/` (except `bundled/`).
 

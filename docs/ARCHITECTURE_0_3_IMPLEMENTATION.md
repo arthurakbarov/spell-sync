@@ -13,12 +13,13 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 Phase 10: version 0.3.0 — **complete** (owner-approved with documented residuals:
 R-WIN, R-PWR, R-CON). Release not performed.
 
-Post-0.3 ops: **in progress** — documentation/meta hardening and CI hygiene after Phase 10
-approval. Release/tag/publication and real-app / Windows hardware validation remain
-owner-initiated and are **not** claimed complete by this cycle.
+Post-0.3 ops: **complete** (engineering). Product UX waves A–F, local two-mode
+validation, ETA/observe, agent-contract unification with nix-darwin naming, and
+engineering/product completion docs are landed. Criterion 9 (owner publish) and
+residuals R-WIN / R-PWR / R-CON remain owner-initiated only.
 
 [architecture-status:start]
-current: post-0.3-ops
+current: owner-publish
 phase-1: complete
 phase-2: complete
 phase-2b: complete
@@ -33,7 +34,8 @@ phase-7: complete
 phase-8: complete
 phase-9: complete
 phase-10: complete
-post-0.3-ops: in-progress
+post-0.3-ops: complete
+owner-publish: not-started
 [architecture-status:end]
 
 ## Verified baseline
@@ -47,14 +49,15 @@ post-0.3-ops: in-progress
 Public version: `0.3.0` (`pyproject.toml`).
 
 Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-CON).
-Phase 10 is **complete**. Current tracker focus: `post-0.3-ops` (**in progress**).
+Phase 10 is **complete**. Post-0.3 ops is **complete** (engineering). Current tracker
+focus: `owner-publish` (**not started** — awaits explicit owner push/tag/release).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
 
 Implementation patch range (product corrective through readiness): `ad37965` … tip HEAD.
 
 Last recorded exact-head CI snapshot in this file (may lag tip by at most one docs-sync commit; tip evidence is authoritative):
-`43e4ea7`, run `20260804T003904.407326Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=14c3f4cb…`.
+`cca3c84`, run `20260804T061239.056921Z`, `CI_EVIDENCE_MATCH=exact-head`, `ciInputDigest=2c19f452…`.
 
 Open engineering residuals (not release blockers if previously accepted):
 
@@ -86,7 +89,7 @@ CLI (cli.py, commands.py, *_cmd.py)
   → private _runtime_factory
   → ResolvedRuntime (config + journal + RuntimeIdentity)
   → RuntimeContext (wordlist, RuntimeSettings, dictionaries, strict_push)
-  → sync_run / push_* / pull / project_setup / diagnostics (core)
+  → sync_run / push_* / project_setup / diagnostics (core)
 
 TUI (tui/controller.py, screens/)
   → typed requests + SpellSyncService protocol
@@ -132,8 +135,8 @@ No production `ContextVar` for settings or validated runtime.
 No module-level config cache in `settings.py`.
 No hidden mutation runtime; fresh resolution under the operation lock via
 `mutation_scope_for` / `RuntimeResolver.mutation_scope`.
-`ResolvedRuntime` is the canonical resolved bundle; `ValidatedRuntime` remains a
-compatibility alias only where legacy naming persists in tests or docs migration.
+`ResolvedRuntime` is the canonical resolved bundle (the former `ValidatedRuntime` alias was
+removed).
 
 ## Service responsibility inventory
 
@@ -202,7 +205,7 @@ blocking, and privacy rules.
 7. Documentation reorganization + ADRs
 8. Agent config refresh
 9. ~~Dead directory audit~~ done
-10. ~~Version 0.3.0~~ done (awaiting approval)
+10. ~~Version 0.3.0~~ done (approved with documented residuals)
 
 ## Phase 3 — Explicit runtime (complete)
 
@@ -249,7 +252,7 @@ and commit-bound final CI evidence.
 
 - Architecture and runtime identity tests pass; full CI green on accepted HEAD
 - Owner approval recorded; tracker status `complete`
-- Phase 4 remains `not-started`
+- Phase 4 delivered after this phase (see Phase 4 below)
 
 ## Phase 4 — Focused application services and thin facade
 
@@ -585,6 +588,13 @@ Delivered in this cycle (engineering polish, not release):
 - Docs contract hygiene: no `python3.N` commands and no maintainer topology paths in public docs
 - Canonical `spell_sync/operation_reports.py` — diagnostics no longer depends on application
 - Coverage-padding inventory frozen (`tests/test_padding_inventory_policy.py`)
+- Guided TUI / docs product labels aligned to Collect my words / Update my apps
+- Test-impact mappings expanded off packaging fallback; dead-code audit fail-closed
+- `EventLevel` alias retired; CI necessity ladder wording synced in agent docs
+- `ValidatedRuntime` shim removed; maintainer absolute paths scrubbed from scripts/tests
+- Agent-config scan for maintainer-home paths in `scripts/` and `tests/`
+- Core modules mapped off packaging fallback; dead-code audit non-vacuous for product modules
+- Execution-control product-path boundary scan uses real service modules
 
 Open residuals: manual target validation 0/35; Windows hardware R1–R7; gradual retirement of
 legacy coverage-padding suites without weakening the 100%/96% CI gate.
@@ -705,7 +715,9 @@ Summary:
 ```text
 Phase 10 (complete, owner-approved with residuals): tip evidence authoritative via check-ci-evidence;
   last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
-Post-0.3 ops (in progress): operation_reports extraction; coverage-padding freeze; docs/meta hygiene
+Post-0.3 ops (complete, engineering): waves A–F; ETA/observe; agent-contract unification
+  (README, git-change-management, repository-workflow, after-changes, security-audit);
+  only owner-publish + residuals R-WIN/R-PWR/R-CON remain
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
@@ -717,11 +729,10 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-0.3 architecture migration **complete**. Current: `post-0.3-ops` (**in progress**). Release/tag/
-publication, real-app manual validation, and Windows hardware adversarial evidence remain
-owner-initiated only.
+0.3 architecture migration **complete**. Post-0.3 ops **complete** (engineering).
+Current: `owner-publish` (**not started**). Release/tag/publication, real-app manual
+validation, and Windows hardware adversarial evidence remain owner-initiated only.
 
 ## Deferred work
 
-- TUI flow split (`tui/flows/`) — only if controller refactor warrants it
 - Developer stderr traceback mode — only if existing verbose path insufficient

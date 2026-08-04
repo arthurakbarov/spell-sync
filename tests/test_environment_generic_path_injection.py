@@ -52,7 +52,7 @@ def test_assess_ci_necessity_uses_injected_paths_not_production_evidence(tmp_pat
         tmp_path / "home", project_root=repo
     )
     assert not temp_paths.ci_summary_path.is_file()
-    result = _load_necessity_mod().assess_ci_necessity(repo, paths=temp_paths)
+    result = _load_necessity_mod().assess_ci_necessity(repo, paths=temp_paths, purpose="publish")
     assert result.result == "full-required"
     assert result.reason in {"missing-valid-evidence", "run-head-unavailable", "ci-input-mismatch"}
 

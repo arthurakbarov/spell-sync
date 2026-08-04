@@ -12,7 +12,8 @@ in the linked canonical documents — not in implementation trackers or release 
 | [SUPPORTED_TARGETS.md](SUPPORTED_TARGETS.md) | Target capability matrix |
 | [CONFIGURATION.md](CONFIGURATION.md) | `spell-sync.toml` reference |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Symptom-based guidance |
-| [PERSONAL_WORKSPACE.md](PERSONAL_WORKSPACE.md) | Optional private wordlist layout |
+| [PERSONAL_WORKSPACE.md](PERSONAL_WORKSPACE.md) | Where the word list lives: local / synced folder / private Git |
+| [PERSONAL_GIT_REMOTE.md](PERSONAL_GIT_REMOTE.md) | Optional private GitHub (or other) remote recipe |
 | [RECOVERY.md](RECOVERY.md) | Transaction journal and `recover` |
 
 ## For contributors
@@ -20,6 +21,8 @@ in the linked canonical documents — not in implementation trackers or release 
 | Document | Contents |
 |----------|----------|
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, CI, local validation |
+| [ENGINEERING_COMPLETION.md](ENGINEERING_COMPLETION.md) | Repo/agent done-definition |
+| [PRODUCT_COMPLETION.md](PRODUCT_COMPLETION.md) | Product UX / release readiness |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Agent workflow and evidence contracts |
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Focused test levels and selection |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Pull requests |

@@ -779,11 +779,3 @@ else:
 
     def _win_remove_owned_tree(parent: TrustedDirectory) -> None:  # pragma: no cover
         raise TrustedFsError("unsupported_platform", "Windows-only helper invoked on non-Windows.")
-
-
-class TrustedRoot(TrustedDirectory):
-    """Alias for project-root trusted directory."""
-
-
-def _map_error(exc: TrustedFsError) -> TrustedFsError:
-    return exc

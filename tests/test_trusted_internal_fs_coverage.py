@@ -35,7 +35,6 @@ from spell_sync.trusted_internal_fs import (
     _dir_fd_supported,
     _fsync_directory_fd,
     _fsync_fd,
-    _map_error,
     _posix_open_at,
     relative_components,
     set_open_boundary_hook,
@@ -654,10 +653,6 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
                 self.assertEqual(ctx.exception.code, "fstat_failed")
             child.close()
             parent.close()
-
-    def test_map_error(self) -> None:
-        err = TrustedFsError("code", "detail")
-        self.assertIs(_map_error(err), err)
 
     def test_win32_dispatch_branches(self) -> None:
         with patch("spell_sync.trusted_internal_fs.sys.platform", "win32"):
