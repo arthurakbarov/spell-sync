@@ -1,7 +1,9 @@
 """Freeze legacy coverage-padding inventory so it cannot grow silently.
 
-Behavioral and invariant tests are preferred. Existing `*coverage*` suites remain as a
-documented residual until line coverage can be maintained without them.
+Behavioral and invariant tests are preferred (see `docs/TESTING_STRATEGY.md`).
+Existing `*coverage*` suites remain as residual R-PWR: freeze + shrink only — move
+coverage into behavioral modules, then delete padding tests; never raise the ceiling
+without owner approval.
 """
 
 from __future__ import annotations

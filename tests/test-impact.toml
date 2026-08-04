@@ -110,6 +110,7 @@ production = [
 ]
 moduleTests = [
   "tests/test_pull_safety.py",
+  "tests/test_sync_invariants_property.py",
 ]
 clusterTests = [
   "tests/test_dry_run.py",
@@ -117,6 +118,7 @@ clusterTests = [
   "tests/test_read_outcome.py",
   "tests/test_symlinks.py",
   "tests/test_sync_run.py",
+  "tests/test_sync_invariants_property.py",
   "tests/tui/test_pull_flow.py",
 ]
 validators = [

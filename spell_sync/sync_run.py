@@ -29,7 +29,7 @@ from .read_outcome import ReadStatus
 from .resolved_runtime import ResolvedRuntime
 from .sync_context import RuntimeContext, as_dictionary_list
 from .sync_models import DictionaryDiff, PushResult
-from .words import WordSet, clean_words, merge_case_duplicates, sort_words
+from .words import WordSet, clean_words, merge_case_duplicates, union_words_casefold
 
 # Re-export public result types for existing imports.
 __all__ = ["PushResult", "DictionaryDiff", "SyncRun", "sync_run_for"]
@@ -114,22 +114,16 @@ class SyncRun:
         if unreadable is not None:
             return unreadable
 
-        words = clean_words(read_text_words(self.wordlist_str))
-        before = len(words)
-        ordered = sort_words(words)
-        seen_casefold = {word.casefold() for word in ordered}
-        for dictionary, read_result in iter_wordlist_sources(
+        wordlist_words = read_text_words(self.wordlist_str)
+        before = len(clean_words(wordlist_words))
+        source_groups: list[WordSet] = []
+        for _dictionary, read_result in iter_wordlist_sources(
             self._ctx,
             unreadable_reason="no access — pull skipped",
             corrupt_reason="corrupt or unsupported — pull skipped",
         ):
-            local_words = read_result.words
-            for word in sort_words(local_words):
-                key = word.casefold()
-                if key not in seen_casefold:
-                    ordered.append(word)
-                    seen_casefold.add(key)
-        merged = merge_case_duplicates(ordered)
+            source_groups.append(read_result.words)
+        merged = union_words_casefold(wordlist_words, *source_groups)
         after = len(merged)
         from .push_journal import file_content_hash
 
@@ -159,14 +153,7 @@ class SyncRun:
 
         words = clean_words(read_text_words(self.wordlist_str))
         before = len(words)
-        ordered = sort_words(words)
-        seen_casefold = {word.casefold() for word in ordered}
-        for word in sort_words(external):
-            key = word.casefold()
-            if key not in seen_casefold:
-                ordered.append(word)
-                seen_casefold.add(key)
-        merged = merge_case_duplicates(ordered)
+        merged = union_words_casefold(words, external)
         after = len(merged)
         if not self._write_wordlist(merged):
             log.abort("pull aborted — failed to write wordlist.")

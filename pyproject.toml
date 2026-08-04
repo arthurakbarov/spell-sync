@@ -27,6 +27,7 @@ dependencies = [
 [dependency-groups]
 test-core = [
   "pytest>=9,<10",
+  "hypothesis>=6.135,<7",
 ]
 coverage = [
   "pytest-cov>=7,<8",
@@ -60,6 +61,7 @@ dev = [
   "pytest-cov>=7,<8",
   "ruff>=0.15,<1",
   "mypy>=2,<3",
+  "hypothesis>=6.135,<7",
 ]
 
 [tool.pytest.ini_options]

@@ -12,7 +12,7 @@ from spell_sync.application.reports import OperationOutcome, OperationReport
 from spell_sync.application.service import SpellSyncService
 from spell_sync.diagnostics.history_builder import build_history_record
 from spell_sync.diagnostics.history_record import OperationHistoryRecord
-from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS, OperationHistoryStore
+from spell_sync.diagnostics.history_store import OperationHistoryStore
 from spell_sync.diagnostics.paths import resolve_app_state_paths
 from spell_sync.diagnostics.safe_log import sanitize_log_message
 from spell_sync.project_setup.execute import ProjectSetupExecution, ProjectSetupOutcome
@@ -70,13 +70,16 @@ def test_malformed_line_is_skipped(tmp_path: Path) -> None:
     assert read.malformed_lines == 1
 
 
-def test_compaction_keeps_newest(tmp_path: Path) -> None:
+def test_compaction_keeps_newest(tmp_path: Path, monkeypatch) -> None:
+    cap = 8
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", cap)
+
     store = OperationHistoryStore(_paths(tmp_path))
-    for index in range(MAX_HISTORY_RECORDS + 5):
+    for index in range(cap + 5):
         store.append(_record(record_id=f"id-{index:03d}"))
-    records = store.read_recent(limit=MAX_HISTORY_RECORDS + 10).records
-    assert len(records) <= MAX_HISTORY_RECORDS
-    assert records[0].record_id == f"id-{MAX_HISTORY_RECORDS + 4:03d}"
+    records = store.read_recent(limit=cap + 10).records
+    assert len(records) <= cap
+    assert records[0].record_id == f"id-{cap + 4:03d}"
 
 
 def test_clear_history(tmp_path: Path) -> None:

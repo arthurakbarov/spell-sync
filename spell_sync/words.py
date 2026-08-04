@@ -79,3 +79,21 @@ def merge_case_duplicates(words: Iterable[str | None]) -> list[str]:
         if key not in canonical:
             canonical[key] = normalized
     return sort_words(canonical.values())
+
+
+def union_words_casefold(*groups: Iterable[str | None]) -> list[str]:
+    """Case-insensitive union of word groups (Pull merge).
+
+    Within each group, words are cleaned and sorted. Across groups, the first
+    spelling for a casefold key wins. The result is then
+    :func:`merge_case_duplicates`-normalized.
+    """
+    ordered: list[str] = []
+    seen_casefold: set[str] = set()
+    for group in groups:
+        for word in sort_words(group):
+            key = word.casefold()
+            if key not in seen_casefold:
+                ordered.append(word)
+                seen_casefold.add(key)
+    return merge_case_duplicates(ordered)

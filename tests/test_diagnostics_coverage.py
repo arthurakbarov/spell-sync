@@ -113,6 +113,7 @@ def test_history_lock_unavailable(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_compaction_write_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
     from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
 
     store = OperationHistoryStore(_paths(tmp_path))
@@ -396,6 +397,7 @@ def test_history_duplicate_check_read_failure(tmp_path: Path, monkeypatch) -> No
 
 
 def test_compaction_read_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
     from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
 
     store = OperationHistoryStore(_paths(tmp_path))
@@ -422,6 +424,7 @@ def test_compaction_read_failure(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_compaction_temp_unlink_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
     from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
 
     store = OperationHistoryStore(_paths(tmp_path))
@@ -578,7 +581,8 @@ def test_history_state_dir_creation_failure(tmp_path: Path, monkeypatch) -> None
     assert not result.ok
 
 
-def test_compaction_temp_path_symlink(tmp_path: Path) -> None:
+def test_compaction_temp_path_symlink(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
     from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
 
     paths = _paths(tmp_path)
@@ -612,6 +616,7 @@ def test_compaction_temp_path_symlink(tmp_path: Path) -> None:
 
 
 def test_compaction_cleanup_unlink_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
     from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
 
     paths = _paths(tmp_path)

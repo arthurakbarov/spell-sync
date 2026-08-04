@@ -5,6 +5,32 @@ Canonical guide for selecting validation during spell-sync development.
 **Principle:** local edit speed beats local completeness. Full CI with coverage is a
 **publish/release** property, not an every-commit property.
 
+Prefer **behavioral and invariant tests** over line-execution padding. When a new line is
+uncovered, add or extend a non-`*coverage*` test first; grow frozen `*coverage*` suites only
+with explicit owner approval (see `tests/test_padding_inventory_policy.py`, residual R-PWR).
+
+## Coverage and suite shape
+
+| Keep strict | Do not grow | Add where missing |
+|-------------|-------------|-------------------|
+| Mutation safety clusters at commit gate | Legacy `*coverage*` padding inventory | Property/idempotence tests for Pull union and Push subsets |
+| 100% line / ≥96% branch on publish full CI | String-fragile skill-prose contracts | Real-app manual samples before publish (R-CON) |
+| Installed-wheel smoke on publish | Full CI after every polish commit | Windows hardware adversarial when available (R-WIN) |
+
+**Freeze + shrink:** do not raise `MAX_COVERAGE_NAMED_TEST_DEFS`. When refactoring, move
+coverage into behavioral modules and delete padding tests so the ceiling can drop later.
+
+**Property tests:** `tests/test_sync_invariants_property.py` (Hypothesis) covers casefold
+Pull union absorption/commutativity and Push subset idempotence. Keep examples bounded;
+do not replace safety integration tests.
+
+**Publish sampling (R-CON):** before owner publish, record at least three real-application
+manual validations on the primary maintainer OS (recommended first sample: Chrome, Firefox,
+system spelling) via skill `platform-validation`. Synthetic CI is not a substitute.
+
+**History compaction tests** must monkeypatch `MAX_HISTORY_RECORDS` to a small cap (for
+example 8) so full CI does not spend seconds writing 500+ JSONL rows per case.
+
 ## Two local modes
 
 ```text
