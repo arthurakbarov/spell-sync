@@ -37,8 +37,8 @@ def test_test_efficiency_rule_exists() -> None:
 def test_select_and_run_tests_skill_exists() -> None:
     path = ROOT / ".cursor" / "skills" / "select-and-run-tests" / "SKILL.md"
     assert path.is_file()
-    text = path.read_text(encoding="utf-8").lower()
-    assert "this skill does not run full ci" in text
+    text = path.read_text(encoding="utf-8").lower().replace("*", "")
+    assert "does not run full ci" in text
 
 
 def test_agent_config_enforces_test_efficiency_contract(agent_config) -> None:

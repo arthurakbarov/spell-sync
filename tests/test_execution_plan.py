@@ -58,7 +58,10 @@ def test_execution_plan_serializes_bounded_keys():
     assert payload["executionId"] == "ci:pytest"
     assert payload["stallSeconds"] == 45.0
     assert payload["runId"] == "run-1"
-    assert len(payload) <= 20
+    assert len(payload) <= 22
+    assert "expectedPromptCount" in payload
+    assert "interactiveAllowanceSeconds" in payload
+    assert "wallHardSeconds" in payload
 
 
 def test_to_json_dict_round_trip_keys():
