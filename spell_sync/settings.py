@@ -27,6 +27,8 @@ KNOWN_KEYS: dict[str, frozenset[str]] = {
             "hunspell",
             "obsidian",
             "libreoffice",
+            "macos_spelling",
+            "win_spelling",
         }
     ),
     "neovim": frozenset({"mkspell_after_push"}),

@@ -24,6 +24,8 @@ class DictionarySettings:
     hunspell: bool = True
     obsidian: bool = True
     libreoffice: bool = True
+    macos_spelling: bool = True
+    win_spelling: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +77,8 @@ class RuntimeSettings:
                 hunspell=_bool(dictionaries, "hunspell", True),
                 obsidian=_bool(dictionaries, "obsidian", True),
                 libreoffice=_bool(dictionaries, "libreoffice", True),
+                macos_spelling=_bool(dictionaries, "macos_spelling", True),
+                win_spelling=_bool(dictionaries, "win_spelling", True),
             ),
             push=PushPolicy(
                 guard_wordlist_max=_int(push, "guard_wordlist_max", PUSH_GUARD_WORDLIST_MAX),
@@ -107,6 +111,8 @@ class RuntimeSettings:
             "hunspell": self.dictionaries.hunspell,
             "obsidian": self.dictionaries.obsidian,
             "libreoffice": self.dictionaries.libreoffice,
+            "macos_spelling": self.dictionaries.macos_spelling,
+            "win_spelling": self.dictionaries.win_spelling,
         }
         return frozenset(name for name, enabled in mapping.items() if enabled)
 

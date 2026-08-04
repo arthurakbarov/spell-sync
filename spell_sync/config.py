@@ -98,6 +98,14 @@ def enable_libreoffice(*, settings: RuntimeSettings) -> bool:
     return settings.dictionaries.libreoffice
 
 
+def enable_macos_spelling(*, settings: RuntimeSettings) -> bool:
+    return settings.dictionaries.macos_spelling
+
+
+def enable_win_spelling(*, settings: RuntimeSettings) -> bool:
+    return settings.dictionaries.win_spelling
+
+
 def neovim_mkspell_after_push(*, settings: RuntimeSettings) -> bool:
     return settings.neovim.mkspell_after_push
 

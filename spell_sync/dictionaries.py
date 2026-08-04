@@ -18,9 +18,11 @@ from .config import (
     enable_hunspell,
     enable_jetbrains,
     enable_libreoffice,
+    enable_macos_spelling,
     enable_neovim,
     enable_obsidian,
     enable_vivaldi,
+    enable_win_spelling,
 )
 from .dictionary_registry import DictionarySource, discover_from_sources
 from .io import (
@@ -158,41 +160,44 @@ def _windows_spelling_path(locale: str) -> str:
     return str(appdata / "Microsoft" / "Spelling" / locale / "default.dic")
 
 
-def _platform_dictionaries() -> List[Dictionary]:
-    dictionaries: List[Dictionary] = []
-    if is_windows():
-        dictionaries.extend(
-            [
-                Dictionary(
-                    "win-ru",
-                    _windows_spelling_path("ru-RU"),
-                    DictionaryFormat.TEXT,
-                    encoding="utf-16-le",
-                    bom=True,
-                    subset=subset_russian,
-                ),
-                Dictionary(
-                    "win-en",
-                    _windows_spelling_path("en-US"),
-                    DictionaryFormat.TEXT,
-                    encoding="utf-16-le",
-                    bom=True,
-                    subset=subset_english,
-                ),
-                Dictionary(
-                    "win-en-gb",
-                    _windows_spelling_path("en-GB"),
-                    DictionaryFormat.TEXT,
-                    encoding="utf-16-le",
-                    bom=True,
-                    subset=subset_english,
-                ),
-            ]
-        )
-    elif is_macos():
-        for name, path in macos_dictionary_paths():
-            dictionaries.append(Dictionary(name, str(path), DictionaryFormat.TEXT))
-    return dictionaries
+def _discover_macos_spelling() -> List[Dictionary]:
+    if not is_macos():
+        return []
+    return [
+        Dictionary(name, str(path), DictionaryFormat.TEXT)
+        for name, path in macos_dictionary_paths()
+    ]
+
+
+def _discover_win_spelling() -> List[Dictionary]:
+    if not is_windows():
+        return []
+    return [
+        Dictionary(
+            "win-ru",
+            _windows_spelling_path("ru-RU"),
+            DictionaryFormat.TEXT,
+            encoding="utf-16-le",
+            bom=True,
+            subset=subset_russian,
+        ),
+        Dictionary(
+            "win-en",
+            _windows_spelling_path("en-US"),
+            DictionaryFormat.TEXT,
+            encoding="utf-16-le",
+            bom=True,
+            subset=subset_english,
+        ),
+        Dictionary(
+            "win-en-gb",
+            _windows_spelling_path("en-GB"),
+            DictionaryFormat.TEXT,
+            encoding="utf-16-le",
+            bom=True,
+            subset=subset_english,
+        ),
+    ]
 
 
 def _discover_sublime() -> List[Dictionary]:
@@ -307,6 +312,16 @@ def _optional_dictionary_sources(
             lambda: enable_libreoffice(settings=settings),
             _discover_libreoffice,
         ),
+        DictionarySource(
+            "macos_spelling",
+            lambda: enable_macos_spelling(settings=settings),
+            _discover_macos_spelling,
+        ),
+        DictionarySource(
+            "win_spelling",
+            lambda: enable_win_spelling(settings=settings),
+            _discover_win_spelling,
+        ),
     )
 
 
@@ -318,7 +333,6 @@ def discover_dictionaries(settings: RuntimeSettings) -> List[Dictionary]:
     or inspected.
     """
     resolved = settings
-    dictionaries = _platform_dictionaries()
-    dictionaries.extend(_discover_sublime())
+    dictionaries = _discover_sublime()
     dictionaries.extend(discover_from_sources(_optional_dictionary_sources(resolved)))
     return _dedupe_dictionaries(dictionaries)

@@ -13,6 +13,8 @@ jetbrains = true
 hunspell = true
 obsidian = true
 libreoffice = true
+macos_spelling = true
+win_spelling = true
 
 [neovim]
 # mkspell_after_push = true   # regenerate .spl after push (requires nvim on PATH)

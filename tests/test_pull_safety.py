@@ -208,6 +208,8 @@ class TestPullSafety(unittest.TestCase):
         self.assertIn(EventId.PULL_VALIDATING, event_ids)
         self.assertIn(EventId.PULL_LOCK_ACQUIRED, event_ids)
         self.assertIn(EventId.PULL_PLAN_VERIFIED, event_ids)
+        if preview.source_rows:
+            self.assertIn(EventId.PULL_SOURCE_STARTED, event_ids)
         self.assertIn(EventId.PULL_WRITE_STARTED, event_ids)
         self.assertIn(EventId.PULL_COMPLETED, event_ids)
 

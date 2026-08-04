@@ -20,7 +20,7 @@ from ..event_helpers import (
     push_abort_reason_to_event_reason,
     runtime_changed_reason,
 )
-from ..event_metadata import EventReason
+from ..event_metadata import EventReason, TargetId
 from ..events import (
     EventCategory,
     EventEmitter,
@@ -319,6 +319,27 @@ class SyncService:
                     correlation_id=correlation_id,
                 ),
             )
+            total_sources = max(len(preview.source_rows), 1)
+            for index, source in enumerate(preview.source_rows, start=1):
+                source_target: str | None
+                try:
+                    source_target = TargetId.parse(source.name).value
+                except ValueError:
+                    source_target = None
+                emit_technical(
+                    emitter,
+                    build_technical_event(
+                        event_id=EventId.PULL_SOURCE_STARTED,
+                        operation=OperationKind.PULL,
+                        category=EventCategory.TARGET,
+                        severity=EventSeverity.INFO,
+                        phase=EventPhase.EXECUTING,
+                        correlation_id=correlation_id,
+                        target_id=source_target,
+                        completed=index,
+                        total=total_sources,
+                    ),
+                )
             emit_technical(
                 emitter,
                 build_technical_event(
@@ -514,24 +535,6 @@ class SyncService:
                 ),
             )
         return result
-
-    def _run_push_for_run(
-        self,
-        run: SyncRun,
-        prepared: PreparedPush,
-        *,
-        dry_run: bool,
-        event_sink: EventSink | None = None,
-        correlation_id: str | None = None,
-    ) -> PushExecution:
-        result = self._execute_push_for_run(
-            run,
-            prepared,
-            dry_run=dry_run,
-            event_sink=event_sink,
-            correlation_id=correlation_id,
-        )
-        return self.push_execution_from_result(prepared, result)
 
     def pull_execution_from_result(
         self,

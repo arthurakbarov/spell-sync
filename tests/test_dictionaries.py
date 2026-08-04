@@ -72,6 +72,40 @@ class TestBraveVivaldiDiscovery(unittest.TestCase):
                 names = [item.name for item in discover_dictionaries(RuntimeSettings.defaults())]
             self.assertIn("chrome:Default", names)
 
+    def test_macos_spelling_false_skips_discovery(self):
+        with tempfile.TemporaryDirectory() as d:
+            macos_dict = Path(d) / "LocalDictionary"
+            macos_dict.write_text("word\n", encoding="utf-8")
+            settings = RuntimeSettings.from_config_dict(
+                {
+                    "dictionaries": {
+                        "editors": False,
+                        "chrome": False,
+                        "edge": False,
+                        "brave": False,
+                        "vivaldi": False,
+                        "firefox": False,
+                        "neovim": False,
+                        "jetbrains": False,
+                        "hunspell": False,
+                        "obsidian": False,
+                        "libreoffice": False,
+                        "macos_spelling": False,
+                        "win_spelling": False,
+                    }
+                }
+            )
+            with (
+                patch("spell_sync.dictionaries.is_macos", return_value=True),
+                patch("spell_sync.dictionaries.is_windows", return_value=False),
+                patch(
+                    "spell_sync.dictionaries.macos_dictionary_paths",
+                    return_value=[("macos-applespell", macos_dict)],
+                ),
+            ):
+                names = [item.name for item in discover_dictionaries(settings)]
+            self.assertNotIn("macos-applespell", names)
+
 
 if __name__ == "__main__":
     import unittest
