@@ -22,6 +22,7 @@ The agent **may and should** create local commits on any local branch (including
 
 - One concern per commit (product vs tooling vs agent-config vs docs-only)
 - Subject: imperative mood, present tense, ~50–72 chars, ends with `.`
+- Blank line between subject and body when a body is present
 - Subject says **why** / user-visible outcome — not a file list
 - Optional body: 1–3 lines of why/context; no bullet dumps of paths
 - Do **not** use Conventional Commit type prefixes (`feat:`, `fix:`, `docs:`)
