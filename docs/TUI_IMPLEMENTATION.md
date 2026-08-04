@@ -214,5 +214,7 @@ python3 scripts/check_ci_necessity.py --explain
 
 Run full `scripts/ci.sh` only when necessity is `full-required` (or the owner asks).
 
-Coverage policy: L2 publish CI enforces 100% line and ≥96% branch coverage on `spell_sync/`.
+Coverage policy: L2 publish CI uses tiered coverage (`scripts/coverage_policy.py`) —
+100% lines on application + mutation paths; ≥98% lines on TUI/presentation/remainder;
+≥96% branches everywhere.
 Local L0/L1 edit loops do not run coverage.

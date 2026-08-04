@@ -40,9 +40,11 @@ def _isolated_test_environment(
 
 
 @pytest.fixture
-def isolated_test_home(_isolated_test_environment: Path | None) -> Path | None:
-    """Isolated HOME directory when environment isolation is active."""
-    return _isolated_test_environment
+def history_record_cap(monkeypatch: pytest.MonkeyPatch) -> int:
+    """Small MAX_HISTORY_RECORDS for compaction tests (avoid 500-row setups)."""
+    from tests.history_test_utils import install_history_record_cap
+
+    return install_history_record_cap(monkeypatch)
 
 
 _ROOT = Path(__file__).resolve().parent.parent

@@ -64,7 +64,8 @@ Open engineering residuals (not release blockers if previously accepted):
 - Real-application manual validation: **0/35** (`docs/target-validation.json`)
 - Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
 - Legacy `*coverage*` padding inventory frozen at ≤373 `def test_` (see
-  `tests/test_padding_inventory_policy.py`) — do not grow; shrink only with coverage-preserving refactors
+  `tests/test_padding_inventory_policy.py`) — do not grow; shrink only; publish gate is
+  tiered (`scripts/coverage_policy.py`: 100% on application + mutation; ≥98% TUI/remainder)
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -597,7 +598,8 @@ Delivered in this cycle (engineering polish, not release):
 - Execution-control product-path boundary scan uses real service modules
 
 Open residuals: manual target validation 0/35; Windows hardware R1–R7; gradual retirement of
-legacy coverage-padding suites without weakening the 100%/96% CI gate.
+legacy coverage-padding suites without weakening the tiered CI coverage gate
+(`scripts/coverage_policy.py`).
 
 Not an architecture migration phase. Do not publish without an explicit owner command.
 

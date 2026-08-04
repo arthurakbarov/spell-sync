@@ -4,6 +4,7 @@ sharedFixtures = [
   "tests/runtime_helpers.py",
   "tests/service_test_utils.py",
   "tests/journal_test_utils.py",
+  "tests/history_test_utils.py",
   "tests/conftest_execution.py",
   "tests/support/wiring.py",
   "tests/tui/fake_service.py",

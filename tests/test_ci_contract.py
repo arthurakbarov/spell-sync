@@ -700,13 +700,13 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_coverage_policy_script_is_shared() -> None:
+def test_coverage_policy_argv_runs_shared_script() -> None:
     from scripts import ci_runner
 
     gate = ci_runner._coverage_argv("python3")
-    assert gate[1] == "-c"
-    assert "coverage.json" in gate[2]
-    assert f"{ci_runner.COVERAGE_LINE_REQUIREMENT}%" in gate[2]
-    assert f"{ci_runner.COVERAGE_BRANCH_MINIMUM_PERCENT}%" in gate[2]
-    # Gate and argv helpers must emit identical policy text.
-    assert ci_runner._coverage_policy_script() == gate[2]
+    assert gate[0] == "python3"
+    assert gate[1].endswith("scripts/coverage_policy.py")
+    assert Path(gate[1]).is_file()
+    assert ci_runner.COVERAGE_LINE_REQUIREMENT == 100
+    assert ci_runner.COVERAGE_PRESENTATION_LINE_PERCENT == 98
+    assert ci_runner.COVERAGE_BRANCH_MINIMUM_PERCENT == 96

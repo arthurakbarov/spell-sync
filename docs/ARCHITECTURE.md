@@ -131,7 +131,9 @@ Envelope `schema_version: 1` on all `--json` output. Journal internal schema is 
 
 ## Testing
 
-L2 publish CI (`scripts/ci.sh`) enforces 100% line and ≥96% branch coverage on `spell_sync/`.
+L2 publish CI (`scripts/ci.sh`) enforces tiered coverage on `spell_sync/` via
+`scripts/coverage_policy.py`: 100% lines on application + mutation paths; ≥98% lines on
+TUI/presentation/remainder; ≥96% branches everywhere.
 Ordinary edit cycles use L0/L1 (`run_dev_loop.py`) without coverage. Regression tests for
 transaction safety live in `tests/test_transaction_safety.py` and `tests/test_push_safety_coverage.py`.
 

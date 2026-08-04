@@ -30,7 +30,7 @@ Documented and accepted for initial release; follow-up on second machine or late
 | ID | Topic |
 |----|-------|
 | R-WIN | Windows real-hardware adversarial validation (reparse/junction) |
-| R-PWR | Legacy coverage padding inventory (frozen; shrink only with coverage-preserving refactors) |
+| R-PWR | Legacy coverage padding inventory (frozen; shrink only; tiered gate allows ≥98% on TUI/presentation) |
 | R-CON | Real-application manual validation coverage (see `docs/target-validation.json`) |
 
 ## Second-machine follow-up

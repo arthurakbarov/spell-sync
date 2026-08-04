@@ -70,16 +70,13 @@ def test_malformed_line_is_skipped(tmp_path: Path) -> None:
     assert read.malformed_lines == 1
 
 
-def test_compaction_keeps_newest(tmp_path: Path, monkeypatch) -> None:
-    cap = 8
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", cap)
-
+def test_compaction_keeps_newest(tmp_path: Path, history_record_cap: int) -> None:
     store = OperationHistoryStore(_paths(tmp_path))
-    for index in range(cap + 5):
+    for index in range(history_record_cap + 5):
         store.append(_record(record_id=f"id-{index:03d}"))
-    records = store.read_recent(limit=cap + 10).records
-    assert len(records) <= cap
-    assert records[0].record_id == f"id-{cap + 4:03d}"
+    records = store.read_recent(limit=history_record_cap + 10).records
+    assert len(records) <= history_record_cap
+    assert records[0].record_id == f"id-{history_record_cap + 4:03d}"
 
 
 def test_clear_history(tmp_path: Path) -> None:

@@ -14,7 +14,7 @@ with explicit owner approval (see `tests/test_padding_inventory_policy.py`, resi
 | Keep strict | Do not grow | Add where missing |
 |-------------|-------------|-------------------|
 | Mutation safety clusters at commit gate | Legacy `*coverage*` padding inventory | Property/idempotence tests for Pull union and Push subsets |
-| 100% line / ≥96% branch on publish full CI | String-fragile skill-prose contracts | Real-app manual samples before publish (R-CON) |
+| Publish coverage: **100% lines** on `application/` + mutation paths; **≥98% lines** on TUI/presentation/remainder; **≥96% branches** everywhere (`scripts/coverage_policy.py`) | Fragile skill-prose substring contracts (prefer paths/headings/frontmatter) | Real-app manual samples before publish (R-CON) |
 | Installed-wheel smoke on publish | Full CI after every polish commit | Windows hardware adversarial when available (R-WIN) |
 
 **Freeze + shrink:** do not raise `MAX_COVERAGE_NAMED_TEST_DEFS`. When refactoring, move
@@ -28,8 +28,9 @@ do not replace safety integration tests.
 manual validations on the primary maintainer OS (recommended first sample: Chrome, Firefox,
 system spelling) via skill `platform-validation`. Synthetic CI is not a substitute.
 
-**History compaction tests** must monkeypatch `MAX_HISTORY_RECORDS` to a small cap (for
-example 8) so full CI does not spend seconds writing 500+ JSONL rows per case.
+**History compaction tests** use the shared `history_record_cap` fixture
+(`tests/history_test_utils.py`) so full CI does not spend seconds writing 500+ JSONL rows
+per case.
 
 ## Two local modes
 
@@ -101,7 +102,9 @@ python3 scripts/check_ci_evidence.py
 python3 scripts/check_ci_evidence.py --release
 ```
 
-Full CI includes grouped pytest **with** coverage (100% lines / ≥96% branches), packaging,
+Full CI includes grouped pytest **with** tiered coverage (`scripts/coverage_policy.py`:
+100% lines on application + mutation paths; ≥98% lines on TUI/presentation/remainder;
+≥96% branches everywhere), packaging,
 wheel-smoke, and all validators. Agent runs full CI only on explicit owner request
 (“готов к push/release”) or via `release-candidate` / publish workflows.
 

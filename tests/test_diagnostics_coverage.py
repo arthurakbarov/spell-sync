@@ -112,12 +112,9 @@ def test_history_lock_unavailable(tmp_path: Path, monkeypatch) -> None:
     assert not result.ok
 
 
-def test_compaction_write_failure(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
-    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
-
+def test_compaction_write_failure(tmp_path: Path, monkeypatch, history_record_cap: int) -> None:
     store = OperationHistoryStore(_paths(tmp_path))
-    for index in range(MAX_HISTORY_RECORDS + 2):
+    for index in range(history_record_cap + 2):
         store.append(
             OperationHistoryRecord(
                 schema_version=1,
@@ -396,12 +393,9 @@ def test_history_duplicate_check_read_failure(tmp_path: Path, monkeypatch) -> No
     assert result.ok
 
 
-def test_compaction_read_failure(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
-    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
-
+def test_compaction_read_failure(tmp_path: Path, monkeypatch, history_record_cap: int) -> None:
     store = OperationHistoryStore(_paths(tmp_path))
-    for index in range(MAX_HISTORY_RECORDS + 1):
+    for index in range(history_record_cap + 1):
         store.append(
             OperationHistoryRecord(
                 schema_version=1,
@@ -423,12 +417,11 @@ def test_compaction_read_failure(tmp_path: Path, monkeypatch) -> None:
     store._maybe_compact_unlocked()
 
 
-def test_compaction_temp_unlink_failure(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
-    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
-
+def test_compaction_temp_unlink_failure(
+    tmp_path: Path, monkeypatch, history_record_cap: int
+) -> None:
     store = OperationHistoryStore(_paths(tmp_path))
-    for index in range(MAX_HISTORY_RECORDS + 2):
+    for index in range(history_record_cap + 2):
         store.append(
             OperationHistoryRecord(
                 schema_version=1,
@@ -581,13 +574,10 @@ def test_history_state_dir_creation_failure(tmp_path: Path, monkeypatch) -> None
     assert not result.ok
 
 
-def test_compaction_temp_path_symlink(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
-    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
-
+def test_compaction_temp_path_symlink(tmp_path: Path, history_record_cap: int) -> None:
     paths = _paths(tmp_path)
     store = OperationHistoryStore(paths)
-    for index in range(MAX_HISTORY_RECORDS):
+    for index in range(history_record_cap):
         store.append(
             OperationHistoryRecord(
                 schema_version=1,
@@ -615,13 +605,12 @@ def test_compaction_temp_path_symlink(tmp_path: Path, monkeypatch) -> None:
     assert outside.read_text(encoding="utf-8") == "blocked"
 
 
-def test_compaction_cleanup_unlink_failure(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("spell_sync.diagnostics.history_store.MAX_HISTORY_RECORDS", 8)
-    from spell_sync.diagnostics.history_store import MAX_HISTORY_RECORDS
-
+def test_compaction_cleanup_unlink_failure(
+    tmp_path: Path, monkeypatch, history_record_cap: int
+) -> None:
     paths = _paths(tmp_path)
     store = OperationHistoryStore(paths)
-    for index in range(MAX_HISTORY_RECORDS + 1):
+    for index in range(history_record_cap + 1):
         store.append(
             OperationHistoryRecord(
                 schema_version=1,

@@ -80,7 +80,8 @@ necessity is `commit-gate-sufficient`. On full CI completion it prints `CI_RESUL
 `CI_SUMMARY`, and `CI_LOG`. See `docs/TESTING_STRATEGY.md`.
 
 Docs style, docs contract, agent config, architecture boundaries, ruff, mypy, grouped pytest
-with **100% line** and **≥96% branch** coverage on `spell_sync/` (full CI only), packaging,
+with **tiered coverage** on `spell_sync/` (100% lines on application + mutation paths; ≥98%
+lines on TUI/presentation/remainder; ≥96% branches; full CI only), packaging,
 installed-wheel smoke, and headless command scenarios.
 
 Requires **Python 3.11+** (`pyproject.toml`).

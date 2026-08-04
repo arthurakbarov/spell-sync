@@ -30,15 +30,20 @@ def test_test_efficiency_rule_exists() -> None:
     path = ROOT / ".cursor" / "rules" / "test-efficiency.mdc"
     assert path.is_file()
     text = path.read_text(encoding="utf-8")
+    assert text.lstrip().startswith("---")
     assert "alwaysApply: true" in text
     assert "scripts/test_plan.py" in text
+    assert "scripts/run_dev_loop.py" in text
 
 
 def test_select_and_run_tests_skill_exists() -> None:
     path = ROOT / ".cursor" / "skills" / "select-and-run-tests" / "SKILL.md"
     assert path.is_file()
-    text = path.read_text(encoding="utf-8").lower().replace("*", "")
-    assert "does not run full ci" in text
+    text = path.read_text(encoding="utf-8")
+    assert text.lstrip().startswith("---")
+    assert "name: select-and-run-tests" in text
+    assert "## Full gate" in text
+    assert "spell-sync-ci" in text
 
 
 def test_agent_config_enforces_test_efficiency_contract(agent_config) -> None:
