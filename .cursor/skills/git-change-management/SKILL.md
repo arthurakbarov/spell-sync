@@ -8,6 +8,8 @@ description: >-
 
 # Git change management (spell-sync)
 
+SSOT: `docs/GIT-WORKFLOW.md`.
+
 Shared contract: `.cursor/README.md` § Shared contract (note intentional divergence
 from nix: local commits anytime here).
 
@@ -45,9 +47,12 @@ Mid-arc micro-checkpoints may use the edit loop alone.
 
 ### Commit message shape
 
-- One concern per commit
+See `docs/GIT-WORKFLOW.md` (same shape as nix-darwin).
+
+- One concern per commit; fold ruff/format follow-ups into the producing commit
 - Imperative subject ending with `.` (no `feat:` / `docs:` / `Wave E:` prefixes)
 - Optional short why-body; fold tracker/evidence notes into the producing commit
+- Check: `python3 scripts/validate_commit_messages.py`
 
 ## Full gate (owner push / publish / final only)
 

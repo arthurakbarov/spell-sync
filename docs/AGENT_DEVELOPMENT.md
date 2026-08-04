@@ -10,7 +10,7 @@ reporting.
 | Role | Owns |
 |------|------|
 | Repository owner | Intent, scope approval, phase acceptance, release/push policy |
-| Cursor Agent | Code changes, **local commits anytime on any branch**, local minimal validation, full CI only before push/release, docs/contracts sync |
+| Cursor Agent | Code changes, **local commits anytime on any branch** (see `docs/GIT-WORKFLOW.md`), local minimal validation, full CI only before push/release, docs/contracts sync |
 | Repository automation | Static checks, tests, coverage, packaging, machine-readable CI summary |
 
 The owner is not expected to grep CI logs, run individual test modules manually, fix

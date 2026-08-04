@@ -5,8 +5,8 @@ alwaysApply: true
 
 # Git change management
 
-Detail: skill `git-change-management`. Snapshot: `docs/AGENT_DEVELOPMENT.md`
-§ Workspace snapshot.
+SSOT: `docs/GIT-WORKFLOW.md`. Detail: skill `git-change-management`.
+Snapshot: `docs/AGENT_DEVELOPMENT.md` § Workspace snapshot.
 
 ## Local commits (no owner approval)
 
@@ -20,6 +20,8 @@ The agent **may and should** create local commits on any local branch (including
 
 ## Commit shape (required)
 
+Full rules: `docs/GIT-WORKFLOW.md` (shared message shape with nix-darwin).
+
 - One concern per commit (product vs tooling vs agent-config vs docs-only)
 - Subject: imperative mood, present tense, ~50–72 chars, ends with `.`
 - Blank line between subject and body when a body is present
@@ -27,8 +29,8 @@ The agent **may and should** create local commits on any local branch (including
 - Optional body: 1–3 lines of why/context; no bullet dumps of paths
 - Do **not** use Conventional Commit type prefixes (`feat:`, `fix:`, `docs:`)
 - Do **not** use wave/phase labels in the subject (`Wave E:`, `Phase 10:`)
-- Do **not** create empty “sync tracker to tip HEAD” commits; fold evidence notes
-  into the commit that produced the evidence
+- Fold ruff/format/unused follow-ups and tip-HEAD evidence notes into the
+  producing commit — do not land them as separate tip commits
 
 ## Still owner-gated
 

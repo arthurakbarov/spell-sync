@@ -46,6 +46,7 @@ docs/RECOVERY.md
 docs/TUI_IMPLEMENTATION.md
 docs/CONFIGURATION.md
 docs/AGENT_DEVELOPMENT.md
+docs/GIT-WORKFLOW.md
 ```
 
 ## Pull and Push

@@ -52,7 +52,7 @@ keeps feature-branch + explicit-commit policy.
 | `execution-time-control.mdc` | Budgets, stalls, ETA, no unbounded gates |
 | `project-environment.mdc` | Python / uv / env contract |
 | `project-safety.mdc` | Mutation + release/privacy invariants |
-| `git-change-management.mdc` | Local commits anytime; push/tag/publish owner-gated |
+| `git-change-management.mdc` | Local commits anytime; push/tag/publish owner-gated; SSOT `docs/GIT-WORKFLOW.md` |
 | `karpathy-guidelines.mdc` | Simplicity / surgical diffs |
 | `no-canvas-for-text.mdc` | Never use Canvas for text/tables — reply in chat |
 

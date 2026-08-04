@@ -24,6 +24,7 @@ in the linked canonical documents — not in implementation trackers or release 
 | [ENGINEERING_COMPLETION.md](ENGINEERING_COMPLETION.md) | Repo/agent done-definition |
 | [PRODUCT_COMPLETION.md](PRODUCT_COMPLETION.md) | Product UX / release readiness |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Agent workflow and evidence contracts |
+| [GIT-WORKFLOW.md](GIT-WORKFLOW.md) | Commit shape, split discipline, push policy |
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Focused test levels and selection |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Pull requests |
 | [PROJECT_MAP.md](PROJECT_MAP.md) | Module ownership map |

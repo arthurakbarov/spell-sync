@@ -725,6 +725,11 @@ def validate_agent_config(root: Path) -> list[str]:
     agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
     if not agent_dev.is_file():
         errors.append("missing docs/AGENT_DEVELOPMENT.md")
+    git_workflow = root / "docs" / "GIT-WORKFLOW.md"
+    if not git_workflow.is_file():
+        errors.append("missing docs/GIT-WORKFLOW.md")
+    elif "ends with" not in git_workflow.read_text(encoding="utf-8"):
+        errors.append("docs/GIT-WORKFLOW.md must document trailing-period commit subjects")
 
     if agents.is_file():
         text = agents.read_text(encoding="utf-8")

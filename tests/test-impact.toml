@@ -20,6 +20,7 @@ agentPaths = [
   ".cursor/",
   "AGENTS.md",
   "docs/AGENT_DEVELOPMENT.md",
+  "docs/GIT-WORKFLOW.md",
 ]
 ciScriptPaths = [
   "scripts/ci.sh",
@@ -319,6 +320,7 @@ production = [
   ".cursor/",
   "AGENTS.md",
   "docs/AGENT_DEVELOPMENT.md",
+  "docs/GIT-WORKFLOW.md",
   "scripts/agent_context.py",
   "scripts/check_agent_config.py",
   "scripts/check_architecture.py",
@@ -330,6 +332,7 @@ production = [
   "scripts/coverage_policy.py",
   "scripts/documentation_state.py",
   "scripts/lib/git-commit.sh",
+  "scripts/validate_commit_messages.py",
   "scripts/validate_dev_commands.py",
   "config/dev-commands.json",
   "config/dev-surface.json",
@@ -343,6 +346,7 @@ moduleTests = [
   "tests/test_ci_necessity.py",
   "tests/test_coverage_policy.py",
   "tests/test_run_dev_loop_budget.py",
+  "tests/test_validate_commit_messages.py",
 ]
 clusterTests = [
   "tests/test_agent_config_validator.py",
@@ -357,12 +361,14 @@ clusterTests = [
   "tests/test_ci_evidence_reuse.py",
   "tests/test_coverage_policy.py",
   "tests/test_run_dev_loop_budget.py",
+  "tests/test_validate_commit_messages.py",
 ]
 validators = [
   "scripts/check_agent_config.py",
   "scripts/check_architecture.py --check",
   "scripts/check_docs_contract.py",
   "scripts/validate_ci_impact.py",
+  "scripts/validate_commit_messages.py",
 ]
 
 [clusters.documentation]
