@@ -54,6 +54,13 @@ from tests.tui.test_helpers import wait_for_operation_report, wait_for_text
 
 
 class TestLineCoverageGaps(unittest.TestCase):
+    def test_set_setup_storage_strategy_rejects_unknown(self):
+        controller = TuiController(fake_service(), CliOptions())
+        with self.assertRaisesRegex(ValueError, "unknown storage strategy"):
+            controller.set_setup_storage_strategy("not-a-strategy")
+        controller.set_setup_storage_strategy("local")
+        self.assertEqual(controller.setup_storage_strategy(), "local")
+
     def test_execute_pull_wordlist_path_mismatch(self):
         service = SpellSyncService()
         preview = PullPreview(
@@ -515,6 +522,22 @@ class TestLineCoverageGaps(unittest.TestCase):
 
 
 class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
+    async def test_storage_strategy_ignores_unknown_radio(self):
+        from spell_sync.application.product_concepts import STORAGE_STRATEGY_LOCAL
+        from spell_sync.tui.screens.setup_welcome_screen import SetupStorageStrategyScreen
+
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 36)) as pilot:
+            app.push_screen(SetupStorageStrategyScreen(controller))
+            await pilot.pause()
+            screen = app.screen
+            assert isinstance(screen, SetupStorageStrategyScreen)
+            pressed = MagicMock()
+            pressed.id = "storage-unknown"
+            screen.on_radio_set_changed(MagicMock(pressed=pressed))
+            self.assertEqual(screen._selected, STORAGE_STRATEGY_LOCAL)
+
     async def test_dashboard_corrupt_journal_banner(self):
         controller = TuiController(
             fake_service(
