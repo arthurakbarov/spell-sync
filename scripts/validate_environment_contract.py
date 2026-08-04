@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import re
 import tomllib
 from pathlib import Path
 
@@ -20,32 +19,6 @@ DEV_INCLUDES = ("test-core", "coverage", "quality")
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
-
-
-def _package_name(spec: object) -> str:
-    if isinstance(spec, dict):
-        return ""
-    text = str(spec).strip()
-    return re.split(r"[<>=!;\[]", text, maxsplit=1)[0].strip().lower().replace("_", "-")
-
-
-def _collect_group_packages(groups: dict[str, object], name: str, *, seen: set[str]) -> set[str]:
-    if name in seen:
-        return set()
-    seen.add(name)
-    raw = groups.get(name)
-    if not isinstance(raw, list):
-        return set()
-    packages: set[str] = set()
-    for item in raw:
-        if isinstance(item, dict) and "include-group" in item:
-            included = str(item["include-group"])
-            packages.update(_collect_group_packages(groups, included, seen=seen))
-            continue
-        package = _package_name(item)
-        if package:
-            packages.add(package)
-    return packages
 
 
 def _check_contract_file() -> list[str]:
@@ -221,33 +194,11 @@ def _check_pyproject(contract_data: dict[str, object] | None) -> list[str]:
             )
 
     optional = project.get("optional-dependencies", {}) if isinstance(project, dict) else {}
-    dev_extra = optional.get("dev") if isinstance(optional, dict) else None
-    if not isinstance(dev_extra, list) or not dev_extra:
+    if isinstance(optional, dict) and "dev" in optional:
         errors.append(
-            "[ENVIRONMENT-CONTRACT-001] pyproject.toml missing "
-            "[project.optional-dependencies].dev; "
-            "remediation: keep transitional dev extra aligned with dependency groups"
+            "[ENVIRONMENT-CONTRACT-001] [project.optional-dependencies].dev must be absent; "
+            "remediation: use dependency-groups.dev (PEP 735) as the maintainer SSOT"
         )
-    elif isinstance(groups, dict):
-        pyproject_text = _read(PYPROJECT_PATH)
-        if "Deprecated" in pyproject_text:
-            pass
-        else:
-            group_packages = _collect_group_packages(groups, "dev", seen=set())
-            extra_packages = {_package_name(item) for item in dev_extra if _package_name(item)}
-            if group_packages != extra_packages:
-                missing = sorted(group_packages - extra_packages)
-                extra = sorted(extra_packages - group_packages)
-                detail = []
-                if missing:
-                    detail.append(f"missing from dev extra: {', '.join(missing)}")
-                if extra:
-                    detail.append(f"extra in dev extra: {', '.join(extra)}")
-                errors.append(
-                    "[ENVIRONMENT-CONTRACT-001] dependency-groups dev and "
-                    "optional-dependencies dev must align "
-                    f"({'; '.join(detail)}); remediation: sync dev extra with groups SSOT"
-                )
     return errors
 
 

@@ -14,7 +14,7 @@ def main() -> int:
     groups = pyproject.get("dependency-groups", {})
     project = pyproject.get("project", {})
     runtime = project.get("dependencies", [])
-    optional = project.get("optional-dependencies", {}).get("dev", [])
+    optional = project.get("optional-dependencies", {})
 
     if "textual" not in " ".join(runtime):
         print("DEPENDENCY_GROUP_VALIDATION=failed")
@@ -40,9 +40,9 @@ def main() -> int:
         print("DEPENDENCY_GROUP_VALIDATION=failed")
         print("DEPENDENCY_GROUP_FAILED_ID=release-groups-missing")
         return 1
-    if optional and "Deprecated" not in (ROOT / "pyproject.toml").read_text(encoding="utf-8"):
+    if isinstance(optional, dict) and "dev" in optional:
         print("DEPENDENCY_GROUP_VALIDATION=failed")
-        print("DEPENDENCY_GROUP_FAILED_ID=optional-dev-not-deprecated")
+        print("DEPENDENCY_GROUP_FAILED_ID=optional-dev-present")
         return 1
     print("DEPENDENCY_GROUP_VALIDATION=success")
     return 0

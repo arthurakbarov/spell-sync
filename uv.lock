@@ -979,15 +979,6 @@ dependencies = [
     { name = "textual" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "hypothesis" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
 [package.dev-dependencies]
 coverage = [
     { name = "pytest-cov" },
@@ -1017,15 +1008,7 @@ test-core = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.135,<7" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=2,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9,<10" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7,<8" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15,<1" },
-    { name = "textual", specifier = ">=8.2.8,<9" },
-]
-provides-extras = ["dev"]
+requires-dist = [{ name = "textual", specifier = ">=8.2.8,<9" }]
 
 [package.metadata.requires-dev]
 coverage = [{ name = "pytest-cov", specifier = ">=7,<8" }]

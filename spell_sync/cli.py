@@ -22,7 +22,7 @@ from .log import log
 from .plan_cmd import cmd_plan
 from .recover_cmd import cmd_recover
 from .support_report_cmd import cmd_support_report
-from .tui import (
+from .tui.routing import (
     print_non_interactive_ui_error,
     print_non_interactive_usage_error,
     should_launch_tui,

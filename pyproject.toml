@@ -54,15 +54,6 @@ dev = [
 Homepage = "https://github.com/arthurakbarov/spell-sync"
 Repository = "https://github.com/arthurakbarov/spell-sync"
 Issues = "https://github.com/arthurakbarov/spell-sync/issues"
-[project.optional-dependencies]
-# Deprecated: use uv dependency-groups (dev, packaging, release-check) for maintainer workflows.
-dev = [
-  "pytest>=9,<10",
-  "pytest-cov>=7,<8",
-  "ruff>=0.15,<1",
-  "mypy>=2,<3",
-  "hypothesis>=6.135,<7",
-]
 
 [tool.pytest.ini_options]
 markers = [
@@ -103,6 +94,8 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
 files = ["spell_sync"]
+# disallow_untyped_defs deferred: ~50 missing annotations across product/TUI; keep
+# check_untyped_defs until a dedicated annotation pass lands.
 
 [tool.coverage.run]
 source = ["spell_sync"]
