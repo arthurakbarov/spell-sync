@@ -74,9 +74,9 @@ On Windows, tooling uses bounded subprocess fallback without POSIX process-group
 
 ### Owner workspace snapshot
 
-Creating the owner-controlled workspace archive (`$HOME/code.zip`) is supported on the
-maintainer macOS owner environment. Snapshot policy lives in private `spell-sync-dev`
-(`snapshot-policy.toml`).
+Creating the owner-controlled workspace archive (canonical path configured by private
+snapshot policy) is supported on the maintainer macOS owner environment. Snapshot policy
+lives in private `spell-sync-dev` (`snapshot-policy.toml`).
 
 The archive stores declarations and compact evidence, not disposable `.venv` directories or
 execution-control SQLite history.

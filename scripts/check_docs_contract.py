@@ -60,6 +60,19 @@ HISTORICAL_DOC_PATHS = frozenset(
         "docs/MANUAL_TESTING.md",
     }
 )
+PINNED_PYTHON_EXEMPT_PREFIXES = (
+    "docs/decisions/",
+)
+PRIVATE_PATH_DOC_PATTERNS = (
+    re.compile(r"~/code(?:/|\b)"),
+    re.compile(r"/Users/[A-Za-z0-9._-]+/"),
+    re.compile(r"\$HOME/code\.zip"),
+)
+PRIVATE_PATH_DOC_EXEMPT = frozenset(
+    {
+        "docs/AGENT_DEVELOPMENT.md",  # documents snapshot absolute-path report contract
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -939,6 +952,47 @@ def check_repository(root: Path) -> list[ContractViolation]:
     violations.extend(_check_cli_command_listings(root, cli_commands))
     violations.extend(_check_agent_workflow_docs(root))
     violations.extend(_check_testing_strategy_doc(root))
+    violations.extend(_check_public_docs_hygiene(root))
+    return violations
+
+
+def _check_public_docs_hygiene(root: Path) -> list[ContractViolation]:
+    """Pinned python3.x commands and maintainer topology must not leak into user docs."""
+    violations: list[ContractViolation] = []
+    for path in _tracked_markdown(root):
+        rel = str(path.relative_to(root))
+        if rel in HISTORICAL_DOC_PATHS:
+            continue
+        if any(rel.startswith(prefix) for prefix in PINNED_PYTHON_EXEMPT_PREFIXES):
+            continue
+        if any(part in rel for part in EXCLUDE_PATH_PARTS):
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_no, line in enumerate(lines, start=1):
+            if PINNED_PYTHON.search(line):
+                violations.append(
+                    ContractViolation(
+                        "DOCS-PYTHON-001",
+                        path,
+                        line_no,
+                        line.strip(),
+                        "use portable `python3` (not python3.N) in committed docs",
+                    )
+                )
+            if rel in PRIVATE_PATH_DOC_EXEMPT:
+                continue
+            for pattern in PRIVATE_PATH_DOC_PATTERNS:
+                if pattern.search(line):
+                    violations.append(
+                        ContractViolation(
+                            "DOCS-PRIVACY-001",
+                            path,
+                            line_no,
+                            line.strip(),
+                            "do not publish maintainer home/topology paths in public docs",
+                        )
+                    )
+                    break
     return violations
 
 

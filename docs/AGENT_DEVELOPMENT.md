@@ -168,9 +168,10 @@ Document only the supported Cursor Agent workflow and public processes.
 
 ## Phase boundaries
 
-Current package version comes from `pyproject.toml`. Completed automation phases (2C–2E) established
-deterministic CI and agent workflow. Phase 3 (explicit runtime) is tracked in the architecture
-implementation document.
+Current package version comes from `pyproject.toml`. Architecture migration phases 1–10 are
+**complete** (see `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`). The tracker current focus is
+`post-0.3-ops` (release, manual validation, and related owner-initiated work — not a new
+architecture migration).
 
 ## Final report contract
 

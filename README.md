@@ -24,11 +24,71 @@ You always see a **preview** before anything changes.
 **New here?** Follow **[Getting Started](docs/GETTING_STARTED.md)** — folder → `spell-sync` →
 **Start here** → **Review and update**. No Git or programming required.
 
-[Supported apps](docs/SUPPORTED_APPS.md) · [Personal workspace](docs/PERSONAL_WORKSPACE.md)
+[Supported apps](docs/SUPPORTED_APPS.md) · [Personal workspace](docs/PERSONAL_WORKSPACE.md) ·
+[Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)
 
 Git is optional. Maintainer-only release tooling is separate and is **not** required to use
 Spell Sync.
 
+## Install
+
+### From GitHub
+
+```bash
+uv tool install \
+  git+https://github.com/arthurakbarov/spell-sync
+
+uv tool update-shell   # only if the uv tools directory is not already on PATH
+spell-sync
+```
+
+For release-candidate testing before a GitHub release, install from a wheel in `dist/` — see
+[Manual testing](docs/MANUAL_TESTING.md).
+
+### From a clone
+
+```bash
+git clone https://github.com/arthurakbarov/spell-sync
+cd spell-sync
+uv tool install .
+spell-sync
+```
+
+### Development
+
+```bash
+git clone https://github.com/arthurakbarov/spell-sync
+cd spell-sync
+uv sync
+uv run spell-sync
+```
+
+Editable install for local CLI testing:
+
+```bash
+uv tool install --editable .
+```
+
+Requires **Python 3.11+**. Python **3.11** and **3.12** are currently tested; **3.13** is
+experimental (see [Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)).
+
+## Quick start
+
+**Beginner path:** create a folder, run `spell-sync`, press **Start here**, then use
+**Review and update** on the dashboard. Details: [Getting Started](docs/GETTING_STARTED.md).
+
+Or use commands:
+
+| Situation | Command |
+|-----------|---------|
+| First setup (non-interactive) | `spell-sync init` |
+| Added a word in an app | `spell-sync pull` then commit `wordlist.txt` if you use Git |
+| New machine / after `git pull` | `spell-sync push` |
+| Delete a word everywhere | Remove from wordlist → `spell-sync push` (not pull) |
+| Preview changes | `spell-sync status` or `spell-sync plan` |
+| Preview removals | `spell-sync plan --removals` |
+| Crash / interrupted push | `spell-sync recover` |
+| Terminal UI | `spell-sync` (TTY) or `spell-sync ui` |
 
 ## What the personal word list contains
 
@@ -96,7 +156,9 @@ update `spell-sync.toml` only — they do not modify wordlists, application dict
 Open **Targets → Details** to inspect capabilities, runtime state, and validation status for one target.
 
 See [Supported targets](docs/SUPPORTED_TARGETS.md) for the difference between implemented,
-automatically tested, and manually validated support.
+automatically tested, and manually validated support. Real-application manual validation may
+still be `not-run` even when synthetic CI passes — see
+[Supported environments](docs/SUPPORTED_ENVIRONMENTS.md).
 
 ### Safety previews
 
@@ -114,65 +176,6 @@ external changes to conflicted files are not overwritten without warning.
 
 Operation history stores counts, outcomes, and opaque identifiers — never your words. Technical logs
 are redacted and bounded. See [Architecture](docs/ARCHITECTURE.md) for details.
-
-## Install
-
-### From GitHub
-
-```bash
-uv tool install \
-  git+https://github.com/arthurakbarov/spell-sync
-
-uv tool update-shell   # only if the uv tools directory is not already on PATH
-spell-sync
-```
-
-For release-candidate testing before a GitHub release, install from a wheel in `dist/` — see
-[Manual testing](docs/MANUAL_TESTING.md).
-
-### From a clone
-
-```bash
-git clone https://github.com/arthurakbarov/spell-sync
-cd spell-sync
-uv tool install .
-spell-sync
-```
-
-### Development
-
-```bash
-git clone https://github.com/arthurakbarov/spell-sync
-cd spell-sync
-uv sync
-uv run spell-sync
-```
-
-Editable install for local CLI testing:
-
-```bash
-uv tool install --editable .
-```
-
-Requires **Python 3.11+**. Python **3.11** and **3.12** are currently tested.
-
-## Quick start
-
-**Beginner path:** create a folder, run `spell-sync`, press **Start here**, then use
-**Review and update** on the dashboard. Details: [Getting Started](docs/GETTING_STARTED.md).
-
-Or use commands:
-
-| Situation | Command |
-|-----------|---------|
-| First setup (non-interactive) | `spell-sync init` |
-| Added a word in an app | `spell-sync pull` then commit `wordlist.txt` if you use Git |
-| New machine / after `git pull` | `spell-sync push` |
-| Delete a word everywhere | Remove from wordlist → `spell-sync push` (not pull) |
-| Preview changes | `spell-sync status` or `spell-sync plan` |
-| Preview removals | `spell-sync plan --removals` |
-| Crash / interrupted push | `spell-sync recover` |
-| Terminal UI | `spell-sync` (TTY) or `spell-sync ui` |
 
 ## CLI
 

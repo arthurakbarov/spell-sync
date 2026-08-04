@@ -4,6 +4,25 @@ Symptom-based guidance for Spell Sync. For target capability limits see
 [Supported targets](SUPPORTED_TARGETS.md). For real-application validation workflow see
 [Manual testing](MANUAL_TESTING.md) and Recovery details in [Recovery](RECOVERY.md).
 
+## Contents
+
+- [Chrome does not recognize pushed words](#chrome-does-not-recognize-pushed-words)
+- [Firefox profile was not detected](#firefox-profile-was-not-detected)
+- [Push is blocked because an application is running](#push-is-blocked-because-an-application-is-running)
+- [Configuration is invalid or rejected](#configuration-is-invalid-or-rejected)
+- [Configuration changed after preview](#configuration-changed-after-preview)
+- [A target was skipped safely](#a-target-was-skipped-safely)
+- [A target is corrupt or unreadable](#a-target-is-corrupt-or-unreadable)
+- [Recovery is required](#recovery-is-required)
+- [I pushed and want to undo it](#i-pushed-and-want-to-undo-it)
+- [Words returned after Push](#words-returned-after-push)
+- [An application already recognizes a word by default](#an-application-already-recognizes-a-word-by-default)
+- [The support report could not be exported](#the-support-report-could-not-be-exported)
+- [Spell Sync was installed but the command is not found](#spell-sync-was-installed-but-the-command-is-not-found)
+- [TUI does not start in the current terminal](#tui-does-not-start-in-the-current-terminal)
+- [I want to preview differences before Push](#i-want-to-preview-differences-before-push)
+- [Wordlist quality warnings](#wordlist-quality-warnings)
+
 ## Chrome does not recognize pushed words
 
 ### What happened

@@ -6,8 +6,8 @@ Package version source of truth: `project.version` in `pyproject.toml`.
 
 Requires **Python 3.11+**.
 
-Python **3.11** and **3.12** are tested in CI. Classifiers list those versions; newer Python
-releases may work but are not verified yet.
+Python **3.11** and **3.12** are tested in CI. Python **3.13** is experimental
+(`continue-on-error` compatibility job). See [Supported environments](SUPPORTED_ENVIRONMENTS.md).
 
 ```bash
 git clone https://github.com/arthurakbarov/spell-sync.git
@@ -36,6 +36,17 @@ When `lightweight-sufficient`:
 ```bash
 python3 scripts/run_lightweight_validation.py
 python3 scripts/check_ci_evidence.py
+```
+
+Registered development and CI commands run under execution budget control
+(`docs/EXECUTION_TIME_CONTROL.md`, `tests/execution-budget.toml`). Prefer integrated runners
+(`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`) over raw unbounded pytest.
+Product Pull/Push/Recovery paths are not wrapped by the controller.
+
+Before commit, optional:
+
+```bash
+python3 scripts/run_pre_final_checks.py
 ```
 
 A successful full CI run exits **0** and prints:

@@ -10,14 +10,12 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 7: documentation reorganization and ADRs — **complete** (owner-approved).
-Phase 8: agent configuration refresh — **complete** (owner-approved).
-Phase 9: dead directory audit — **complete** (owner-approved).
 Phase 10: version 0.3.0 — **complete** (owner-approved with documented residuals:
 R-WIN, R-PWR, R-CON). Release not performed.
 
-Post-0.3 ops: **not started** — release/tag/publication and real-app manual validation remain
-owner-initiated only; not an architecture migration phase.
+Post-0.3 ops: **in progress** — documentation/meta hardening and CI hygiene after Phase 10
+approval. Release/tag/publication and real-app / Windows hardware validation remain
+owner-initiated and are **not** claimed complete by this cycle.
 
 [architecture-status:start]
 current: post-0.3-ops
@@ -35,7 +33,7 @@ phase-7: complete
 phase-8: complete
 phase-9: complete
 phase-10: complete
-post-0.3-ops: not-started
+post-0.3-ops: in-progress
 [architecture-status:end]
 
 ## Verified baseline
@@ -501,8 +499,8 @@ full final CI on committed clean HEAD 3c6bc35
 
 ### Goal
 
-Inventory obsolete and generated paths in the maintainer workspace (`~/code/`). Report
-only — no automated deletion.
+Inventory obsolete and generated paths in the **public** repository and related maintainer
+workspace. Report only — no automated deletion.
 
 ### Delivered
 
@@ -562,11 +560,24 @@ CI_EVIDENCE_MATCH=exact-head
 
 ## Post-0.3 ops
 
-**Status:** not started
+**Status:** in progress
 
-Owner-initiated only: GitHub Release / tag / package publish, real-application manual
-validation matrix updates, and optional Windows real-hardware adversarial evidence.
-Not an architecture migration phase — do not start without an explicit owner command.
+Owner-initiated tracks that remain open:
+
+- GitHub Release / tag / package publish
+- Real-application manual validation matrix updates
+- Optional Windows real-hardware adversarial evidence
+
+Delivered in this cycle (engineering polish, not release):
+
+- README Install / Quick start moved above conceptual sections; environments honesty link
+- Troubleshooting contents index; Recovery beginner landing
+- DEVELOPMENT execution-time control + Python 3.13 experimental note
+- AGENT_DEVELOPMENT phase boundaries updated past Phase 3
+- Single shared coverage policy script in `ci_runner.py`
+- Docs contract hygiene: no `python3.N` commands and no maintainer topology paths in public docs
+
+Not an architecture migration phase. Do not publish without an explicit owner command.
 
 ## Phase 2B: complete application boundary
 

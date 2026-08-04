@@ -538,3 +538,35 @@ class TestDocsContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_public_docs_hygiene_flags_pinned_python(tmp_path: Path) -> None:
+    from scripts import check_docs_contract as mod
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    bad = docs_dir / "SAMPLE.md"
+    bad.write_text("Run `python3.11 scripts/x.py`\n", encoding="utf-8")
+    original = mod._tracked_markdown
+    mod._tracked_markdown = lambda root: [bad]  # type: ignore[assignment]
+    try:
+        violations = mod._check_public_docs_hygiene(tmp_path)
+    finally:
+        mod._tracked_markdown = original
+    assert any(item.check_id == "DOCS-PYTHON-001" for item in violations)
+
+
+def test_public_docs_hygiene_flags_private_path(tmp_path: Path) -> None:
+    from scripts import check_docs_contract as mod
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    bad = docs_dir / "SAMPLE.md"
+    bad.write_text("Workspace lives under ~/code/ forever.\n", encoding="utf-8")
+    original = mod._tracked_markdown
+    mod._tracked_markdown = lambda root: [bad]  # type: ignore[assignment]
+    try:
+        violations = mod._check_public_docs_hygiene(tmp_path)
+    finally:
+        mod._tracked_markdown = original
+    assert any(item.check_id == "DOCS-PRIVACY-001" for item in violations)

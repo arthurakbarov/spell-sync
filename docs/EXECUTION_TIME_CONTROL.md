@@ -169,7 +169,7 @@ scan, mkdir, serialization, or file write; incomplete results are reported expli
 
 Focused and pre-final gates run bounded planner children (`focused:planner`, `pre-final:planner`)
 **before** parent gate admission. Snapshot gates require explicit `--workspace-root` and
-`--output`; public pytest must not mutate owner `$HOME/code.zip`. Pre-gate `bootstrap.python`
+`--output`; public pytest must not mutate the owner workspace archive path. Pre-gate `bootstrap.python`
 uses a committed 30s subprocess timeout before full CI gate children start.
 
 `ci:pytest` uses the dedicated `ci-pytest` profile (measured full-suite evidence). Fast CI

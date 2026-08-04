@@ -3,6 +3,17 @@
 spell-sync protects dictionary writes with backups, a transaction journal, and `spell-sync recover`.
 There is **one** journal schema (version **2**); older or corrupt journals are rejected.
 
+## Beginner path
+
+If something went wrong while updating apps:
+
+1. Open the dashboard and look for **Review recovery**, or run `spell-sync recover`.
+2. If recovery is not offered and you only want to reverse a **successful** Push, there is no
+   `rollback` command — see [I pushed and want to undo it](TROUBLESHOOTING.md#i-pushed-and-want-to-undo-it).
+3. For a safe diagnostic export without your words, run `spell-sync support-report`.
+
+The sections below are the technical Recovery contract (journal, lock, backups).
+
 ## When to use what
 
 | Situation | Command |

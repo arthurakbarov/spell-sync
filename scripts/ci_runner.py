@@ -539,39 +539,38 @@ def _verify_wheel_origin(origin: Path, *, venv_dir: Path, root: Path) -> tuple[b
     return True, str(origin_resolved)
 
 
+COVERAGE_LINE_REQUIREMENT = 100
+COVERAGE_BRANCH_MINIMUM_PERCENT = 96
+
+
+def _coverage_policy_script() -> str:
+    """Single coverage policy script shared by gate helpers (avoids literal drift)."""
+    line_req = COVERAGE_LINE_REQUIREMENT
+    branch_min = COVERAGE_BRANCH_MINIMUM_PERCENT
+    return f"""
+import json
+totals = json.load(open("coverage.json", encoding="utf-8"))["totals"]
+if totals["missing_lines"]:
+    raise SystemExit(f"line coverage must be {line_req}% ({{totals['missing_lines']}} lines missing)")
+branches = totals["num_branches"]
+branch_rate = 100.0 if not branches else 100.0 * totals["covered_branches"] / branches
+if branch_rate < {branch_min}:
+    raise SystemExit(f"branch coverage must be at least {branch_min}% ({{branch_rate:.2f}}%)")
+print(f"coverage policy: {line_req}% lines, {{branch_rate:.2f}}% branches")
+"""
+
+
 def _coverage_gate(
     py: str,
     *,
     root: Path,
     run_step: RunStep,
 ) -> tuple[int, str]:
-    script = """
-import json
-totals = json.load(open("coverage.json", encoding="utf-8"))["totals"]
-if totals["missing_lines"]:
-    raise SystemExit(f"line coverage must be 100% ({totals['missing_lines']} lines missing)")
-branches = totals["num_branches"]
-branch_rate = 100.0 if not branches else 100.0 * totals["covered_branches"] / branches
-if branch_rate < 96:
-    raise SystemExit(f"branch coverage must be at least 96% ({branch_rate:.2f}%)")
-print(f"coverage policy: 100% lines, {branch_rate:.2f}% branches")
-"""
-    return run_step([py, "-c", script], cwd=root)
+    return run_step([py, "-c", _coverage_policy_script()], cwd=root)
 
 
 def _coverage_argv(py: str) -> list[str]:
-    script = """
-import json
-totals = json.load(open("coverage.json", encoding="utf-8"))["totals"]
-if totals["missing_lines"]:
-    raise SystemExit(f"line coverage must be 100% ({totals['missing_lines']} lines missing)")
-branches = totals["num_branches"]
-branch_rate = 100.0 if not branches else 100.0 * totals["covered_branches"] / branches
-if branch_rate < 96:
-    raise SystemExit(f"branch coverage must be at least 96% ({branch_rate:.2f}%)")
-print(f"coverage policy: 100% lines, {branch_rate:.2f}% branches")
-"""
-    return [py, "-c", script]
+    return [py, "-c", _coverage_policy_script()]
 
 
 def _make_run_id(now: datetime) -> str:
