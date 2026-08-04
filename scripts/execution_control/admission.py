@@ -221,17 +221,3 @@ def assess_admission(
         ),
         plan,
     )
-
-
-def timing_block_from_plan(plan) -> dict[str, object]:
-    return {
-        "executionId": plan.execution_id,
-        "profileId": plan.profile_id,
-        "expectedSeconds": plan.expected_seconds,
-        "softSeconds": plan.soft_seconds,
-        "stallSeconds": plan.stall_seconds,
-        "hardSeconds": plan.hard_seconds,
-        "predictionSource": plan.prediction_source,
-        "confidence": plan.confidence,
-        "sampleCount": plan.sample_count,
-    }

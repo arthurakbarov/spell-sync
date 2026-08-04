@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "commands": {
+    "agent-context": {
+      "command": "python3 scripts/agent_context.py",
+      "stage": "before-work",
+      "task": "Read-only branch/dirty/necessity rollup",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "environment-check": {
+      "command": "python3 scripts/project_environment.py check",
+      "stage": "before-work",
+      "task": "Verify maintainer environment",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "edit-loop": {
+      "command": "python3 scripts/run_dev_loop.py",
+      "stage": "edit-loop",
+      "task": "Local minimal validation (≤60s)",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "commit-gate": {
+      "command": "python3 scripts/run_dev_loop.py --commit-gate",
+      "stage": "commit-gate",
+      "task": "Commit gate (≤120s + safety clusters)",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "ci-necessity": {
+      "command": "python3 scripts/check_ci_necessity.py --purpose local --explain",
+      "stage": "commit-gate",
+      "task": "Assess local CI necessity",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "full-ci": {
+      "command": "scripts/ci.sh",
+      "stage": "full-ci",
+      "task": "Full CI (publish / owner final only)",
+      "mutatesRepo": false,
+      "network": "maybe"
+    },
+    "ci-evidence": {
+      "command": "python3 scripts/check_ci_evidence.py",
+      "stage": "evidence",
+      "task": "Verify CI evidence for HEAD",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "runs-show": {
+      "command": "python3 scripts/dev_runs.py show <run-id>",
+      "stage": "triage",
+      "task": "Show one execution/CI run",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "runs-failures": {
+      "command": "python3 scripts/dev_runs.py failures",
+      "stage": "triage",
+      "task": "List recent failed execution spans",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "timing-report": {
+      "command": "python3 scripts/execution_budget_report.py",
+      "stage": "triage",
+      "task": "Timing / budget history report",
+      "mutatesRepo": false,
+      "network": false
+    }
+  }
+}

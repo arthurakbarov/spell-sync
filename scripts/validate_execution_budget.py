@@ -39,21 +39,14 @@ FORBIDDEN_PATTERNS = (
 
 ATOMIC_CI_IDS = (
     "ci:execution-budget-registry",
+    "ci:dev-commands-registry",
+    "ci:timing-observability",
     "ci:ci-impact-registry",
     "ci:test-impact-registry",
     "ci:docs-style",
     "ci:docs-contract",
     "ci:agent-config",
     "ci:target-capabilities",
-)
-
-LONG_CI_STEP_MARKERS = (
-    "environment.lock",
-    "environment.check",
-    "packaging.wheel-smoke",
-    "tests:rest",
-    "tests:tui",
-    "gate:full-ci",
 )
 
 
@@ -699,6 +692,41 @@ def _check_atomic_ids(registry) -> list[str]:
     return errors
 
 
+def _check_timing_observability_wired() -> list[str]:
+    errors: list[str] = []
+    ci = _read(ROOT / "scripts/ci_runner.py")
+    if "validate_timing_observability.py" not in ci or "timing.observability" not in ci:
+        errors.append(
+            "[EXECUTION-CONTROL-TIMING-001] full CI must run validate_timing_observability.py; "
+            "remediation: add timing.observability step in ci_runner.py"
+        )
+    mappings = _read(ROOT / "scripts/execution_control/mappings.py")
+    if "timing.observability" not in mappings or "ci:timing-observability" not in mappings:
+        errors.append(
+            "[EXECUTION-CONTROL-TIMING-001] missing stable ID mapping for timing.observability; "
+            "remediation: add entry in mappings.py"
+        )
+    polish = _read(ROOT / "scripts/build_pre_final_plan.py")
+    if "validate_timing_observability.py" not in polish:
+        errors.append(
+            "[EXECUTION-CONTROL-TIMING-001] pre-final polish must include timing observability; "
+            "remediation: keep scripts/validate_timing_observability.py in POLISH_VALIDATORS"
+        )
+    impact = _read(ROOT / "tests/test-impact.toml")
+    if "scripts/validate_timing_observability.py" not in impact:
+        errors.append(
+            "[EXECUTION-CONTROL-TIMING-001] execution-control cluster must list "
+            "validate_timing_observability.py; remediation: add to tests/test-impact.toml"
+        )
+    smoke = ROOT / "tests/test_timing_observability_contract.py"
+    if not smoke.is_file():
+        errors.append(
+            "[EXECUTION-CONTROL-TIMING-001] missing tests/test_timing_observability_contract.py; "
+            "remediation: add subprocess smoke coverage for the validator"
+        )
+    return errors
+
+
 def _check_session_deltas() -> list[str]:
     errors: list[str] = []
     session = _read(ROOT / "scripts/execution_control/session.py")
@@ -988,6 +1016,7 @@ def main() -> int:
     errors.extend(_check_narrow_replacement_plan())
     errors.extend(_check_snapshot_integration())
     errors.extend(_check_atomic_ids(registry))
+    errors.extend(_check_timing_observability_wired())
     errors.extend(_check_session_deltas())
     errors.extend(_check_functional_output_separation())
     errors.extend(_check_wheel_smoke_composite())
@@ -998,18 +1027,30 @@ def main() -> int:
     errors.extend(_check_environment_integration())
 
     product_paths = (
-        "spell_sync/application/services/pull.py",
-        "spell_sync/application/services/push.py",
+        "spell_sync/application/services/sync.py",
         "spell_sync/application/services/recovery.py",
+        "spell_sync/application/service.py",
+        "spell_sync/sync_run.py",
+        "spell_sync/push_transaction.py",
     )
+    checked = 0
     for rel in product_paths:
         path = ROOT / rel
-        if path.is_file():
-            text = path.read_text(encoding="utf-8")
-            if "execution_control" in text or "run_monitored_command" in text:
-                errors.append(
-                    f"[EXECUTION-CONTROL-BOUNDARY-003] product path must not use controller: {rel}"
-                )
+        if not path.is_file():
+            errors.append(
+                f"[EXECUTION-CONTROL-BOUNDARY-003] missing product path for boundary scan: {rel}"
+            )
+            continue
+        checked += 1
+        text = path.read_text(encoding="utf-8")
+        if "execution_control" in text or "run_monitored_command" in text:
+            errors.append(
+                f"[EXECUTION-CONTROL-BOUNDARY-003] product path must not use controller: {rel}"
+            )
+    if checked == 0:
+        errors.append(
+            "[EXECUTION-CONTROL-BOUNDARY-003] no product paths available for boundary scan"
+        )
 
     if errors:
         for item in errors:

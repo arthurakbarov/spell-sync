@@ -25,12 +25,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tui", action="store_true")
     parser.add_argument("--packaging", action="store_true")
     parser.add_argument("--enforce-stall", action="store_true")
+    parser.add_argument(
+        "--prompts",
+        type=int,
+        default=0,
+        help="Expected interactive prompts (+5s each on ETA/wall hard; not work budget).",
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.command and args.command[0] == "--":
         args.command = args.command[1:]
     if not args.command:
         parser.error("command required")
+    if args.prompts < 0:
+        parser.error("--prompts must be >= 0")
     exit_code, _timing = run_monitored_command(
         ROOT,
         execution_id=args.execution_id,
@@ -43,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         tui=args.tui,
         packaging=args.packaging,
         enforce_stall=args.enforce_stall,
+        expected_prompt_count=args.prompts,
     )
     return exit_code
 

@@ -15,7 +15,7 @@ from scripts.execution_control.budget_analysis import (  # noqa: E402
     build_execution_budget_report,
     write_privacy_safe_execution_summary,
 )
-from scripts.test_groups import validate_union  # noqa: E402
+from scripts.test_groups import validate_group_order, validate_union  # noqa: E402
 
 
 def main() -> int:
@@ -33,6 +33,13 @@ def main() -> int:
         print("TIMING_OBSERVABILITY_VALIDATION=failed")
         print("TIMING_OBSERVABILITY_FAILED_ID=test-group-union")
         for item in problems[:5]:
+            print(f"TIMING_OBSERVABILITY_DETAIL={item}")
+        return 1
+    order_ok, order_problems = validate_group_order()
+    if not order_ok:
+        print("TIMING_OBSERVABILITY_VALIDATION=failed")
+        print("TIMING_OBSERVABILITY_FAILED_ID=test-group-order")
+        for item in order_problems:
             print(f"TIMING_OBSERVABILITY_DETAIL={item}")
         return 1
     summary_path = write_privacy_safe_execution_summary(ROOT, payload)

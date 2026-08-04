@@ -15,6 +15,9 @@ def print_plan(plan: ExecutionPlan) -> None:
     else:
         print(f"EXECUTION_STALL_SECONDS={plan.stall_seconds:.0f}")
     print(f"EXECUTION_HARD_SECONDS={plan.hard_seconds:.0f}")
+    print(f"EXECUTION_INTERACTIVE_PROMPTS={plan.expected_prompt_count}")
+    print(f"EXECUTION_INTERACTIVE_ALLOWANCE_SECONDS={plan.interactive_allowance_seconds:.0f}")
+    print(f"EXECUTION_WALL_HARD_SECONDS={plan.wall_hard_seconds:.0f}")
     print(f"EXECUTION_DIAGNOSTIC_HARD_SECONDS={plan.diagnostic_hard_seconds:.0f}")
     print(f"EXECUTION_BUDGET_SOURCE={plan.prediction_source}")
     print(f"EXECUTION_CONFIDENCE={plan.confidence}")
@@ -36,7 +39,7 @@ def print_soft_overrun(
     if plan.stall_seconds is not None:
         remaining = max(0.0, plan.stall_seconds - progress_age)
         print(f"EXECUTION_STALL_REMAINING_SECONDS={remaining:.2f}")
-    print(f"EXECUTION_HARD_REMAINING_SECONDS={max(0.0, plan.hard_seconds - elapsed):.2f}")
+    print(f"EXECUTION_HARD_REMAINING_SECONDS={max(0.0, plan.wall_hard_seconds - elapsed):.2f}")
 
 
 def print_result(
@@ -47,10 +50,12 @@ def print_result(
     active_child: str | None,
     history_updated: bool,
     learning_accepted: bool,
+    waiting_seconds: float = 0.0,
 ) -> None:
     print(f"EXECUTION_RESULT={result}")
     print(f"EXECUTION_EXIT={exit_code}")
     print(f"EXECUTION_DURATION_SECONDS={duration:.2f}")
+    print(f"EXECUTION_WAITING_SECONDS={waiting_seconds:.2f}")
     print(f"EXECUTION_ACTIVE_CHILD={active_child or ''}")
     print(f"EXECUTION_HISTORY_UPDATED={'true' if history_updated else 'false'}")
     print(f"EXECUTION_LEARNING_ACCEPTED={'true' if learning_accepted else 'false'}")

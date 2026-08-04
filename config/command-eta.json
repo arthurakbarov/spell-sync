@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "announceThresholdSeconds": 5,
+  "promptAllowanceSeconds": 5,
+  "commands": {
+    "gate:full-ci": {
+      "estimatedSeconds": 770
+    },
+    "gate:pre-final": {
+      "estimatedSeconds": 180
+    },
+    "gate:focused-cluster": {
+      "estimatedSeconds": 120
+    },
+    "gate:focused-module": {
+      "estimatedSeconds": 45
+    },
+    "dev-loop:L0": {
+      "estimatedSeconds": 45
+    },
+    "dev-loop:L1": {
+      "estimatedSeconds": 90
+    },
+    "dev-loop-step:pytest": {
+      "estimatedSeconds": 20
+    },
+    "dev-loop-step:architecture": {
+      "estimatedSeconds": 8
+    },
+    "dev-loop-step:validator:scripts/check_agent_config.py": {
+      "estimatedSeconds": 6
+    },
+    "dev-loop-step:validator:scripts/check_docs_contract.py": {
+      "estimatedSeconds": 6
+    },
+    "dev-loop-step:validator:scripts/validate_execution_budget.py": {
+      "estimatedSeconds": 8
+    }
+  }
+}

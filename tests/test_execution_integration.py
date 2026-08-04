@@ -86,6 +86,7 @@ def test_ci_check_execution_id_mappings():
     assert ci_check_execution_id("tests:rest") == "tests:rest"
     assert ci_check_execution_id("tests:tui") == "tests:tui"
     assert ci_check_execution_id("execution-budget.registry") == "ci:execution-budget-registry"
+    assert ci_check_execution_id("timing.observability") == "ci:timing-observability"
     assert ci_check_execution_id("unknown-check") == "ci:unknown-check"
     assert "mypy" in CI_CHECK_EXECUTION_IDS
     assert GATE_EXECUTION_IDS["full-ci"] == "gate:full-ci"
@@ -100,23 +101,21 @@ def test_ci_child_mappings_resolve_profile(registry):
 
 def test_product_paths_not_wrapped_by_controller():
     candidates = (
-        "spell_sync/application/services/pull.py",
-        "spell_sync/application/services/push.py",
+        "spell_sync/application/services/sync.py",
         "spell_sync/application/services/recovery.py",
         "spell_sync/application/service.py",
-        "spell_sync/application/services/sync.py",
         "spell_sync/sync_run.py",
+        "spell_sync/push_transaction.py",
     )
     checked = 0
     for rel in candidates:
         path = ROOT / rel
-        if not path.is_file():
-            continue
+        assert path.is_file(), f"missing product path: {rel}"
         checked += 1
         text = path.read_text(encoding="utf-8")
         assert "execution_control" not in text
         assert "run_monitored_command" not in text
-    assert checked >= 1
+    assert checked == len(candidates)
 
 
 def test_snapshot_tests_profile_exists_and_mapped(registry):

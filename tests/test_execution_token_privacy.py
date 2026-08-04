@@ -53,6 +53,15 @@ def _runtime_secrets() -> dict[str, str]:
     }
 
 
+def test_basic_urlsafe_chars_are_redacted(isolated_state_dir):
+    """Basic tokens may use urlsafe alphabet (-/_); classic base64 charset alone is insufficient."""
+    del isolated_state_dir
+    payload = "Basic _ZE_wQ-gJg34lcfFjig_extra"
+    redacted = sanitize_text(payload, workspace_roots=workspace_roots(public_root=ROOT))
+    assert "_ZE_wQ-gJg34lcfFjig_extra" not in redacted
+    assert "Basic [REDACTED]" in redacted
+
+
 def test_runtime_generated_tokens_redacted_from_sanitizer(isolated_state_dir):
     del isolated_state_dir
     values = _runtime_secrets()

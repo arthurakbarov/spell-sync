@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "ownerCommands": [
+    "environment-check",
+    "edit-loop",
+    "commit-gate",
+    "full-ci",
+    "ci-evidence",
+    "runs-failures",
+    "timing-report"
+  ],
+  "agentCommands": [
+    "agent-context",
+    "environment-check",
+    "edit-loop",
+    "commit-gate",
+    "ci-necessity",
+    "full-ci",
+    "ci-evidence",
+    "runs-show",
+    "runs-failures",
+    "timing-report"
+  ],
+  "notes": [
+    "Owner: short list for day-to-day validation and triage.",
+    "Agent: full list including agent-context, necessity, and runs show.",
+    "Product CLI (pull/push/ui) remains in spell_sync/cli.py + AGENTS.md fence."
+  ]
+}

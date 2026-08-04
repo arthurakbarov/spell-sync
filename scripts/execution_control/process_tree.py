@@ -196,54 +196,6 @@ def terminate_ownership_snapshot(
     return tuple(ident.pid for ident in _running_identities(snapshot.identities))
 
 
-def terminate_descendants(
-    root_pid: int,
-    *,
-    grace: float,
-    exclude: set[int] | None = None,
-) -> tuple[int, ...]:
-    exclude = exclude or set()
-    snapshot = capture_ownership_snapshot(root_pid, root_pid)
-    filtered = tuple(ident for ident in snapshot.identities if ident.pid not in exclude)
-    return terminate_ownership_snapshot(
-        OwnershipSnapshot(root_pid=root_pid, owned_pgid=root_pid, identities=filtered),
-        grace=grace,
-    )
-
-
-def _terminate_owned_group(
-    pgid: int,
-    *,
-    grace: float,
-    root_pid: int | None = None,
-    exclude: set[int] | None = None,
-    snapshot: OwnershipSnapshot | None = None,
-) -> tuple[int, ...]:
-    del exclude
-    if root_pid is not None:
-        owned = snapshot or capture_ownership_snapshot(root_pid, pgid)
-        return terminate_ownership_snapshot(owned, grace=grace)
-    try:
-        os.killpg(pgid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    except PermissionError:
-        pass
-    deadline = time.monotonic() + grace
-    while time.monotonic() < deadline:
-        if not _process_group_exists(pgid):
-            break
-        time.sleep(0.05)
-    if _process_group_exists(pgid):
-        try:
-            os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        except PermissionError:
-            pass
-    return tuple()
-
-
 def _read_stream(
     stream,
     tracker: ProgressTracker | None,

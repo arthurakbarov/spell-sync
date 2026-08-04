@@ -9,7 +9,7 @@ from pathlib import Path
 _URL_CRED_RE = re.compile(r"(\w+://)([^/\s:@]+):([^@\s/]+)@")
 _ENV_ASSIGN_RE = re.compile(r"(?i)([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*)=([^\s]+)")
 _BEARER_RE = re.compile(r"Bearer\s+[A-Za-z0-9_\-\.=]+", re.IGNORECASE)
-_BASIC_RE = re.compile(r"Basic\s+[A-Za-z0-9+/=]+", re.IGNORECASE)
+_BASIC_RE = re.compile(r"Basic\s+[A-Za-z0-9_\-\.+/=]+", re.IGNORECASE)
 _PREFIX_TOKEN_RE = re.compile(r"\b(?:sk|ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_\-]{8,}\b")
 _TOKEN_LIKE_RE = re.compile(r"\b[A-Za-z0-9_\-]{32,}\b")
 _ALL_LETTER_TOKEN_RE = re.compile(r"\b[A-Za-z]{32,}\b")

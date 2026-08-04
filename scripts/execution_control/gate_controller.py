@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .controller import ExecutionController
+from .eta import announce_plan_eta
 from .gate_admission import assess_gate_admission, emit_narrow_replacement
 from .history import HistoryStore
 from .models import (
@@ -126,6 +127,7 @@ class GateController(ExecutionController):
             )
             if parent_plan is not None:
                 self._persist_plan(parent_plan)
+                announce_plan_eta(parent_plan, root=self.root, history=self.history)
                 print_plan(parent_plan)
             return None, ExecutionStatus.BLOCKED_ADMISSION.value
         assert parent_plan is not None
@@ -142,6 +144,7 @@ class GateController(ExecutionController):
                 print(f"EXECUTION_OWNER_PID={owner.get('owner_pid', '')}")
             return None, ExecutionStatus.BLOCKED_DUPLICATE.value
         self._persist_plan(parent_plan)
+        announce_plan_eta(parent_plan, root=self.root, history=self.history)
         print_plan(parent_plan)
         return parent_plan, "run"
 

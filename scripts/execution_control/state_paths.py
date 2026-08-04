@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-CONTROLLER_SCHEMA_VERSION = 1
 HISTORY_SCHEMA_VERSION = 2
 
 

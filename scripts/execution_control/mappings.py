@@ -6,6 +6,8 @@ import sys
 
 CI_CHECK_EXECUTION_IDS: dict[str, str] = {
     "execution-budget.registry": "ci:execution-budget-registry",
+    "dev-commands.registry": "ci:dev-commands-registry",
+    "timing.observability": "ci:timing-observability",
     "ci-impact.registry": "ci:ci-impact-registry",
     "test-impact.registry": "ci:test-impact-registry",
     "docs.style": "ci:docs-style",

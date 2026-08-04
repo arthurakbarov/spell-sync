@@ -112,11 +112,6 @@ class ExecutionBudgetRegistry:
     child_mappings: dict[str, ChildMapping]
 
 
-def _require_positive(name: str, value: float) -> None:
-    if value <= 0:
-        raise ValueError(f"{name} must be > 0")
-
-
 def _validate_profile(profile_id: str, payload: dict[str, object]) -> list[str]:
     errors: list[str] = []
     unknown = set(payload) - ALLOWED_PROFILE_KEYS

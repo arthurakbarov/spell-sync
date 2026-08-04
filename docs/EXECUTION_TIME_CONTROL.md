@@ -41,6 +41,40 @@ Testing after a small change must not consume most of the edit loop.
 No registered expensive development command may wait without a bound.
 ```
 
+## ETA announce
+
+When a planned or observed expected **display** duration is greater than **5 seconds**,
+runners print one stderr line before work starts:
+
+```text
+eta: expected ~12m50s (gate:full-ci)
+eta: expected ~1m10s (gate:focused-module) [work ~1m05s + 5s interactive ×1]
+```
+
+Display duration = work estimate + (`prompt_count` × **5 seconds**).
+
+| Concept | Counts toward work budget (`expected` / `soft` / `hard`) | Counts toward wall hard / ETA display |
+|---------|----------------------------------------------------------|----------------------------------------|
+| Command work | yes | yes |
+| Interactive prompt allowance (5s × N) | **no** | yes |
+
+Source preference for work estimate: learning history median for the execution ID, else
+`config/command-eta.json`, else the immutable plan `expected_seconds` / caller hint.
+
+Disable announce with `SPELL_SYNC_ETA_ANNOUNCE=0`.
+
+Interactive replies use `scripts.execution_control.interactive.prompt_user`: waits are measured,
+logged into session `waitingSeconds`, excluded from work duration / learning samples, and do not
+consume the profile hard budget (wall hard = profile hard + allowance).
+
+Observed entry points (announce + measure + learn, without hard kill):
+
+- `scripts/run_with_budget.py` / controller / gate controller
+- `scripts/run_dev_loop.py` (parent `dev-loop:L0|L1` and each step `dev-loop-step:*`)
+- `scripts/execution_control/observe.py` for other maintainer scripts
+
+Product Pull, Push, and Recovery remain outside this machinery.
+
 ## Decision order
 
 Before test or CI execution:
@@ -102,6 +136,7 @@ Stdlib-only package under `scripts/execution_control/`:
 | `session.py` | Edit-loop test-time share and regression warnings |
 | `budget_analysis.py` | History/registry report payload for CLI reporting |
 | `mappings.py` | Stable execution IDs for CI checks and gates |
+| `privacy.py` | Secret and token redaction for command and output text |
 
 CLI entry points:
 
@@ -202,8 +237,9 @@ changes.
 
 ### Policy fingerprint
 
-Hash of registry digest, profile ID, progress contract, hard cap, and controller schema
-version. Changes when timing policy changes without necessarily changing workload.
+Hash of registry digest, registry and formula schema versions, profile ID, execution ID,
+progress contract, hard cap, and policy-source module digests. Changes when timing policy
+changes without necessarily changing workload.
 
 ### Normalized signature
 

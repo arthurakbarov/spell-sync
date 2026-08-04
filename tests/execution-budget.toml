@@ -74,7 +74,7 @@ initialSoftSeconds = 630
 stallFloorSeconds = 30
 stallCapSeconds = 180
 initialHardSeconds = 1200
-hardCapSeconds = 1800
+hardCapSeconds = 1200
 diagnosticHardSeconds = 10
 terminationGraceSeconds = 10
 progressContract = "structured-phase-transition"
@@ -272,6 +272,8 @@ source = "bootstrap-readonly-estimate"
 
 [childMappings]
 "ci:execution-budget-registry" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:dev-commands-registry" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:timing-observability" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:ci-impact-registry" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:test-impact-registry" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:docs-style" = { profile = "ci-validator", parent = "gate:full-ci" }

@@ -85,6 +85,17 @@ class ExecutionPlan:
     orchestration_overhead_estimate: float = 0.0
     planned_child_expected_sum: float = 0.0
     planned_orchestration_overhead: float = 0.0
+    expected_prompt_count: int = 0
+
+    @property
+    def interactive_allowance_seconds(self) -> float:
+        from .eta import PROMPT_ALLOWANCE_SECONDS
+
+        return max(0, int(self.expected_prompt_count)) * PROMPT_ALLOWANCE_SECONDS
+
+    @property
+    def wall_hard_seconds(self) -> float:
+        return float(self.hard_seconds) + self.interactive_allowance_seconds
 
     def to_json_dict(self) -> dict[str, Any]:
         payload = {
@@ -107,6 +118,9 @@ class ExecutionPlan:
             "sampleCount": self.sample_count,
             "admissionDecision": self.admission_decision,
             "contextSignature": self.context_signature,
+            "expectedPromptCount": self.expected_prompt_count,
+            "interactiveAllowanceSeconds": self.interactive_allowance_seconds,
+            "wallHardSeconds": self.wall_hard_seconds,
         }
         if self.environment_signature:
             payload["environmentSignature"] = self.environment_signature
@@ -172,7 +186,3 @@ class ExecutionRunResult:
     @property
     def raw_output(self) -> str:
         return self.raw_stdout_tail + self.raw_stderr_tail
-
-    @property
-    def sanitized_output(self) -> str:
-        return self.sanitized_stdout_tail + self.sanitized_stderr_tail

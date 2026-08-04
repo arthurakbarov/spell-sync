@@ -11,7 +11,9 @@ from pathlib import Path
 
 from .admission import assess_admission, narrow_replacement_plan
 from .diagnostics import collect_timeout_bundle
+from .eta import announce_plan_eta
 from .history import HistoryStore
+from .interactive import capture_waiting, current_waiting_seconds
 from .models import (
     AdmissionDecision,
     ExecutionPlan,
@@ -69,6 +71,7 @@ class ExecutionController:
         tui: bool = False,
         packaging: bool = False,
         run_id_override: str | None = None,
+        expected_prompt_count: int = 0,
     ) -> tuple[ExecutionPlan | None, str]:
         profile = profile_for_execution_id(self.registry, execution_id)
         admission, plan = assess_admission(
@@ -117,7 +120,10 @@ class ExecutionController:
                 f"EXECUTION_REPLACEMENT_PREDICTED_COST={replacement.predicted_replacement_cost:.2f}"
             )
             if plan is not None:
+                if expected_prompt_count:
+                    plan = replace(plan, expected_prompt_count=max(0, int(expected_prompt_count)))
                 self._persist_plan(plan)
+                announce_plan_eta(plan, root=self.root, history=self.history)
                 print_plan(plan)
             return None, ExecutionStatus.BLOCKED_ADMISSION.value
         if admission.decision == AdmissionDecision.DEFER_TO_PRE_FINAL:
@@ -131,6 +137,8 @@ class ExecutionController:
         assert plan is not None
         if run_id_override is not None:
             plan = replace(plan, run_id=run_id_override)
+        if expected_prompt_count:
+            plan = replace(plan, expected_prompt_count=max(0, int(expected_prompt_count)))
         acquired, owner = self.history.acquire_lease(
             normalized_signature=plan.normalized_signature,
             run_id=plan.run_id,
@@ -154,6 +162,7 @@ class ExecutionController:
                         pass
             return None, ExecutionStatus.BLOCKED_DUPLICATE.value
         self._persist_plan(plan)
+        announce_plan_eta(plan, root=self.root, history=self.history)
         print_plan(plan)
         return plan, "run"
 
@@ -172,29 +181,33 @@ class ExecutionController:
         hard_seconds_override: float | None = None,
     ) -> ExecutionRunResult:
         tracker = create_tracker(plan.progress_contract_id)
-        effective_hard = (
+        # Work budget (hard_seconds) stays immutable; interactive allowance is wall-only.
+        base_hard = (
             hard_seconds_override if hard_seconds_override is not None else plan.hard_seconds
         )
+        effective_hard = float(base_hard) + plan.interactive_allowance_seconds
         if parent_deadline_monotonic is not None:
             parent_remaining = max(0.0, parent_deadline_monotonic - time.monotonic())
             effective_hard = min(effective_hard, parent_remaining)
         roots = workspace_roots(public_root=self.root)
         try:
-            result = run_owned_command(
-                command,
-                cwd=cwd or self.root,
-                env=env,
-                hard_seconds=max(0.001, effective_hard),
-                soft_seconds=plan.soft_seconds,
-                stall_seconds=plan.stall_seconds,
-                termination_grace_seconds=plan.termination_grace_seconds,
-                tracker=tracker,
-                enforce_hard=self.enforce_hard,
-                enforce_stall=self.enforce_stall,
-                parent_deadline_monotonic=parent_deadline_monotonic,
-                soft_report_plan=plan,
-                active_child=active_child or plan.execution_id,
-            )
+            with capture_waiting():
+                result = run_owned_command(
+                    command,
+                    cwd=cwd or self.root,
+                    env=env,
+                    hard_seconds=max(0.001, effective_hard),
+                    soft_seconds=plan.soft_seconds,
+                    stall_seconds=plan.stall_seconds,
+                    termination_grace_seconds=plan.termination_grace_seconds,
+                    tracker=tracker,
+                    enforce_hard=self.enforce_hard,
+                    enforce_stall=self.enforce_stall,
+                    parent_deadline_monotonic=parent_deadline_monotonic,
+                    soft_report_plan=plan,
+                    active_child=active_child or plan.execution_id,
+                )
+                waiting_seconds = current_waiting_seconds()
         except KeyboardInterrupt:
             self._record_interrupt_span(
                 plan,
@@ -205,7 +218,10 @@ class ExecutionController:
             if release_lease:
                 self.history.release_lease(plan.normalized_signature)
             raise
-        status, accepted, quarantine = self._classify_result(plan, result)
+        work_duration = max(0.0, float(result.duration_seconds) - waiting_seconds)
+        status, accepted, quarantine = self._classify_result(
+            plan, result, work_duration=work_duration
+        )
         diagnostic_bundle = None
         if result.timed_out:
             bundle = collect_timeout_bundle(
@@ -230,7 +246,7 @@ class ExecutionController:
             policy_fingerprint=plan.policy_fingerprint,
             start_time=result.start_time_iso,
             end_time=result.end_time_iso,
-            duration_seconds=result.duration_seconds,
+            duration_seconds=work_duration,
             exit_code=result.exit_code,
             status=status.value,
             expected_seconds=plan.expected_seconds,
@@ -257,7 +273,7 @@ class ExecutionController:
                 category=category, duration_seconds=0.0, reused_saved=plan.expected_seconds
             )
         else:
-            record_session_event(category=category, duration_seconds=result.duration_seconds)
+            record_session_event(category=category, duration_seconds=work_duration)
         if accepted:
             prior = self.history.fetch_learning_durations(
                 execution_id=plan.execution_id,
@@ -281,16 +297,19 @@ class ExecutionController:
         print_result(
             result=status.value,
             exit_code=result.exit_code,
-            duration=result.duration_seconds,
+            duration=work_duration,
             active_child=active_child,
             history_updated=not self.history.degraded,
             learning_accepted=accepted,
+            waiting_seconds=waiting_seconds,
         )
         sanitized_stdout = sanitize_text(result.stdout_tail, workspace_roots=roots)
         sanitized_stderr = sanitize_text(result.stderr_tail, workspace_roots=roots)
         timing = {
             **plan.to_json_dict(),
-            "actualSeconds": result.duration_seconds,
+            "actualSeconds": work_duration,
+            "waitingSeconds": waiting_seconds,
+            "wallSeconds": result.duration_seconds,
             "result": status.value,
             "stdoutTail": sanitized_stdout,
             "stderrTail": sanitized_stderr,
@@ -360,7 +379,12 @@ class ExecutionController:
         self,
         plan: ExecutionPlan,
         result: ProcessResult,
+        *,
+        work_duration: float | None = None,
     ) -> tuple[ExecutionStatus, bool, str | None]:
+        duration = (
+            float(work_duration) if work_duration is not None else float(result.duration_seconds)
+        )
         if result.interrupted:
             return ExecutionStatus.INTERRUPTED, False, "interrupted"
         if result.timed_out:
@@ -369,9 +393,9 @@ class ExecutionController:
             return ExecutionStatus.TIMEOUT_HARD, False, "timeout-hard"
         if result.exit_code != 0:
             return ExecutionStatus.FAILED, False, None
-        if result.duration_seconds > plan.soft_seconds:
+        if duration > plan.soft_seconds:
             return ExecutionStatus.SUCCESS_SLOW, False, "soft-overrun"
-        if result.duration_seconds <= plan.soft_seconds:
+        if duration <= plan.soft_seconds:
             return ExecutionStatus.SUCCESS, True, None
         return ExecutionStatus.SUCCESS, False, None
 
@@ -403,6 +427,7 @@ def run_monitored_command(
     parent_span_id: str | None = None,
     parent_run_id: str | None = None,
     run_id_override: str | None = None,
+    expected_prompt_count: int = 0,
 ) -> tuple[int, dict[str, object] | None]:
     controller = ExecutionController.open(
         root, enforce_hard=enforce_hard, enforce_stall=enforce_stall
@@ -419,6 +444,7 @@ def run_monitored_command(
         tui=tui,
         packaging=packaging,
         run_id_override=run_id_override,
+        expected_prompt_count=expected_prompt_count,
     )
     if plan is None:
         if state == ExecutionStatus.REUSED.value:

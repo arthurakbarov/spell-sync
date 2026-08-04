@@ -8,7 +8,7 @@ from .admission import AdmissionPlan, narrow_replacement_plan
 from .aggregate_plan import build_aggregate_gate_plan, summarize_child_plans
 from .history import HistoryStore
 from .models import AdmissionDecision, ExecutionPlan
-from .registry import ExecutionBudgetRegistry, Profile, profile_for_execution_id
+from .registry import ExecutionBudgetRegistry, Profile
 from .session import current_session_test_share
 
 
@@ -129,10 +129,3 @@ def emit_narrow_replacement(
     print(f"EXECUTION_REPLACEMENT_EXECUTION_ID={replacement.suggested_execution_id}")
     print(f"EXECUTION_REPLACEMENT_COMMAND_KEY={replacement.suggested_command_key}")
     print(f"EXECUTION_REPLACEMENT_PREDICTED_COST={replacement.predicted_replacement_cost:.2f}")
-
-
-def gate_profile_for_execution_id(
-    registry: ExecutionBudgetRegistry,
-    execution_id: str,
-) -> Profile:
-    return profile_for_execution_id(registry, execution_id)

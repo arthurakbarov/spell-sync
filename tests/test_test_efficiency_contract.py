@@ -128,6 +128,111 @@ def test_all_registry_test_targets_exist() -> None:
     assert "TEST_IMPACT_VALIDATION=success" in proc.stdout
 
 
+def test_safety_critical_clusters_declare_validators() -> None:
+    from scripts.test_selection.registry import SAFETY_CRITICAL_CLUSTERS, load_registry
+
+    registry = load_registry(ROOT / "tests" / "test-impact.toml")
+    for name in sorted(SAFETY_CRITICAL_CLUSTERS):
+        assert registry.clusters[name].validators, f"{name} missing validators"
+
+
+def test_validate_flags_empty_safety_validators(monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace
+
+    from scripts import validate_test_impact as vit
+    from scripts.test_selection.registry import load_registry
+
+    real = load_registry(ROOT / "tests" / "test-impact.toml")
+    clusters = dict(real.clusters)
+    clusters["pull"] = replace(clusters["pull"], validators=())
+    monkeypatch.setattr(vit, "load_registry", lambda path: replace(real, clusters=clusters))
+    errors = vit.validate(ROOT)
+    assert any("TEST-IMPACT-VALIDATOR-002" in err and "cluster: pull" in err for err in errors)
+
+
+def test_validate_flags_unlisted_multi_importer_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace
+
+    from scripts import validate_test_impact as vit
+    from scripts.test_selection.registry import load_registry
+
+    real = load_registry(ROOT / "tests" / "test-impact.toml")
+    remaining = tuple(path for path in real.shared_fixtures if path != "tests/tui/fake_service.py")
+    assert "tests/tui/fake_service.py" in real.shared_fixtures
+    monkeypatch.setattr(
+        vit,
+        "load_registry",
+        lambda path: replace(real, shared_fixtures=remaining),
+    )
+    errors = vit.validate(ROOT)
+    assert any(
+        "TEST-IMPACT-FIXTURE-002" in err and "tests/tui/fake_service.py" in err for err in errors
+    )
+
+
+def test_validate_flags_module_tests_outside_cluster_tests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from scripts import validate_test_impact as vit
+    from scripts.test_selection.registry import load_registry
+
+    real = load_registry(ROOT / "tests" / "test-impact.toml")
+    clusters = dict(real.clusters)
+    pull = clusters["pull"]
+    clusters["pull"] = replace(
+        pull,
+        module_tests=(*pull.module_tests, "tests/test_ci_impact.py"),
+    )
+    monkeypatch.setattr(vit, "load_registry", lambda path: replace(real, clusters=clusters))
+    errors = vit.validate(ROOT)
+    assert any("TEST-IMPACT-TARGET-003" in err and "cluster: pull" in err for err in errors)
+
+
+def test_group_order_matches_manifest() -> None:
+    from scripts.test_groups import GROUP_ORDER, load_test_groups, validate_group_order
+
+    ok, problems = validate_group_order()
+    assert ok, problems
+    assert tuple(group.group_id for group in load_test_groups()) == GROUP_ORDER
+
+
+def test_empty_group_command_fails_closed() -> None:
+    from scripts import test_groups as tg
+
+    with pytest.raises(ValueError, match="test group has no files"):
+        tg.pytest_command_for_group("tests:does-not-exist", "python3", root=ROOT)
+
+
+def test_underscore_test_suffix_files_are_grouped() -> None:
+    from scripts.test_groups import all_test_files, assign_group, load_test_groups
+
+    groups = load_test_groups()
+    relative = {path.relative_to(ROOT).as_posix() for path in all_test_files(ROOT)}
+    assert "tests/arbitrary_validation_test.py" in relative
+    assert assign_group("tests/arbitrary_validation_test.py", groups) == "tests:rest"
+
+
+def test_shared_fixture_helpers_select_pytest_clusters() -> None:
+    from scripts.test_selection.registry import (
+        ALL_PYTEST_CLUSTERS,
+        clusters_for_file,
+        load_registry,
+    )
+
+    registry = load_registry(ROOT / "tests" / "test-impact.toml")
+    for fixture in (
+        "tests/journal_test_utils.py",
+        "tests/conftest_execution.py",
+        "tests/support/wiring.py",
+        "tests/tui/fake_service.py",
+        "tests/tui/test_helpers.py",
+    ):
+        selected = clusters_for_file(fixture, registry)
+        assert selected == set(ALL_PYTEST_CLUSTERS), fixture
+
+
 def test_full_ci_result_not_confused_with_focused_evidence() -> None:
     ci_runner = (ROOT / "scripts" / "ci_runner.py").read_text(encoding="utf-8")
     assert "finalEvidence" in ci_runner

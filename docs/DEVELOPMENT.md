@@ -20,6 +20,23 @@ public repo.
 
 ## Deterministic development workflow
 
+Operator command table (SSOT: `config/dev-commands.json`):
+
+[dev-commands:start]
+| Task | Command | Stage |
+|------|---------|-------|
+| Read-only branch/dirty/necessity rollup | `python3 scripts/agent_context.py` | before-work |
+| Verify maintainer environment | `python3 scripts/project_environment.py check` | before-work |
+| Assess local CI necessity | `python3 scripts/check_ci_necessity.py --purpose local --explain` | commit-gate |
+| Commit gate (≤120s + safety clusters) | `python3 scripts/run_dev_loop.py --commit-gate` | commit-gate |
+| Local minimal validation (≤60s) | `python3 scripts/run_dev_loop.py` | edit-loop |
+| Verify CI evidence for HEAD | `python3 scripts/check_ci_evidence.py` | evidence |
+| Full CI (publish / owner final only) | `scripts/ci.sh` | full-ci |
+| List recent failed execution spans | `python3 scripts/dev_runs.py failures` | triage |
+| Show one execution/CI run | `python3 scripts/dev_runs.py show <run-id>` | triage |
+| Timing / budget history report | `python3 scripts/execution_budget_report.py` | triage |
+[dev-commands:end]
+
 1. Run focused pytest for the changed scope (`docs/TESTING_STRATEGY.md`, skill
    `select-and-run-tests`).
 2. Run documentation and architecture contract checks when docs or boundaries change.
@@ -38,6 +55,21 @@ python3 scripts/run_lightweight_validation.py
 python3 scripts/check_ci_evidence.py
 ```
 
+Done-definition: [`ENGINEERING_COMPLETION.md`](ENGINEERING_COMPLETION.md) (repo/agent) and
+[`PRODUCT_COMPLETION.md`](PRODUCT_COMPLETION.md) (product UX/release).
+
+Triage failed runs (do not pipe CI through `tail`):
+
+```bash
+python3 scripts/dev_runs.py failures
+python3 scripts/dev_runs.py show <run-id>
+python3 scripts/execution_budget_report.py
+```
+
+Long commands print `eta: expected ~…` on stderr when display duration exceeds 5s
+(`docs/EXECUTION_TIME_CONTROL.md`). Each expected interactive prompt adds a fixed **5s**
+allowance to ETA / wall hard only — not to the work budget. Runs are logged and successful
+samples update future estimates.
 Registered development and CI commands run under execution budget control
 (`docs/EXECUTION_TIME_CONTROL.md`, `tests/execution-budget.toml`). Prefer integrated runners
 (`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`) over raw unbounded pytest.
@@ -83,9 +115,10 @@ python3 scripts/check_architecture.py --check
 python3 scripts/check_agent_config.py
 ```
 
-Coverage gate (full CI): 100% lines, ≥96% branches on `spell_sync/`. Prefer behavior and
-invariant tests over line-execution padding. Legacy `*coverage*` padding suites are frozen
-by `tests/test_padding_inventory_policy.py` and must not grow.
+Coverage gate (**full CI / publish**): 100% lines, ≥96% branches on `spell_sync/`. Prefer
+behavior and invariant tests over line-execution padding. Legacy `*coverage*` padding suites
+are frozen by `tests/test_padding_inventory_policy.py` and must not grow. Ordinary edit/commit
+cycles use local minimal without coverage (`docs/TESTING_STRATEGY.md`).
 
 ## JSON output
 

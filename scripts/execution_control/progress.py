@@ -22,7 +22,6 @@ _ARTIFACT_RE = re.compile(r"(SNAPSHOT_|CI_RESULT=|TEST_RUN_RESULT=|EXECUTION_GAT
 class ProgressTracker:
     contract_id: str
     last_progress_at: float = field(default_factory=time.monotonic)
-    last_sequence: int = -1
     last_node_id: str = ""
     last_child_id: str = ""
     last_phase_id: str = ""
@@ -77,16 +76,6 @@ class ProgressTracker:
                 if state != self.last_artifact_state:
                     self.last_artifact_state = state
                     self._mark_progress(now)
-
-    def observe_child_event(self, child_id: str) -> None:
-        if child_id != self.last_child_id:
-            self.last_child_id = child_id
-            self._mark_progress(time.monotonic())
-
-    def observe_sequence(self, sequence: int) -> None:
-        if sequence > self.last_sequence:
-            self.last_sequence = sequence
-            self._mark_progress(time.monotonic())
 
     def _mark_progress(self, now: float) -> None:
         gap = now - self.last_progress_at

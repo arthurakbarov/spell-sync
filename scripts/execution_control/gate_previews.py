@@ -9,7 +9,7 @@ from .mappings import ci_check_execution_id, snapshot_step_execution_id
 from .models import ExecutionPlan
 from .plan_preview import preview_execution_plan
 from .planning_supervisor import run_planning_supervisor
-from .registry import ExecutionBudgetRegistry, load_registry, profile_for_execution_id
+from .registry import ExecutionBudgetRegistry, load_registry
 
 FOCUSED_STEP_EXECUTION_IDS: dict[str, str] = {
     "validator": "focused:validators",
@@ -194,7 +194,3 @@ def registry_for(root: Path) -> ExecutionBudgetRegistry:
     from .registry import REGISTRY_REL_PATH
 
     return load_registry(root / REGISTRY_REL_PATH)
-
-
-def profile_for_gate(root: Path, execution_id: str):
-    return profile_for_execution_id(registry_for(root), execution_id)
