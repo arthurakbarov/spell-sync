@@ -55,7 +55,7 @@ def test_markdown_only_diff_is_lightweight_sufficient(tmp_path: Path) -> None:
     assert result.reason == "non-ci-inputs-only"
 
 
-def test_product_change_requires_full_ci(tmp_path: Path) -> None:
+def test_product_change_requires_full_ci_for_publish(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_git(repo)
@@ -73,8 +73,31 @@ def test_product_change_requires_full_ci(tmp_path: Path) -> None:
     _git_commit(repo, "product")
     digest = _compute_ci_input_digest(repo)
     _write_summary(repo, head=base_head, ci_input_digest=digest)
-    result = assess_ci_necessity(repo, base=base_head)
+    result = assess_ci_necessity(repo, base=base_head, purpose="publish")
     assert result.result == "full-required"
+
+
+def test_product_change_is_commit_gate_for_local(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git(repo)
+    (repo / "ci").mkdir()
+    (repo / "ci" / "ci-impact.toml").write_text(
+        (ROOT / "ci" / "ci-impact.toml").read_text(), encoding="utf-8"
+    )
+    (repo / "spell_sync").mkdir()
+    (repo / "spell_sync" / "sample.py").write_text("x = 1\n", encoding="utf-8")
+    _git_add_all(repo)
+    _git_commit(repo, "base")
+    base_head = _git_head(repo)
+    (repo / "spell_sync" / "sample.py").write_text("x = 2\n", encoding="utf-8")
+    _git_add_all(repo)
+    _git_commit(repo, "product")
+    digest = _compute_ci_input_digest(repo)
+    _write_summary(repo, head=base_head, ci_input_digest=digest)
+    result = assess_ci_necessity(repo, base=base_head, purpose="local")
+    assert result.result == "commit-gate-sufficient"
+    assert result.reason == "product-input-changed"
 
 
 @pytest.mark.parametrize(
@@ -102,7 +125,7 @@ def test_ci_relevant_changes_require_full_ci(
     _git_commit(repo, message)
     digest = _compute_ci_input_digest(repo)
     _write_summary(repo, head=base_head, ci_input_digest=digest)
-    result = assess_ci_necessity(repo, base=base_head)
+    result = assess_ci_necessity(repo, base=base_head, purpose="publish")
     assert result.result == "full-required"
 
 
@@ -128,7 +151,7 @@ def test_mixed_docs_and_product_requires_full_ci(tmp_path: Path) -> None:
     (repo / "spell_sync" / "sample.py").write_text("x = 9\n", encoding="utf-8")
     _git_add_all(repo)
     _git_commit(repo, "mixed")
-    result = assess_ci_necessity(repo, base=base_head)
+    result = assess_ci_necessity(repo, base=base_head, purpose="publish")
     assert result.result == "full-required"
 
 
@@ -138,7 +161,7 @@ def test_untracked_production_file_requires_full_ci(tmp_path: Path) -> None:
     digest = _compute_ci_input_digest(repo)
     _write_summary(repo, head=base_head, ci_input_digest=digest)
     (repo / "spell_sync" / "new.py").write_text("y = 1\n", encoding="utf-8")
-    result = assess_ci_necessity(repo, base=base_head)
+    result = assess_ci_necessity(repo, base=base_head, purpose="publish")
     assert result.result == "full-required"
     assert result.reason == "ci-input-dirty"
 
@@ -162,7 +185,7 @@ def test_impact_registry_change_requires_full_ci(tmp_path: Path) -> None:
     registry_path.write_text(registry_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     _git_add_all(repo)
     _git_commit(repo, "registry")
-    result = assess_ci_necessity(repo, base=base_head)
+    result = assess_ci_necessity(repo, base=base_head, purpose="publish")
     assert result.result == "full-required"
 
 

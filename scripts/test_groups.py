@@ -29,73 +29,10 @@ class TestGroup:
     fallback: bool = False
 
 
-def _default_groups() -> tuple[TestGroup, ...]:
-    return (
-        TestGroup(
-            "tests:tui",
-            "tests:tui",
-            ("tests/tui/**", "tests/test_gui_smoke.py", "tests/test_tui_*.py"),
-            "TUI screens, navigation, wizard, and smoke tests",
-        ),
-        TestGroup(
-            "tests:dev-tooling",
-            "tests:dev-tooling",
-            (
-                "tests/test_execution_*.py",
-                "tests/test_ci_*.py",
-                "tests/test_test_impact*.py",
-                "tests/test_test_selection*.py",
-                "tests/test_test_run_ledger*.py",
-                "tests/test_run_focused_tests.py",
-                "tests/test_run_pre_final_checks.py",
-            ),
-            "CI timing, admission, evidence, test selection, and agent tooling",
-        ),
-        TestGroup(
-            "tests:environment",
-            "tests:environment",
-            (
-                "tests/test_environment*.py",
-                "tests/test_compatibility*.py",
-                "tests/test_project_environment*.py",
-                "tests/test_snapshot*.py",
-                "tests/test_support_matrix*.py",
-            ),
-            "Environment contract, compatibility, and snapshot policy",
-        ),
-        TestGroup(
-            "tests:packaging",
-            "tests:packaging",
-            (
-                "tests/test_installed_workflow.py",
-                "tests/test_wheel*.py",
-                "tests/test_package*.py",
-            ),
-            "Wheel install, packaging, and installed smoke",
-        ),
-        TestGroup(
-            "tests:integration",
-            "tests:integration",
-            (
-                "tests/test_*integration*.py",
-                "tests/test_*workflow*.py",
-            ),
-            "Slow multi-step and subprocess integration flows",
-        ),
-        TestGroup(
-            "tests:rest",
-            "tests:rest",
-            ("tests/test_*.py",),
-            "Unclaimed remainder tests (fallback group)",
-            fallback=True,
-        ),
-    )
-
-
 def load_test_groups(manifest_path: Path | None = None) -> tuple[TestGroup, ...]:
     path = manifest_path or MANIFEST_PATH
     if not path.is_file():
-        return _default_groups()
+        raise FileNotFoundError(f"test group manifest missing: {path}")
     payload = tomllib.loads(path.read_text(encoding="utf-8"))
     groups: list[TestGroup] = []
     for item in payload.get("groups", []):
@@ -114,12 +51,17 @@ def load_test_groups(manifest_path: Path | None = None) -> tuple[TestGroup, ...]
                     fallback=bool(item.get("fallback", False)),
                 )
             )
-    return tuple(groups) if groups else _default_groups()
+    if not groups:
+        raise ValueError(f"test group manifest has no groups: {path}")
+    return tuple(groups)
 
 
 def all_test_files(root: Path | None = None) -> tuple[Path, ...]:
     base = root or ROOT
-    return tuple(sorted(base.joinpath("tests").rglob("test_*.py")))
+    tests_root = base.joinpath("tests")
+    found = {path for path in tests_root.rglob("test_*.py") if path.is_file()}
+    found.update(path for path in tests_root.rglob("*_test.py") if path.is_file())
+    return tuple(sorted(found))
 
 
 def _matches(pattern: str, rel_path: str) -> bool:
@@ -175,23 +117,28 @@ def validate_union(
     groups = groups or load_test_groups()
     base = root or ROOT
     assigned: dict[str, str] = {}
-    duplicates: list[str] = []
+    problems: list[str] = []
     for path in all_test_files(base):
         rel = path.relative_to(base).as_posix()
         group_id = assign_group(rel, groups)
         if group_id is None:
-            duplicates.append(f"unassigned:{rel}")
+            problems.append(f"unassigned:{rel}")
             continue
-        if rel in assigned:
-            duplicates.append(f"duplicate:{rel}")
         assigned[rel] = group_id
-    missing = [
-        path.relative_to(base).as_posix()
-        for path in all_test_files(base)
-        if path.relative_to(base).as_posix() not in assigned
+    return not problems, problems
+
+
+def validate_group_order(
+    groups: tuple[TestGroup, ...] | None = None,
+) -> tuple[bool, list[str]]:
+    groups = groups or load_test_groups()
+    manifest_ids = tuple(group.group_id for group in groups)
+    if manifest_ids == GROUP_ORDER:
+        return True, []
+    return False, [
+        f"GROUP_ORDER={','.join(GROUP_ORDER)}",
+        f"manifest={','.join(manifest_ids)}",
     ]
-    ok = not missing and not duplicates
-    return ok, missing + duplicates
 
 
 def is_pytest_group(step_id: str) -> bool:
@@ -208,7 +155,7 @@ def pytest_command_for_group(
 ) -> list[str]:
     files = group_files(group_id, root=root)
     if not files:
-        return [py, "-m", "pytest", "-q", "--collect-only"]
+        raise ValueError(f"test group has no files: {group_id}")
     command = [py, "-m", "pytest", *files, "-q", "--durations=10"]
     if with_coverage:
         command.extend(

@@ -6,7 +6,6 @@ import hashlib
 import importlib.metadata
 import json
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -103,10 +102,6 @@ def build_installed_manifest(
 def manifest_digest(manifest: InstalledManifest) -> str:
     payload = json.dumps(manifest.to_json_dict(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def current_python_cache_tag() -> str:
-    return sys.implementation.cache_tag or ""
 
 
 def _build_installed_manifest_subprocess(*, python: Path, project_root: Path) -> InstalledManifest:

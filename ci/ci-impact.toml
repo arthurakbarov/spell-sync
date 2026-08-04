@@ -43,8 +43,10 @@ patterns = [
   "uv.lock",
   ".python-version",
   "config/environment-contract.toml",
+  "config/command-eta.json",
+  "config/dev-commands.json",
+  "config/dev-surface.json",
   "MANIFEST.in",
-  "scripts/build*.py",
 ]
 
 [classes.toolchain]
@@ -62,6 +64,7 @@ patterns = [
   "scripts/run_lightweight_validation.py",
   "scripts/run_pre_final_checks.py",
   "scripts/run_focused_tests.py",
+  "scripts/run_dev_loop.py",
   "scripts/run_snapshot_tests.py",
   "scripts/snapshot_dev_paths.py",
   "scripts/test_plan.py",
@@ -72,9 +75,14 @@ patterns = [
   "scripts/run_with_budget.py",
   "scripts/execution_budget_report.py",
   "scripts/execution_budget_admin.py",
+  "scripts/dev_runs.py",
+  "scripts/agent_context.py",
+  "scripts/build_focused_plan.py",
+  "scripts/build_pre_final_plan.py",
   "scripts/test_groups.py",
   "scripts/audit_dead_code.py",
   "ci/**",
+  ".github/workflows/**",
 ]
 
 [classes.packageData]
@@ -113,5 +121,6 @@ patterns = [
   ".gitignore",
   ".gitattributes",
   ".editorconfig",
-  ".github/**",
+  ".github/ISSUE_TEMPLATE/**",
+  ".github/*.md",
 ]

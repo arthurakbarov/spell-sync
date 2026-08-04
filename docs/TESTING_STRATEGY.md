@@ -1,18 +1,16 @@
 # Efficient staged testing
 
-Canonical guide for selecting validation during spell-sync development. Full repository
-CI remains mandatory once on a stable final tree; this document defines how to reach that
-gate without redundant work.
+Canonical guide for selecting validation during spell-sync development.
 
-## Principle
+**Principle:** local edit speed beats local completeness. Full CI with coverage is a
+**publish/release** property, not an every-commit property.
 
-During development:
+## Two local modes
 
 ```text
-smallest failing test
-→ affected module tests
-→ affected risk cluster
-→ one final full CI
+Local minimal (every edit + every local commit, no coverage)
+→ continue editing
+→ Full (once before push/release or explicit owner “final”; hard wall ≤20 min)
 ```
 
 Do not loop:
@@ -21,222 +19,195 @@ Do not loop:
 full CI → tiny edit → full CI → format fix → full CI
 ```
 
-## Validation levels
-
-### Level 0 — reproduction
-
-Use when a specific defect is known.
+### Local minimal — default
 
 ```bash
-python3 -m pytest tests/test_runtime_architecture.py::test_name -q
+python3 scripts/run_dev_loop.py
+python3 scripts/run_dev_loop.py --commit-gate
+python3 scripts/check_ci_necessity.py --purpose local --explain
 ```
 
-Goal: minimal feedback in seconds. Do not run neighboring modules unless needed to
-reproduce.
+Runs only:
 
-### Level 1 — changed-module validation
+1. Changed-module / affected pytest targets **without coverage**
+2. `ruff check` / `ruff format --check` on touched Python
+3. `scripts/check_architecture.py --check` when application boundaries change
+4. Mapped validators from the test-impact registry
 
-After Level 0 passes, run `moduleTests` mapped to touched production modules once. Level 1
-is intentionally smaller than Level 2: direct module regressions and minimal integration
-only.
+Does **not** run: full CI, packaging wheel-smoke, environment suite, entire TUI group fan-out,
+coverage policy, or mandatory pre-final polish.
 
-```bash
-python3 scripts/test_plan.py --explain
-python3 scripts/run_focused_tests.py
-```
+**Edit loop** (`run_dev_loop.py` without flags): affected module scope, wall **≤60s** strict.
 
-### Level 2 — risk-cluster validation
+**Commit gate** (`run_dev_loop.py --commit-gate`): same affected module scope plus **safety
+cluster tests** when mutation paths change (pull/push/transaction/recovery). Wall **≤120s**
+strict (affected work + ~1 min tooling overhead). If exceeded, shrink scope — do **not**
+escalate to full CI.
 
-When Level 1 is green, run the deduplicated `clusterTests` plan once. Level 2 must be a
-strict superset of Level 1 for each cluster (except documented tiny clusters). Level 1
-does not replace mandatory Level 2 before final CI.
+Shared-fixture edits do **not** fan out to all pytest clusters in local minimal mode
+(deferred to full CI).
 
-Clusters are defined in `tests/test-impact.toml`:
+| Change class | Local minimal gate |
+|--------------|-------------------|
+| Product (`spell_sync/**`, non-TUI) | Affected module tests + validators |
+| TUI | Touched TUI module tests + validators |
+| Tooling / CI scripts / test-impact | Dev-tooling slice + validators |
+| Docs / agent only | docs-contract + agent-config |
+| Packaging / `pyproject` | Dependency + environment validators (**not** wheel-smoke) |
+| Mutation paths (pull/push/transaction/recovery) | Commit gate adds safety **cluster** tests |
 
-| Cluster | Typical scope |
-|---------|---------------|
-| `runtime` | Resolver, mutation scope, runtime settings |
-| `configuration` | Config, settings, project setup |
-| `pull` | Pull safety, sync_run, dry-run, TUI pull flow |
-| `push` | Push writers, app guards |
-| `transaction` | Journal, lock, atomic writes, secure internal artifacts |
-| `recovery` | Recovery commands, discard safety, TUI recovery |
-| `tui` | Textual screens and mutation routing |
-| `cli-json` | CLI commands and JSON contracts |
-| `packaging` | Wheel metadata and installed workflow |
-| `agent-workflow` | Cursor rules, skills, validators |
-| `documentation` | Docs style and contract only |
-| `diagnostics-events` | Technical events and history privacy |
-| `execution-control` | Execution budgets, admission, stall contracts |
-| `user-documentation` | User docs and onboarding copy validators |
-| `test-selection` | Focused-test planner and impact registry |
-
-```bash
-python3 scripts/run_focused_tests.py --cluster runtime
-```
-
-### Level 3 — final repository CI
-
-Full mode requires a clean committed working tree (`bootstrap.clean-tree`). Uncommitted
-source changes fail before expensive checks. Diagnostic partial runs (`--only`, `--from`,
-`--resume-failed`) may run on a dirty tree but set `finalEvidence=false`.
-
-Final evidence requires committed clean CI-relevant state verified by
-`python3 scripts/check_ci_evidence.py`.
-
-Full CI evidence is bound to **CI-relevant inputs** (`ciInputDigest`), not merely to the Git
-commit identifier. A later non-CI commit may reuse successful full CI evidence only when the
-CI input digest is unchanged and current lightweight validation succeeds.
-
-Exact Git HEAD matching remains required for release, publication, and signed artifact
-workflows (`python3 scripts/check_ci_evidence.py --release`).
-
-Before final validation, assess necessity:
-
-```bash
-python3 scripts/check_ci_necessity.py --explain
-```
+Expected necessity for normal local product work:
 
 | Result | Action |
 |--------|--------|
-| `full-required` | `scripts/ci.sh` then `python3 scripts/check_ci_evidence.py` |
-| `lightweight-sufficient` | `python3 scripts/run_lightweight_validation.py` then `python3 scripts/check_ci_evidence.py` |
-| `no-action` | Do not rerun full CI |
+| `commit-gate-sufficient` | Local minimal only; **do not** run full CI |
+| `lightweight-sufficient` | `python3 scripts/run_lightweight_validation.py` |
+| `no-action` | Skip redundant validation |
+| `full-required` | Rare locally (unknown classification); treat as full CI |
+
+### Full — publish / release / explicit final
 
 ```bash
+python3 scripts/check_ci_necessity.py --purpose publish --explain
 scripts/ci.sh
+python3 scripts/check_ci_evidence.py
+# release / signed artifacts:
+python3 scripts/check_ci_evidence.py --release
 ```
 
-## Time budget guidance
+Full CI includes grouped pytest **with** coverage (100% lines / ≥96% branches), packaging,
+wheel-smoke, and all validators. Agent runs full CI only on explicit owner request
+(“готов к push/release”) or via `release-candidate` / publish workflows.
 
-| Level | Typical target |
-|-------|----------------|
-| Level 0 | seconds |
-| Level 1 | module: typically ≤45s expected (registry `focused-module`) |
-| Level 2 | cluster: typically ≤120s expected; if plan prediction exceeds `editLoopBudgetSeconds` (120), optional scope may narrow |
-| Level 3 | full CI: once per stable tip (~10 min today; improve via profiling, not by skipping) |
+Hard safety wall: **≤1200s (20 min)** via execution-controller profile `full-ci`. Soft/expected
+timings remain for tracking only — functional failure or hard-cap termination is the stop
+condition, not exceeding expected duration.
 
-Keep most edit-session runs focused so mean wall time stays around 2 minutes. If Level 1
-routinely exceeds the focused-module expectation, reduce fixture overhead (session-scoped
-immutable setup, smaller synthetic repos) rather than skipping safety coverage. Required
-safety clusters are never dropped for budget reasons.
+## Legacy level names
 
-## Planner and runner
+Older docs referred to Level 0–3 or L0 / L1 / L2. Mapping:
+
+| Old | New |
+|-----|-----|
+| Level 0 / L0 micro | Local minimal edit loop (`run_dev_loop.py`) |
+| Level 1 / L1 commit gate | Local minimal commit gate (`--commit-gate`) |
+| Level 2 | *(removed — commit gate replaced the middle cluster fan-out)* |
+| Level 3 / L2 full CI | Full (`scripts/ci.sh`) |
+
+Clusters remain defined in `tests/test-impact.toml` (runtime, pull, push, transaction,
+recovery, tui, …). Safety-critical clusters use **cluster** tests at commit gate only when
+mutation paths change; ordinary local minimal scope stays at **module** tests.
+
+## Planner and runners
 
 | Tool | Purpose |
 |------|---------|
-| `scripts/test_plan.py` | Select targets from git changes or explicit files |
-| `scripts/run_focused_tests.py` | Execute plan with ledger deduplication |
-| `tests/test-impact.toml` | Machine-readable production → test mapping |
-| `.artifacts/test-runs/current.json` | Successful focused-run evidence (gitignored) |
-
-Examples:
+| `scripts/run_dev_loop.py` | Default local minimal entry (no coverage, no edit-loop block) |
+| `scripts/test_plan.py` | Select targets (`--dev-scope` for local minimal) |
+| `scripts/run_focused_tests.py` | Heavier focused runner (budget-controlled); prefer `run_dev_loop` for edits |
+| `tests/test-impact.toml` | Production → test mapping |
+| `ci/test-groups.toml` | Full-CI pytest groups |
+| `.artifacts/test-runs/current.json` | Focused-run evidence (gitignored) |
 
 ```bash
-python3 scripts/test_plan.py
-python3 scripts/test_plan.py --files spell_sync/push_prepared.py --format json
-python3 scripts/run_focused_tests.py --force
+python3 scripts/test_plan.py --dev-scope --explain
+python3 scripts/run_dev_loop.py
+python3 scripts/run_dev_loop.py --commit-gate
 ```
 
-## Ledger and deduplication
+With `--dev-scope`, planner level `cluster` downgrades to **module** tests unless a
+safety-critical cluster is required (commit gate passes `include_safety_cluster_tests`).
 
-A successful focused command is recorded with a run key derived from:
+## Necessity planner
 
-- repository `HEAD`
-- working-tree digest
-- command argv
-- selected targets and clusters
-- `pyproject.toml` and `tests/test-impact.toml` digests
-- Python major/minor
+```bash
+# Agent / local default
+python3 scripts/check_ci_necessity.py --purpose local --explain
 
-Identical successful runs on an unchanged tree are skipped:
-
-```text
-TEST_RUN_RESULT=skipped
-TEST_RUN_REASON=already-passed-for-current-state
+# Before push / release
+python3 scripts/check_ci_necessity.py --purpose publish --explain
 ```
 
-Evidence invalidates when targets, mapped production files, shared fixtures, test
-configuration, Python version, or command options change.
+| Purpose | Product/test/toolchain change |
+|---------|-------------------------------|
+| `local` | `commit-gate-sufficient` |
+| `publish` | `full-required` |
 
-## Docs-only changes
+Full CI evidence (`ciInputDigest`) remains required for publish/release. Exact Git HEAD
+matching remains required for release, publication, and signed artifacts.
 
-Documentation edits select validators only (docs style, docs contract, agent config when
-agent docs change). Product pytest suites are not run during the focused loop.
+## Time budgets (SLA)
 
-## Safety-critical changes
+| Mode | Wall SLA | Expected / tracking | When |
+|------|----------|---------------------|------|
+| Local minimal edit | **≤60s** strict | same as SLA | every edit |
+| Local minimal commit gate | **≤120s** strict | same as SLA | every local commit |
+| Full CI | **≤1200s** hard safety | expected from `gate:full-ci` plan; compare actual | push/release / explicit final |
 
-Changes under Pull, Push, transaction, journal, lock, or Recovery paths always include the
-matching safety cluster. The planner cannot omit these clusters.
+`run_dev_loop.py` prints `DEV_LOOP_BUDGET_SECONDS`, `DEV_LOOP_WALL_SECONDS`, and
+`DEV_LOOP_BUDGET_STATUS=within|exceeded`. Exceed without `--ignore-budget` exits `2`
+(functional failures still exit `1`). Shrink scope — do **not** escalate to full CI.
 
-Internal artifact security changes (lock, journal temp/publication, transaction root) require:
+### Full expected tracking
 
-| Suite | Purpose |
-|-------|---------|
-| `tests/test_secure_artifacts_adversarial.py` | Mandatory R1–R7 adversarial regressions |
-| `tests/test_internal_artifact_security.py` | Adversarial symlink/reparse and rollback preserve |
-| `tests/test_secure_artifacts.py` | Unit coverage for `secure_artifacts` branches |
-| `tests/test_transaction_safety.py` | End-to-end mutation fault matrix |
+Full CI may take as long as needed to finish correctly within the hard safety cap. Still:
 
-Verify victim files outside trusted root are unchanged in adversarial scenarios. Do not use real
-application dictionaries.
+1. Before run: note `ExecutionPlan` expected / soft from `tests/execution-budget.toml`
+   profile `full-ci` (and any learned expected printed by the controller).
+2. After run: compare wall time to expected and soft (`success-slow` when beyond soft).
+3. Report: expected seconds, soft seconds, actual seconds, delta, status
+   (`within-expected` | `soft-exceeded` | `hard-bound` if the safety hard cap fired).
 
-## Final CI evidence
+Baseline reference (local full CI ~2026-08): wall ≈ **651s** (~11 min); registry
+`initialExpectedSeconds=420`, `initialSoftSeconds=630`, `hardCapSeconds=1200`.
+Re-check after each full CI run.
 
-Only a successful full run with:
+### Measured wall times (2026-08-04, local machine)
 
-```json
-{"mode": "full", "finalEvidence": true}
-```
+Single-shot samples via `scripts/run_dev_loop.py` (no coverage):
 
-and matching current tree digest counts as final CI evidence. Partial diagnostic runs are
-for fixing a single failed gate between full runs.
+| Scenario | Edit loop | Commit gate | Notes |
+|----------|-----------|-------------|-------|
+| docs | 0.3s | 0.2s | validators only |
+| tooling (`check_ci_necessity`) | 8.5s | 55s | agent-workflow module slice |
+| push product | 1.4s | 2.3s | push + transaction module; safety at commit gate |
+| TUI controller | 42s | 67s | under 60s / 120s |
+| shared fixture (`conftest`) | 2.1s | 2.8s | test-selection only (no full fan-out) |
+| packaging (`pyproject`) | — | 19s | validators + packaging unit; wheel-smoke deferred to full CI |
 
-## Baseline CI reuse
+Ordinary product commit gate should stay well under **120s**.
 
-When the working tree is clean and `.artifacts/ci/ci-summary.json` shows `mode=full`,
-`result=success`, and matching tree digest for current `HEAD`, do not rerun baseline full
-CI before starting a task. Use lightweight validators and phase-specific focused tests
-instead.
+## Docs-only and safety
 
-Rerun baseline full CI only for unknown repository health, release operations, explicit
-owner request, recent toolchain changes, or stale or failed evidence.
+Documentation edits: validators only (docs style/contract, agent config when agent docs
+change).
+
+Pull / Push / transaction / Recovery path changes always include the matching safety
+cluster tests at commit gate. Adversarial suites remain mandatory before full CI publish when
+those surfaces change (see historical safety table in repo tests).
 
 ## Prohibited shortcuts
 
 Do not, for speed:
 
-- remove assertions or lower coverage thresholds
+- remove assertions or lower full CI coverage thresholds
 - permanently skip safety suites after mutation changes
-- use `pytest --lf` or `pytest -x` as final cluster evidence
-- treat partial CI as final validation
-- rerun identical successful commands on an unchanged tree
-- run packaging or wheel smoke during unrelated focused loops
+- use `pytest --lf` or `pytest -x` as local minimal or full CI evidence
+- treat local minimal as publish validation
+- run packaging or wheel smoke during unrelated local minimal loops
+- run full CI after every polish commit
 
 ## Execution time control
 
-Registered expensive commands (focused runner, pre-final, full CI children) run through the
-execution controller — not as unbounded direct subprocess calls.
+Full CI and registered expensive commands use the execution controller
+(`docs/EXECUTION_TIME_CONTROL.md`). Local minimal `run_dev_loop.py` is intentionally outside the
+edit-loop admission budget so micro validation is not blocked.
 
-Decision order before execution:
+## Developer report
 
-```text
-CI necessity → functional evidence reuse → duplicate check → admission → immutable plan → run
-```
-
-Integrated runners (`run_focused_tests.py`, `run_pre_final_checks.py`, `ci_runner.py`) invoke
-the controller automatically. Admission may skip execution when evidence is valid
-(`EXECUTION_RESULT=reused`) or narrow over-budget edit-loop plans. Each run receives expected,
-soft, and hard thresholds printed as `EXECUTION_*` lines.
-
-Do not wrap CI with `tail`, `tee`, or other pipeline wrappers. Run `scripts/ci.sh` directly so
-hard bounds and child timeout IDs remain authoritative.
-
-Registry: `tests/execution-budget.toml`. Canonical detail: `docs/EXECUTION_TIME_CONTROL.md`.
-
-## Developer report section
-
-Modifying tasks should include a **Test selection** section documenting changed scope,
-commands run, skipped duplicates, execution reuse decisions, and full CI count (expected: 1).
+Modifying tasks should document: mode used (local minimal edit / commit gate / full), commands,
+durations, `DEV_LOOP_BUDGET_*` (local minimal) or full expected vs actual, and whether full CI
+was deferred. Expected full CI count per ordinary polish task: **0**. Expected before
+push/release: **1**.
 
 See `docs/AGENT_DEVELOPMENT.md` and `.cursor/skills/select-and-run-tests/SKILL.md`.

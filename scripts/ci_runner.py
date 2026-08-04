@@ -58,7 +58,6 @@ from scripts.test_selection.tree_state import (  # noqa: E402
 
 _UV_VERSION_PATTERN = re.compile(r"uv\s+(\d+\.\d+\.\d+)")
 
-ARTIFACTS = ROOT / ".artifacts" / "ci"
 LOG_RETENTION = 5
 SUMMARY_SCHEMA = 5
 MIN_PYTHON = (3, 11)
@@ -93,11 +92,6 @@ def _capture_environment_identity(root: Path) -> dict[str, object]:
 
 def _ci_tree_digest(root: Path) -> str:
     return content_tree_digest(root)
-
-
-def _full_ci_history_counts(artifacts: Path) -> dict[str, int]:
-    counts = summarize_ci_history(artifacts)
-    return counts.to_json_dict()
 
 
 def _project_python(root: Path, fallback: str) -> str:
@@ -144,6 +138,8 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
     steps: list[tuple[str, list[str]]] = [
         ("environment.contract", [py, "scripts/validate_environment_contract.py"]),
         ("execution-budget.registry", [py, "scripts/validate_execution_budget.py"]),
+        ("dev-commands.registry", [py, "scripts/validate_dev_commands.py", "--check"]),
+        ("timing.observability", [py, "scripts/validate_timing_observability.py"]),
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
@@ -561,15 +557,6 @@ if branch_rate < {branch_min}:
     )
 print(f"coverage policy: {line_req}% lines, {{branch_rate:.2f}}% branches")
 """
-
-
-def _coverage_gate(
-    py: str,
-    *,
-    root: Path,
-    run_step: RunStep,
-) -> tuple[int, str]:
-    return run_step([py, "-c", _coverage_policy_script()], cwd=root)
 
 
 def _coverage_argv(py: str) -> list[str]:

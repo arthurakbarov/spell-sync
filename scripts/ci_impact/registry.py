@@ -15,7 +15,6 @@ from .constants import (
 )
 
 REGISTRY_REL_PATH = "ci/ci-impact.toml"
-SCHEMA_VERSION_KEY = "schemaVersion"
 ALLOWED_TOP_KEYS = frozenset(
     {"schemaVersion", "meta", "excluded", "allowedUnclassified", "classes"}
 )
@@ -180,10 +179,7 @@ def classify_path(path: str, registry: CiImpactRegistry) -> ChangeClass:
     # Deterministic tie-break using CLASS_PRIORITY order.
     from .constants import CLASS_PRIORITY
 
-    for change_class in CLASS_PRIORITY:
-        if change_class in matched:
-            return change_class
-    return ChangeClass.UNKNOWN
+    return min(matched, key=CLASS_PRIORITY.index)
 
 
 def classify_paths(

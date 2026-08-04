@@ -19,8 +19,7 @@ __all__ = [
 ]
 
 
-def tree_digest(root: Path, *, tracked_paths: list[str] | None = None) -> str:
-    del tracked_paths
+def tree_digest(root: Path) -> str:
     return content_tree_digest(root)
 
 

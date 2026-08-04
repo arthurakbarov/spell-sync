@@ -25,16 +25,8 @@ FULL_CI_CHANGE_CLASSES = frozenset(
         ChangeClass.BUILD,
         ChangeClass.TOOLCHAIN,
         ChangeClass.PACKAGE_DATA,
-        ChangeClass.UNKNOWN,
-    }
-)
-
-LIGHTWEIGHT_CHANGE_CLASSES = frozenset(
-    {
-        ChangeClass.DOCUMENTATION,
-        ChangeClass.AGENT_WORKFLOW,
-        ChangeClass.REPOSITORY_METADATA,
         ChangeClass.VALIDATOR,
+        ChangeClass.UNKNOWN,
     }
 )
 

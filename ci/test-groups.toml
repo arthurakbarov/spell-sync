@@ -18,11 +18,9 @@ description = "CI timing, admission, evidence, test selection, and agent tooling
 patterns = [
   "tests/test_execution_*.py",
   "tests/test_ci_*.py",
-  "tests/test_test_impact*.py",
-  "tests/test_test_selection*.py",
-  "tests/test_test_run_ledger*.py",
-  "tests/test_run_focused_tests.py",
-  "tests/test_run_pre_final_checks.py",
+  "tests/test_focused_test_runner.py",
+  "tests/test_test_efficiency_contract.py",
+  "tests/test_test_planner.py",
 ]
 
 [[groups]]
@@ -32,9 +30,7 @@ description = "Environment contract, compatibility, and snapshot policy"
 patterns = [
   "tests/test_environment*.py",
   "tests/test_compatibility*.py",
-  "tests/test_project_environment*.py",
   "tests/test_snapshot*.py",
-  "tests/test_support_matrix*.py",
 ]
 
 [[groups]]
@@ -43,8 +39,6 @@ executionId = "tests:packaging"
 description = "Wheel install, packaging, and installed smoke"
 patterns = [
   "tests/test_installed_workflow.py",
-  "tests/test_wheel*.py",
-  "tests/test_package*.py",
 ]
 
 [[groups]]
@@ -63,4 +57,5 @@ description = "Unclaimed remainder tests (fallback group)"
 fallback = true
 patterns = [
   "tests/test_*.py",
+  "tests/*_test.py",
 ]

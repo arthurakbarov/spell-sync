@@ -122,12 +122,41 @@ def assess_ci_necessity(
     *,
     base: str | None = None,
     explain: bool = False,
+    purpose: str = "local",
     paths: EnvironmentPaths | None = None,
 ) -> NecessityResult:
+    if purpose not in {"local", "publish"}:
+        raise ValueError(f"unsupported purpose: {purpose!r} (expected local|publish)")
     env_paths = paths or production_environment_paths(root)
     registry = load_registry(root / REGISTRY_REL_PATH)
     head = git_head(root)
     current_input = compute_ci_input_state(root, registry)
+
+    def _maybe_local_commit_gate(
+        *,
+        reason: str,
+        classes: tuple[ChangeClass, ...] = (),
+        changed_files: int = 0,
+        explanations: tuple[str, ...] = (),
+        reusable_run_head: str = "",
+    ) -> NecessityResult:
+        if purpose == "local":
+            return NecessityResult(
+                result="commit-gate-sufficient",
+                reason=reason,
+                classes=classes,
+                changed_files=changed_files,
+                reusable_run_head=reusable_run_head,
+                explanations=explanations,
+            )
+        return NecessityResult(
+            result="full-required",
+            reason=reason,
+            classes=classes,
+            changed_files=changed_files,
+            reusable_run_head=reusable_run_head,
+            explanations=explanations,
+        )
 
     uncommitted = changed_source_paths(root)
     unclassified = [
@@ -156,8 +185,7 @@ def assess_ci_necessity(
             if explain
             else ()
         )
-        return NecessityResult(
-            result="full-required",
+        return _maybe_local_commit_gate(
             reason="ci-input-dirty",
             classes=classes,
             changed_files=len(ci_dirty),
@@ -173,7 +201,7 @@ def assess_ci_necessity(
             capture_output=True,
         )
         if verify.returncode != 0:
-            return NecessityResult(result="full-required", reason="run-head-unavailable")
+            return _maybe_local_commit_gate(reason="run-head-unavailable")
         diff_paths = [
             path
             for path in _git_diff_name_status(root, compare_base, head)
@@ -207,8 +235,7 @@ def assess_ci_necessity(
                 if explain
                 else ()
             )
-            return NecessityResult(
-                result="full-required",
+            return _maybe_local_commit_gate(
                 reason="product-input-changed",
                 classes=full_classes,
                 changed_files=len(diff_paths),
@@ -224,9 +251,7 @@ def assess_ci_necessity(
         run_head = _summary_run_head(summary)
         if summary_digest and summary_digest == current_input.digest and run_head:
             non_ci_only = all(
-                classify_path(path, registry) in NON_CI_CHANGE_CLASSES
-                or classify_path(path, registry) == ChangeClass.VALIDATOR
-                for path in diff_paths
+                classify_path(path, registry) in NON_CI_CHANGE_CLASSES for path in diff_paths
             )
             if non_ci_only:
                 diff_class_set = {classify_path(path, registry) for path in diff_paths}
@@ -239,9 +264,9 @@ def assess_ci_necessity(
                 )
 
     if not summary or summary.get("result") != "success":
-        return NecessityResult(result="full-required", reason="missing-valid-evidence")
+        return _maybe_local_commit_gate(reason="missing-valid-evidence")
 
-    return NecessityResult(result="full-required", reason="ci-input-mismatch")
+    return _maybe_local_commit_gate(reason="ci-input-mismatch")
 
 
 def _print_text(result: NecessityResult) -> None:
@@ -262,14 +287,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base", help="Compare committed changes from this git HEAD")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     parser.add_argument("--explain", action="store_true")
+    parser.add_argument(
+        "--purpose",
+        choices=("local", "publish"),
+        default="local",
+        help="local: commit-gate for product changes; publish: full CI when inputs change",
+    )
     args = parser.parse_args(argv)
-    result = assess_ci_necessity(ROOT, base=args.base, explain=args.explain)
+    result = assess_ci_necessity(
+        ROOT,
+        base=args.base,
+        explain=args.explain,
+        purpose=args.purpose,
+    )
     if args.format == "json":
         print(
             json.dumps(
                 {
                     "result": result.result,
                     "reason": result.reason,
+                    "purpose": args.purpose,
                     "classes": [item.value for item in result.classes],
                     "changedFiles": result.changed_files,
                     "reusableRunHead": result.reusable_run_head,
@@ -280,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     else:
+        print(f"CI_NECESSITY_PURPOSE={args.purpose}")
         _print_text(result)
     return 0
 

@@ -36,11 +36,9 @@ def _dedupe_steps(steps: list[PlannedStep]) -> tuple[PlannedStep, ...]:
 def build_planned_steps(
     plan: TestPlan,
     *,
-    root: Path,
     python: str,
     changed_files: tuple[str, ...] = (),
 ) -> tuple[PlannedStep, ...]:
-    del root
     steps: list[PlannedStep] = []
 
     for validator in plan.validators:

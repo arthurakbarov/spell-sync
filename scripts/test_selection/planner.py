@@ -5,7 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from scripts.ci_impact.registry import (
+    classify_path,
+)
+from scripts.ci_impact.registry import (
+    load_registry as load_ci_impact_registry,
+)
+from scripts.ci_impact.registry import (
+    requires_full_ci as class_requires_full_ci,
+)
 from scripts.test_selection.registry import (
+    DEV_SCOPE_EXCLUDED_TESTS,
+    SAFETY_CRITICAL_CLUSTERS,
     Registry,
     clusters_for_file,
     dedupe_sorted,
@@ -55,7 +66,9 @@ def _collect_tests(
     registry: Registry,
     *,
     level: str,
+    cluster_level_for: set[str] | None = None,
 ) -> list[str]:
+    cluster_level_for = cluster_level_for or set()
     tests: list[str] = []
     for name in sorted(clusters):
         if name == "_test_file":
@@ -63,7 +76,8 @@ def _collect_tests(
         spec = registry.clusters.get(name)
         if spec is None:
             continue
-        if level == "module":
+        effective = "cluster" if name in cluster_level_for else level
+        if effective == "module":
             tests.extend(spec.module_tests)
         else:
             tests.extend(spec.cluster_tests)
@@ -104,18 +118,30 @@ def _pytest_command(targets: list[str], python: str = "python3") -> tuple[str, .
     return (python, "-m", "pytest", *targets, "-q", "--durations=10")
 
 
-def _clusters_from_changes(changed_files: list[str], registry: Registry) -> set[str]:
+def _requires_full_ci(root: Path, changed_files: list[str]) -> bool:
+    """Derive plan.requires_full_ci from CI impact classes (not always True)."""
+    if not changed_files:
+        return True
+
+    ci_registry = load_ci_impact_registry(root / "ci" / "ci-impact.toml")
+    return any(class_requires_full_ci(classify_path(path, ci_registry)) for path in changed_files)
+
+
+def _clusters_and_direct_tests(
+    changed_files: list[str],
+    registry: Registry,
+    *,
+    dev_scope: bool = False,
+) -> tuple[set[str], list[str]]:
     clusters: set[str] = set()
     direct_tests: list[str] = []
     for path in changed_files:
-        file_clusters = clusters_for_file(path, registry)
+        file_clusters = clusters_for_file(path, registry, dev_scope=dev_scope)
         if "_test_file" in file_clusters:
             direct_tests.append(path)
             continue
         clusters.update(file_clusters)
-    if direct_tests and not clusters:
-        return clusters
-    return clusters
+    return clusters, direct_tests
 
 
 def build_plan(
@@ -127,6 +153,8 @@ def build_plan(
     target_override: str | None = None,
     level: str = "cluster",
     python: str = "python3",
+    dev_scope: bool = False,
+    include_safety_cluster_tests: bool = False,
 ) -> TestPlan:
     registry = registry or load_registry(root / "tests" / "test-impact.toml")
     reasons: list[str] = []
@@ -134,9 +162,13 @@ def build_plan(
     pytest_targets: list[str] = []
     validators: list[str] = []
     static_targets: list[str] = []
-    requires_full_ci = True
-    validation_level: ValidationLevel = 2 if level == "cluster" else 1
-    final_focused_evidence = level == "cluster"
+    requires_full_ci = _requires_full_ci(root, changed_files)
+    effective_level = level
+    if dev_scope and level == "cluster":
+        # Local commit gate: module tests by default; cluster fan-out only when safety-required.
+        effective_level = "module"
+    validation_level: ValidationLevel = 2 if effective_level == "cluster" else 1
+    final_focused_evidence = effective_level == "cluster"
 
     if target_override:
         pytest_targets = [target_override]
@@ -156,14 +188,18 @@ def build_plan(
             command=_pytest_command(pytest_targets, python),
         )
 
-    required = required_safety_clusters(changed_files, registry)
+    required = required_safety_clusters(changed_files, registry, dev_scope=dev_scope)
 
     if not changed_files:
         reasons.append("no changed files detected")
     else:
         docs_only = all(is_docs_only(path, registry) for path in changed_files)
+        shared_fixture_paths = frozenset(registry.shared_fixtures) | frozenset(
+            {"tests/conftest.py"}
+        )
         test_only = all(
-            path.startswith("tests/") and path.endswith(".py") for path in changed_files
+            path.startswith("tests/") and path.endswith(".py") and path not in shared_fixture_paths
+            for path in changed_files
         )
         if docs_only:
             clusters.add("documentation")
@@ -176,12 +212,20 @@ def build_plan(
             pytest_targets = list(changed_files)
             reasons.append("test file changes only")
         else:
-            clusters.update(_clusters_from_changes(changed_files, registry))
+            mapped, direct_tests = _clusters_and_direct_tests(
+                changed_files, registry, dev_scope=dev_scope
+            )
+            clusters.update(mapped)
+            if direct_tests:
+                pytest_targets.extend(direct_tests)
+                reasons.append(f"changed test files: {', '.join(sorted(direct_tests))}")
             if clusters:
                 reasons.append(f"mapped clusters: {', '.join(sorted(clusters))}")
             if not clusters and not pytest_targets:
                 clusters.add("packaging")
                 reasons.append("conservative fallback for unknown production file")
+            if dev_scope and any(path in shared_fixture_paths for path in changed_files):
+                reasons.append("dev-scope: shared fixtures map to test-selection only")
 
     if cluster_override:
         clusters.add(cluster_override)
@@ -192,7 +236,23 @@ def build_plan(
         reasons.append(f"required safety clusters: {', '.join(sorted(required))}")
 
     if clusters:
-        pytest_targets.extend(_collect_tests(clusters, registry, level=level))
+        cluster_level_for: set[str] = set()
+        if include_safety_cluster_tests:
+            cluster_level_for = (clusters | required) & SAFETY_CRITICAL_CLUSTERS
+            if cluster_level_for:
+                validation_level = 2
+                final_focused_evidence = True
+                reasons.append(
+                    "safety cluster tests: " + ", ".join(sorted(cluster_level_for)),
+                )
+        pytest_targets.extend(
+            _collect_tests(
+                clusters,
+                registry,
+                level=effective_level,
+                cluster_level_for=cluster_level_for,
+            )
+        )
         validators.extend(_collect_validators(clusters, registry))
         static_targets.extend(_collect_static_targets(clusters, registry))
 
@@ -201,6 +261,12 @@ def build_plan(
     pytest_targets = dedupe_sorted(pytest_targets)
     validators = dedupe_sorted(validators)
     static_targets = dedupe_sorted(static_targets)
+
+    if dev_scope and pytest_targets:
+        filtered = [path for path in pytest_targets if path not in DEV_SCOPE_EXCLUDED_TESTS]
+        if len(filtered) != len(pytest_targets):
+            reasons.append("dev-scope: deferred wheel-smoke tests to L2")
+            pytest_targets = filtered
 
     if "documentation" in clusters and not pytest_targets:
         command: tuple[str, ...] = ()

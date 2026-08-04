@@ -40,7 +40,7 @@ find spell_sync tests scripts -type d -name __pycache__ -prune -exec rm -rf {} +
 
 | Path / topic | Status |
 |--------------|--------|
-| Public review-archive workflow (`scripts/review-archive*`) | **Absent** — removed in Phase 2C |
+| Public review-archive workflow (`scripts/review[-_]archive*`) | **Absent** — tracked sources removed in Phase 2C; untracked bytecode remnants may remain until local `__pycache__` cleanup |
 
 Maintainer review-bundle directories and scripts are out of scope for this public audit.
 

@@ -13,7 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ci_impact.constants import ChangeClass  # noqa: E402
+from scripts.ci_impact.constants import (  # noqa: E402
+    FULL_CI_CHANGE_CLASSES,
+    NON_CI_CHANGE_CLASSES,
+    ChangeClass,
+)
 from scripts.ci_impact.registry import (  # noqa: E402
     classify_path,
     load_registry,
@@ -26,6 +30,12 @@ from scripts.ci_input_state import compute_ci_input_state  # noqa: E402
 @pytest.fixture(scope="module")
 def registry():
     return load_registry(ROOT / "ci" / "ci-impact.toml")
+
+
+def test_non_ci_classes_exclude_validators() -> None:
+    assert ChangeClass.VALIDATOR in FULL_CI_CHANGE_CLASSES
+    assert ChangeClass.VALIDATOR not in NON_CI_CHANGE_CLASSES
+    assert ChangeClass.DOCUMENTATION in NON_CI_CHANGE_CLASSES
 
 
 def test_registry_covers_tracked_paths(registry) -> None:
@@ -44,6 +54,7 @@ def test_full_ci_classes(registry) -> None:
     assert requires_full_ci(classify_path("tests/test_core.py", registry))
     assert requires_full_ci(classify_path("pyproject.toml", registry))
     assert requires_full_ci(classify_path("scripts/ci_runner.py", registry))
+    assert requires_full_ci(classify_path("scripts/check_architecture.py", registry))
     assert not requires_full_ci(classify_path("docs/TESTING_STRATEGY.md", registry))
 
 

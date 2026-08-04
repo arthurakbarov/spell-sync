@@ -30,8 +30,6 @@ from scripts.environment_contract.paths import (  # noqa: E402
 )
 from scripts.test_selection.tree_state import changed_source_paths, git_head  # noqa: E402
 
-RECEIPT_REL_PATH = Path(".artifacts") / "lightweight-validation" / "current.json"
-
 
 def _run(command: list[str], *, cwd: Path = ROOT) -> tuple[int, str]:
     proc = subprocess.run(command, cwd=cwd, check=False, capture_output=True, text=True)
@@ -46,9 +44,7 @@ def _run(command: list[str], *, cwd: Path = ROOT) -> tuple[int, str]:
 def _changed_classes(root: Path) -> set[ChangeClass]:
     registry = load_registry(root / REGISTRY_REL_PATH)
     classes = {classify_path(path, registry) for path in changed_source_paths(root)}
-    return {
-        item for item in classes if item in NON_CI_CHANGE_CLASSES or item == ChangeClass.VALIDATOR
-    }
+    return {item for item in classes if item in NON_CI_CHANGE_CLASSES}
 
 
 def _commands_for_classes(classes: set[ChangeClass]) -> list[list[str]]:
@@ -64,8 +60,6 @@ def _commands_for_classes(classes: set[ChangeClass]) -> list[list[str]]:
     if ChangeClass.AGENT_WORKFLOW in classes:
         commands.append([py, "scripts/check_agent_config.py"])
     if ChangeClass.REPOSITORY_METADATA in classes:
-        commands.append([py, "scripts/validate_ci_impact.py"])
-    if ChangeClass.VALIDATOR in classes:
         commands.append([py, "scripts/validate_ci_impact.py"])
     # Architecture tracker / ADR consistency is covered by docs contract.
     deduped: list[list[str]] = []

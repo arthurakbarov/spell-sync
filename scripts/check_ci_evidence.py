@@ -47,7 +47,6 @@ from scripts.test_selection.tree_state import (  # noqa: E402
 )
 
 SUPPORTED_SCHEMAS = frozenset({3, 4, 5})
-RECEIPT_REL_PATH = Path(".artifacts") / "lightweight-validation" / "current.json"
 
 
 def _fail(

@@ -54,6 +54,26 @@ def test_docs_only_selects_documentation_cluster(planner_mod, registry) -> None:
     )
     assert plan.clusters == ("documentation",)
     assert plan.pytest_targets == ()
+    assert plan.requires_full_ci is False
+
+
+def test_product_change_requires_full_ci(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/cli.py"],
+        registry=registry,
+    )
+    assert plan.requires_full_ci is True
+
+
+def test_agent_workflow_only_does_not_require_full_ci(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        [".cursor/rules/test-efficiency.mdc"],
+        registry=registry,
+    )
+    assert "agent-workflow" in plan.clusters
+    assert plan.requires_full_ci is False
 
 
 def test_runtime_file_selects_runtime_cluster(planner_mod, registry) -> None:
@@ -162,6 +182,72 @@ def test_conftest_selects_all_pytest_clusters(registry_mod, registry) -> None:
     assert clusters == registry_mod.ALL_PYTEST_CLUSTERS
 
 
+def test_shared_fixture_change_is_not_test_only_short_circuit(
+    planner_mod, registry, registry_mod
+) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["tests/conftest.py"],
+        registry=registry,
+    )
+    assert set(plan.clusters) == registry_mod.ALL_PYTEST_CLUSTERS
+    assert plan.pytest_targets != ("tests/conftest.py",)
+    assert len(plan.pytest_targets) > 1
+    assert "test file changes only" not in plan.reasons
+
+
+def test_dev_scope_shared_fixture_maps_to_test_selection_only(
+    planner_mod, registry, registry_mod
+) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["tests/conftest.py"],
+        registry=registry,
+        dev_scope=True,
+    )
+    assert plan.clusters == ("test-selection",)
+    assert len(plan.pytest_targets) < len(
+        planner_mod.build_plan(ROOT, ["tests/conftest.py"], registry=registry).pytest_targets
+    )
+    assert any("dev-scope" in reason for reason in plan.reasons)
+
+
+def test_dev_scope_packaging_skips_wheel_smoke_and_agent_workflow(
+    planner_mod, registry, registry_mod
+) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["pyproject.toml"],
+        registry=registry,
+        level="cluster",
+        dev_scope=True,
+    )
+    assert plan.clusters == ("packaging",)
+    assert "tests/test_installed_workflow.py" not in plan.pytest_targets
+    assert any("wheel-smoke" in reason for reason in plan.reasons)
+    full = planner_mod.build_plan(
+        ROOT,
+        ["pyproject.toml"],
+        registry=registry,
+        level="cluster",
+        dev_scope=False,
+    )
+    assert "agent-workflow" in full.clusters
+    assert "tests/test_installed_workflow.py" in full.pytest_targets
+
+
+def test_tui_shared_helper_change_selects_all_pytest_clusters(
+    planner_mod, registry, registry_mod
+) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["tests/tui/fake_service.py"],
+        registry=registry,
+    )
+    assert set(plan.clusters) == registry_mod.ALL_PYTEST_CLUSTERS
+    assert plan.pytest_targets != ("tests/tui/fake_service.py",)
+
+
 def test_duplicate_tests_deduplicated(planner_mod, registry) -> None:
     plan = planner_mod.build_plan(
         ROOT,
@@ -259,6 +345,39 @@ def test_module_level_uses_module_tests(planner_mod, registry) -> None:
     assert "tests/test_runtime_architecture.py" not in plan.pytest_targets
 
 
+def test_dev_scope_cluster_level_prefers_module_tests(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/application/runtime_resolver.py"],
+        registry=registry,
+        level="cluster",
+        dev_scope=True,
+    )
+    assert "tests/test_explicit_runtime.py" in plan.pytest_targets
+    assert "tests/test_runtime_architecture.py" not in plan.pytest_targets
+
+
+def test_commit_gate_includes_safety_cluster_tests(planner_mod, registry) -> None:
+    module_only = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/push_prepared.py"],
+        registry=registry,
+        level="module",
+        dev_scope=True,
+        include_safety_cluster_tests=False,
+    )
+    commit_gate = planner_mod.build_plan(
+        ROOT,
+        ["spell_sync/push_prepared.py"],
+        registry=registry,
+        level="module",
+        dev_scope=True,
+        include_safety_cluster_tests=True,
+    )
+    assert "tests/test_transaction_safety.py" not in module_only.pytest_targets
+    assert "tests/test_transaction_safety.py" in commit_gate.pytest_targets
+
+
 def test_cluster_level_uses_cluster_tests(planner_mod, registry) -> None:
     plan = planner_mod.build_plan(
         ROOT,
@@ -315,3 +434,17 @@ def test_no_duplicate_command_targets(planner_mod, registry) -> None:
     )
     command_targets = [part for part in plan.command if part.startswith("tests/")]
     assert len(command_targets) == len(set(command_targets))
+
+
+def test_mixed_production_and_test_keeps_changed_test_file(planner_mod, registry) -> None:
+    plan = planner_mod.build_plan(
+        ROOT,
+        [
+            "spell_sync/application/runtime_resolver.py",
+            "tests/test_runtime_architecture.py",
+        ],
+        registry=registry,
+    )
+    assert "runtime" in plan.clusters
+    assert "tests/test_runtime_architecture.py" in plan.pytest_targets
+    assert any("changed test files" in reason for reason in plan.reasons)

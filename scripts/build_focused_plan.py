@@ -56,7 +56,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     steps = build_planned_steps(
         plan,
-        root=ROOT,
         python=args.python,
         changed_files=tuple(changed),
     )

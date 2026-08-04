@@ -9,6 +9,8 @@ from pathlib import Path
 
 SAFETY_CRITICAL_CLUSTERS = frozenset({"pull", "push", "transaction", "recovery"})
 CONSERVATIVE_FALLBACK_CLUSTER = "packaging"
+# Wheel/installed smoke stays L2-only; keep L0/L1 packaging gates under the commit SLA.
+DEV_SCOPE_EXCLUDED_TESTS = frozenset({"tests/test_installed_workflow.py"})
 ALL_PYTEST_CLUSTERS = frozenset(
     {
         "runtime",
@@ -21,6 +23,7 @@ ALL_PYTEST_CLUSTERS = frozenset(
         "cli-json",
         "packaging",
         "agent-workflow",
+        "diagnostics-events",
         "execution-control",
         "test-selection",
         "user-documentation",
@@ -38,10 +41,6 @@ class ClusterSpec:
     static_targets: tuple[str, ...] = ()
     allow_no_match: bool = False
 
-    @property
-    def tests(self) -> tuple[str, ...]:
-        return self.cluster_tests
-
 
 @dataclass(frozen=True, slots=True)
 class Registry:
@@ -51,7 +50,6 @@ class Registry:
     agent_paths: tuple[str, ...]
     ci_script_paths: tuple[str, ...]
     pyproject_path: str
-    conservative_tests: tuple[str, ...]
 
 
 def _as_tuple(value: object) -> tuple[str, ...]:
@@ -149,9 +147,6 @@ def load_registry(path: Path) -> Registry:
     meta = data.get("meta", {})
     if not isinstance(meta, dict):
         meta = {}
-    fallback = data.get("fallback", {})
-    if not isinstance(fallback, dict):
-        fallback = {}
     return Registry(
         clusters=clusters,
         shared_fixtures=_as_tuple(meta.get("sharedFixtures")),
@@ -159,7 +154,6 @@ def load_registry(path: Path) -> Registry:
         agent_paths=_as_tuple(meta.get("agentPaths")),
         ci_script_paths=_as_tuple(meta.get("ciScriptPaths")),
         pyproject_path=str(meta.get("pyprojectPath", "pyproject.toml")),
-        conservative_tests=_as_tuple(fallback.get("tests")),
     )
 
 
@@ -180,9 +174,17 @@ def is_docs_only(path: str, registry: Registry) -> bool:
     return any(normalized.startswith(prefix) for prefix in registry.docs_only_prefixes)
 
 
-def clusters_for_file(path: str, registry: Registry) -> set[str]:
+def clusters_for_file(
+    path: str,
+    registry: Registry,
+    *,
+    dev_scope: bool = False,
+) -> set[str]:
     normalized = path.replace("\\", "/")
     if normalized in registry.shared_fixtures or normalized == "tests/conftest.py":
+        # L0/L1: avoid 100+ file fan-out; L2/registry validation still uses full set.
+        if dev_scope:
+            return {"test-selection"}
         return set(ALL_PYTEST_CLUSTERS)
     if normalized.startswith("tests/") and normalized.endswith(".py"):
         return {"_test_file"}
@@ -193,7 +195,9 @@ def clusters_for_file(path: str, registry: Registry) -> set[str]:
         matched.add("agent-workflow")
     if normalized == registry.pyproject_path:
         matched.add("packaging")
-        matched.add("agent-workflow")
+        # L2 keeps the agent-workflow coupling; L0/L1 stay packaging validators + unit slice.
+        if not dev_scope:
+            matched.add("agent-workflow")
     for cluster in registry.clusters.values():
         if path_matches(normalized, cluster.production):
             matched.add(cluster.name)
@@ -202,10 +206,15 @@ def clusters_for_file(path: str, registry: Registry) -> set[str]:
     return matched
 
 
-def required_safety_clusters(changed_files: list[str], registry: Registry) -> set[str]:
+def required_safety_clusters(
+    changed_files: list[str],
+    registry: Registry,
+    *,
+    dev_scope: bool = False,
+) -> set[str]:
     required: set[str] = set()
     for path in changed_files:
-        for cluster_name in clusters_for_file(path, registry):
+        for cluster_name in clusters_for_file(path, registry, dev_scope=dev_scope):
             if cluster_name in SAFETY_CRITICAL_CLUSTERS:
                 required.add(cluster_name)
     return required

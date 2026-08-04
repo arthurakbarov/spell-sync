@@ -53,7 +53,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--level",
         choices=("module", "cluster"),
         default="cluster",
-        help="Level 1 module tests or Level 2 cluster tests.",
+        help="Module tests (edit loop) or cluster tests (full planner; dev-scope downgrades).",
+    )
+    parser.add_argument(
+        "--dev-scope",
+        action="store_true",
+        help="Local minimal scope: shared fixtures map to test-selection only (no full fan-out).",
     )
     parser.add_argument(
         "--format",
@@ -165,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         target_override=args.target,
         level=args.level,
         python=args.python,
+        dev_scope=args.dev_scope,
     )
     if args.format == "json":
         payload = plan.to_json_dict()

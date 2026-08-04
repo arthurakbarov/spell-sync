@@ -3,6 +3,11 @@ sharedFixtures = [
   "tests/conftest.py",
   "tests/runtime_helpers.py",
   "tests/service_test_utils.py",
+  "tests/journal_test_utils.py",
+  "tests/conftest_execution.py",
+  "tests/support/wiring.py",
+  "tests/tui/fake_service.py",
+  "tests/tui/test_helpers.py",
 ]
 docsOnlyPrefixes = [
   "docs/",
@@ -18,31 +23,40 @@ agentPaths = [
 ciScriptPaths = [
   "scripts/ci.sh",
   "scripts/ci_runner.py",
+  "scripts/ci_history.py",
+  "scripts/ci_impact/",
+  "scripts/agent_context.py",
   "scripts/check_agent_config.py",
   "scripts/check_docs_contract.py",
-  "scripts/test_plan.py",
+  "scripts/check_architecture.py",
+  "scripts/check_ci_evidence.py",
+  "scripts/check_ci_necessity.py",
+  "scripts/check_target_capabilities.py",
+  "scripts/run_dev_loop.py",
   "scripts/run_focused_tests.py",
+  "scripts/run_lightweight_validation.py",
+  "scripts/test_plan.py",
   "scripts/test_selection/",
+  "scripts/validate_ci_impact.py",
+  "ci/",
+  ".github/workflows/",
 ]
 pyprojectPath = "pyproject.toml"
-
-[fallback]
-tests = [
-  "tests/test_core.py",
-  "tests/test_installed_workflow.py",
-]
 
 [clusters.runtime]
 production = [
   "spell_sync/runtime_settings.py",
   "spell_sync/runtime_identity.py",
   "spell_sync/resolved_runtime.py",
+  "spell_sync/runtime.py",
   "spell_sync/sync_context.py",
-  "spell_sync/validated_runtime.py",
+  "spell_sync/application/__init__.py",
   "spell_sync/application/runtime_resolver.py",
   "spell_sync/application/mutation_scope.py",
+  "spell_sync/application/project_resolution.py",
   "spell_sync/application/_runtime_factory.py",
   "spell_sync/mutation_guards.py",
+  "spell_sync/project.py",
 ]
 moduleTests = [
   "tests/test_runtime_identity.py",
@@ -56,7 +70,9 @@ clusterTests = [
   "tests/test_application_service.py",
   "tests/test_application_services.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.configuration]
 production = [
@@ -64,6 +80,8 @@ production = [
   "spell_sync/settings.py",
   "spell_sync/project_setup/*.py",
   "spell_sync/config_check_cmd.py",
+  "spell_sync/target_capabilities.py",
+  "spell_sync/target_validation.py",
 ]
 moduleTests = [
   "tests/test_settings.py",
@@ -80,8 +98,15 @@ validators = []
 [clusters.pull]
 production = [
   "spell_sync/application/services/sync.py",
+  "spell_sync/dictionaries.py",
+  "spell_sync/dictionary_hints.py",
+  "spell_sync/dictionary_registry.py",
   "spell_sync/io.py",
+  "spell_sync/paths.py",
+  "spell_sync/read_outcome.py",
+  "spell_sync/sync_models.py",
   "spell_sync/sync_run.py",
+  "spell_sync/words.py",
 ]
 moduleTests = [
   "tests/test_pull_safety.py",
@@ -94,7 +119,9 @@ clusterTests = [
   "tests/test_sync_run.py",
   "tests/tui/test_pull_flow.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.push]
 production = [
@@ -103,9 +130,14 @@ production = [
   "spell_sync/application/service.py",
   "spell_sync/application/services/*.py",
   "spell_sync/application/_operation_deps.py",
+  "spell_sync/command_helpers.py",
   "spell_sync/io.py",
   "spell_sync/app_process_check.py",
+  "spell_sync/neovim_mkspell.py",
+  "spell_sync/removal_review.py",
   "spell_sync/runtime_identity.py",
+  "spell_sync/skip_reasons.py",
+  "spell_sync/sync_models.py",
 ]
 moduleTests = [
   "tests/test_runtime_identity.py",
@@ -115,11 +147,12 @@ clusterTests = [
   "tests/test_runtime_identity.py",
   "tests/test_push_transaction.py",
   "tests/test_transaction_safety.py",
-  "tests/test_push_safety_coverage.py",
   "tests/test_push_safety_edges.py",
   "tests/test_app_process_check.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.transaction]
 production = [
@@ -127,6 +160,7 @@ production = [
   "spell_sync/push_journal.py",
   "spell_sync/push_prepared.py",
   "spell_sync/push_transaction.py",
+  "spell_sync/journal_schema.py",
   "spell_sync/secure_artifacts.py",
   "spell_sync/trusted_internal_fs.py",
 ]
@@ -145,7 +179,9 @@ clusterTests = [
   "tests/test_secure_artifacts_static_guard.py",
   "tests/test_transaction_safety.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.recovery]
 production = [
@@ -158,17 +194,23 @@ moduleTests = [
 ]
 clusterTests = [
   "tests/test_recovery_discard_safety.py",
-  "tests/test_recovery_facade_coverage.py",
   "tests/test_safe_discard_adversarial.py",
   "tests/test_tui_recovery_safety.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.tui]
 production = [
   "spell_sync/tui/",
+  "spell_sync/application/builders.py",
+  "spell_sync/application/operation_explanations.py",
+  "spell_sync/application/review_session.py",
   "spell_sync/application/service.py",
   "spell_sync/application/services/*.py",
+  "spell_sync/application/target_details.py",
+  "spell_sync/application/user_notices.py",
   "spell_sync/application/_operation_deps.py",
 ]
 moduleTests = [
@@ -176,19 +218,34 @@ moduleTests = [
 ]
 clusterTests = [
   "tests/tui/test_architecture.py",
+  "tests/tui/test_dashboard.py",
+  "tests/tui/test_doctor_screen.py",
+  "tests/tui/test_pull_flow.py",
+  "tests/tui/test_review_workflow.py",
   "tests/test_tui_mutation_safety.py",
   "tests/test_tui_recovery_safety.py",
   "tests/test_gui_smoke.py",
-  "tests/tui/test_review_workflow.py",
 ]
-validators = []
+validators = [
+  "scripts/check_architecture.py --check",
+]
 
 [clusters.cli-json]
 production = [
   "spell_sync/cli.py",
+  "spell_sync/cli_options.py",
   "spell_sync/commands.py",
   "spell_sync/cli_request_adapter.py",
+  "spell_sync/command_helpers.py",
+  "spell_sync/doctor.py",
+  "spell_sync/exit_codes.py",
+  "spell_sync/health/**",
   "spell_sync/json_output.py",
+  "spell_sync/lint.py",
+  "spell_sync/log.py",
+  "spell_sync/plan_cmd.py",
+  "spell_sync/subprocess_utils.py",
+  "spell_sync/ui_cmd.py",
   "spell_sync/application/requests.py",
 ]
 moduleTests = [
@@ -207,25 +264,43 @@ validators = []
 [clusters.packaging]
 production = [
   "pyproject.toml",
+  "uv.lock",
+  ".python-version",
+  "config/environment-contract.toml",
   "spell_sync/__init__.py",
+  "spell_sync/__main__.py",
+  "spell_sync/bundled_files.py",
   "spell_sync/version_cmd.py",
+  "scripts/environment_contract/**",
   "scripts/project_environment.py",
+  "scripts/run_compatibility_checks.py",
+  "scripts/snapshot_dev_paths.py",
   "scripts/validate_dependency_groups.py",
+  "scripts/validate_environment_contract.py",
+  "scripts/validate_snapshot_policy.py",
+  "scripts/validate_support_matrix.py",
 ]
 moduleTests = [
   "tests/test_installed_workflow.py",
   "tests/test_dependency_group_contract.py",
+  "tests/test_environment_contract.py",
   "tests/test_environment_dependency_report.py",
+  "tests/test_packaging_surface_validators.py",
 ]
 clusterTests = [
   "tests/test_installed_workflow.py",
   "tests/test_ci_contract.py",
   "tests/test_dependency_group_contract.py",
+  "tests/test_environment_contract.py",
   "tests/test_environment_dependency_report.py",
+  "tests/test_environment_lifecycle.py",
+  "tests/test_packaging_surface_validators.py",
 ]
 validators = [
   "scripts/check_target_capabilities.py --check",
   "scripts/validate_dependency_groups.py",
+  "scripts/validate_support_matrix.py",
+  "scripts/validate_snapshot_policy.py",
 ]
 staticTargets = [
   "spell_sync",
@@ -236,30 +311,44 @@ production = [
   ".cursor/",
   "AGENTS.md",
   "docs/AGENT_DEVELOPMENT.md",
+  "scripts/agent_context.py",
   "scripts/check_agent_config.py",
+  "scripts/check_architecture.py",
+  "scripts/check_ci_evidence.py",
+  "scripts/check_ci_necessity.py",
   "scripts/check_docs_contract.py",
+  "scripts/ci_input_state.py",
   "scripts/ci_runner.py",
-  "scripts/test_plan.py",
-  "scripts/run_focused_tests.py",
-  "scripts/test_selection/",
-  "tests/test-impact.toml",
+  "scripts/documentation_state.py",
+  "scripts/lib/git-commit.sh",
 ]
 moduleTests = [
-  "tests/test_test_planner.py",
-  "tests/test_focused_test_runner.py",
+  "tests/test_agent_config_validator.py",
+  "tests/test_agent_context.py",
+  "tests/test_check_architecture.py",
+  "tests/test_docs_contract.py",
+  "tests/test_ci_impact.py",
+  "tests/test_ci_necessity.py",
+  "tests/test_run_dev_loop_budget.py",
 ]
 clusterTests = [
   "tests/test_agent_config_validator.py",
+  "tests/test_agent_context.py",
+  "tests/test_check_architecture.py",
   "tests/test_docs_contract.py",
   "tests/test_ci_contract.py",
   "tests/test_ci_evidence.py",
-  "tests/test_test_planner.py",
-  "tests/test_focused_test_runner.py",
-  "tests/test_test_efficiency_contract.py",
+  "tests/test_ci_impact.py",
+  "tests/test_ci_necessity.py",
+  "tests/test_ci_history.py",
+  "tests/test_ci_evidence_reuse.py",
+  "tests/test_run_dev_loop_budget.py",
 ]
 validators = [
   "scripts/check_agent_config.py",
+  "scripts/check_architecture.py --check",
   "scripts/check_docs_contract.py",
+  "scripts/validate_ci_impact.py",
 ]
 
 [clusters.documentation]
@@ -267,6 +356,7 @@ production = [
   "docs/",
   "README.md",
   "docs/CONTRIBUTING.md",
+  "scripts/check-docs-style.sh",
 ]
 moduleTests = []
 clusterTests = []
@@ -278,11 +368,17 @@ validators = [
 [clusters.diagnostics-events]
 production = [
   "spell_sync/application/events.py",
+  "spell_sync/application/event_helpers.py",
+  "spell_sync/application/event_metadata.py",
   "spell_sync/application/event_presenter.py",
+  "spell_sync/application/reports.py",
+  "spell_sync/application/session_report_export.py",
   "spell_sync/application/services/_shared.py",
-  "spell_sync/diagnostics/technical_event_log.py",
-  "spell_sync/diagnostics/technical_logging.py",
-  "spell_sync/diagnostics/safe_log.py",
+  "spell_sync/application/support_report.py",
+  "spell_sync/diagnostics/",
+  "spell_sync/operation_reports.py",
+  "spell_sync/support/",
+  "spell_sync/support_report_cmd.py",
 ]
 moduleTests = [
   "tests/test_technical_logging.py",
@@ -291,7 +387,6 @@ moduleTests = [
 clusterTests = [
   "tests/test_technical_logging.py",
   "tests/test_diagnostic_redaction.py",
-  "tests/test_diagnostics_coverage.py",
   "tests/test_support_report.py",
   "tests/test_application_services.py",
   "tests/tui/test_architecture.py",
@@ -311,6 +406,7 @@ production = [
   "scripts/test_groups.py",
   "ci/test-groups.toml",
   "scripts/execution_budget_report.py",
+  "scripts/execution_budget_admin.py",
   "scripts/execution_control/budget_analysis.py",
   "tests/execution-budget.toml",
 ]
@@ -321,7 +417,7 @@ moduleTests = [
   "tests/test_execution_planner_supervision.py",
   "tests/test_execution_parent_interrupt_status.py",
   "tests/test_execution_budget_report.py",
-  "tests/test_execution_group_coverage.py",
+  "tests/test_timing_observability_contract.py",
 ]
 clusterTests = [
   "tests/test_execution_admission.py",
@@ -340,7 +436,6 @@ clusterTests = [
   "tests/test_execution_edit_loop_summary.py",
   "tests/test_execution_fingerprints.py",
   "tests/test_execution_gate_finalization.py",
-  "tests/test_execution_group_coverage.py",
   "tests/test_execution_hard_timeout_detached.py",
   "tests/test_execution_history.py",
   "tests/test_execution_integration.py",
@@ -370,6 +465,7 @@ clusterTests = [
   "tests/test_execution_token_privacy.py",
   "tests/test_execution_wheel_origin_output.py",
   "tests/test_execution_workload_prediction.py",
+  "tests/test_timing_observability_contract.py",
 ]
 validators = [
   "scripts/validate_execution_budget.py",
@@ -406,6 +502,7 @@ clusterTests = [
 validators = [
   "scripts/validate_user_documentation.py",
   "scripts/validate_repository_consistency.py",
+  "scripts/audit_dead_code.py",
 ]
 
 [clusters.test-selection]
@@ -413,6 +510,7 @@ production = [
   "scripts/test_plan.py",
   "scripts/run_focused_tests.py",
   "scripts/test_selection/",
+  "scripts/validate_test_impact.py",
   "tests/test-impact.toml",
 ]
 moduleTests = [
@@ -426,4 +524,5 @@ clusterTests = [
 ]
 validators = [
   "scripts/check_agent_config.py",
+  "scripts/validate_test_impact.py",
 ]

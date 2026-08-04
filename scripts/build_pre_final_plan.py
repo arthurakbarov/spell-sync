@@ -19,6 +19,8 @@ from scripts.test_selection.planner import build_plan  # noqa: E402
 POLISH_VALIDATORS: tuple[tuple[str, str], ...] = (
     ("timing-observability", "scripts/validate_timing_observability.py"),
     ("dependency-groups", "scripts/validate_dependency_groups.py"),
+    ("support-matrix", "scripts/validate_support_matrix.py"),
+    ("snapshot-policy", "scripts/validate_snapshot_policy.py"),
     ("user-documentation", "scripts/validate_user_documentation.py"),
     ("repository-consistency", "scripts/validate_repository_consistency.py"),
     ("dead-code-audit", "scripts/audit_dead_code.py"),
@@ -26,12 +28,14 @@ POLISH_VALIDATORS: tuple[tuple[str, str], ...] = (
 
 
 def _changed_python_files(changed: list[str]) -> list[str]:
-    return sorted(path for path in changed if path.endswith(".py"))
+    return sorted(path for path in changed if path.endswith(".py") and (ROOT / path).is_file())
 
 
 def _changed_production_modules(changed: list[str]) -> list[str]:
     return sorted(
-        path for path in changed if path.startswith("spell_sync/") and path.endswith(".py")
+        path
+        for path in changed
+        if path.startswith("spell_sync/") and path.endswith(".py") and (ROOT / path).is_file()
     )
 
 
