@@ -11,6 +11,7 @@ Git: [GIT-WORKFLOW.md](GIT-WORKFLOW.md). Snapshot procedure:
 | Dead-code report | Tiny-module scan | no | `.artifacts/quality/dead-code-report.json` | `audit_dead_code.py` |
 | Timing / execution history | ETA learning | no | execution-control SQLite (state dir) | budgeted / observe runs |
 | Check-session ledger | Ephemeral reuse of successful checks in one agent arc | no | `/tmp/spell-sync-agent-session/` (override `SPELL_SYNC_CHECK_SESSION_DIR`) | `check_session.py` / `run_dev_loop.py` |
+| Opt-in commit-msg hook | Local spell-sync message-shape gate | no | `.git/hooks/commit-msg` (managed marker) | `install_git_hooks.py` |
 | Timeout diagnostics | Stall/hard captures | no | execution-control timeouts dir | hard/stall termination |
 | Support report | Redacted user diagnostics | yes (export) | user-chosen path | `support-report` / TUI Health |
 | Technical log | Operation JSONL | no | app state beside wordlist | product runs |
@@ -18,7 +19,7 @@ Git: [GIT-WORKFLOW.md](GIT-WORKFLOW.md). Snapshot procedure:
 | Journal / snapshots | Push recovery | no | beside wordlist | interrupted Push |
 | Project lock | Mutation exclusion | no | `.spell-sync.lock` near project | mutating ops |
 | Workspace snapshot | Owner three-repo archive | optional | owner-home `code.zip` | modifying task end |
-| Wheel / sdist | Release candidates | yes | `dist/` | packaging / RC |
+| Wheel / sdist | Release candidates; members privacy-checked in full CI (`packaging.members`) | yes | `dist/` | packaging / RC |
 
 ## Rules
 
