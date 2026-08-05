@@ -48,6 +48,7 @@ Every dismissible screen exposes Escape → Back/Cancel (bindings or modal cance
 | Target / source / check rows | `DataTable` |
 | Operation history list | `DataTable` (row select opens details) |
 | Short safety / direction copy | `Static` summary above the table |
+| Filesystem path entry | `Input` + `PathSuggester` (Tab / →); not DirectoryTree |
 | Live mutation stages | Compact stage list + `ProgressBar` (ETA when totals known) |
 | Technical JSONL | Support-only; never the default Health view |
 

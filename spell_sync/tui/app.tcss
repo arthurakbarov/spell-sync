@@ -133,14 +133,6 @@ Button.-disabled-action {
     opacity: 0.45;
 }
 
-#wordlist-browser {
-    height: 12;
-    min-height: 8;
-    max-width: 78;
-    margin: 0 0 1 0;
-    border: solid $surface-lighten-2;
-}
-
 #confirm-body {
     max-width: 78;
     width: 100%;

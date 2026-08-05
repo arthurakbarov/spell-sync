@@ -17,6 +17,7 @@ from spell_sync.project_setup.prepare import prepare_project_setup
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
+from spell_sync.tui.path_suggester import PathSuggester
 from spell_sync.tui.screens.dashboard import DashboardScreen
 from spell_sync.tui.screens.doctor_screen import DoctorScreen
 from spell_sync.tui.screens.logs_screen import TechnicalLogScreen
@@ -30,8 +31,6 @@ from spell_sync.tui.screens.setup_welcome_screen import (
     SetupStorageStrategyScreen,
     SetupWelcomeScreen,
     SetupWordlistScreen,
-    WordlistDirectoryTree,
-    filter_wordlist_browser_paths,
 )
 from tests.tui.fake_service import fake_service
 from tests.tui.test_helpers import dismiss_operation_linger, wait_for_text
@@ -345,20 +344,6 @@ class TestSetupWordlistInteractions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(controller._setup_wordlist, controller.setup_wordlist_default())
 
 
-class TestWordlistDirectoryTree(unittest.TestCase):
-    def test_filter_keeps_dirs_and_wordlist_only(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            keep_dir = root / "keep"
-            keep_dir.mkdir()
-            wordlist = root / "wordlist.txt"
-            wordlist.write_text("alpha\n", encoding="utf-8")
-            other = root / "notes.txt"
-            other.write_text("nope\n", encoding="utf-8")
-            filtered = filter_wordlist_browser_paths([keep_dir, wordlist, other])
-            self.assertEqual(filtered, [keep_dir, wordlist])
-
-
 class TestSetupOpenProjectScreen(unittest.IsolatedAsyncioTestCase):
     async def test_back_pops_screen(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
@@ -383,38 +368,16 @@ class TestSetupOpenProjectScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertIsInstance(app.screen, SetupOpenProjectScreen)
 
-    async def test_browser_and_bottom_actions_present(self):
+    async def test_path_input_has_suggester_and_actions(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(80, 24)) as pilot:
             app.push_screen(SetupOpenProjectScreen(controller))
             await pilot.pause()
-            self.assertIsInstance(app.screen.query_one("#wordlist-browser"), WordlistDirectoryTree)
+            inp = app.screen.query_one("#wordlist-input", Input)
+            self.assertIsInstance(inp.suggester, PathSuggester)
             self.assertTrue(app.screen.query("#setup-actions"))
-
-    async def test_directory_selection_fills_wordlist_path(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp)
-            controller = TuiController(
-                fake_service(setup_state=_missing_project_state()), CliOptions()
-            )
-            app = SpellSyncApp(controller)
-            async with app.run_test(size=(100, 32)) as pilot:
-                app.push_screen(SetupOpenProjectScreen(controller))
-                await pilot.pause()
-                screen = app.screen
-                assert isinstance(screen, SetupOpenProjectScreen)
-                screen.on_directory_tree_directory_selected(SimpleNamespace(path=folder))
-                self.assertEqual(
-                    screen.query_one("#wordlist-input", Input).value,
-                    str(folder / "wordlist.txt"),
-                )
-                wordlist = folder / "wordlist.txt"
-                screen.on_directory_tree_file_selected(SimpleNamespace(path=wordlist))
-                self.assertEqual(
-                    screen.query_one("#wordlist-input", Input).value,
-                    str(wordlist),
-                )
+            self.assertIs(inp, app.focused)
 
 
 class TestSetupWelcomeLayout(unittest.IsolatedAsyncioTestCase):
@@ -440,7 +403,10 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
                 app.screen.query_one("#wordlist-input", Input).value,
                 str(existing),
             )
-            self.assertIsInstance(app.screen.query_one("#wordlist-browser"), WordlistDirectoryTree)
+            self.assertIsInstance(
+                app.screen.query_one("#wordlist-input", Input).suggester,
+                PathSuggester,
+            )
 
     async def test_valid_path_updates_project_and_returns(self):
         with tempfile.TemporaryDirectory() as tmp:

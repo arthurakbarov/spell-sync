@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable
-
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     Button,
-    DirectoryTree,
     Footer,
     Header,
     Input,
@@ -42,6 +39,7 @@ from ...application.product_concepts import (
 )
 from ...project_setup.prepare import PreparedProjectSetup
 from ..controller import TuiController
+from ..path_suggester import PathSuggester
 
 _STORAGE_RADIO_IDS = {
     "storage-local": STORAGE_STRATEGY_LOCAL,
@@ -49,40 +47,43 @@ _STORAGE_RADIO_IDS = {
     "storage-git": STORAGE_STRATEGY_GIT,
 }
 
-_WORDLIST_NAME = "wordlist.txt"
-
-
-def _browser_root() -> Path:
-    home = Path.home()
-    documents = home / "Documents"
-    if documents.is_dir():
-        return documents
-    return home
-
-
-def filter_wordlist_browser_paths(paths: Iterable[Path]) -> list[Path]:
-    """Keep directories and wordlist.txt files; skip other files and OS errors."""
-    filtered: list[Path] = []
-    for path in paths:
-        try:
-            if path.is_dir():
-                filtered.append(path)
-            elif path.is_file() and path.name.lower() == _WORDLIST_NAME:
-                filtered.append(path)
-        except OSError:
-            continue
-    return filtered
-
-
-class WordlistDirectoryTree(DirectoryTree):
-    """Show directories and wordlist.txt files only."""
-
-    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
-        return filter_wordlist_browser_paths(paths)
+_PATH_HINT = (
+    "Type a path. Tab or → completes folders and files like a shell "
+    "(starts from whatever you type, including ~ and /)."
+)
 
 
 def _action_buttons(*buttons: Button) -> Vertical:
     return Vertical(*buttons, id="setup-actions", classes="setup-actions")
+
+
+def _wordlist_path_input(*, value: str = "") -> Input:
+    return Input(
+        placeholder="~/Documents/Spell Sync/wordlist.txt",
+        id="wordlist-input",
+        value=value,
+        suggester=PathSuggester(),
+    )
+
+
+class _PathCompleteMixin:
+    """Accept inline path suggestions with Tab when the path input is focused."""
+
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("tab", "complete_path", "Complete", priority=True),
+    ]
+
+    def action_complete_path(self) -> None:
+        try:
+            inp = self.query_one("#wordlist-input", Input)
+        except Exception:
+            return
+        suggestion = getattr(inp, "_suggestion", "") or ""
+        if not suggestion or not inp.has_focus:
+            return
+        inp.value = suggestion
+        inp.cursor_position = len(suggestion)
 
 
 class SetupWelcomeScreen(Screen[None]):
@@ -194,27 +195,11 @@ class SetupStorageStrategyScreen(Screen[None]):
             self._controller.set_setup_storage_strategy(self._selected)
             self.app.push_screen(SetupWordlistScreen(self._controller))
 
-
-class _WordlistBrowseMixin:
-    """Shared DirectoryTree + path input behavior for open/repoint screens."""
-
-    def _set_wordlist_input(self, path: Path) -> None:
-        self.query_one("#wordlist-input", Input).value = str(path)
-
-    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        path = Path(event.path)
-        if path.name.lower() == _WORDLIST_NAME:
-            self._set_wordlist_input(path)
-
-    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
-        directory = Path(event.path)
-        candidate = directory / _WORDLIST_NAME
-        self._set_wordlist_input(candidate)
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
 
-class SetupOpenProjectScreen(_WordlistBrowseMixin, Screen[None]):
-    BINDINGS = [("escape", "back", "Back")]
-
+class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
@@ -223,22 +208,19 @@ class SetupOpenProjectScreen(_WordlistBrowseMixin, Screen[None]):
         yield Header()
         with VerticalScroll(id="setup-body", classes="setup-body"):
             yield Static(
-                "Open existing word list\n\n"
-                "Browse to a folder or select wordlist.txt. "
-                "You can still type or paste a path below.",
+                "Open existing word list\n\n" + _PATH_HINT,
                 classes="setup-prose",
             )
-            yield WordlistDirectoryTree(_browser_root(), id="wordlist-browser")
             yield Static("Path to wordlist.txt:", classes="setup-prose")
-            yield Input(
-                placeholder="~/Documents/Spell Sync/wordlist.txt",
-                id="wordlist-input",
-            )
+            yield _wordlist_path_input()
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
         )
         yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#wordlist-input", Input).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
@@ -258,10 +240,11 @@ class SetupOpenProjectScreen(_WordlistBrowseMixin, Screen[None]):
 
             self.app.push_screen(DashboardScreen(self._controller))
 
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
-class SetupWordlistScreen(Screen[None]):
-    BINDINGS = [("escape", "back", "Back")]
 
+class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
@@ -275,11 +258,8 @@ class SetupWordlistScreen(Screen[None]):
                 for index, (label, _path) in enumerate(self._presets):
                     yield RadioButton(label, id=f"wordlist-preset-{index}", value=(index == 0))
                 yield RadioButton("Custom", id="wordlist-preset-custom", value=False)
-            yield Input(
-                placeholder="~/Documents/Spell Sync/wordlist.txt",
-                id="wordlist-input",
-                value=str(self._controller.setup_wordlist_default()),
-            )
+            yield Static(_PATH_HINT, classes="setup-prose")
+            yield _wordlist_path_input(value=str(self._controller.setup_wordlist_default()))
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
@@ -331,10 +311,11 @@ class SetupWordlistScreen(Screen[None]):
 
             self.app.push_screen(SetupTargetsScreen(self._controller, detail or ""))
 
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
-class ChangeWordlistScreen(_WordlistBrowseMixin, Screen[None]):
-    BINDINGS = [("escape", "back", "Back")]
 
+class ChangeWordlistScreen(_PathCompleteMixin, Screen[None]):
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
@@ -343,14 +324,12 @@ class ChangeWordlistScreen(_WordlistBrowseMixin, Screen[None]):
         yield Header()
         with VerticalScroll(id="setup-body", classes="setup-body"):
             yield Static(
-                f"{CHANGE_WORDLIST_HEADING}\n\n{CHANGE_WORDLIST_BODY}\n\n"
-                "Browse to a folder or select wordlist.txt, or type a path below.",
+                f"{CHANGE_WORDLIST_HEADING}\n\n{CHANGE_WORDLIST_BODY}\n\n{_PATH_HINT}",
                 id="change-wordlist-content",
                 classes="setup-prose",
             )
-            yield WordlistDirectoryTree(_browser_root(), id="wordlist-browser")
             yield Static("Path to wordlist.txt:", classes="setup-prose")
-            yield Input(placeholder="~/Documents/Spell Sync/wordlist.txt", id="wordlist-input")
+            yield _wordlist_path_input()
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
@@ -361,6 +340,7 @@ class ChangeWordlistScreen(_WordlistBrowseMixin, Screen[None]):
         wordlist = self._controller.project_wordlist
         if wordlist is not None:
             self.query_one("#wordlist-input", Input).value = str(wordlist)
+        self.query_one("#wordlist-input", Input).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
@@ -380,6 +360,9 @@ class ChangeWordlistScreen(_WordlistBrowseMixin, Screen[None]):
             dashboard = self.app.screen
             if isinstance(dashboard, DashboardScreen):
                 dashboard.refresh_dashboard()
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
 
 class SetupPreviewScreen(Screen[None]):
@@ -458,3 +441,6 @@ class SetupPreviewScreen(Screen[None]):
                     setup_prepared=self._prepared,
                 )
             )
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
