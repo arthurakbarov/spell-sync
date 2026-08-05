@@ -2,40 +2,120 @@ Screen {
     layout: vertical;
 }
 
+/* Shared shell — all product screens */
+.screen-body,
+.setup-body {
+    height: 1fr;
+    max-width: 78;
+    width: 100%;
+    padding: 1 2 0 2;
+}
+
+.screen-prose,
+.setup-prose {
+    height: auto;
+    max-width: 78;
+    margin-bottom: 1;
+}
+
+.screen-actions,
+.setup-actions {
+    dock: bottom;
+    height: auto;
+    width: 100%;
+    max-width: 78;
+    padding: 1 2 1 2;
+    margin-top: 1;
+    layout: vertical;
+}
+
+.screen-actions Button,
+.setup-actions Button {
+    width: 36;
+    min-width: 36;
+    max-width: 36;
+    margin: 0 0 1 0;
+}
+
+.action-status {
+    height: auto;
+    max-width: 78;
+    margin: 0 0 1 0;
+    color: $text-muted;
+}
+
+.section-label {
+    height: auto;
+    width: 100%;
+    max-width: 78;
+    margin: 1 0 0 0;
+    text-style: bold;
+    color: $text-muted;
+}
+
+.duration-hint {
+    height: auto;
+    margin: 0 0 1 0;
+    color: $text-muted;
+}
+
+/* Summary blocks */
 #dashboard-summary,
-#status-content,
+#status-summary,
+#doctor-summary,
+#pull-summary,
 #preview-content,
-#doctor-content,
+#recovery-content,
 #removals-summary,
-#removals-content,
 #narrow-warning,
 #dashboard-issues,
+#blocking-banner,
 #targets-header,
-#targets-status {
+#targets-status,
+#operation-title,
+#operation-details,
+#operation-stages,
+#report-content,
+#logs-title,
+#logs-privacy,
+#logs-status,
+#review-title,
+#review-body,
+#review-pull-content,
+#review-pull-complete,
+#review-push-content,
+#review-session-report,
+#change-wordlist-hint {
     height: auto;
-    padding: 1 2;
+    padding: 0;
+    margin-bottom: 1;
+}
+
+/* Tables — prefer height share inside body scroll */
+DataTable,
+#preview-table,
+#status-table,
+#doctor-table,
+#pull-table,
+#recovery-table,
+#review-push-table,
+#history-table,
+#operation-stages-table {
+    height: auto;
+    min-height: 6;
+    max-height: 14;
+    margin: 0 0 1 0;
+    border: solid $surface-lighten-2;
 }
 
 #targets-list {
     height: 1fr;
     min-height: 6;
-    padding: 0 1;
-}
-
-#action-grid {
-    layout: grid;
-    grid-size: 2;
-    grid-gutter: 1 2;
-    padding: 1 2;
-    height: auto;
-}
-
-Button.-disabled-action {
-    opacity: 0.45;
+    padding: 0;
 }
 
 .setup-target-row {
-    padding: 0 2 1 2;
+    padding: 0 0 1 0;
     height: auto;
 }
 
@@ -49,40 +129,8 @@ Button.-disabled-action {
     color: $text-muted;
 }
 
-#preview-table {
-    height: 1fr;
-    padding: 0 2;
-}
-
-/* Setup wizard: readable prose width, bottom equal-width actions (80-col friendly). */
-.setup-body {
-    height: 1fr;
-    max-width: 78;
-    width: 100%;
-    padding: 1 2 0 2;
-}
-
-.setup-prose {
-    height: auto;
-    max-width: 78;
-    margin-bottom: 1;
-}
-
-.setup-actions {
-    dock: bottom;
-    height: auto;
-    width: 100%;
-    max-width: 78;
-    padding: 1 2 1 2;
-    margin-top: 1;
-    layout: vertical;
-}
-
-.setup-actions Button {
-    width: 36;
-    min-width: 36;
-    max-width: 36;
-    margin: 0 0 1 0;
+Button.-disabled-action {
+    opacity: 0.45;
 }
 
 #wordlist-browser {
@@ -91,4 +139,26 @@ Button.-disabled-action {
     max-width: 78;
     margin: 0 0 1 0;
     border: solid $surface-lighten-2;
+}
+
+#confirm-body {
+    max-width: 78;
+    width: 100%;
+    padding: 1 2;
+    height: auto;
+}
+
+.dashboard-menu {
+    height: auto;
+    width: 100%;
+    max-width: 78;
+    layout: vertical;
+    margin-top: 1;
+}
+
+.dashboard-menu Button {
+    width: 36;
+    min-width: 36;
+    max-width: 36;
+    margin: 0 0 1 0;
 }

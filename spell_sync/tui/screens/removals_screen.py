@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Button, Footer, Header, Static
+
+from ..layout import action_bar
 
 
 class RemovalsScreen(Screen[None]):
@@ -25,9 +27,11 @@ class RemovalsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="removals-summary")
-        with VerticalScroll(id="removals-scroll"):
-            yield Static(id="removals-content")
+        with Vertical(id="screen-body", classes="screen-body"):
+            yield Static(id="removals-summary")
+            with VerticalScroll(id="removals-scroll"):
+                yield Static(id="removals-content")
+        yield action_bar(Button("Back", id="btn-back"))
         yield Footer()
 
     def on_mount(self) -> None:
@@ -41,3 +45,7 @@ class RemovalsScreen(Screen[None]):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-back":
+            self.action_back()

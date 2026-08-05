@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from ...application.target_details import format_target_details_text
 from ..controller import TuiController
+from ..layout import action_bar
 
 
 class TargetDetailsScreen(Screen[None]):
@@ -24,8 +26,9 @@ class TargetDetailsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="target-details-content")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="target-details-content")
+        yield action_bar(Button("Back", id="btn-back"))
         yield Footer()
 
     def on_mount(self) -> None:

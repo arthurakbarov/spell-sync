@@ -6,6 +6,7 @@ from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import Worker, WorkerState
@@ -24,6 +25,7 @@ from ...application.product_concepts import (
 from ...application.reports import OperationOutcome, OperationReport, PullPreview, PushPreview
 from ..controller import TuiController
 from ..export_results import ReportExportResult
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -89,10 +91,13 @@ class ReviewStartScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(REVIEW_AND_UPDATE_LABEL, id="review-title")
-        yield Static(id="review-body")
-        yield Button("Start review", id="btn-start", variant="primary")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(REVIEW_AND_UPDATE_LABEL, id="review-title")
+            yield Static(id="review-body")
+        yield action_bar(
+            Button("Start review", id="btn-start", variant="primary"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -121,11 +126,14 @@ class ReviewPullScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="review-pull-content")
-        yield Button(COLLECT_WORDS_LABEL, id="btn-pull", variant="primary")
-        yield Button("Skip collect", id="btn-skip")
-        yield Button("View additions", id="btn-additions")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="review-pull-content")
+        yield action_bar(
+            Button(COLLECT_WORDS_LABEL, id="btn-pull", variant="primary"),
+            Button("Skip collect", id="btn-skip"),
+            Button("View additions", id="btn-additions"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -246,8 +254,9 @@ class ReviewPullCompleteScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="review-pull-complete")
-        yield Button("Build Push preview", id="btn-build-push", variant="primary")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="review-pull-complete")
+        yield action_bar(Button("Build Push preview", id="btn-build-push", variant="primary"))
         yield Footer()
 
     def on_mount(self) -> None:
@@ -276,12 +285,15 @@ class ReviewPushScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="review-push-content")
-        yield DataTable(id="review-push-table")
-        yield Button("View removals", id="btn-view-removals")
-        yield Button(UPDATE_APPS_LABEL, id="btn-push", variant="primary")
-        yield Button("Finish without update", id="btn-finish")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="review-push-content")
+            yield DataTable(id="review-push-table")
+        yield action_bar(
+            Button(UPDATE_APPS_LABEL, id="btn-push", variant="primary"),
+            Button("View removals", id="btn-view-removals"),
+            Button("Finish without update", id="btn-finish"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -290,7 +302,9 @@ class ReviewPushScreen(LoadTokenMixin, Screen[None]):
     def _load_fresh_preview(self) -> None:
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#review-push-content", Static).update("Loading push preview...")
+        self.query_one("#review-push-content", Static).update(
+            loading_message("Loading push preview...", "push_preview")
+        )
         self._worker = self.load_push_preview_worker()
         self.set_interval(0.05, self._poll_push_worker, repeat=40)
 
@@ -475,12 +489,15 @@ class ReviewSessionReportScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="review-session-report")
-        yield Button("Save report", id="btn-save-report")
-        yield Static(id="session-report-export-status")
-        yield Button("Back to dashboard", id="btn-dashboard", variant="primary")
-        yield Button("View operation history", id="btn-history")
-        yield Button("Quit", id="btn-quit", variant="error")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="review-session-report")
+            yield Static(id="session-report-export-status")
+        yield action_bar(
+            Button("Back to dashboard", id="btn-dashboard", variant="primary"),
+            Button("Save report", id="btn-save-report"),
+            Button("View operation history", id="btn-history"),
+            Button("Quit", id="btn-quit", variant="error"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:

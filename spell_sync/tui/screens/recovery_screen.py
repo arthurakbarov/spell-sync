@@ -6,6 +6,7 @@ from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
@@ -14,6 +15,7 @@ from ...application.operation_explanations import recovery_blocker_notice
 from ...application.reports import RecoveryPreview, RecoveryStatus
 from ...application.user_notices import format_notice_block, format_notice_summary
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -33,12 +35,16 @@ class RecoveryScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="recovery-content")
-        yield DataTable(id="recovery-table")
-        yield Button("Refresh", id="btn-refresh", variant="primary")
-        yield Button("View details", id="btn-details")
-        yield Button("Recover", id="btn-recover")
-        yield Button("Discard metadata", id="btn-discard")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="recovery-content")
+            yield DataTable(id="recovery-table")
+        yield action_bar(
+            Button("Recover", id="btn-recover", variant="primary"),
+            Button("View details", id="btn-details"),
+            Button("Discard metadata", id="btn-discard"),
+            Button("Refresh", id="btn-refresh"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,7 +144,9 @@ class RecoveryScreen(LoadTokenMixin, Screen[None]):
         self._preview = None
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#recovery-content", Static).update("Loading recovery preview...")
+        self.query_one("#recovery-content", Static).update(
+            loading_message("Loading recovery preview...", "recovery_preview")
+        )
         self._worker = self.load_recovery_worker()
         self.set_interval(0.05, self._poll_recovery_worker, repeat=40)
 
@@ -281,6 +289,8 @@ class RecoveryScreen(LoadTokenMixin, Screen[None]):
             self.action_run_discard()
         elif event.button.id == "btn-details":
             self.action_view_details()
+        elif event.button.id == "btn-back":
+            self.action_back()
 
     def action_back(self) -> None:
         self._controller.invalidate_recovery_preview()

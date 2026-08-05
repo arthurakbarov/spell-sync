@@ -1,6 +1,8 @@
 # TUI implementation
 
 Developer reference for the Textual terminal UI and its relationship to the application layer.
+The shared screen shell, action ordering, table usage, and duration hints are defined in
+[`TUI_LAYOUT.md`](TUI_LAYOUT.md).
 
 ## Architecture
 
@@ -50,7 +52,7 @@ doctor, logs, and post-setup target settings.
 | Open existing | `setup_welcome_screen.py` | Browse/`wordlist.txt` tree, Continue, Back |
 | Wordlist | `setup_welcome_screen.py` | Presets, Continue, Back |
 | Change wordlist | `setup_welcome_screen.py` | Browse tree, Continue, Back (from Dashboard) |
-| Targets | `setup_targets_screen.py` | Continue, Back, Refresh |
+| Targets | `setup_targets_screen.py` | Continue, Refresh, Select available, Clear, Back |
 | Setup preview | `setup_welcome_screen.py` | Create project, Back |
 | Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
 | Setup operation | `operation_screen.py` | (worker) |
@@ -98,11 +100,11 @@ In-memory session on `TuiController` — not persisted as a history record.
 |--------|--------|-----------------|
 | Review start | `review_update_screen.py` | Start review, Back |
 | Pull review | `review_update_screen.py` | Collect my words, Skip collect, View additions, Back |
-| Pull confirm | `pull_confirm_screen.py` | Confirm, Back |
+| Pull confirm | `pull_confirm_screen.py` | Run pull, Cancel |
 | Pull operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
 | Pull complete | `review_update_screen.py` | Build push preview |
 | Push review | `review_update_screen.py` | Update my apps, Finish without update, View removals, Back |
-| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run push, View removals, Cancel |
 | Push operation | `operation_screen.py` | (worker; `on_complete` hand-off) |
 | Session report | `review_update_screen.py` | Dashboard |
 
@@ -114,9 +116,9 @@ separate operations with existing confirm/execute paths.
 | Screen | Module | Primary actions |
 |--------|--------|-----------------|
 | Pull preview | `pull_screen.py` | Preview, Execute, Back |
-| Pull confirm | `pull_confirm_screen.py` | Confirm, Back |
+| Pull confirm | `pull_confirm_screen.py` | Run pull, Cancel |
 | Push preview | `preview_screen.py` | Pull/Push, Back |
-| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run, Back |
+| Push confirm | `push_confirm_screen.py` | Type PUSH (removals), Run push, View removals, Cancel |
 | Removals detail | `removals_screen.py` | Back |
 | Operation | `operation_screen.py` | (worker) |
 | Report | `report_screen.py` | Dashboard |
@@ -130,10 +132,10 @@ explanations for skipped targets and sources.
 |--------|--------|-----------------|
 | Status | `status_screen.py` | Back |
 | Health | `doctor_screen.py` | Export support report, Technical details (support), Back |
-| History | `logs_screen.py` | Filters, Clear, Back |
-| Technical log | `logs_screen.py` | Back (opened from Health only) |
-| Recovery | `recovery_screen.py` | Recover, Discard, Back |
-| Recovery confirm | `recovery_confirm_screen.py` | Type RECOVER, Run, Back |
+| History | `logs_screen.py` | Filters, row details, Refresh, Clear, Back |
+| Technical log | `logs_screen.py` | Refresh, Back (opened from Health only) |
+| Recovery | `recovery_screen.py` | Recover, View details, Discard, Refresh, Back |
+| Recovery confirm | `recovery_confirm_screen.py` | Type RECOVER/DISCARD, Run, Cancel |
 
 Navigation: keyboard (Tab, Enter, Escape), mouse clicks, visible focus styles in `app.tcss`.
 Workers use `LoadTokenMixin` for stale-result suppression; screens cancel work on dismiss.

@@ -16,6 +16,7 @@ from textual.worker import Worker, WorkerState
 from ...application.product_concepts import TARGETS_SCOPE_NOTICE
 from ...project_setup.discovery import SetupTarget
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -115,14 +116,17 @@ class SetupTargetsScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="targets-header")
-        yield ScrollableContainer(id="targets-list")
-        yield Static(id="targets-status")
-        yield Button("Refresh targets", id="btn-refresh")
-        yield Button("Select available", id="btn-select-available")
-        yield Button("Clear selection", id="btn-clear")
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
+        with Vertical(id="screen-body", classes="screen-body"):
+            yield Static(id="targets-header")
+            yield ScrollableContainer(id="targets-list")
+        yield action_bar(
+            Button("Continue", id="btn-continue", variant="primary"),
+            Button("Refresh targets", id="btn-refresh"),
+            Button("Select available", id="btn-select-available"),
+            Button("Clear selection", id="btn-clear"),
+            Button("Back", id="btn-back"),
+            status_id="targets-status",
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -133,7 +137,7 @@ class SetupTargetsScreen(LoadTokenMixin, Screen[None]):
         self.query_one("#btn-continue", Button).disabled = refreshing
         self.query_one("#btn-select-available", Button).disabled = refreshing
         self.query_one("#btn-clear", Button).disabled = refreshing
-        status = "Refreshing targets…" if refreshing else ""
+        status = loading_message("Refreshing targets...", "targets_refresh") if refreshing else ""
         self.query_one("#targets-status", Static).update(status)
 
     def _sync_checkboxes(self) -> None:

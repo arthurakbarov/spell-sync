@@ -6,16 +6,22 @@ from datetime import datetime
 
 from textual import on, work
 from textual.app import ComposeResult
-from textual.containers import ScrollableContainer
+from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Select, Static
+from textual.widgets import Button, DataTable, Footer, Header, Select, Static
 from textual.worker import Worker, WorkerState
 
 from ...application.events import OperationKind
 from ...application.reports import OperationOutcome
 from ...diagnostics.history_record import OperationHistoryRecord
+from ...diagnostics.technical_event_log import ParsedTechnicalLogEvent, parse_technical_log_line
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
+
+_MAX_TECH_LOG_ROWS = 200
+_MAX_FALLBACK_LINES = 40
+_MAX_FALLBACK_LINE_LENGTH = 160
 
 
 def _format_timestamp(value: datetime) -> str:
@@ -43,6 +49,33 @@ def _summary_line(record: OperationHistoryRecord) -> str:
     )
 
 
+def _history_detail(record: OperationHistoryRecord) -> str:
+    if record.operation == "pull" and record.added_words:
+        return f"{record.added_words} added"
+    if record.operation == "push" and record.updated_targets:
+        return f"{record.updated_targets} updated"
+    if record.operation == "setup" and record.created_files:
+        return f"{record.created_files} files"
+    if record.operation == "recover" and record.restored_files:
+        return f"{record.restored_files} restored"
+    return record.outcome.replace("_", " ").title()
+
+
+def _technical_event_message(event: ParsedTechnicalLogEvent) -> str:
+    parts = [event.operation.value]
+    if event.phase is not None:
+        parts.append(event.phase.value)
+    if event.reason is not None:
+        parts.append(event.reason.value)
+    if event.outcome is not None:
+        parts.append(event.outcome.value)
+    if event.target_id is not None:
+        parts.append(f"target={event.target_id.value}")
+    if event.completed is not None and event.total is not None:
+        parts.append(f"{event.completed}/{event.total}")
+    return " · ".join(parts)
+
+
 class LogsScreen(LoadTokenMixin, Screen[None]):
     BINDINGS = [("escape", "back", "Back")]
 
@@ -59,38 +92,41 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Operation history", id="logs-title")
-        yield Static(
-            "Operation history stores counts and outcomes, not your words.",
-            id="logs-privacy",
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static("Operation history", id="logs-title")
+            yield Static(
+                "Operation history stores counts and outcomes, not your words.",
+                id="logs-privacy",
+            )
+            yield Select(
+                [
+                    ("All operations", "all"),
+                    ("Setup", "setup"),
+                    ("Pull", "pull"),
+                    ("Push", "push"),
+                    ("Recovery", "recover"),
+                ],
+                id="filter-operation",
+                value="all",
+            )
+            yield Select(
+                [
+                    ("All outcomes", "all"),
+                    ("Completed", "completed"),
+                    ("Warnings", "completed_with_warnings"),
+                    ("Stopped safely", "stopped_safely"),
+                    ("Failed / recovery required", "failed"),
+                ],
+                id="filter-outcome",
+                value="all",
+            )
+            yield Static(id="logs-status")
+            yield DataTable(id="history-table", cursor_type="row")
+        yield action_bar(
+            Button("Refresh", id="btn-refresh"),
+            Button("Clear operation history", id="btn-clear"),
+            Button("Back", id="btn-back"),
         )
-        yield Select(
-            [
-                ("All operations", "all"),
-                ("Setup", "setup"),
-                ("Pull", "pull"),
-                ("Push", "push"),
-                ("Recovery", "recover"),
-            ],
-            id="filter-operation",
-            value="all",
-        )
-        yield Select(
-            [
-                ("All outcomes", "all"),
-                ("Completed", "completed"),
-                ("Warnings", "completed_with_warnings"),
-                ("Stopped safely", "stopped_safely"),
-                ("Failed / recovery required", "failed"),
-            ],
-            id="filter-outcome",
-            value="all",
-        )
-        yield Static(id="logs-status")
-        yield ScrollableContainer(id="history-list")
-        yield Button("Refresh", id="btn-refresh")
-        yield Button("Clear operation history", id="btn-clear")
-        yield Button("Back", id="btn-back")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -106,17 +142,29 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
             lines.append("")
         if not self._records:
             lines.append("No completed operations recorded yet.")
-        container = self.query_one("#history-list", ScrollableContainer)
-        container.remove_children()
+        table = self.query_one("#history-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns("Time", "Operation", "Outcome", "Details")
         for index, record in enumerate(self._records):
-            line = _summary_line(record)
-            container.mount(Button(line, id=f"history-row-{index}", classes="history-row"))
+            detail = _history_detail(record)
+            if record.warnings:
+                detail = f"{detail} !"
+            table.add_row(
+                _format_timestamp(record.timestamp),
+                record.operation.title(),
+                record.outcome.replace("_", " ").title(),
+                detail,
+                key=str(index),
+            )
         status = "\n".join(lines[2:4]) if len(lines) > 2 else ""
         self.query_one("#logs-status", Static).update(status)
 
     def _start_load(self) -> None:
         if self.is_mounted:
-            self.query_one("#history-list", ScrollableContainer).remove_children()
+            self.query_one("#history-table", DataTable).clear()
+            self.query_one("#logs-status", Static).update(
+                loading_message("Loading operation history...", "history_load")
+            )
         self._load_token = self._begin_load()
         self.query_one("#btn-refresh", Button).disabled = True
         self.query_one("#btn-clear", Button).disabled = True
@@ -209,11 +257,15 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
             return
         if event.button.id == "btn-clear":
             self.app.push_screen(ClearHistoryConfirmScreen(self._controller, self))
+
+    @on(DataTable.RowSelected, "#history-table")
+    def _on_history_row_selected(self, event: DataTable.RowSelected) -> None:
+        try:
+            index = int(event.row_key.value)
+        except (TypeError, ValueError):
             return
-        if event.button.id and event.button.id.startswith("history-row-"):
-            index = int(event.button.id.rsplit("-", 1)[-1])
-            if 0 <= index < len(self._records):
-                self.app.push_screen(HistoryDetailsScreen(self._records[index]))
+        if 0 <= index < len(self._records):
+            self.app.push_screen(HistoryDetailsScreen(self._records[index]))
 
 
 class HistoryDetailsScreen(Screen[None]):
@@ -225,8 +277,9 @@ class HistoryDetailsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="details-content")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="details-content")
+        yield action_bar(Button("Back", id="btn-back"))
         yield Footer()
 
     def on_mount(self) -> None:
@@ -276,9 +329,14 @@ class TechnicalLogScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="tech-log-content")
-        yield Button("Refresh", id="btn-refresh")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="tech-log-summary")
+            yield DataTable(id="tech-log-table")
+            yield Static(id="tech-log-content")
+        yield action_bar(
+            Button("Refresh", id="btn-refresh"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -317,7 +375,7 @@ class TechnicalLogScreen(LoadTokenMixin, Screen[None]):
             self.query_one("#tech-log-content", Static).update("× Technical log unavailable.")
             return
         snapshot = payload
-        lines = [
+        summary_lines = [
             "Technical log",
             "",
             "Path:",
@@ -326,12 +384,37 @@ class TechnicalLogScreen(LoadTokenMixin, Screen[None]):
             "Showing the latest 200 lines.",
         ]
         if snapshot.truncated:
-            lines.append("Showing the most recent part of the log.")
+            summary_lines.append("Showing the most recent part of the log.")
         if snapshot.detail:
-            lines.append(snapshot.detail)
-        lines.append("")
-        lines.extend(snapshot.lines or ["(empty)"])
-        self.query_one("#tech-log-content", Static).update("\n".join(lines))
+            summary_lines.append(snapshot.detail)
+        self.query_one("#tech-log-summary", Static).update("\n".join(summary_lines))
+
+        table = self.query_one("#tech-log-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns("Time", "Level", "Event", "Message")
+        fallback: list[str] = []
+        for line in snapshot.lines[-_MAX_TECH_LOG_ROWS:]:
+            event = parse_technical_log_line(line)
+            if event is None:
+                fallback.append(line[:_MAX_FALLBACK_LINE_LENGTH])
+                continue
+            table.add_row(
+                event.timestamp,
+                event.severity.value,
+                event.event_id.value,
+                _technical_event_message(event),
+            )
+        table.display = table.row_count > 0
+        fallback_static = self.query_one("#tech-log-content", Static)
+        fallback_static.display = bool(fallback) or not snapshot.lines
+        if fallback:
+            fallback_static.update(
+                "Unparsed log lines:\n\n" + "\n".join(fallback[-_MAX_FALLBACK_LINES:])
+            )
+        elif not snapshot.lines:
+            fallback_static.update("(empty)")
+        else:
+            fallback_static.update("")
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -344,6 +427,8 @@ class TechnicalLogScreen(LoadTokenMixin, Screen[None]):
 
 
 class ClearHistoryConfirmScreen(Screen[None]):
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
     def __init__(self, controller: TuiController, logs_screen: LogsScreen) -> None:
         super().__init__()
         self._controller = controller
@@ -351,18 +436,24 @@ class ClearHistoryConfirmScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(
-            "\n".join(
-                [
-                    "Clear operation history?",
-                    "",
-                    "This does not change your wordlist or application dictionaries.",
-                ]
+        with VerticalScroll(id="screen-body", classes="screen-body confirm-body"):
+            yield Static(
+                "\n".join(
+                    [
+                        "Clear operation history?",
+                        "",
+                        "This does not change your wordlist or application dictionaries.",
+                    ]
+                )
             )
+        yield action_bar(
+            Button("Clear", id="btn-confirm", variant="error"),
+            Button("Cancel", id="btn-cancel"),
         )
-        yield Button("Clear", id="btn-confirm", variant="error")
-        yield Button("Cancel", id="btn-cancel")
         yield Footer()
+
+    def action_cancel(self) -> None:
+        self.app.pop_screen()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-cancel":

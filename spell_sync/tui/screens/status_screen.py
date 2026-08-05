@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.reports import StatusDetailSnapshot
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -27,15 +29,23 @@ class StatusScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="status-content")
-        yield Button("Refresh", id="btn-refresh", variant="primary")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="status-summary", classes="screen-prose")
+            yield DataTable(id="status-table")
+        yield action_bar(
+            Button("Refresh", id="btn-refresh"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
+        table = self.query_one("#status-table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Target", "Enabled", "Available", "Read", "Words", "Format")
         try:
             self._render_snapshot(self._controller.status_detail())
         except Exception:
-            self.query_one("#status-content", Static).update("× Status load failed.")
+            self.query_one("#status-summary", Static).update("× Status load failed.")
 
     def _set_loading(self, loading: bool) -> None:
         self.query_one("#btn-refresh", Button).disabled = loading
@@ -46,14 +56,9 @@ class StatusScreen(LoadTokenMixin, Screen[None]):
             "Status",
             f"Wordlist: {snapshot.wordlist_path}",
             f"Project: {snapshot.project_dir}",
-            "",
-            "Configuration paths:",
         ]
         if snapshot.config_paths:
-            lines.extend(f"  {path}" for path in snapshot.config_paths)
-        else:
-            lines.append("  (none)")
-        lines.append("")
+            lines.append("Config: " + ", ".join(snapshot.config_paths))
         if snapshot.load_error:
             lines.append(f"× {snapshot.load_error}")
         elif snapshot.wordlist_error is not None:
@@ -62,34 +67,34 @@ class StatusScreen(LoadTokenMixin, Screen[None]):
             lines.append(f"Words in wordlist: {snapshot.wordlist_count}")
             if snapshot.destructive_risk:
                 lines.append(f"! {snapshot.destructive_risk}")
-        lines.append("")
-        lines.append("Targets:")
-        if not snapshot.targets:
-            lines.append("  – No targets configured.")
-        for target in snapshot.targets:
-            enabled = "enabled" if target.enabled else "disabled"
-            availability = "available" if target.available else "unavailable"
-            lines.append(
-                f"  {target.name}: {enabled}, {availability}, "
-                f"read={target.read_status}, format={target.format or 'n/a'}"
-            )
-            if target.path:
-                lines.append(f"    path: {target.path}")
-            if target.word_count is not None:
-                lines.append(f"    words: {target.word_count}")
-            if target.detail:
-                lines.append(f"    detail: {target.detail}")
         if snapshot.skipped_unreadable:
-            lines.append("")
             lines.append(f"Skipped unreadable: {', '.join(snapshot.skipped_unreadable)}")
         if snapshot.skipped_corrupt:
             lines.append(f"Skipped corrupt: {', '.join(snapshot.skipped_corrupt)}")
-        self.query_one("#status-content", Static).update("\n".join(lines))
+        table = self.query_one("#status-table", DataTable)
+        table.clear()
+        if not snapshot.targets:
+            lines.append("No targets configured.")
+            self.query_one("#status-summary", Static).update("\n".join(lines))
+            table.add_row("(none)", "-", "-", "-", "-", "-")
+            return
+        self.query_one("#status-summary", Static).update("\n".join(lines))
+        for target in snapshot.targets:
+            table.add_row(
+                target.name,
+                "yes" if target.enabled else "no",
+                "yes" if target.available else "no",
+                target.read_status,
+                "-" if target.word_count is None else str(target.word_count),
+                target.format or "n/a",
+            )
 
     def refresh_status(self) -> None:
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#status-content", Static).update("Loading status...")
+        self.query_one("#status-summary", Static).update(
+            loading_message("Loading status...", "status")
+        )
         self.load_status_worker()
 
     @work(thread=True, exclusive=True, group="status-load")
@@ -114,7 +119,7 @@ class StatusScreen(LoadTokenMixin, Screen[None]):
         self._set_loading(False)
         if event.state is WorkerState.ERROR:
             if self.is_mounted:
-                self.query_one("#status-content", Static).update(
+                self.query_one("#status-summary", Static).update(
                     "× Status unavailable — try Refresh."
                 )
             return
@@ -127,6 +132,8 @@ class StatusScreen(LoadTokenMixin, Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-refresh":
             self.action_refresh_status()
+        elif event.button.id == "btn-back":
+            self.action_back()
 
     def action_refresh_status(self) -> None:
         self.refresh_status()

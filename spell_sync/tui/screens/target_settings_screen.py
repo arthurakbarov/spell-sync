@@ -7,7 +7,7 @@ from typing import Any
 from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import ScrollableContainer
+from textual.containers import ScrollableContainer, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import Worker, WorkerState
@@ -17,6 +17,7 @@ from ...application.user_notices import format_notice_block, format_notice_summa
 from ...project_setup.discovery import target_display_name
 from ...project_setup.target_settings import PreparedTargetSettingsUpdate
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 from .setup_targets_screen import SetupTargetRowWidget
 
@@ -39,14 +40,17 @@ class TargetSettingsScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="targets-header")
-        yield ScrollableContainer(id="targets-list")
-        yield Static(id="targets-status")
-        yield Button("Refresh", id="btn-refresh")
-        yield Button("Select available", id="btn-select-available")
-        yield Button("Clear selection", id="btn-clear")
-        yield Button("Review changes", id="btn-review", variant="primary")
-        yield Button("Back", id="btn-back")
+        with Vertical(id="screen-body", classes="screen-body"):
+            yield Static(id="targets-header")
+            yield ScrollableContainer(id="targets-list")
+        yield action_bar(
+            Button("Review changes", id="btn-review", variant="primary"),
+            Button("Refresh", id="btn-refresh"),
+            Button("Select available", id="btn-select-available"),
+            Button("Clear selection", id="btn-clear"),
+            Button("Back", id="btn-back"),
+            status_id="targets-status",
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -61,7 +65,7 @@ class TargetSettingsScreen(LoadTokenMixin, Screen[None]):
             self._load_error
         )
         self.query_one("#btn-clear", Button).disabled = refreshing or bool(self._load_error)
-        status = "Refreshing targets…" if refreshing else ""
+        status = loading_message("Refreshing targets...", "targets_refresh") if refreshing else ""
         self.query_one("#targets-status", Static).update(status)
 
     def _sync_checkboxes(self) -> None:
@@ -222,9 +226,12 @@ class TargetSettingsReviewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="review-content")
-        yield Button("Save configuration", id="btn-save", variant="primary")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="review-content")
+        yield action_bar(
+            Button("Save configuration", id="btn-save", variant="primary"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:

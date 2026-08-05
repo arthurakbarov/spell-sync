@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Static
 
 from ...application.product_concepts import PULL_PREVIEW_SAFETY
 from ...application.reports import PullPreview
 from ..controller import TuiController
+from ..layout import action_bar
 
 
 class PullConfirmScreen(ModalScreen[bool]):
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
     def __init__(self, controller: TuiController, preview: PullPreview) -> None:
         super().__init__()
         self._controller = controller
@@ -20,11 +23,16 @@ class PullConfirmScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="confirm-body"):
+        with VerticalScroll(id="confirm-body", classes="screen-body confirm-body"):
             yield Static(id="confirm-summary")
-            yield Button("Run pull", id="btn-run", variant="primary")
-            yield Button("Cancel", id="btn-cancel")
+        yield action_bar(
+            Button("Run pull", id="btn-run", variant="primary"),
+            Button("Cancel", id="btn-cancel"),
+        )
         yield Footer()
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
     def on_mount(self) -> None:
         preview = self._preview

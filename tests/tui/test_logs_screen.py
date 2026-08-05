@@ -6,9 +6,10 @@ import unittest
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from textual.widgets import Static
+from textual.widgets import DataTable, Static
 from textual.worker import WorkerState
 
 from spell_sync.application.requests import ProjectRef
@@ -66,22 +67,22 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         )
         return TuiController(service, ProjectRef())
 
-    async def _wait_for_rows(self, pilot, app, *, minimum: int = 1) -> list:
-        rows: list = []
+    async def _wait_for_rows(self, pilot, app, *, minimum: int = 1) -> int:
+        row_count = 0
         for _ in range(30):
             await pilot.pause()
-            rows = list(app.screen.query(".history-row"))
-            if len(rows) >= minimum:
+            row_count = app.screen.query_one("#history-table", DataTable).row_count
+            if row_count >= minimum:
                 break
-        return rows
+        return row_count
 
     async def test_logs_screen_renders_history(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 40)) as pilot:
             app.push_screen(LogsScreen(controller))
-            rows = await self._wait_for_rows(pilot, app)
-            self.assertEqual(len(rows), 1)
+            row_count = await self._wait_for_rows(pilot, app)
+            self.assertEqual(row_count, 1)
 
     async def test_empty_history_state(self):
         controller = self._controller(records=(), malformed_lines=0)
@@ -98,7 +99,9 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DashboardScreen(controller))
             await pilot.pause()
-            await pilot.click("#btn-history")
+            screen = app.screen
+            assert isinstance(screen, DashboardScreen)
+            screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-history")))
             await pilot.pause()
             self.assertIsInstance(app.screen, LogsScreen)
 
@@ -130,7 +133,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             app.push_screen(TechnicalLogScreen(controller))
             await pilot.pause()
             await pilot.pause()
-            tech = str(app.screen.query_one("#tech-log-content").render())
+            tech = str(app.screen.query_one("#tech-log-summary").render())
             self.assertIn("Technical log", tech)
 
     async def test_technical_log_truncated_marker(self):
@@ -140,8 +143,27 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             app.push_screen(TechnicalLogScreen(controller))
             await pilot.pause()
             await pilot.pause()
-            tech = str(app.screen.query_one("#tech-log-content").render())
+            tech = str(app.screen.query_one("#tech-log-summary").render())
             self.assertIn("most recent part", tech)
+
+    async def test_technical_json_line_renders_as_table_row(self):
+        line = (
+            '{"schemaVersion":1,"timestamp":"2026-07-18T14:32:00Z",'
+            '"eventId":"push.completed","operation":"push","category":"lifecycle",'
+            '"severity":"success","phase":"completed"}'
+        )
+        controller = self._controller()
+        controller._service.read_technical_log_tail = lambda **kwargs: TechnicalLogSnapshot(
+            path=Path("/tmp/spell-sync.log"),
+            lines=(line,),
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 40)) as pilot:
+            app.push_screen(TechnicalLogScreen(controller))
+            await pilot.pause()
+            await pilot.pause()
+            table = app.screen.query_one("#tech-log-table", DataTable)
+            self.assertEqual(table.row_count, 1)
 
     async def test_clear_history_confirmation(self):
         controller = self._controller()
@@ -174,7 +196,9 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 40)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
-            await pilot.click("#history-row-0")
+            table = app.screen.query_one("#history-table", DataTable)
+            table.focus()
+            await pilot.press("enter")
             await pilot.pause()
             self.assertIsInstance(app.screen, HistoryDetailsScreen)
 
@@ -292,7 +316,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#btn-refresh")
             for _ in range(15):
                 await pilot.pause()
-            content = str(app.screen.query_one("#tech-log-content").render())
+            content = str(app.screen.query_one("#tech-log-summary").render())
             self.assertIn("Technical log", content)
 
     async def test_technical_log_back_button_pops_screen(self):

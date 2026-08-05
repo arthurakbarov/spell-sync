@@ -16,6 +16,15 @@ async def wait_for_text(pilot, selector: str, expected: str, *, max_pauses: int 
         rendered = str(widget.render())
         if expected in rendered and "Loading" not in rendered and "Running" not in rendered:
             return widget
+        # DataTable cells are not always present in render(); fall back to row scan.
+        get_row_at = getattr(widget, "get_row_at", None)
+        row_count = getattr(widget, "row_count", None)
+        if callable(get_row_at) and isinstance(row_count, int):
+            joined = " ".join(
+                " ".join(str(cell) for cell in get_row_at(i)) for i in range(row_count)
+            )
+            if expected in joined and "Loading" not in joined and "Running" not in joined:
+                return widget
     if widget is None:
         widget = pilot.app.screen.query_one(selector)
     return widget

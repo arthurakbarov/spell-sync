@@ -84,7 +84,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.switch_screen(StatusScreen(controller))
-            content = await wait_for_text(pilot, "#status-content", "load failed")
+            content = await wait_for_text(pilot, "#status-summary", "load failed")
             text = str(content.render())
             self.assertIn("load failed", text)
             self.assertNotIn("Traceback", text)

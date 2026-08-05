@@ -62,7 +62,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
                 pull_preview=sample_pull_preview(),
             )
             app.push_screen(screen)
-            await wait_for_text(pilot, "#operation-stages", "already running")
+            await wait_for_text(pilot, "#operation-stages-table", "already running")
             screen.action_safe_back()
             screen.action_safe_quit()
 
@@ -195,7 +195,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "unavailable")
+            await wait_for_text(pilot, "#pull-summary", "unavailable")
             screen = app.screen
             assert isinstance(screen, PullScreen)
             screen._preview = sample_pull_preview()
@@ -269,7 +269,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             screen = OperationScreen(controller, operation="unknown")
             app.push_screen(screen)
-            await wait_for_text(pilot, "#operation-stages", "no result")
+            await wait_for_text(pilot, "#operation-stages-table", "no result")
             screen._finished = True
             screen.on_button_pressed(
                 type("E", (), {"button": type("B", (), {"id": "btn-close"})()})()
@@ -337,11 +337,11 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "custom diction")
+            await wait_for_text(pilot, "#pull-summary", "custom diction")
             screen = app.screen
             assert isinstance(screen, PullScreen)
             await pilot.click("#btn-refresh")
-            await wait_for_text(pilot, "#pull-content", "custom diction")
+            await wait_for_text(pilot, "#pull-summary", "custom diction")
             screen._preview = None
             screen.action_run_pull()
             screen.action_view_additions()
@@ -375,7 +375,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "load failed")
+            await wait_for_text(pilot, "#pull-summary", "load failed")
 
     async def test_preview_poll_error_and_continue_cancel(self):
         preview = sample_preview(removals=0, plan_identifier="fixed")
@@ -459,7 +459,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 36)) as pilot:
             op2 = OperationScreen(controller, operation="unknown")
             app.push_screen(op2)
-            await wait_for_text(pilot, "#operation-stages", "no result")
+            await wait_for_text(pilot, "#operation-stages-table", "no result")
             op2._worker = None
             op2._poll_operation()
             op2._finished = False
@@ -518,7 +518,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            await wait_for_text(pilot, "#pull-content", "custom diction")
+            await wait_for_text(pilot, "#pull-summary", "custom diction")
             pull = app.screen
             assert isinstance(pull, PullScreen)
             await pilot.click("#btn-view-additions")

@@ -6,6 +6,7 @@ from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
@@ -20,6 +21,7 @@ from ...application.product_concepts import (
 )
 from ...application.reports import PushPreview
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -46,11 +48,15 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="preview-content")
-        yield DataTable(id="preview-table")
-        yield Button("View removals", id="btn-view-removals")
-        yield Button("Refresh preview", id="btn-refresh-preview", variant="primary")
-        yield Button("Continue to push", id="btn-continue-push")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="preview-content", classes="screen-prose")
+            yield DataTable(id="preview-table")
+        yield action_bar(
+            Button("Continue to push", id="btn-continue-push", variant="primary"),
+            Button("View removals", id="btn-view-removals"),
+            Button("Refresh preview", id="btn-refresh-preview"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -110,21 +116,13 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
 
         lines = [
             f"{UPDATE_APPS_LABEL} preview (no writes)",
-            "",
             PUSH_PREVIEW_SAFETY,
-            "",
             PUSH_DIRECTION_LABEL,
-            "",
             f"Created: {preview.created_at}",
-            f"Total additions: {preview.additions}",
-            f"Total removals: {preview.removals}",
-            f"Targets to update: {preview.targets_to_update}",
-            f"Unchanged: {preview.unchanged}",
-            "",
+            f"Additions: {preview.additions} · Removals: {preview.removals}",
+            f"Update: {preview.targets_to_update} · Unchanged: {preview.unchanged}",
             PUSH_SCOPE_NOTICE,
-            "",
             PUSH_FILTERING_NOTICE,
-            "",
             PUSH_REDUNDANCY_PREVIEW_NOTICE,
         ]
         if preview.skipped:
@@ -141,7 +139,9 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
         self._preview = None
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#preview-content", Static).update("Loading preview...")
+        self.query_one("#preview-content", Static).update(
+            loading_message("Loading preview...", "push_preview")
+        )
         self._worker = self.load_preview_worker()
         self.set_interval(0.05, self._poll_preview_worker, repeat=40)
 
@@ -262,6 +262,8 @@ class PreviewScreen(LoadTokenMixin, Screen[None]):
             self.action_refresh_preview()
         elif event.button.id == "btn-continue-push":
             self.action_continue_push()
+        elif event.button.id == "btn-back":
+            self.action_back()
 
     def action_refresh_preview(self) -> None:
         self.refresh_preview()

@@ -107,7 +107,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            content = await wait_for_text(pilot, "#pull-content", "custom diction")
+            content = await wait_for_text(pilot, "#pull-summary", "custom diction")
             text = str(content.render()).lower()
             self.assertIn("application custom diction", text)
             self.assertNotIn("sources used:", text)
@@ -118,7 +118,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
             app.push_screen(PullScreen(controller))
-            content = await wait_for_text(pilot, "#pull-content", "already")
+            content = await wait_for_text(pilot, "#pull-summary", "already")
             self.assertIn("enabled custom diction", str(content.render()).lower())
 
     async def test_push_preview_includes_filtering_and_redundancy_notices(self):

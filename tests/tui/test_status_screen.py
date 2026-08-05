@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 
+from textual.widgets import DataTable
+
 from spell_sync.application.reports import TargetStatusRow
 from spell_sync.cli_options import CliOptions
 from spell_sync.exit_codes import ExitCode
@@ -22,8 +24,12 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 32)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("s")
-            content = await wait_for_text(pilot, "#status-content", "chrome")
-            self.assertIn("enabled", str(content.render()))
+            await wait_for_text(pilot, "#status-summary", "Wordlist")
+            table = app.screen.query_one("#status-table", DataTable)
+            self.assertGreaterEqual(table.row_count, 1)
+            row_text = " ".join(str(cell) for cell in table.get_row_at(0))
+            self.assertIn("chrome", row_text.lower())
+            self.assertIn("yes", row_text.lower())
 
     async def test_disabled_unavailable_corrupt_targets(self):
         detail = sample_status_detail(
@@ -46,17 +52,20 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(StatusScreen(controller))
-            content = await wait_for_text(pilot, "#status-content", "corrupt")
+            content = await wait_for_text(pilot, "#status-summary", "Skipped corrupt")
             self.assertIn("Skipped corrupt", str(content.render()))
+            table = app.screen.query_one("#status-table", DataTable)
+            row_text = " ".join(str(cell) for cell in table.get_row_at(0))
+            self.assertIn("corrupt", row_text)
 
     async def test_refresh_and_back(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(StatusScreen(controller))
-            await wait_for_text(pilot, "#status-content", "Wordlist")
+            await wait_for_text(pilot, "#status-summary", "Wordlist")
             await pilot.press("r")
-            await wait_for_text(pilot, "#status-content", "Wordlist")
+            await wait_for_text(pilot, "#status-summary", "Wordlist")
             await pilot.press("escape")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
@@ -67,7 +76,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(StatusScreen(controller))
-            content = await wait_for_text(pilot, "#status-content", "could not be loaded")
+            content = await wait_for_text(pilot, "#status-summary", "could not be loaded")
             self.assertIn("could not be loaded", str(content.render()))
 
     async def test_wordlist_error(self):
@@ -76,7 +85,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(StatusScreen(controller))
-            content = await wait_for_text(pilot, "#status-content", "Wordlist error")
+            content = await wait_for_text(pilot, "#status-summary", "Wordlist error")
             self.assertIn("Wordlist error", str(content.render()))
 
 

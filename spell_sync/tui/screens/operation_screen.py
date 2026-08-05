@@ -8,10 +8,11 @@ from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Button, Footer, Header, ProgressBar, Static
+from textual.widgets import Button, DataTable, Footer, Header, ProgressBar, Static
 from textual.worker import WorkerState
 
 from ...application.events import EventId, EventPhase, EventSeverity, PresentedEvent
@@ -30,6 +31,7 @@ from ...project_setup.execute import ProjectSetupExecution
 from ...project_setup.prepare import PreparedProjectSetup
 from ...project_setup.target_settings import PreparedTargetSettingsUpdate, TargetSettingsExecution
 from ..controller import TuiController
+from ..layout import action_bar, expected_duration_hint
 from ..workers import LoadTokenMixin
 
 _CANCELLATION_POLICY = (
@@ -112,11 +114,13 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="operation-title")
-        yield Static(id="operation-stages")
-        yield ProgressBar(id="operation-progress", total=100, show_eta=False)
-        yield Static(id="operation-details")
-        yield Button("Close", id="btn-close", disabled=True)
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="operation-title", classes="screen-prose")
+            yield Static(id="operation-duration", classes="duration-hint")
+            yield ProgressBar(id="operation-progress", total=100, show_eta=True)
+            yield DataTable(id="operation-stages-table")
+            yield Static(id="operation-details", classes="screen-prose")
+        yield action_bar(Button("Close", id="btn-close", disabled=True))
         yield Footer()
 
     def on_mount(self) -> None:
@@ -131,12 +135,16 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         }
         title = titles.get(self._operation, f"Running {self._operation}")
         self.query_one("#operation-title", Static).update(title)
-        self.query_one("#operation-stages", Static).update("Preparing...")
+        hint = expected_duration_hint(self._operation)
+        self.query_one("#operation-duration", Static).update(hint or "")
+        table = self.query_one("#operation-stages-table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Step", "Message")
+        table.add_row("→", "Preparing...")
         self.query_one("#operation-details", Static).update("")
         if not self._controller.begin_mutation():
-            self.query_one("#operation-stages", Static).update(
-                "× Another operation is already running."
-            )
+            table.clear()
+            table.add_row("×", "Another operation is already running.")
             self._finished = True
             self.query_one("#btn-close", Button).disabled = False
             return
@@ -198,11 +206,16 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
             EventSeverity.ERROR: "×",
             EventSeverity.INFO: "→",
         }[event.severity]
-        line = f"{prefix} {event.message}"
+        message = event.message
         if event.target_id:
-            line = f"{prefix} {event.message} ({event.target_id})"
+            message = f"{event.message} ({event.target_id})"
+        line = f"{prefix} {message}"
         self._stage_lines.append(line)
-        self.query_one("#operation-stages", Static).update("\n".join(self._stage_lines[-12:]))
+        table = self.query_one("#operation-stages-table", DataTable)
+        table.clear()
+        for stage in self._stage_lines[-12:]:
+            mark, _, rest = stage.partition(" ")
+            table.add_row(mark, rest)
         self.query_one("#operation-details", Static).update(event.message)
         if event.completed is not None and event.total:
             progress = self.query_one("#operation-progress", ProgressBar)
@@ -317,7 +330,9 @@ class OperationScreen(LoadTokenMixin, Screen[None]):
         self._mutating = False
         self._controller.end_mutation()
         if self.is_mounted:
-            self.query_one("#operation-stages", Static).update(f"× {message}")
+            table = self.query_one("#operation-stages-table", DataTable)
+            table.clear()
+            table.add_row("×", message)
             self.query_one("#btn-close", Button).disabled = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

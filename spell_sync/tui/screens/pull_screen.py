@@ -6,8 +6,9 @@ from typing import Any
 
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Button, DataTable, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.product_concepts import (
@@ -19,6 +20,7 @@ from ...application.product_concepts import (
 )
 from ...application.reports import PullPreview
 from ..controller import TuiController
+from ..layout import action_bar, loading_message
 from ..workers import LoadTokenMixin
 
 
@@ -38,17 +40,25 @@ class PullScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="pull-content")
-        yield Button("Refresh preview", id="btn-refresh", variant="primary")
-        yield Button("Run pull", id="btn-run")
-        yield Button("View additions", id="btn-view-additions")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="pull-summary", classes="screen-prose")
+            yield DataTable(id="pull-table")
+        yield action_bar(
+            Button("Run pull", id="btn-run", variant="primary"),
+            Button("View additions", id="btn-view-additions"),
+            Button("Refresh preview", id="btn-refresh"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
+        table = self.query_one("#pull-table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Source", "Status", "Added", "Detail")
         try:
             self._render_preview(self._controller.prepare_pull())
         except Exception:
-            self.query_one("#pull-content", Static).update("× Pull preview load failed.")
+            self.query_one("#pull-summary", Static).update("× Pull preview load failed.")
 
     def _set_loading(self, loading: bool) -> None:
         self.query_one("#btn-refresh", Button).disabled = loading
@@ -56,7 +66,9 @@ class PullScreen(LoadTokenMixin, Screen[None]):
 
     def _render_preview(self, preview: PullPreview) -> None:
         self._preview = preview
-        body = self.query_one("#pull-content", Static)
+        body = self.query_one("#pull-summary", Static)
+        table = self.query_one("#pull-table", DataTable)
+        table.clear()
         run_btn = self.query_one("#btn-run", Button)
         if preview.wordlist_error is not None or preview.prepare_error is not None:
             body.update("× Pull preview unavailable.")
@@ -64,29 +76,24 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             return
         lines = [
             f"{COLLECT_WORDS_LABEL} preview (no writes)",
-            "",
             PULL_PREVIEW_SAFETY,
-            "",
             PULL_DIRECTION_LABEL,
-            "",
             pull_preview_additions_line(preview.additions),
-            f"Sources ready: {len(preview.sources_used)}",
-            f"Sources skipped: {len(preview.sources_skipped)}",
+            f"Sources ready: {len(preview.sources_used)} · skipped: {len(preview.sources_skipped)}",
             f"Wordlist: {preview.wordlist_path}",
             f"Created: {preview.created_at}",
-            "",
             PULL_SCOPE_NOTICE,
-            "",
-            "Sources:",
         ]
-        for row in preview.source_rows:
-            detail = f" ({row.detail})" if row.detail else ""
-            lines.append(f"  {row.name}: {row.status}, +{row.words_contributed}{detail}")
         if preview.warnings:
-            lines.append("")
-            lines.append("Warnings:")
-            lines.extend(f"  ! {warning}" for warning in preview.warnings)
+            lines.append("Warnings: " + "; ".join(preview.warnings))
         body.update("\n".join(lines))
+        for row in preview.source_rows:
+            table.add_row(
+                row.name,
+                row.status,
+                f"+{row.words_contributed}",
+                row.detail or "",
+            )
         run_btn.disabled = not preview.is_executable or self._controller.mutation_active
 
     def refresh_preview(self) -> None:
@@ -94,7 +101,9 @@ class PullScreen(LoadTokenMixin, Screen[None]):
         self._preview = None
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#pull-content", Static).update("Loading pull preview...")
+        self.query_one("#pull-summary", Static).update(
+            loading_message("Loading pull preview...", "pull_preview")
+        )
         self._worker = self.load_pull_worker()
         self.set_interval(0.05, self._poll_pull_worker, repeat=40)
 
@@ -124,7 +133,7 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             return
         if worker.state is WorkerState.ERROR:
             self._set_loading(False)
-            self.query_one("#pull-content", Static).update(
+            self.query_one("#pull-summary", Static).update(
                 "× Pull preview unavailable — try Refresh."
             )
             self._worker = None
@@ -141,7 +150,7 @@ class PullScreen(LoadTokenMixin, Screen[None]):
         self._set_loading(False)
         if event.state is WorkerState.ERROR:
             if self.is_mounted:
-                self.query_one("#pull-content", Static).update(
+                self.query_one("#pull-summary", Static).update(
                     "× Pull preview unavailable — try Refresh."
                 )
             return
@@ -208,6 +217,8 @@ class PullScreen(LoadTokenMixin, Screen[None]):
             self.action_run_pull()
         elif event.button.id == "btn-view-additions":
             self.action_view_additions()
+        elif event.button.id == "btn-back":
+            self.action_back()
 
     def action_back(self) -> None:
         self._controller.invalidate_pull_preview()

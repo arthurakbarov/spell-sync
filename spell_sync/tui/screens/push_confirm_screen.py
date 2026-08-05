@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Static
 
 from ...application.product_concepts import PUSH_PREVIEW_SAFETY
 from ...application.reports import PushPreview
 from ..controller import TuiController
+from ..layout import action_bar
 
 
 class PushConfirmScreen(ModalScreen[bool]):
     """Return True when the user confirms the current preview."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self, controller: TuiController, preview: PushPreview) -> None:
         super().__init__()
@@ -23,14 +26,19 @@ class PushConfirmScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="confirm-body"):
+        with VerticalScroll(id="confirm-body", classes="screen-body confirm-body"):
             yield Static(id="confirm-summary")
             if self._requires_typed:
                 yield Input(placeholder="Type PUSH to continue", id="confirm-input")
-            yield Button("Run push", id="btn-run", variant="primary")
-            yield Button("View removals", id="btn-view-removals")
-            yield Button("Cancel", id="btn-cancel")
+        yield action_bar(
+            Button("Run push", id="btn-run", variant="primary"),
+            Button("View removals", id="btn-view-removals"),
+            Button("Cancel", id="btn-cancel"),
+        )
         yield Footer()
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
     def on_mount(self) -> None:
         preview = self._preview

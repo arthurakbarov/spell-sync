@@ -6,7 +6,7 @@ from pathlib import Path
 
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
@@ -29,6 +29,7 @@ from ...application.user_notices import (
     format_notice_summary,
 )
 from ..controller import TuiController
+from ..layout import loading_message, section_label
 from ..workers import LoadTokenMixin
 
 
@@ -54,38 +55,39 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="narrow-warning")
-        yield Static(id="blocking-banner")
-        yield Static(id="dashboard-summary")
-        yield Static(id="dashboard-issues")
-        with Vertical(id="action-grid"):
-            yield Static("Usual path", classes="section-label")
-            yield Button(
-                REVIEW_AND_UPDATE_LABEL,
-                id="btn-review-update",
-                variant="primary",
-            )
-            yield Static("Single steps", classes="section-label")
-            yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
-            yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
-            yield Button(CHECK_APPS_LABEL, id="btn-status")
-            yield Button(
-                "Review recovery",
-                id="btn-recovery",
-                disabled=True,
-                classes="-disabled-action",
-            )
-            yield Static("Manage", classes="section-label")
-            yield Button("Targets", id="btn-targets")
-            yield Button("Change word list location", id="btn-change-wordlist")
-            yield Static(
-                "Points Spell Sync at another wordlist.txt; does not move files.",
-                id="change-wordlist-hint",
-            )
-            yield Static("Support", classes="section-label")
-            yield Button("Health", id="btn-health")
-            yield Button("History", id="btn-history")
-            yield Button("Quit", id="btn-quit", variant="error")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="narrow-warning")
+            yield Static(id="blocking-banner")
+            yield Static(id="dashboard-summary", classes="screen-prose")
+            yield Static(id="dashboard-issues", classes="screen-prose")
+            with Vertical(id="screen-actions", classes="dashboard-menu"):
+                yield section_label("Usual path")
+                yield Button(
+                    REVIEW_AND_UPDATE_LABEL,
+                    id="btn-review-update",
+                    variant="primary",
+                )
+                yield section_label("Single steps")
+                yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
+                yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
+                yield Button(CHECK_APPS_LABEL, id="btn-status")
+                yield Button(
+                    "Review recovery",
+                    id="btn-recovery",
+                    disabled=True,
+                    classes="-disabled-action",
+                )
+                yield section_label("Manage")
+                yield Button("Targets", id="btn-targets")
+                yield Button("Change word list location", id="btn-change-wordlist")
+                yield Static(
+                    "Points Spell Sync at another wordlist.txt; does not move files.",
+                    id="change-wordlist-hint",
+                )
+                yield section_label("Support")
+                yield Button("Health", id="btn-health")
+                yield Button("History", id="btn-history")
+                yield Button("Quit", id="btn-quit", variant="error")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -177,7 +179,7 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
 
         if recovery_needed:
             review_btn.disabled = True
-            review_btn.remove_class("primary")
+            review_btn.variant = "default"
             recovery_btn.disabled = False
             recovery_btn.remove_class("-disabled-action")
             recovery_btn.variant = "primary"
@@ -213,7 +215,9 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
     def refresh_dashboard(self) -> None:
         self._active_token = self._begin_load()
         self._set_loading(True)
-        self.query_one("#dashboard-summary", Static).update("Loading dashboard...")
+        self.query_one("#dashboard-summary", Static).update(
+            loading_message("Loading dashboard...", "dashboard")
+        )
         self.load_dashboard_worker()
 
     @work(thread=True, exclusive=True, group="dashboard-load")
@@ -328,3 +332,6 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
         self.app.push_screen(DoctorScreen(self._controller))
 
     action_open_doctor = action_open_health
+
+    def on_resize(self) -> None:
+        self._refresh_layout_warning()

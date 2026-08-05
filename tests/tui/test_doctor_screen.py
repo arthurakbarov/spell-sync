@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from textual.widgets import DataTable
+
 from spell_sync.application.reports import DoctorCheckView, DoctorSnapshot
 from spell_sync.cli_options import CliOptions
 from spell_sync.tui.app import SpellSyncApp
@@ -49,21 +51,26 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            content = await wait_for_text(pilot, "#doctor-content", "Configuration")
-            text = str(content.render())
-            self.assertIn("✓ Passed", text)
-            self.assertIn("! Warning", text)
-            self.assertIn("× Failed", text)
-            self.assertIn("Action: Run recover", text)
+            await wait_for_text(pilot, "#doctor-summary", "blocking issues")
+            table = app.screen.query_one("#doctor-table", DataTable)
+            self.assertEqual(table.row_count, 3)
+            joined = " | ".join(
+                " ".join(str(cell) for cell in table.get_row_at(i)) for i in range(table.row_count)
+            )
+            self.assertIn("Configuration", joined)
+            self.assertIn("Passed", joined)
+            self.assertIn("Warning", joined)
+            self.assertIn("Failed", joined)
+            self.assertIn("Run recover", joined)
 
     async def test_rerun_and_back(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-run-doctor")
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.press("escape")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
@@ -74,7 +81,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            content = await wait_for_text(pilot, "#doctor-content", "Doctor failed")
+            content = await wait_for_text(pilot, "#doctor-summary", "Doctor failed")
             self.assertNotIn("Traceback", str(content.render()))
 
     async def test_export_support_report_success(self):
@@ -85,7 +92,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             status = await wait_for_text(pilot, "#doctor-export-status", "Report saved")
             self.assertIn("Report saved", str(status.render()))
@@ -99,7 +106,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             await wait_for_text(pilot, "#doctor-export-status", "exists")
 
@@ -111,7 +118,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             await wait_for_text(pilot, "#doctor-export-status", "could not be exported")
 
@@ -130,7 +137,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             screen = app.screen
             assert isinstance(screen, DoctorScreen)
@@ -156,7 +163,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             await pilot.click("#btn-export-support")
             await wait_for_text(pilot, "#doctor-export-status", "Report saved")
@@ -174,7 +181,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
             await pilot.press("escape")
             completed.set()

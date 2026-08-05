@@ -133,7 +133,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.switch_screen(StatusScreen(controller))
-            await wait_for_text(pilot, "#status-content", "destructive")
+            await wait_for_text(pilot, "#status-summary", "destructive")
             screen = app.screen
             assert isinstance(screen, StatusScreen)
 
@@ -147,11 +147,11 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 skipped_corrupt=(),
             )
             screen._render_snapshot(empty_targets)
-            self.assertIn("No targets configured", _static_text(screen, "#status-content"))
+            self.assertIn("No targets configured", _static_text(screen, "#status-summary"))
 
             with patch.object(controller, "status_detail", side_effect=RuntimeError("boom")):
                 screen.on_mount()
-            self.assertIn("failed", _static_text(screen, "#status-content"))
+            self.assertIn("failed", _static_text(screen, "#status-summary"))
 
             screen._active_token = screen._begin_load()
             with patch.object(controller, "status_detail", side_effect=RuntimeError("boom")):
@@ -164,7 +164,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.on_load_status_worker_state_changed(
                 SimpleNamespace(state=WorkerState.ERROR, worker=SimpleNamespace(result=None))
             )
-            self.assertIn("unavailable", _static_text(screen, "#status-content"))
+            self.assertIn("unavailable", _static_text(screen, "#status-summary"))
 
             stale = screen._load_generation
             screen._active_token = stale - 1
@@ -371,13 +371,13 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.switch_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "blocking issues")
+            await wait_for_text(pilot, "#doctor-summary", "blocking issues")
             screen = app.screen
             assert isinstance(screen, DoctorScreen)
 
             with patch.object(controller, "doctor", side_effect=RuntimeError("boom")):
                 screen.on_mount()
-            self.assertIn("failed", _static_text(screen, "#doctor-content"))
+            self.assertIn("failed", _static_text(screen, "#doctor-summary"))
 
             screen._active_token = screen._begin_load()
             with patch.object(controller, "doctor", side_effect=RuntimeError("boom")):
@@ -390,7 +390,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.on_load_doctor_worker_state_changed(
                 SimpleNamespace(state=WorkerState.ERROR, worker=SimpleNamespace(result=None))
             )
-            self.assertIn("unavailable", _static_text(screen, "#doctor-content"))
+            self.assertIn("unavailable", _static_text(screen, "#doctor-summary"))
 
             stale = screen._load_generation
             screen._active_token = stale - 1

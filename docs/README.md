@@ -47,6 +47,7 @@ in the linked canonical documents — not in implementation trackers or release 
 | [architecture/DIAGNOSTICS.md](architecture/DIAGNOSTICS.md) | Events, logs, history, privacy |
 | [architecture/TARGET_MODEL.md](architecture/TARGET_MODEL.md) | Discovery, capabilities, validation |
 | [TUI_IMPLEMENTATION.md](TUI_IMPLEMENTATION.md) | Textual screens and flows |
+| [TUI_LAYOUT.md](TUI_LAYOUT.md) | Shared TUI shell, actions, tables, duration hints |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
 
 Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md).

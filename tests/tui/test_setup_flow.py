@@ -547,7 +547,7 @@ class TestDoctorTechnicalLog(unittest.IsolatedAsyncioTestCase):
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 32)) as pilot:
             app.push_screen(DoctorScreen(controller))
-            await wait_for_text(pilot, "#doctor-content", "Doctor")
+            await wait_for_text(pilot, "#doctor-summary", "Doctor")
             screen = app.screen
             assert isinstance(screen, DoctorScreen)
             screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-tech-log")))

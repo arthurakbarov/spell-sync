@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Static
 
 from ...application.reports import RecoveryPreview, RecoveryStatus
 from ..controller import TuiController
+from ..layout import action_bar
 
 
 class RecoveryConfirmScreen(ModalScreen[bool]):
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
     def __init__(
         self,
         controller: TuiController,
@@ -26,15 +29,20 @@ class RecoveryConfirmScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="confirm-body"):
+        with VerticalScroll(id="confirm-body", classes="screen-body confirm-body"):
             yield Static(id="confirm-summary")
             yield Input(
                 placeholder=f"Type {self._typed_token} to continue",
                 id="confirm-input",
             )
-            yield Button("Run", id="btn-run", variant="primary")
-            yield Button("Cancel", id="btn-cancel")
+        yield action_bar(
+            Button("Run", id="btn-run", variant="primary"),
+            Button("Cancel", id="btn-cancel"),
+        )
         yield Footer()
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
     def on_mount(self) -> None:
         preview = self._preview

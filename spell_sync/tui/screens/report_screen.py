@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from ...application.operation_explanations import format_operation_report_text
 from ...application.reports import OperationOutcome, OperationReport
 from ..controller import TuiController
+from ..layout import action_bar
 
 
 class ReportScreen(Screen[None]):
@@ -22,12 +24,16 @@ class ReportScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="report-content")
-        yield Button("Back to dashboard", id="btn-dashboard", variant="primary")
-        yield Button("Open details", id="btn-details")
-        yield Button("Quit", id="btn-quit", variant="error")
+        with VerticalScroll(id="screen-body", classes="screen-body"):
+            yield Static(id="report-content")
+        buttons = [
+            Button("Back to dashboard", id="btn-dashboard", variant="primary"),
+            Button("Open details", id="btn-details"),
+        ]
         if self._report.outcome is OperationOutcome.STOPPED_SAFELY and self._report.conflict_target:
-            yield Button("Rebuild preview", id="btn-rebuild")
+            buttons.append(Button("Rebuild preview", id="btn-rebuild"))
+        buttons.append(Button("Quit", id="btn-quit", variant="error"))
+        yield action_bar(*buttons)
         yield Footer()
 
     def on_mount(self) -> None:
