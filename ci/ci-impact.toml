@@ -78,6 +78,8 @@ patterns = [
   "scripts/dev_runs.py",
   "scripts/agent_context.py",
   "scripts/preflight_publish.py",
+  "scripts/cli_text.py",
+  "scripts/validate_doctor_schema.py",
   "scripts/build_focused_plan.py",
   "scripts/build_pre_final_plan.py",
   "scripts/test_groups.py",

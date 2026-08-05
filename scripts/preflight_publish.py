@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.check_ci_necessity import assess_ci_necessity  # noqa: E402
+from scripts.cli_text import format_field_block, format_kv_lines  # noqa: E402
 
 
 def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -54,16 +55,42 @@ def main(argv: list[str] | None = None) -> int:
 
     print("PREFLIGHT_STAGE=clean-tree", flush=True)
     if _tree_dirty():
-        print("PREFLIGHT_RESULT=blocked", flush=True)
-        print("PREFLIGHT_REASON=dirty-working-tree", flush=True)
+        print(
+            format_kv_lines(
+                [
+                    ("PREFLIGHT_RESULT", "blocked"),
+                    ("PREFLIGHT_REASON", "dirty-working-tree"),
+                ]
+            ),
+            flush=True,
+        )
         return 2
 
     print("PREFLIGHT_STAGE=necessity", flush=True)
     necessity = assess_ci_necessity(ROOT, purpose="publish", explain=True)
+    print(
+        format_field_block(
+            [
+                ("necessity", str(necessity.result)),
+                ("reason", str(necessity.reason)),
+            ]
+        ),
+        flush=True,
+    )
     print(f"PREFLIGHT_NECESSITY={necessity.result}", flush=True)
     print(f"PREFLIGHT_NECESSITY_REASON={necessity.reason}", flush=True)
 
     if not args.execute:
+        print(
+            format_field_block(
+                [
+                    ("next", "scripts/ci.sh"),
+                    ("next", "python3 scripts/check_ci_evidence.py"),
+                    ("next", "privacy-export skill checklist"),
+                ]
+            ),
+            flush=True,
+        )
         print("PREFLIGHT_RESULT=ready-plan", flush=True)
         print("PREFLIGHT_NEXT=scripts/ci.sh", flush=True)
         print("PREFLIGHT_NEXT=python3 scripts/check_ci_evidence.py", flush=True)

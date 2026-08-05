@@ -26,6 +26,10 @@ in the linked canonical documents — not in implementation trackers or release 
 | [CONTRACTS.md](CONTRACTS.md) | Doctor/status/TUI state vocabulary |
 | [FEATURE_MATRIX.md](FEATURE_MATRIX.md) | Feature honesty (automated vs manual) |
 | [INVENTORY.md](INVENTORY.md) | Maintainer / manual / non-repo items |
+| [WORKFLOW.md](WORKFLOW.md) | Operator edit / checkpoint / full-gate loop |
+| [ARTIFACTS-AND-STATE.md](ARTIFACTS-AND-STATE.md) | Local vs shareable artifacts |
+| [OPERATIONS.md](OPERATIONS.md) | Failure runbooks tied to CONTRACTS |
+| [ROADMAP.md](ROADMAP.md) | Open completion blockers only |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Agent workflow and evidence contracts |
 | [GIT-WORKFLOW.md](GIT-WORKFLOW.md) | Commit shape, split discipline, push policy |
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Focused test levels and selection |
@@ -60,6 +64,7 @@ Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLE
 |----------|----------|
 | [architecture/DIAGNOSTICS.md](architecture/DIAGNOSTICS.md) | Technical events, logs, history |
 | [technical/](technical/) | Machine-readable schemas and contracts |
+| [technical/doctor-report.schema.json](technical/doctor-report.schema.json) | Doctor JSON payload schema |
 
 ## Targets and validation
 

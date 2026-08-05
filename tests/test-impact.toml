@@ -338,6 +338,8 @@ production = [
   "scripts/preflight_publish.py",
   "scripts/validate_commit_messages.py",
   "scripts/validate_dev_commands.py",
+  "scripts/validate_doctor_schema.py",
+  "scripts/cli_text.py",
   "config/dev-commands.json",
   "config/dev-surface.json",
 ]
@@ -349,6 +351,7 @@ moduleTests = [
   "tests/test_ci_impact.py",
   "tests/test_ci_necessity.py",
   "tests/test_coverage_policy.py",
+  "tests/test_doctor_schema.py",
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
@@ -365,6 +368,7 @@ clusterTests = [
   "tests/test_ci_history.py",
   "tests/test_ci_evidence_reuse.py",
   "tests/test_coverage_policy.py",
+  "tests/test_doctor_schema.py",
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
@@ -375,6 +379,7 @@ validators = [
   "scripts/check_docs_contract.py",
   "scripts/validate_ci_impact.py",
   "scripts/validate_commit_messages.py",
+  "scripts/validate_doctor_schema.py",
 ]
 
 [clusters.documentation]
@@ -543,12 +548,14 @@ moduleTests = [
   "tests/test_test_planner.py",
   "tests/test_focused_test_runner.py",
   "tests/test_sample_budget.py",
+  "tests/test_cli_text.py",
 ]
 clusterTests = [
   "tests/test_test_planner.py",
   "tests/test_focused_test_runner.py",
   "tests/test_test_efficiency_contract.py",
   "tests/test_sample_budget.py",
+  "tests/test_cli_text.py",
 ]
 validators = [
   "scripts/check_agent_config.py",

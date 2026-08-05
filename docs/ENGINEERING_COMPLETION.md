@@ -25,6 +25,8 @@ release readiness lives in [`PRODUCT_COMPLETION.md`](PRODUCT_COMPLETION.md).
    explicit owner request. Local commits on any branch do not need owner approval.
 
 Honesty SSOT: `docs/CONTRACTS.md`, `docs/FEATURE_MATRIX.md`, `docs/INVENTORY.md`.
+Operator loop: `docs/WORKFLOW.md`. Artifacts: `docs/ARTIFACTS-AND-STATE.md`.
+Open blockers: `docs/ROADMAP.md`.
 
 ## Verify locally
 

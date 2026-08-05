@@ -22,6 +22,8 @@ skill `select-and-run-tests`. Arc: skill `repository-workflow`. Safety:
 - Inspect first: `python3 scripts/agent_context.py` (optional `--json`)
 - Triage: `python3 scripts/dev_runs.py failures` / `show <run-id>`
 - Done: `docs/ENGINEERING_COMPLETION.md` + `docs/PRODUCT_COMPLETION.md`
+- Operator loop: `docs/WORKFLOW.md`
+- Operator loop: `docs/WORKFLOW.md`
 
 ## User-visible maintainer CLI
 

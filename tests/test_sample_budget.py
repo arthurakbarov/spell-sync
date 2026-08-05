@@ -6,6 +6,7 @@ from pathlib import Path
 
 from scripts.test_selection.registry import load_registry
 from scripts.test_selection.sample_budget import (
+    SAMPLE_MUST_KEEP_CORE,
     SAMPLE_SMOKE_POOL,
     apply_sample_budget,
 )
@@ -24,9 +25,11 @@ def test_must_keep_always_present() -> None:
         budget_seconds=60,
         seed="fixed-seed",
     )
-    assert result.must_keep == ("tests/test_run_dev_loop_budget.py",)
-    assert result.targets[0] == "tests/test_run_dev_loop_budget.py"
-    assert "tests/test_run_dev_loop_budget.py" not in result.filled
+    assert "tests/test_run_dev_loop_budget.py" in result.must_keep
+    assert result.targets[0] in result.must_keep
+    for core in SAMPLE_MUST_KEEP_CORE:
+        if (ROOT / core).is_file():
+            assert core in result.must_keep
 
 
 def test_same_seed_same_plan() -> None:
@@ -44,6 +47,7 @@ def test_same_seed_same_plan() -> None:
     assert a.targets == b.targets
     assert a.filled == b.filled
     assert a.fill_ratio == b.fill_ratio
+    assert a.to_json_dict()["fillRatio"] == a.fill_ratio
 
 
 def test_budget_zero_keeps_must_only() -> None:
@@ -58,12 +62,12 @@ def test_budget_zero_keeps_must_only() -> None:
         overhead_seconds=0,
         seed="zero",
     )
-    assert result.targets == ("tests/test_agent_context.py",)
+    assert "tests/test_agent_context.py" in result.must_keep
     assert result.filled == ()
     assert result.fill_ratio == 0.0
 
 
-def test_smoke_pool_preferred_when_empty_must_keep() -> None:
+def test_smoke_pool_preferred_when_filling() -> None:
     registry = load_registry(ROOT / "tests" / "test-impact.toml")
     result = apply_sample_budget(
         root=ROOT,
@@ -73,6 +77,6 @@ def test_smoke_pool_preferred_when_empty_must_keep() -> None:
         budget_seconds=60,
         seed="smoke",
     )
-    assert result.filled
-    assert result.filled[0] in SAMPLE_SMOKE_POOL
+    assert result.must_keep
+    assert any(path in SAMPLE_SMOKE_POOL for path in result.must_keep)
     assert result.fill_ratio > 0

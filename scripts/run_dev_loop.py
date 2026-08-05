@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.cli_text import format_kv_lines  # noqa: E402
 from scripts.execution_control.eta import announce_expected_eta  # noqa: E402
 from scripts.execution_control.observe import (  # noqa: E402
     observe_subprocess,
@@ -65,6 +67,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--explain", action="store_true")
     parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Print the planned steps/targets as JSON and exit without running them.",
+    )
+    parser.add_argument(
         "--ignore-budget",
         action="store_true",
         help="Do not fail when wall time exceeds the local minimal SLA (still report status).",
@@ -112,11 +119,12 @@ def main(argv: list[str] | None = None) -> int:
     budget = budget_seconds_for_gate(gate)
     wall_started = time.monotonic()
     gate_id = f"dev-loop:{gate}"
-    announce_expected_eta(
-        gate_id,
-        hint=float(budget),
-        root=ROOT,
-    )
+    if not args.plan:
+        announce_expected_eta(
+            gate_id,
+            hint=float(budget),
+            root=ROOT,
+        )
     print(f"DEV_LOOP_GATE={gate}", flush=True)
     print("DEV_LOOP_COVERAGE=false", flush=True)
     print("DEV_LOOP_ADMISSION=bypass", flush=True)
@@ -138,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         include_safety_cluster_tests=args.commit_gate,
     )
     pytest_targets = list(plan.pytest_targets)
+    sample_meta: dict[str, object] | None = None
     sample_enabled = gate == "L0" and not args.no_sample and args.target is None
     if sample_enabled:
         registry = load_registry(ROOT / "tests" / "test-impact.toml")
@@ -149,24 +158,50 @@ def main(argv: list[str] | None = None) -> int:
             budget_seconds=float(budget),
         )
         pytest_targets = list(sample.targets)
-        print("DEV_LOOP_SAMPLE=true", flush=True)
-        print(f"DEV_LOOP_SAMPLE_SEED={sample.seed}", flush=True)
-        print(f"DEV_LOOP_SAMPLE_MUST_KEEP={len(sample.must_keep)}", flush=True)
-        print(f"DEV_LOOP_SAMPLE_FILLED={len(sample.filled)}", flush=True)
-        print(f"DEV_LOOP_SAMPLE_OMITTED={len(sample.omitted)}", flush=True)
-        print(f"DEV_LOOP_SAMPLE_USED_SECONDS={sample.used_seconds}", flush=True)
-        print(f"DEV_LOOP_SAMPLE_FILL_RATIO={sample.fill_ratio}", flush=True)
+        sample_meta = sample.to_json_dict()
+        print(
+            format_kv_lines(
+                [
+                    ("DEV_LOOP_SAMPLE", "true"),
+                    ("DEV_LOOP_SAMPLE_SEED", sample.seed),
+                    ("DEV_LOOP_SAMPLE_MUST_KEEP", str(len(sample.must_keep))),
+                    ("DEV_LOOP_SAMPLE_FILLED", str(len(sample.filled))),
+                    ("DEV_LOOP_SAMPLE_OMITTED", str(len(sample.omitted))),
+                    ("DEV_LOOP_SAMPLE_USED_SECONDS", str(sample.used_seconds)),
+                    ("DEV_LOOP_SAMPLE_FILL_RATIO", str(sample.fill_ratio)),
+                ]
+            ),
+            flush=True,
+        )
     else:
         print("DEV_LOOP_SAMPLE=false", flush=True)
 
     print(f"DEV_LOOP_CHANGED_FILES={len(plan.changed_files)}")
     print(f"DEV_LOOP_CLUSTERS={','.join(plan.clusters)}")
     print(f"DEV_LOOP_TARGETS={len(pytest_targets)}")
-    if args.explain:
+    if args.explain or args.plan:
         for reason in plan.reasons:
             print(f"DEV_LOOP_REASON={reason}")
         for target in pytest_targets:
             print(f"DEV_LOOP_PYTEST_TARGET={target}")
+
+    if args.plan:
+        payload = {
+            "gate": gate,
+            "budgetSeconds": budget,
+            "changedFiles": list(plan.changed_files),
+            "clusters": list(plan.clusters),
+            "validators": list(plan.validators),
+            "pytestTargets": pytest_targets,
+            "sample": sample_meta,
+            "reasons": list(plan.reasons),
+        }
+        print("DEV_LOOP_PLAN_JSON_BEGIN", flush=True)
+        print(json.dumps(payload, indent=2, sort_keys=True), flush=True)
+        print("DEV_LOOP_PLAN_JSON_END", flush=True)
+        print("DEV_LOOP_RESULT=plan", flush=True)
+        print("DEV_LOOP_EXIT=0", flush=True)
+        return 0
 
     exit_code = 0
     changed_py = sorted(

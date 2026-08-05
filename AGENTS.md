@@ -50,6 +50,10 @@ docs/GIT-WORKFLOW.md
 docs/CONTRACTS.md
 docs/FEATURE_MATRIX.md
 docs/INVENTORY.md
+docs/WORKFLOW.md
+docs/ARTIFACTS-AND-STATE.md
+docs/OPERATIONS.md
+docs/ROADMAP.md
 ```
 
 ## Pull and Push

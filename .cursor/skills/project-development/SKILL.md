@@ -29,7 +29,9 @@ Always-on: `project-development.mdc`, `agent-workflow.mdc`, `test-efficiency.mdc
 1. `python3 scripts/agent_context.py`
 2. `python3 scripts/project_environment.py check`
 3. Minimal coherent diff
-4. `python3 scripts/run_dev_loop.py`
+4. `python3 scripts/run_dev_loop.py` (or `--plan` first)
+
+Operator SSOT: `docs/WORKFLOW.md`.
 
 ## Checkpoint
 
@@ -67,4 +69,6 @@ Or `scripts/ci.sh` then `python3 scripts/check_ci_evidence.py`.
 - Honesty: `docs/CONTRACTS.md`, `docs/FEATURE_MATRIX.md`, `docs/INVENTORY.md`
 - Command SSOT: `config/dev-commands.json` + `config/dev-surface.json`
 - Done: `docs/ENGINEERING_COMPLETION.md` + `docs/PRODUCT_COMPLETION.md`
+- Operator loop: `docs/WORKFLOW.md`
+- Artifacts: `docs/ARTIFACTS-AND-STATE.md`
 - Triage: `python3 scripts/dev_runs.py failures`

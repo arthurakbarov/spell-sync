@@ -32,3 +32,9 @@ def test_budget_status_within_and_exceeded() -> None:
     assert mod.budget_status(wall_seconds=59.9, budget_seconds=60) == "within"
     assert mod.budget_status(wall_seconds=60.0, budget_seconds=60) == "within"
     assert mod.budget_status(wall_seconds=60.01, budget_seconds=60) == "exceeded"
+
+
+def test_plan_mode_exits_without_running_pytest() -> None:
+    mod = _load_run_dev_loop()
+    code = mod.main(["--plan", "--no-sample", "--files", "docs/WORKFLOW.md"])
+    assert code == 0

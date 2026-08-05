@@ -36,6 +36,7 @@ _DOCS = (
     "docs/AGENT_DEVELOPMENT.md",
     "docs/ENGINEERING_COMPLETION.md",
     "docs/TESTING_STRATEGY.md",
+    "docs/WORKFLOW.md",
     "docs/CONTRACTS.md",
     "docs/FEATURE_MATRIX.md",
     ".cursor/README.md",
