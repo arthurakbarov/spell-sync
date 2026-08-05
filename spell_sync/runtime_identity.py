@@ -12,8 +12,6 @@ from .settings import ConfigLoadResult, config_paths_for_wordlist
 from .sync_context import RuntimeContext
 from .target_capabilities import DICTIONARY_FILTER_KINDS, TargetFilterKind
 
-RUNTIME_CHANGED_AFTER_PREVIEW = "runtime_changed_after_preview"
-
 
 @dataclass(frozen=True, slots=True)
 class ConfigInputFingerprint:

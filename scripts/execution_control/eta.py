@@ -61,17 +61,6 @@ def load_eta_config(*, root: Path | None = None) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def prompt_allowance_from_config(config: dict[str, Any] | None = None) -> float:
-    if config is None:
-        return PROMPT_ALLOWANCE_SECONDS
-    raw = config.get("promptAllowanceSeconds", PROMPT_ALLOWANCE_SECONDS)
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        return PROMPT_ALLOWANCE_SECONDS
-    return value if value >= 0 else PROMPT_ALLOWANCE_SECONDS
-
-
 def format_eta_seconds(seconds: float) -> str:
     total = max(0, int(round(seconds)))
     minutes, secs = divmod(total, 60)

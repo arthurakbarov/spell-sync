@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 from .config import CONFIRM_YES, enable_chrome, enable_edge, enable_firefox, enable_obsidian
 from .log import log
@@ -24,7 +24,6 @@ RunningState = Optional[bool]
 ChromeState = RunningState
 FirefoxState = RunningState
 ObsidianState = RunningState
-PushPromptFn = Callable[[], Optional[bool]]
 
 
 def _pgrep_running(returncode: int) -> RunningState:

@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .eta import (
-    DEFAULT_ANNOUNCE_THRESHOLD,
     announce_expected_eta,
     estimate_work_seconds,
     load_eta_config,
@@ -215,8 +214,3 @@ def record_observation(
     finally:
         if close and store is not None:
             store.close()
-
-
-def threshold_seconds(root: Path | None = None) -> float:
-    cfg = load_eta_config(root=root)
-    return float(cfg.get("announceThresholdSeconds", DEFAULT_ANNOUNCE_THRESHOLD))

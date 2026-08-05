@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..operation_reports import OperationOutcome
 from .history_record import OperationHistoryRecord
-from .technical_event_model import OperationKind
 
 
 @dataclass(frozen=True)
@@ -51,7 +49,3 @@ class LoggingSetupResult:
     ok: bool
     log_path: Path | None = None
     detail: str | None = None
-
-
-HistoryOperationFilter = OperationKind | None
-HistoryOutcomeFilter = OperationOutcome | None

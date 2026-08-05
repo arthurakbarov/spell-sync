@@ -166,11 +166,6 @@ FINAL_CI_LIFECYCLE_SKILLS = (
     "spell-sync-ci",
 )
 
-CI_BEFORE_COMMIT_PATTERN = re.compile(
-    r"(?:run full CI|scripts/ci\.sh)[\s\S]{0,500}?\bcommit",
-    re.IGNORECASE,
-)
-
 STALE_CI_THEN_COMMIT = re.compile(
     r"After green CI[\s\S]{0,200}?\bcommit",
     re.IGNORECASE,

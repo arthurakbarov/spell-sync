@@ -26,10 +26,6 @@ def current_waiting_seconds() -> float:
     return float(sum(_bucket()))
 
 
-def reset_waiting_seconds() -> None:
-    _local.waiting_seconds = []
-
-
 def add_waiting_seconds(seconds: float) -> None:
     if seconds > 0:
         _bucket().append(float(seconds))

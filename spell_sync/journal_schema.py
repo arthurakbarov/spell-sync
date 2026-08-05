@@ -20,7 +20,6 @@ _KNOWN_COMMANDS = frozenset(
         "status",
     }
 )
-_KNOWN_STATES = frozenset({"writing", "completed", "rollback_incomplete"})
 JOURNAL_SCHEMA_VERSION = 2
 
 

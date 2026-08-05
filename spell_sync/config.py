@@ -30,9 +30,6 @@ PUSH_MAX_REMOVALS_WITHOUT_CONFIRM_DEFAULT = 50
 # Rotating .bak backups before dictionary overwrite (0 = disabled, 1 = single .bak only).
 BACKUP_KEEP_DEFAULT = 3
 
-# Default watch/automation pull interval when enabled (minutes).
-AUTOMATION_IMPORT_INTERVAL_DEFAULT = 60
-
 # --- CLI ---
 
 CONFIRM_YES = frozenset({"y", "yes"})

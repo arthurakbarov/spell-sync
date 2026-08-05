@@ -23,12 +23,6 @@ def format_field_block(pairs: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def print_field_block(pairs: list[tuple[str, str]], *, file=None) -> None:
-    text = format_field_block(pairs)
-    if text:
-        print(text, file=file, flush=True)
-
-
 def format_kv_lines(pairs: list[tuple[str, str]]) -> str:
     """Emit ``KEY=value`` lines (agent_context / DEV_LOOP style)."""
     return "\n".join(f"{key}={value}" for key, value in pairs)
