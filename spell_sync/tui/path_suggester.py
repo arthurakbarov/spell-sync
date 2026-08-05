@@ -1,94 +1,123 @@
-"""Filesystem path completion for TUI Input widgets (shell-like)."""
+"""Shell-like filesystem path listing and completion for TUI path pickers."""
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
-from textual.suggester import Suggester
-
 _WORDLIST_NAME = "wordlist.txt"
+_DEFAULT_LIMIT = 60
 
 
-def _preserve_home_prefix(typed: str, completed: Path) -> str:
-    """Keep a leading ~/ in the suggestion when the user typed one."""
+@dataclass(frozen=True, slots=True)
+class PathCompletion:
+    """One completion row: prompt for the list, value for the Input."""
+
+    prompt: str
+    value: str
+
+
+def _home_style(typed: str) -> bool:
+    return typed == "~" or typed.startswith("~/") or typed.startswith("~" + os.sep)
+
+
+def _format_value(typed: str, completed: Path, *, directory: bool) -> str:
     home = Path.home()
     try:
         relative = completed.relative_to(home)
+        use_home = _home_style(typed) or not typed.strip()
     except ValueError:
-        return str(completed)
-    if typed == "~" or typed.startswith("~/") or typed.startswith("~" + os.sep):
-        return "~/" + relative.as_posix()
-    return str(completed)
+        relative = None
+        use_home = False
+    if use_home and relative is not None:
+        text = "~/" + relative.as_posix() if str(relative) != "." else "~/"
+    else:
+        text = completed.as_posix() if os.sep == "/" else str(completed)
+    if directory and not text.endswith("/"):
+        text += "/"
+    return text
 
 
-def complete_path(value: str) -> str | None:
-    """Return one shell-style completion for ``value``, or None.
+def _listing_context(typed: str) -> tuple[Path, str, str]:
+    """Return (directory to list, name prefix, typed string used for formatting)."""
+    raw = typed.strip()
+    if not raw:
+        return Path.home(), "", "~/"
+    if raw == "~":
+        return Path.home(), "", "~/"
+    if raw.endswith(("/", "\\")):
+        directory = Path(raw).expanduser()
+        return directory, "", raw if raw.endswith("/") else raw.replace("\\", "/") + "/"
+    expanded = Path(raw).expanduser()
+    return expanded.parent, expanded.name, raw
 
-    Completes the last path segment against entries in the parent directory.
-    Directories are suggested with a trailing ``/``; ``wordlist.txt`` is
-    preferred when the prefix matches.
+
+def list_path_completions(
+    typed: str,
+    *,
+    limit: int = _DEFAULT_LIMIT,
+) -> list[PathCompletion]:
+    """List matching path completions for a typed value.
+
+    - Empty / ``~``: entries under the home directory.
+    - Trailing ``/``: all entries in that directory (no first letter required).
+    - Partial segment: filter by prefix (case-insensitive fallback).
+    Directories come first (with trailing ``/``), then ``wordlist.txt``, then other files.
     """
-    if not value or value.isspace() or value.endswith(("/", "\\")):
-        return None
-
-    typed = value
-    expanded = Path(typed).expanduser()
-    parent = expanded.parent
-    prefix = expanded.name
-    if not parent.exists() or not parent.is_dir():
-        return None
+    directory, prefix, format_typed = _listing_context(typed)
+    if not directory.exists() or not directory.is_dir():
+        return []
     try:
-        names = sorted(os.listdir(parent))
+        names = os.listdir(directory)
     except OSError:
-        return None
+        return []
 
-    def _match(name: str) -> bool:
+    def matches(name: str) -> bool:
         if not prefix:
             return True
         return name.startswith(prefix) or name.casefold().startswith(prefix.casefold())
 
-    directories: list[str] = []
+    dirs: list[str] = []
     files: list[str] = []
-    for name in names:
-        if not _match(name):
+    for name in sorted(names, key=str.casefold):
+        if name in {".", ".."} or not matches(name):
             continue
-        path = parent / name
+        # Hide dotfiles unless the user typed a leading dot.
+        if name.startswith(".") and not prefix.startswith("."):
+            continue
+        path = directory / name
         try:
             is_dir = path.is_dir()
         except OSError:
             continue
         if is_dir:
-            directories.append(name)
+            dirs.append(name)
         else:
             files.append(name)
 
-    # Prefer exact-case matches when both exist.
-    def _prefer_exact(candidates: list[str]) -> list[str]:
-        exact = [n for n in candidates if n.startswith(prefix)]
-        return exact or candidates
+    if prefix:
+        exact_dirs = [n for n in dirs if n.startswith(prefix)]
+        exact_files = [n for n in files if n.startswith(prefix)]
+        if exact_dirs or exact_files:
+            dirs = exact_dirs or dirs
+            files = exact_files or files
 
-    directories = _prefer_exact(directories)
-    files = _prefer_exact(files)
+    wordlists = [n for n in files if n.lower() == _WORDLIST_NAME]
+    other_files = [n for n in files if n.lower() != _WORDLIST_NAME]
+    ordered = dirs + wordlists + other_files
 
-    wordlist_hits = [n for n in files if n.lower() == _WORDLIST_NAME]
-    if wordlist_hits:
-        return _preserve_home_prefix(typed, parent / wordlist_hits[0])
-
-    if directories:
-        text = _preserve_home_prefix(typed, parent / directories[0])
-        return text if text.endswith("/") else text + "/"
-
-    if files:
-        return _preserve_home_prefix(typed, parent / files[0])
-    return None
+    completions: list[PathCompletion] = []
+    for name in ordered[:limit]:
+        path = directory / name
+        is_dir = name in dirs
+        value = _format_value(format_typed, path, directory=is_dir)
+        prompt = f"{name}/" if is_dir else name
+        completions.append(PathCompletion(prompt=prompt, value=value))
+    return completions
 
 
-class PathSuggester(Suggester):
-    """Inline path suggestions for Textual Input (accept with → or Tab)."""
-
-    def __init__(self) -> None:
-        super().__init__(use_cache=False, case_sensitive=True)
-
-    async def get_suggestion(self, value: str) -> str | None:
-        return complete_path(value)
+def complete_path(value: str) -> str | None:
+    """Best single completion (first list hit), for optional inline suggestion."""
+    hits = list_path_completions(value, limit=1)
+    return hits[0].value if hits else None

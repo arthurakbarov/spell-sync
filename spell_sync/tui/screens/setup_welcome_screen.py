@@ -10,7 +10,6 @@ from textual.widgets import (
     Button,
     Footer,
     Header,
-    Input,
     RadioButton,
     RadioSet,
     Static,
@@ -39,7 +38,7 @@ from ...application.product_concepts import (
 )
 from ...project_setup.prepare import PreparedProjectSetup
 from ..controller import TuiController
-from ..path_suggester import PathSuggester
+from ..path_picker import WordlistPathPicker
 
 _STORAGE_RADIO_IDS = {
     "storage-local": STORAGE_STRATEGY_LOCAL,
@@ -48,8 +47,9 @@ _STORAGE_RADIO_IDS = {
 }
 
 _PATH_HINT = (
-    "Type a path. Tab or → completes folders and files like a shell "
-    "(starts from whatever you type, including ~ and /)."
+    "Type a path or pick from the list below. "
+    "Empty field lists home (~/). End a folder with / to list everything inside — "
+    "no first letter needed. Tab applies the highlighted row."
 )
 
 
@@ -57,33 +57,23 @@ def _action_buttons(*buttons: Button) -> Vertical:
     return Vertical(*buttons, id="setup-actions", classes="setup-actions")
 
 
-def _wordlist_path_input(*, value: str = "") -> Input:
-    return Input(
-        placeholder="~/Documents/Spell Sync/wordlist.txt",
-        id="wordlist-input",
-        value=value,
-        suggester=PathSuggester(),
-    )
-
-
 class _PathCompleteMixin:
-    """Accept inline path suggestions with Tab when the path input is focused."""
+    """Tab applies the highlighted path-list row."""
 
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("tab", "complete_path", "Complete", priority=True),
     ]
 
+    def _path_picker(self) -> WordlistPathPicker:
+        return self.query_one(WordlistPathPicker)
+
     def action_complete_path(self) -> None:
         try:
-            inp = self.query_one("#wordlist-input", Input)
+            picker = self._path_picker()
         except Exception:
             return
-        suggestion = getattr(inp, "_suggestion", "") or ""
-        if not suggestion or not inp.has_focus:
-            return
-        inp.value = suggestion
-        inp.cursor_position = len(suggestion)
+        picker.apply_highlighted()
 
 
 class SetupWelcomeScreen(Screen[None]):
@@ -212,7 +202,7 @@ class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
                 classes="setup-prose",
             )
             yield Static("Path to wordlist.txt:", classes="setup-prose")
-            yield _wordlist_path_input()
+            yield WordlistPathPicker()
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
@@ -220,14 +210,14 @@ class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#wordlist-input", Input).focus()
+        self._path_picker().focus_input()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
             self.app.pop_screen()
             return
         if event.button.id == "btn-continue":
-            raw = self.query_one("#wordlist-input", Input).value
+            raw = self._path_picker().path_value
             try:
                 path, _detail = self._controller.validate_setup_wordlist(raw)
             except ValueError as exc:
@@ -259,7 +249,7 @@ class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
                     yield RadioButton(label, id=f"wordlist-preset-{index}", value=(index == 0))
                 yield RadioButton("Custom", id="wordlist-preset-custom", value=False)
             yield Static(_PATH_HINT, classes="setup-prose")
-            yield _wordlist_path_input(value=str(self._controller.setup_wordlist_default()))
+            yield WordlistPathPicker(value=str(self._controller.setup_wordlist_default()))
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
@@ -289,18 +279,18 @@ class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         pressed_id = event.pressed.id or ""
         if pressed_id == "wordlist-preset-custom":
-            self.query_one("#wordlist-input", Input).focus()
+            self._path_picker().focus_input()
             return
         if pressed_id.startswith("wordlist-preset-"):
             index = int(pressed_id.rsplit("-", 1)[-1])
-            self.query_one("#wordlist-input", Input).value = str(self._presets[index][1])
+            self._path_picker().path_value = str(self._presets[index][1])
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
             self.app.pop_screen()
             return
         if event.button.id == "btn-continue":
-            raw = self.query_one("#wordlist-input", Input).value
+            raw = self._path_picker().path_value
             try:
                 path, detail = self._controller.validate_setup_wordlist(raw)
             except ValueError as exc:
@@ -329,7 +319,7 @@ class ChangeWordlistScreen(_PathCompleteMixin, Screen[None]):
                 classes="setup-prose",
             )
             yield Static("Path to wordlist.txt:", classes="setup-prose")
-            yield _wordlist_path_input()
+            yield WordlistPathPicker()
         yield _action_buttons(
             Button("Continue", id="btn-continue", variant="primary"),
             Button("Back", id="btn-back"),
@@ -338,16 +328,17 @@ class ChangeWordlistScreen(_PathCompleteMixin, Screen[None]):
 
     def on_mount(self) -> None:
         wordlist = self._controller.project_wordlist
+        picker = self._path_picker()
         if wordlist is not None:
-            self.query_one("#wordlist-input", Input).value = str(wordlist)
-        self.query_one("#wordlist-input", Input).focus()
+            picker.path_value = str(wordlist)
+        picker.focus_input()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
             self.app.pop_screen()
             return
         if event.button.id == "btn-continue":
-            raw = self.query_one("#wordlist-input", Input).value
+            raw = self._path_picker().path_value
             try:
                 path, _detail = self._controller.validate_setup_wordlist(raw)
             except ValueError as exc:

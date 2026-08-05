@@ -17,7 +17,7 @@ from spell_sync.project_setup.prepare import prepare_project_setup
 from spell_sync.project_setup.state import ProjectSetupState, ProjectSetupStatus
 from spell_sync.tui.app import SpellSyncApp
 from spell_sync.tui.controller import TuiController
-from spell_sync.tui.path_suggester import PathSuggester
+from spell_sync.tui.path_picker import WordlistPathPicker
 from spell_sync.tui.screens.dashboard import DashboardScreen
 from spell_sync.tui.screens.doctor_screen import DoctorScreen
 from spell_sync.tui.screens.logs_screen import TechnicalLogScreen
@@ -369,15 +369,21 @@ class TestSetupOpenProjectScreen(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, SetupOpenProjectScreen)
 
     async def test_path_input_has_suggester_and_actions(self):
+        home = Path.home()
+        (home / "Documents").mkdir(exist_ok=True)
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(80, 24)) as pilot:
+        async with app.run_test(size=(80, 28)) as pilot:
             app.push_screen(SetupOpenProjectScreen(controller))
             await pilot.pause()
-            inp = app.screen.query_one("#wordlist-input", Input)
-            self.assertIsInstance(inp.suggester, PathSuggester)
+            picker = app.screen.query_one(WordlistPathPicker)
+            picker.refresh_completions()
+            await pilot.pause()
             self.assertTrue(app.screen.query("#setup-actions"))
-            self.assertIs(inp, app.focused)
+            self.assertTrue(app.screen.query("#path-complete-list"))
+            self.assertIs(picker.query_one("#wordlist-input", Input), app.focused)
+            # Empty field should list home matches.
+            self.assertGreater(picker.query_one("#path-complete-list").option_count, 0)
 
 
 class TestSetupWelcomeLayout(unittest.IsolatedAsyncioTestCase):
@@ -403,10 +409,7 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
                 app.screen.query_one("#wordlist-input", Input).value,
                 str(existing),
             )
-            self.assertIsInstance(
-                app.screen.query_one("#wordlist-input", Input).suggester,
-                PathSuggester,
-            )
+            self.assertTrue(app.screen.query(WordlistPathPicker))
 
     async def test_valid_path_updates_project_and_returns(self):
         with tempfile.TemporaryDirectory() as tmp:

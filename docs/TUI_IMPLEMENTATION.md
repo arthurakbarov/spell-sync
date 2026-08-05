@@ -49,9 +49,9 @@ doctor, logs, and post-setup target settings.
 |--------|--------|-----------------|
 | Welcome | `setup_welcome_screen.py` | Start setup, Open existing, Quit |
 | Storage strategy | `setup_welcome_screen.py` | Continue, Back |
-| Open existing | `setup_welcome_screen.py` | Path input + Tab complete, Continue, Back |
-| Wordlist | `setup_welcome_screen.py` | Presets, path input + Tab complete, Continue, Back |
-| Change wordlist | `setup_welcome_screen.py` | Path input + Tab complete, Continue, Back (from Dashboard) |
+| Open existing | `setup_welcome_screen.py` | Path picker list + Tab, Continue, Back |
+| Wordlist | `setup_welcome_screen.py` | Presets, path picker list, Continue, Back |
+| Change wordlist | `setup_welcome_screen.py` | Path picker list, Continue, Back (from Dashboard) |
 | Targets | `setup_targets_screen.py` | Continue, Refresh, Select available, Clear, Back |
 | Setup preview | `setup_welcome_screen.py` | Create project, Back |
 | Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
@@ -60,9 +60,9 @@ doctor, logs, and post-setup target settings.
 
 Setup prose uses `max-width: 78` with equal-width actions docked at the bottom
 (`app.tcss` `.setup-body` / `.setup-actions`). Open-existing, Change-wordlist, and Custom
-wordlist paths use a shell-like `Input` with `PathSuggester` (Tab / → completes folders and
-files from the typed prefix, including `~` and absolute roots). There is no DirectoryTree
-browser — it could not navigate above its root and blocked finding existing wordlists.
+wordlist paths use `WordlistPathPicker`: an `Input` plus a live `OptionList` of matches.
+Empty input lists `~/`; a trailing `/` lists that folder without requiring a first letter;
+Tab or Enter applies the highlighted row. There is no DirectoryTree browser.
 
 
 ### Dashboard (sectioned)
