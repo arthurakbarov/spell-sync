@@ -340,6 +340,7 @@ production = [
   "scripts/validate_commit_messages.py",
   "scripts/validate_dev_commands.py",
   "scripts/validate_doctor_schema.py",
+  "scripts/validate_target_validation_schema.py",
   "scripts/cli_text.py",
   "config/dev-commands.json",
   "config/dev-surface.json",
@@ -354,6 +355,7 @@ moduleTests = [
   "tests/test_ci_necessity.py",
   "tests/test_coverage_policy.py",
   "tests/test_doctor_schema.py",
+  "tests/test_target_validation_schema.py",
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
@@ -372,6 +374,7 @@ clusterTests = [
   "tests/test_ci_evidence_reuse.py",
   "tests/test_coverage_policy.py",
   "tests/test_doctor_schema.py",
+  "tests/test_target_validation_schema.py",
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
@@ -383,6 +386,7 @@ validators = [
   "scripts/validate_ci_impact.py",
   "scripts/validate_commit_messages.py",
   "scripts/validate_doctor_schema.py",
+  "scripts/validate_target_validation_schema.py",
 ]
 
 [clusters.documentation]

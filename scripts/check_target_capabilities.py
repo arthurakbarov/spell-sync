@@ -7,7 +7,6 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,9 +19,12 @@ LEGACY_MARKER = "```text target-capabilities-matrix"
 LEGACY_HTML_START = "<!-- target-capabilities:start -->"
 LEGACY_HTML_END = "<!-- target-capabilities:end -->"
 
-IMPLEMENTATION_STATUSES = {"implemented", "experimental", "not-implemented"}
-AUTOMATED_STATUSES = {"pass", "fail", "partial", "not-run"}
-MANUAL_STATUSES = {"pass", "fail", "not-run", "experimental"}
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.validate_target_validation_schema import (  # noqa: E402
+    validate_target_validation_payload,
+)
+
 PRIVATE_PATH = re.compile(r"(~/|/Users/|/home/[^/\s]+/|C:\\Users\\)")
 
 
@@ -46,13 +48,12 @@ def _import_registry():
 
 
 def _validate(data: dict[str, object]) -> list[str]:
-    errors: list[str] = []
-    if data.get("schema_version") != 1:
-        errors.append("target-validation.json: schema_version must be 1")
-    entries = data.get("targets")
-    if not isinstance(entries, list):
-        errors.append("target-validation.json: targets must be a list")
+    errors = list(validate_target_validation_payload(data))
+    if any(err.startswith(("targets:list", "missing:targets")) for err in errors):
         return errors
+
+    entries = data.get("targets")
+    assert isinstance(entries, list)
 
     _, capability_by_id_fn, registry_pairs_fn = _import_registry()
     expected_pairs = set(registry_pairs_fn())
@@ -60,12 +61,10 @@ def _validate(data: dict[str, object]) -> list[str]:
 
     for index, item in enumerate(entries):
         if not isinstance(item, dict):
-            errors.append(f"targets[{index}] must be an object")
             continue
         target_id = item.get("target_id")
         platform = item.get("platform")
         if not isinstance(target_id, str) or not isinstance(platform, str):
-            errors.append(f"targets[{index}] requires target_id and platform strings")
             continue
         key = (target_id, platform)
         if key in seen:
@@ -77,26 +76,7 @@ def _validate(data: dict[str, object]) -> list[str]:
             continue
         if platform not in capability.platforms:
             errors.append(f"platform {platform} not supported for target {target_id}")
-        impl = item.get("implementation")
-        auto = item.get("automated_validation")
-        manual = item.get("manual_validation")
-        if impl not in IMPLEMENTATION_STATUSES:
-            errors.append(f"{target_id}/{platform}: invalid implementation status")
-        if auto not in AUTOMATED_STATUSES:
-            errors.append(f"{target_id}/{platform}: invalid automated_validation status")
-        if manual not in MANUAL_STATUSES:
-            errors.append(f"{target_id}/{platform}: invalid manual_validation status")
-        tested_on = item.get("tested_on")
-        if tested_on is not None:
-            try:
-                date.fromisoformat(str(tested_on))
-            except ValueError:
-                errors.append(f"{target_id}/{platform}: invalid tested_on date")
-        if manual == "pass":
-            if not item.get("application_version"):
-                errors.append(f"{target_id}/{platform}: manual pass requires application_version")
-            if not tested_on:
-                errors.append(f"{target_id}/{platform}: manual pass requires tested_on")
+        # Enum / date / manual-pass field rules are enforced by the schema shape validator.
         notes = item.get("notes")
         evidence = item.get("evidence")
         for field_name, value in (("notes", notes), ("evidence", evidence)):

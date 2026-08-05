@@ -66,6 +66,8 @@ Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLE
 | [architecture/DIAGNOSTICS.md](architecture/DIAGNOSTICS.md) | Technical events, logs, history |
 | [technical/](technical/) | Machine-readable schemas and contracts |
 | [technical/doctor-report.schema.json](technical/doctor-report.schema.json) | Doctor JSON payload schema |
+| [technical/target-validation.schema.json](technical/target-validation.schema.json) | Manual target validation matrix schema |
+| [examples/target-validation-entry.example.json](examples/target-validation-entry.example.json) | Example matrix entry for platform-validation |
 
 ## Targets and validation
 

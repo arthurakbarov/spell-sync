@@ -6,7 +6,10 @@ real personal spell-check data only when you accept file mutation risk.
 ## Manual validation policy
 
 Manual validation records belong in `docs/target-validation.json` — not in one-off readiness
-reports.
+reports. Shape: `docs/technical/target-validation.schema.json` (checked by
+`python3 scripts/validate_target_validation_schema.py` and
+`python3 scripts/check_target_capabilities.py --check`). Example entry:
+`docs/examples/target-validation-entry.example.json`.
 
 | Requirement | Detail |
 |-------------|--------|
