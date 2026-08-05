@@ -64,9 +64,9 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(StatusScreen(controller))
             await wait_for_text(pilot, "#status-summary", "Wordlist")
-            await pilot.press("r")
+            await pilot.click("#btn-refresh")
             await wait_for_text(pilot, "#status-summary", "Wordlist")
-            await pilot.press("escape")
+            await pilot.click("#btn-back")
             await pilot.pause()
             self.assertIsInstance(app.screen, DashboardScreen)
 
