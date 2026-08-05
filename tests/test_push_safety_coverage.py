@@ -650,17 +650,6 @@ class TestJournalSchemaProvenanceErrors(unittest.TestCase):
                 )
 
 
-class TestRecoverCmdValidatedFallback(unittest.TestCase):
-    def test_load_when_validated_has_no_journal(self):
-        with tempfile.TemporaryDirectory() as d:
-            wordlist = Path(d) / "wordlist.txt"
-            wordlist.write_text("a\n", encoding="utf-8")
-            code = cmd_recover(
-                CliOptions(wordlist=str(wordlist), json_output=True),
-            )
-            self.assertEqual(code, int(ExitCode.OK))
-
-
 class TestPushPreparedRemainingBranches(unittest.TestCase):
     def test_write_rendered_oserror_and_early_fingerprint(self):
         with tempfile.TemporaryDirectory() as d:

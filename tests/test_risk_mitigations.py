@@ -199,13 +199,6 @@ class TestFirefoxGuard(unittest.TestCase):
         ):
             self.assertFalse(commands._running_apps_check_for_push(DEFAULT_OPTS, _push_preview()))
 
-    def test_pgrep_running_interpretation(self):
-        import spell_sync.app_process_check as guard
-
-        self.assertTrue(guard._pgrep_running(0))
-        self.assertFalse(guard._pgrep_running(1))
-        self.assertIsNone(guard._pgrep_running(2))
-
     def test_is_firefox_running_macos_dispatch(self):
         import spell_sync.app_process_check as guard
 

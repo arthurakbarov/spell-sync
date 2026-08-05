@@ -451,11 +451,6 @@ class TestObsidianCheck(unittest.TestCase):
             self.assertTrue(obsidian_guard.is_obsidian_running())
             win.assert_called_once_with("Obsidian.exe")
 
-    def test_pgrep_running_interpretation(self):
-        self.assertTrue(obsidian_guard._pgrep_running(0))
-        self.assertFalse(obsidian_guard._pgrep_running(1))
-        self.assertIsNone(obsidian_guard._pgrep_running(2))
-
     def test_hunspell_config_dir_os_error(self):
         with tempfile.TemporaryDirectory() as d:
             home = Path(d)

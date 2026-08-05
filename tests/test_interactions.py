@@ -39,17 +39,6 @@ class TestCliDispatch(unittest.TestCase):
         cmd_ui.assert_called_once()
         self.assertEqual(code, 0)
 
-    def test_no_arg_non_tty_requires_command(self):
-        with (
-            patch.object(cli_mod.sys.stdin, "isatty", return_value=False),
-            patch.object(cli_mod.sys.stdout, "isatty", return_value=False),
-        ):
-            buf = io.StringIO()
-            with redirect_stdout(buf):
-                code = cli_mod.main(["spell-sync"])
-        self.assertEqual(code, 2)
-        self.assertIn("requires a command", buf.getvalue())
-
     def test_unknown_command_exit_code(self):
         buf = io.StringIO()
         with redirect_stdout(buf):

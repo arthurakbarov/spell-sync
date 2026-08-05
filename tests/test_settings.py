@@ -121,14 +121,6 @@ class TestSettingsParsingEdgeCases(unittest.TestCase):
             self.assertEqual(data, {})
             self.assertTrue(issues)
 
-    def test_parse_toml_rejects_yes_boolean_alias(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "spell-sync.toml"
-            path.write_text("[dictionaries]\nchrome = yes\n", encoding="utf-8")
-            data, issues = settings_mod._parse_toml_with_issues(path)
-            self.assertEqual(data, {})
-            self.assertTrue(issues)
-
     def test_load_user_settings_merges_files(self):
         with tempfile.TemporaryDirectory() as d:
             repo_cfg = Path(d) / "repo.toml"

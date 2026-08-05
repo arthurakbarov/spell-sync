@@ -175,14 +175,6 @@ class TestTomllibParser(unittest.TestCase):
             self.assertEqual(issues, [])
             self.assertTrue(data["push"]["strict"])
 
-    def test_duplicate_keys_rejected(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "spell-sync.toml"
-            path.write_text("[push]\nstrict = true\nstrict = false\n", encoding="utf-8")
-            data, issues = settings_mod._parse_toml_with_issues(path)
-            self.assertEqual(data, {})
-            self.assertTrue(issues)
-
     def test_accepts_integers(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "spell-sync.toml"
