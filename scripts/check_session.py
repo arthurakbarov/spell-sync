@@ -16,7 +16,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -98,12 +97,15 @@ def start_session(
 ) -> str:
     base_dir = base or _base_dir()
     base_dir.mkdir(parents=True, exist_ok=True)
-    if session_id or os.environ.get("SPELL_SYNC_CHECK_SESSION_ID") or os.environ.get(
-        "CURSOR_TRACE_ID"
+    if (
+        session_id
+        or os.environ.get("SPELL_SYNC_CHECK_SESSION_ID")
+        or os.environ.get("CURSOR_TRACE_ID")
     ):
         sid = resolve_session_id(session_id, base=base_dir)
     else:
-        sid = _sanitize_id(f"arc-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.getpid()}")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        sid = _sanitize_id(f"arc-{stamp}-{os.getpid()}")
     directory = _session_dir(base_dir, sid)
     directory.mkdir(parents=True, exist_ok=True)
     _current_file(base_dir).write_text(sid, encoding="utf-8")
