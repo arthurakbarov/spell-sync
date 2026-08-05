@@ -226,6 +226,9 @@ Every completed phase or corrective task returns:
 
 ## 13. Scope confirmations
 - next phase not started; no push/tag/release; no unrelated product changes
+- residuals still open (prefer stable IDs from PRODUCT_COMPLETION / ENGINEERING_COMPLETION)
+- no false equivalences from docs/CONTRACTS.md claimed as proven
+- validation was not re-run when the When-not-to-rerun table in docs/WORKFLOW.md forbade it
 ```
 
 When the task changed workspace state in any repository, section **14. Workspace snapshot** (see
