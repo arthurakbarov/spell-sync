@@ -700,6 +700,17 @@ if __name__ == "__main__":
     unittest.main()
 
 
+def test_full_ci_check_ids_include_prelude_and_post() -> None:
+    from scripts import ci_runner
+
+    ids = ci_runner.full_ci_check_ids()
+    assert ids[:4] == list(ci_runner.PRELUDE_CHECK_IDS)
+    assert ids[-len(ci_runner.POST_PYTEST_CHECK_IDS) :] == list(ci_runner.POST_PYTEST_CHECK_IDS)
+    assert "privacy.tree" in ids
+    assert "packaging.members" in ids
+    assert len(ids) == len(set(ids))
+
+
 def test_coverage_policy_argv_runs_shared_script() -> None:
     from scripts import ci_runner
 

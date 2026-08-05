@@ -68,12 +68,22 @@ def test_ci_runner_lists_diagnostic_checks() -> None:
     )
     assert proc.returncode == 0
     ids = proc.stdout.splitlines()
+    assert "bootstrap.python" in ids
+    assert "bootstrap.clean-tree" in ids
+    assert "environment.lock" in ids
+    assert "environment.check" in ids
     assert "ruff.format" in ids
     assert "privacy.tree" in ids
     assert "packaging.members" in ids
+    assert "packaging.wheel-smoke" in ids
+    assert "smoke.tui" in ids
     assert "tests:rest" in ids
     assert "tests:tui" in ids
     assert "tests:dev-tooling" in ids
+    # No duplicated IDs; prelude precedes mid-pipeline.
+    assert len(ids) == len(set(ids))
+    assert ids.index("bootstrap.python") < ids.index("privacy.tree")
+    assert ids.index("privacy.tree") < ids.index("packaging.members")
 
 
 def test_modifying_skills_reference_select_and_run_tests() -> None:

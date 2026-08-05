@@ -174,6 +174,41 @@ def _check_ids(steps: list[tuple[str, list[str]]]) -> list[str]:
     return [step_id for step_id, _ in steps]
 
 
+# Prelude gates recorded before `_build_check_steps` in a full CI run.
+PRELUDE_CHECK_IDS: tuple[str, ...] = (
+    "bootstrap.python",
+    "bootstrap.clean-tree",
+    "environment.lock",
+    "environment.check",
+)
+
+# Post-pytest gates recorded after `_build_check_steps` in a full CI run.
+POST_PYTEST_CHECK_IDS: tuple[str, ...] = (
+    "coverage.policy",
+    "packaging.build",
+    "packaging.twine",
+    "packaging.members",
+    "packaging.wheel-smoke",
+    "smoke.init",
+    "smoke.lint",
+    "smoke.tui",
+)
+
+
+def full_ci_check_ids(py: str | None = None) -> list[str]:
+    """Ordered check IDs recorded by a successful full `scripts/ci.sh` run.
+
+    Prelude and post-pytest IDs are always included. Selectable mid-pipeline IDs
+    come from `_build_check_steps`. Wheel-smoke sub-steps collapse to
+    ``packaging.wheel-smoke``.
+    """
+    python_bin = py or sys.executable
+    ids: list[str] = list(PRELUDE_CHECK_IDS)
+    ids.extend(_check_ids(_build_check_steps(python_bin)))
+    ids.extend(POST_PYTEST_CHECK_IDS)
+    return ids
+
+
 def _select_steps(
     steps: list[tuple[str, list[str]]],
     *,
@@ -250,6 +285,11 @@ def _wheel_smoke_preview_steps(py: str) -> list[tuple[str, list[str], bool, bool
 
 
 def _full_ci_preview_steps(py: str) -> tuple[tuple[str, list[str], bool, bool, bool], ...]:
+    """Admission/preview step shapes for mid-pipeline + post-pytest gates.
+
+    Prelude IDs (`PRELUDE_CHECK_IDS`) are planned separately by the gate controller.
+    Keep `POST_PYTEST_CHECK_IDS` in sync with the packaging/smoke block below.
+    """
     steps: list[tuple[str, list[str], bool, bool, bool]] = []
     for step_id, argv in _build_check_steps(py):
         coverage = is_pytest_group(step_id) or step_id == "coverage.policy"
@@ -1663,20 +1703,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     python_bin = os.environ.get("PYTHON_BIN") or sys.executable
     if args.list_checks:
-        ids = _check_ids(_build_check_steps(python_bin))
-        ids.extend(
-            [
-                "coverage.policy",
-                "packaging.build",
-                "packaging.twine",
-                "packaging.members",
-                "packaging.wheel-smoke",
-                "smoke.init",
-                "smoke.lint",
-                "smoke.tui",
-            ]
-        )
-        for check_id in ids:
+        for check_id in full_ci_check_ids(python_bin):
             print(check_id)
         return 0
     resume_failed: list[str] | None = None
