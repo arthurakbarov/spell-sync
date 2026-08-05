@@ -53,3 +53,42 @@ Button.-disabled-action {
     height: 1fr;
     padding: 0 2;
 }
+
+/* Setup wizard: readable prose width, bottom equal-width actions (80-col friendly). */
+.setup-body {
+    height: 1fr;
+    max-width: 78;
+    width: 100%;
+    padding: 1 2 0 2;
+}
+
+.setup-prose {
+    height: auto;
+    max-width: 78;
+    margin-bottom: 1;
+}
+
+.setup-actions {
+    dock: bottom;
+    height: auto;
+    width: 100%;
+    max-width: 78;
+    padding: 1 2 1 2;
+    margin-top: 1;
+    layout: vertical;
+}
+
+.setup-actions Button {
+    width: 36;
+    min-width: 36;
+    max-width: 36;
+    margin: 0 0 1 0;
+}
+
+#wordlist-browser {
+    height: 12;
+    min-height: 8;
+    max-width: 78;
+    margin: 0 0 1 0;
+    border: solid $surface-lighten-2;
+}

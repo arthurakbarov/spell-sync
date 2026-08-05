@@ -7,7 +7,7 @@ Recovery product detail: [RECOVERY.md](RECOVERY.md).
 Normal recovery favors read-only diagnostics, targeted fixes, and explicit confirm.
 Destructive actions are marked and are not default steps.
 
----
+
 
 ## Command not found after install
 
@@ -39,7 +39,7 @@ which spell-sync || true
 
 Full copy: [TROUBLESHOOTING.md](TROUBLESHOOTING.md#spell-sync-was-installed-but-the-command-is-not-found).
 
----
+
 
 ## Invalid configuration blocks writes
 
@@ -70,7 +70,7 @@ spell-sync status --json
 
 - Do not delete the wordlist to "fix" config.
 
----
+
 
 ## Pending Recovery blocks new writes
 
@@ -102,7 +102,7 @@ spell-sync doctor --json
 
 Detail: [RECOVERY.md](RECOVERY.md).
 
----
+
 
 ## Push skipped because an app is running
 
@@ -132,7 +132,7 @@ spell-sync plan --json
 
 - None. Do not force-kill unless the user chooses to.
 
----
+
 
 ## Stale preview / plan mismatch
 
@@ -160,7 +160,7 @@ spell-sync plan --json
 
 - None.
 
----
+
 
 ## Escalation
 

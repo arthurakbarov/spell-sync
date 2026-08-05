@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Iterable
+
 from textual.app import ComposeResult
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, RadioButton, RadioSet, Static
+from textual.widgets import (
+    Button,
+    DirectoryTree,
+    Footer,
+    Header,
+    Input,
+    RadioButton,
+    RadioSet,
+    Static,
+)
 
 from ...application.product_concepts import (
     CHANGE_WORDLIST_BODY,
@@ -36,6 +49,41 @@ _STORAGE_RADIO_IDS = {
     "storage-git": STORAGE_STRATEGY_GIT,
 }
 
+_WORDLIST_NAME = "wordlist.txt"
+
+
+def _browser_root() -> Path:
+    home = Path.home()
+    documents = home / "Documents"
+    if documents.is_dir():
+        return documents
+    return home
+
+
+def filter_wordlist_browser_paths(paths: Iterable[Path]) -> list[Path]:
+    """Keep directories and wordlist.txt files; skip other files and OS errors."""
+    filtered: list[Path] = []
+    for path in paths:
+        try:
+            if path.is_dir():
+                filtered.append(path)
+            elif path.is_file() and path.name.lower() == _WORDLIST_NAME:
+                filtered.append(path)
+        except OSError:
+            continue
+    return filtered
+
+
+class WordlistDirectoryTree(DirectoryTree):
+    """Show directories and wordlist.txt files only."""
+
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        return filter_wordlist_browser_paths(paths)
+
+
+def _action_buttons(*buttons: Button) -> Vertical:
+    return Vertical(*buttons, id="setup-actions", classes="setup-actions")
+
 
 class SetupWelcomeScreen(Screen[None]):
     BINDINGS = [("escape", "quit_setup", "Quit")]
@@ -46,10 +94,13 @@ class SetupWelcomeScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="welcome-content")
-        yield Button(SETUP_START_BUTTON_LABEL, id="btn-setup", variant="primary")
-        yield Button("Open existing word list", id="btn-open")
-        yield Button("Quit", id="btn-quit")
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(id="welcome-content", classes="setup-prose")
+        yield _action_buttons(
+            Button(SETUP_START_BUTTON_LABEL, id="btn-setup", variant="primary"),
+            Button("Open existing word list", id="btn-open"),
+            Button("Quit", id="btn-quit"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -91,26 +142,29 @@ class SetupStorageStrategyScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="storage-content")
-        with RadioSet(id="storage-strategy"):
-            yield RadioButton(
-                STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_LOCAL],
-                id="storage-local",
-                value=True,
-            )
-            yield RadioButton(
-                STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_CLOUD],
-                id="storage-cloud",
-                value=False,
-            )
-            yield RadioButton(
-                STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_GIT],
-                id="storage-git",
-                value=False,
-            )
-        yield Static(id="storage-hint")
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(id="storage-content", classes="setup-prose")
+            with RadioSet(id="storage-strategy"):
+                yield RadioButton(
+                    STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_LOCAL],
+                    id="storage-local",
+                    value=True,
+                )
+                yield RadioButton(
+                    STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_CLOUD],
+                    id="storage-cloud",
+                    value=False,
+                )
+                yield RadioButton(
+                    STORAGE_STRATEGY_LABELS[STORAGE_STRATEGY_GIT],
+                    id="storage-git",
+                    value=False,
+                )
+            yield Static(id="storage-hint", classes="setup-prose")
+        yield _action_buttons(
+            Button("Continue", id="btn-continue", variant="primary"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -141,7 +195,24 @@ class SetupStorageStrategyScreen(Screen[None]):
             self.app.push_screen(SetupWordlistScreen(self._controller))
 
 
-class SetupOpenProjectScreen(Screen[None]):
+class _WordlistBrowseMixin:
+    """Shared DirectoryTree + path input behavior for open/repoint screens."""
+
+    def _set_wordlist_input(self, path: Path) -> None:
+        self.query_one("#wordlist-input", Input).value = str(path)
+
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        path = Path(event.path)
+        if path.name.lower() == _WORDLIST_NAME:
+            self._set_wordlist_input(path)
+
+    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        directory = Path(event.path)
+        candidate = directory / _WORDLIST_NAME
+        self._set_wordlist_input(candidate)
+
+
+class SetupOpenProjectScreen(_WordlistBrowseMixin, Screen[None]):
     BINDINGS = [("escape", "back", "Back")]
 
     def __init__(self, controller: TuiController) -> None:
@@ -150,10 +221,23 @@ class SetupOpenProjectScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Open existing word list\n\nPath to wordlist.txt:")
-        yield Input(placeholder="~/Documents/Spell Sync/wordlist.txt", id="wordlist-input")
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(
+                "Open existing word list\n\n"
+                "Browse to a folder or select wordlist.txt. "
+                "You can still type or paste a path below.",
+                classes="setup-prose",
+            )
+            yield WordlistDirectoryTree(_browser_root(), id="wordlist-browser")
+            yield Static("Path to wordlist.txt:", classes="setup-prose")
+            yield Input(
+                placeholder="~/Documents/Spell Sync/wordlist.txt",
+                id="wordlist-input",
+            )
+        yield _action_buttons(
+            Button("Continue", id="btn-continue", variant="primary"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -185,18 +269,21 @@ class SetupWordlistScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="wordlist-content")
-        with RadioSet(id="wordlist-preset"):
-            for index, (label, _path) in enumerate(self._presets):
-                yield RadioButton(label, id=f"wordlist-preset-{index}", value=(index == 0))
-            yield RadioButton("Custom", id="wordlist-preset-custom", value=False)
-        yield Input(
-            placeholder="~/Documents/Spell Sync/wordlist.txt",
-            id="wordlist-input",
-            value=str(self._controller.setup_wordlist_default()),
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(id="wordlist-content", classes="setup-prose")
+            with RadioSet(id="wordlist-preset"):
+                for index, (label, _path) in enumerate(self._presets):
+                    yield RadioButton(label, id=f"wordlist-preset-{index}", value=(index == 0))
+                yield RadioButton("Custom", id="wordlist-preset-custom", value=False)
+            yield Input(
+                placeholder="~/Documents/Spell Sync/wordlist.txt",
+                id="wordlist-input",
+                value=str(self._controller.setup_wordlist_default()),
+            )
+        yield _action_buttons(
+            Button("Continue", id="btn-continue", variant="primary"),
+            Button("Back", id="btn-back"),
         )
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -245,7 +332,7 @@ class SetupWordlistScreen(Screen[None]):
             self.app.push_screen(SetupTargetsScreen(self._controller, detail or ""))
 
 
-class ChangeWordlistScreen(Screen[None]):
+class ChangeWordlistScreen(_WordlistBrowseMixin, Screen[None]):
     BINDINGS = [("escape", "back", "Back")]
 
     def __init__(self, controller: TuiController) -> None:
@@ -254,13 +341,20 @@ class ChangeWordlistScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(
-            f"{CHANGE_WORDLIST_HEADING}\n\n{CHANGE_WORDLIST_BODY}",
-            id="change-wordlist-content",
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(
+                f"{CHANGE_WORDLIST_HEADING}\n\n{CHANGE_WORDLIST_BODY}\n\n"
+                "Browse to a folder or select wordlist.txt, or type a path below.",
+                id="change-wordlist-content",
+                classes="setup-prose",
+            )
+            yield WordlistDirectoryTree(_browser_root(), id="wordlist-browser")
+            yield Static("Path to wordlist.txt:", classes="setup-prose")
+            yield Input(placeholder="~/Documents/Spell Sync/wordlist.txt", id="wordlist-input")
+        yield _action_buttons(
+            Button("Continue", id="btn-continue", variant="primary"),
+            Button("Back", id="btn-back"),
         )
-        yield Input(placeholder="~/Documents/Spell Sync/wordlist.txt", id="wordlist-input")
-        yield Button("Continue", id="btn-continue", variant="primary")
-        yield Button("Back", id="btn-back")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -298,9 +392,12 @@ class SetupPreviewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(id="preview-content")
-        yield Button("Create project", id="btn-create", variant="primary")
-        yield Button("Back", id="btn-back")
+        with VerticalScroll(id="setup-body", classes="setup-body"):
+            yield Static(id="preview-content", classes="setup-prose")
+        yield _action_buttons(
+            Button("Create project", id="btn-create", variant="primary"),
+            Button("Back", id="btn-back"),
+        )
         yield Footer()
 
     def on_mount(self) -> None:

@@ -45,13 +45,21 @@ doctor, logs, and post-setup target settings.
 
 | Screen | Module | Primary actions |
 |--------|--------|-----------------|
-| Welcome | `setup_welcome_screen.py` | Setup, Quit |
-| Wordlist | `setup_welcome_screen.py` | Continue, Back |
+| Welcome | `setup_welcome_screen.py` | Start setup, Open existing, Quit |
+| Storage strategy | `setup_welcome_screen.py` | Continue, Back |
+| Open existing | `setup_welcome_screen.py` | Browse/`wordlist.txt` tree, Continue, Back |
+| Wordlist | `setup_welcome_screen.py` | Presets, Continue, Back |
+| Change wordlist | `setup_welcome_screen.py` | Browse tree, Continue, Back (from Dashboard) |
 | Targets | `setup_targets_screen.py` | Continue, Back, Refresh |
-| Setup preview | `setup_welcome_screen.py` | Confirm, Back |
+| Setup preview | `setup_welcome_screen.py` | Create project, Back |
 | Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
 | Setup operation | `operation_screen.py` | (worker) |
 | Setup report | `report_screen.py` | Dashboard |
+
+Setup prose uses `max-width: 78` with equal-width actions docked at the bottom
+(`app.tcss` `.setup-body` / `.setup-actions`). Open-existing and Change-wordlist include a
+filtered `DirectoryTree` (`WordlistDirectoryTree`) that shows directories and `wordlist.txt`
+only; path `Input` remains as a typed fallback.
 
 ### Dashboard (sectioned)
 
