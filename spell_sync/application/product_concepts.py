@@ -74,9 +74,7 @@ SETUP_START_BUTTON_LABEL = "Start here"
 
 REVIEW_AND_UPDATE_LABEL = "Review and update"
 
-REVIEW_AND_UPDATE_HELP = (
-    "Guided path: collect words, then update apps — you confirm each preview."
-)
+REVIEW_AND_UPDATE_HELP = "Guided path: collect words, then update apps — you confirm each preview."
 
 COLLECT_WORDS_LABEL = "Collect my words"
 COLLECT_WORDS_HELP = (
