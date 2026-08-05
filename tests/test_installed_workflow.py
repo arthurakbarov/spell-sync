@@ -264,7 +264,9 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
             "if row['target_id'] == 'chrome' and row['platform'] == current"
             "); "
             "assert chrome['automated_validation'] == 'pass'; "
-            "assert chrome['manual_validation'] == 'not-run'",
+            "assert chrome['manual_validation'] == ("
+            "'pass' if current == 'macos' else 'not-run'"
+            ")",
         ],
         env=bundled_env,
         capture_output=True,
