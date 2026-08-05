@@ -38,3 +38,28 @@ def test_plan_mode_exits_without_running_pytest() -> None:
     mod = _load_run_dev_loop()
     code = mod.main(["--plan", "--no-sample", "--files", "docs/WORKFLOW.md"])
     assert code == 0
+
+
+def test_session_reuse_skips_gate(tmp_path, monkeypatch, capsys) -> None:
+    mod = _load_run_dev_loop()
+    from scripts import check_session
+
+    base = tmp_path / "sessions"
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_DIR", str(base))
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_ID", "arc-test-reuse")
+    monkeypatch.delenv("CURSOR_TRACE_ID", raising=False)
+    sid = check_session.start_session(session_id="arc-test-reuse", base=base)
+    fp = check_session.tree_fingerprint(ROOT)
+    check_session.record_check(
+        "dev-loop:L0",
+        exit_code=0,
+        duration=1.25,
+        session_id=sid,
+        root=ROOT,
+        base=base,
+        fingerprint=fp,
+    )
+    code = mod.main(["--no-sample", "--files", "docs/WORKFLOW.md"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "DEV_LOOP_SESSION_REUSE=true" in out

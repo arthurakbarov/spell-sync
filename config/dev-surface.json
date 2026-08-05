@@ -11,6 +11,7 @@
   ],
   "agentCommands": [
     "agent-context",
+    "check-session",
     "environment-check",
     "edit-loop",
     "commit-gate",
@@ -23,7 +24,7 @@
   ],
   "notes": [
     "Owner: short list for day-to-day validation and triage.",
-    "Agent: full list including agent-context, necessity, and runs show.",
+    "Agent: full list including agent-context, check-session, necessity, and runs show.",
     "Product CLI (pull/push/ui) remains in spell_sync/cli.py + AGENTS.md fence."
   ]
 }

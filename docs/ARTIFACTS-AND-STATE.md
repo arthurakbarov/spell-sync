@@ -10,6 +10,7 @@ Git: [GIT-WORKFLOW.md](GIT-WORKFLOW.md). Snapshot procedure:
 | CI input digest | Necessity reuse key | no | under `.artifacts/` | CI / necessity scripts |
 | Dead-code report | Tiny-module scan | no | `.artifacts/quality/dead-code-report.json` | `audit_dead_code.py` |
 | Timing / execution history | ETA learning | no | execution-control SQLite (state dir) | budgeted / observe runs |
+| Check-session ledger | Ephemeral reuse of successful checks in one agent arc | no | `/tmp/spell-sync-agent-session/` (override `SPELL_SYNC_CHECK_SESSION_DIR`) | `check_session.py` / `run_dev_loop.py` |
 | Timeout diagnostics | Stall/hard captures | no | execution-control timeouts dir | hard/stall termination |
 | Support report | Redacted user diagnostics | yes (export) | user-chosen path | `support-report` / TUI Health |
 | Technical log | Operation JSONL | no | app state beside wordlist | product runs |
@@ -22,6 +23,8 @@ Git: [GIT-WORKFLOW.md](GIT-WORKFLOW.md). Snapshot procedure:
 ## Rules
 
 - Do not commit `.artifacts/` churn, `.venv/`, journals, or personal wordlists.
+- Check-session state is ephemeral under `/tmp` (or `SPELL_SYNC_CHECK_SESSION_DIR`); never
+  commit ledgers. Optional env: `SPELL_SYNC_CHECK_SESSION_ID`, `CURSOR_TRACE_ID`.
 - SHA-256 for shareable archives belongs in reports / stdout — not sidecar files in
   the public tree.
 - Product paths must not leak user words into technical logs or history

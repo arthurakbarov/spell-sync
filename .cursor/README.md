@@ -101,6 +101,7 @@ keeps feature-branch + explicit-commit policy.
 ## Surfaces
 
 - Inspect: `python3 scripts/agent_context.py` (optional `--json`)
+- Session reuse: `python3 scripts/check_session.py` (start / record / lookup / finish)
 - Edit loop: `python3 scripts/run_dev_loop.py` (≤60s)
 - Checkpoint: `python3 scripts/run_dev_loop.py --commit-gate` (≤120s)
 - Full CI: `scripts/ci.sh` only on owner push / publish / final

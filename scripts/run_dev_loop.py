@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts import check_session  # noqa: E402
 from scripts.cli_text import format_kv_lines  # noqa: E402
 from scripts.execution_control.eta import announce_expected_eta  # noqa: E402
 from scripts.execution_control.observe import (  # noqa: E402
@@ -81,6 +83,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable sample fill-to-budget on the L0 edit loop (must-keep only).",
     )
+    parser.add_argument(
+        "--no-session-reuse",
+        action="store_true",
+        help="Do not skip the gate when check_session has a reusable success for this fingerprint.",
+    )
     return parser
 
 
@@ -112,6 +119,17 @@ def _needs_architecture(changed: list[str]) -> bool:
     )
 
 
+def _ensure_check_session() -> str | None:
+    """Return session id when reuse/recording should run; start one for Cursor arcs."""
+    if check_session.has_active_session():
+        # Ensure ledger directory exists when env provides the id.
+        sid = check_session.resolve_session_id()
+        if os.environ.get("CURSOR_TRACE_ID") or os.environ.get("SPELL_SYNC_CHECK_SESSION_ID"):
+            return check_session.start_session(session_id=sid)
+        return sid
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -119,6 +137,26 @@ def main(argv: list[str] | None = None) -> int:
     budget = budget_seconds_for_gate(gate)
     wall_started = time.monotonic()
     gate_id = f"dev-loop:{gate}"
+    session_id = None if args.plan else _ensure_check_session()
+    if session_id and not args.plan and not args.no_session_reuse:
+        cached = check_session.lookup_reusable(gate_id, session_id=session_id, root=ROOT)
+        if cached is not None:
+            print(f"DEV_LOOP_GATE={gate}", flush=True)
+            print("DEV_LOOP_SESSION_REUSE=true", flush=True)
+            print(f"DEV_LOOP_SESSION_ID={session_id}", flush=True)
+            print(f"DEV_LOOP_REUSED_DURATION={cached.get('duration', 0)}", flush=True)
+            print("DEV_LOOP_RESULT=success", flush=True)
+            print("DEV_LOOP_EXIT=0", flush=True)
+            check_session.record_check(
+                gate_id,
+                exit_code=0,
+                duration=float(cached.get("duration") or 0.0),
+                selected_by="session-reuse",
+                reused=True,
+                session_id=session_id,
+                root=ROOT,
+            )
+            return 0
     if not args.plan:
         announce_expected_eta(
             gate_id,
@@ -129,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     print("DEV_LOOP_COVERAGE=false", flush=True)
     print("DEV_LOOP_ADMISSION=bypass", flush=True)
     print(f"DEV_LOOP_BUDGET_SECONDS={budget}", flush=True)
+    if session_id:
+        print(f"DEV_LOOP_SESSION_ID={session_id}", flush=True)
+        print("DEV_LOOP_SESSION_REUSE=false", flush=True)
 
     changed = collect_changed_files(
         ROOT,
@@ -270,6 +311,16 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"DEV_LOOP_RESULT={'success' if exit_code == 0 else 'failed'}")
     print(f"DEV_LOOP_EXIT={exit_code}")
+    if session_id is not None:
+        check_session.record_check(
+            gate_id,
+            exit_code=exit_code,
+            duration=wall_seconds,
+            selected_by="run_dev_loop",
+            reused=False,
+            session_id=session_id,
+            root=ROOT,
+        )
     return exit_code
 
 

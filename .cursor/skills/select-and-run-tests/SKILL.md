@@ -22,6 +22,7 @@ Shared contract: `.cursor/README.md` § Shared contract.
 ## Loop (edit)
 
 ```bash
+python3 scripts/check_session.py start
 python3 scripts/check_ci_necessity.py --purpose local --explain
 python3 scripts/test_plan.py --dev-scope --explain
 python3 scripts/run_dev_loop.py
@@ -30,7 +31,8 @@ python3 scripts/run_dev_loop.py
 L0 fills optional module tests toward the ~60s sample budget (`DEV_LOOP_SAMPLE_*`).
 Use `--plan` to print the JSON plan without running. Use `--no-sample` only when
 diagnosing a narrow failure. Skip when necessity is `no-action`. Prefer exact
-failing nodes when reproducing a defect.
+failing nodes when reproducing a defect. With an active check-session, identical
+successful gates on the same fingerprint are reused (`DEV_LOOP_SESSION_REUSE`).
 
 ## Checkpoint
 

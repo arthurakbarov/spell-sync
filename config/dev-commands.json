@@ -15,7 +15,6 @@
       "mutatesRepo": false,
       "network": false
     },
-
     "environment-check": {
       "command": "python3 scripts/project_environment.py check",
       "stage": "before-work",

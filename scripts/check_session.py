@@ -76,6 +76,13 @@ def tree_fingerprint(root: Path | None = None) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def has_active_session(*, base: Path | None = None) -> bool:
+    """True when env id, Cursor trace, or current-session pointer is present."""
+    if os.environ.get("SPELL_SYNC_CHECK_SESSION_ID") or os.environ.get("CURSOR_TRACE_ID"):
+        return True
+    return _current_file(base or _base_dir()).is_file()
+
+
 def resolve_session_id(explicit: str | None = None, *, base: Path | None = None) -> str:
     if os.environ.get("SPELL_SYNC_CHECK_SESSION_ID"):
         return _sanitize_id(os.environ["SPELL_SYNC_CHECK_SESSION_ID"])
