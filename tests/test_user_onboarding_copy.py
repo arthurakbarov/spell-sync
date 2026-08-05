@@ -28,3 +28,7 @@ def test_beginner_welcome_and_primary_path() -> None:
     assert "Review and update" in pc.REVIEW_AND_UPDATE_LABEL
     assert "preview" in pc.WELCOME_WHAT_YOU_DO.lower()
     assert "confirm" in pc.REVIEW_START_BODY.lower()
+    assert "confirm" in pc.REVIEW_AND_UPDATE_HELP.lower()
+    assert "Nothing is removed" in pc.COLLECT_WORDS_HELP
+    assert "Built-in" in pc.UPDATE_APPS_HELP
+    assert "ready" in pc.CHECK_APPS_HELP.lower()
