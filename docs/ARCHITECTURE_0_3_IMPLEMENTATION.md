@@ -64,7 +64,7 @@ Open engineering residuals (not release blockers if previously accepted):
 - Real-application manual validation: **2/35** (`docs/target-validation.json`;
   chrome/macos + macos_spelling/macos recorded 2026-08-05, read-only / dry-run)
 - Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
-- Legacy `*coverage*` padding inventory frozen at ≤373 `def test_` (see
+- Legacy `*coverage*` padding inventory frozen at ≤371 `def test_` (see
   `tests/test_padding_inventory_policy.py`) — do not grow; shrink only; publish gate is
   tiered (`scripts/coverage_policy.py`: 100% on application + mutation; ≥98% TUI/remainder)
 

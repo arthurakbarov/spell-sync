@@ -8,6 +8,7 @@ without owner approval.
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +38,23 @@ ALLOWED_COVERAGE_NAMED_FILES = frozenset(
 )
 
 # Count only def test_ inside ALLOWED_COVERAGE_NAMED_FILES.
-MAX_COVERAGE_NAMED_TEST_DEFS = 372
+# Shrunk from 372 when removing a duplicate recover-path padding test (R-PWR).
+MAX_COVERAGE_NAMED_TEST_DEFS = 371
+
+# Explicitly removed padding / re-export shims — must not return under a new name-free path.
+REMOVED_PADDING_FILES = frozenset(
+    {
+        "tests/test_execution_interrupt.py",
+        "tests/tui/test_button_else_branches.py",
+    }
+)
+
+# Handler-style suites must assert outcomes (not click-and-hope coverage).
+VERIFIED_HANDLER_FILES = frozenset(
+    {
+        "tests/tui/test_setup_screen_handlers.py",
+    }
+)
 
 
 def _looks_like_padding(path: Path) -> bool:
@@ -50,6 +67,33 @@ def _coverage_named_files() -> list[Path]:
     return sorted(
         path for path in TESTS.rglob("*.py") if path.is_file() and _looks_like_padding(path)
     )
+
+
+def _test_functions(path: Path) -> list[ast.AST]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+    ]
+
+
+def _has_verification(node: ast.AST) -> bool:
+    for child in ast.walk(node):
+        if isinstance(child, ast.Assert):
+            return True
+        if isinstance(child, ast.Call):
+            func = child.func
+            if isinstance(func, ast.Attribute) and func.attr.startswith("assert"):
+                return True
+            if isinstance(func, ast.Attribute) and func.attr == "fail":
+                return True
+            if isinstance(func, ast.Name) and func.id in {"raises", "warns", "deprecated_call"}:
+                return True
+            if isinstance(func, ast.Attribute) and func.attr in {"raises", "warns"}:
+                return True
+    return False
 
 
 def test_coverage_named_files_are_frozen() -> None:
@@ -68,3 +112,19 @@ def test_coverage_named_test_count_does_not_grow() -> None:
     assert total <= MAX_COVERAGE_NAMED_TEST_DEFS, (
         f"coverage-named test defs grew to {total} (max {MAX_COVERAGE_NAMED_TEST_DEFS})"
     )
+
+
+def test_removed_padding_files_stay_gone() -> None:
+    survivors = [rel for rel in sorted(REMOVED_PADDING_FILES) if (ROOT / rel).is_file()]
+    assert not survivors, f"removed padding files returned: {survivors}"
+
+
+def test_handler_suites_verify_outcomes() -> None:
+    bare: list[str] = []
+    for rel in sorted(VERIFIED_HANDLER_FILES):
+        path = ROOT / rel
+        assert path.is_file(), f"missing handler suite: {rel}"
+        for node in _test_functions(path):
+            if not _has_verification(node):
+                bare.append(f"{rel}::{node.name}")
+    assert not bare, f"handler tests must assert an outcome: {bare}"
