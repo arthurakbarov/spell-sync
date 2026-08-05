@@ -32,7 +32,13 @@ Spell Sync.
 
 ## Install
 
-### From GitHub
+Requires **Python 3.11+**. You do not need Git for daily use after install — only if you
+prefer installing from a clone or keeping your word list in a private Git repo.
+
+A public PyPI package is not published yet. Install from GitHub (or a local clone) until a
+release is tagged.
+
+### Recommended: `uv`
 
 ```bash
 uv tool install \
@@ -41,6 +47,22 @@ uv tool install \
 uv tool update-shell   # only if the uv tools directory is not already on PATH
 spell-sync
 ```
+
+Install [`uv`](https://docs.astral.sh/uv/) first if you do not have it.
+
+### Without `uv` (pip)
+
+```bash
+python3 -m pip install --user \
+  "spell-sync @ git+https://github.com/arthurakbarov/spell-sync"
+# ensure your user scripts directory is on PATH, then:
+spell-sync
+# or:
+python3 -m spell_sync
+```
+
+If `spell-sync` is not found after install, see
+[Troubleshooting](docs/TROUBLESHOOTING.md#spell-sync-was-installed-but-the-command-is-not-found).
 
 For release-candidate testing before a GitHub release, install from a wheel in `dist/` — see
 [Manual testing](docs/MANUAL_TESTING.md).
@@ -51,6 +73,7 @@ For release-candidate testing before a GitHub release, install from a wheel in `
 git clone https://github.com/arthurakbarov/spell-sync
 cd spell-sync
 uv tool install .
+# or: python3 -m pip install --user .
 spell-sync
 ```
 
@@ -69,8 +92,9 @@ Editable install for local CLI testing:
 uv tool install --editable .
 ```
 
-Requires **Python 3.11+**. Python **3.11** and **3.12** are currently tested; **3.13** is
-experimental (see [Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)).
+Python **3.11** and **3.12** are currently tested; **3.13** is experimental (see
+[Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)). Product runtime does **not**
+require `uv` — `uv` is the convenient installer and the maintainer toolchain.
 
 ## Quick start
 

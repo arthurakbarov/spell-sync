@@ -28,8 +28,8 @@ Target platforms for Pull/Push/TUI product behavior:
 
 | Platform | Product support | Evidence |
 |----------|-----------------|----------|
-| macOS | Supported | Synthetic CI + real-app manual validation: see `target-validation.json` (currently not-run) |
-| Linux | Supported | Synthetic CI + real-app manual validation: see `target-validation.json` (currently not-run) |
+| macOS | Supported | Synthetic CI; real-app manual samples recorded for some targets (see `target-validation.json`) |
+| Linux | Supported | Synthetic CI; real-app manual validation mostly `not-run` |
 | Windows | Supported (capability-limited) | Synthetic CI; adversarial R1–R7 suite exercises POSIX symlink/hard-link vectors (not Windows reparse/junction on real hardware) — see [Supported targets](SUPPORTED_TARGETS.md) Known limitations |
 
 Classifiers currently list `Operating System :: OS Independent`. Platform-specific dictionary

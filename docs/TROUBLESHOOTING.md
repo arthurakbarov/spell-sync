@@ -1,8 +1,8 @@
 # Troubleshooting
 
 Symptom-based guidance for Spell Sync. For target capability limits see
-[Supported targets](SUPPORTED_TARGETS.md). For real-application validation workflow see
-[Manual testing](MANUAL_TESTING.md) and Recovery details in [Recovery](RECOVERY.md).
+[Supported targets](SUPPORTED_TARGETS.md). Recovery details: [Recovery](RECOVERY.md).
+Maintainer release checklist: [Manual testing](MANUAL_TESTING.md).
 
 ## Contents
 

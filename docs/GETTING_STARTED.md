@@ -24,7 +24,8 @@ computer — see [Personal Workspace](PERSONAL_WORKSPACE.md).
 ## What you need
 
 - A Mac, Linux, or Windows computer
-- Spell Sync installed ([README → Install](../README.md#install))
+- **Python 3.11+** and Spell Sync installed ([README → Install](../README.md#install);
+  `uv` recommended, `pip` also works; no PyPI package yet)
 - An empty folder for your private word list (Spell Sync creates the files). Where that
   folder lives is your storage choice: this computer only, a synced cloud folder, or a
   private Git remote.
