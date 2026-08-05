@@ -6,6 +6,7 @@
     "commit-gate",
     "full-ci",
     "ci-evidence",
+    "preflight-publish",
     "runs-failures",
     "timing-report"
   ],
@@ -13,11 +14,13 @@
     "agent-context",
     "check-session",
     "environment-check",
+    "install-git-hooks",
     "edit-loop",
     "commit-gate",
     "ci-necessity",
     "full-ci",
     "ci-evidence",
+    "preflight-publish",
     "privacy-scan",
     "runs-show",
     "runs-failures",
@@ -25,7 +28,7 @@
   ],
   "notes": [
     "Owner: short list for day-to-day validation and triage.",
-    "Agent: full list including agent-context, check-session, necessity, and runs show.",
+    "Agent: full list including agent-context, check-session, necessity, hooks, and runs show.",
     "Product CLI (pull/push/ui) remains in spell_sync/cli.py + AGENTS.md fence."
   ]
 }

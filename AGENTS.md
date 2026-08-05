@@ -87,10 +87,12 @@ use local minimal (`run_dev_loop.py`, 60s edit / 120s commit gate) and must not 
 necessity is `commit-gate-sufficient`. On full CI completion it prints `CI_RESULT`, `CI_EXIT`,
 `CI_SUMMARY`, and `CI_LOG`. See `docs/TESTING_STRATEGY.md`.
 
-Docs style, docs contract, agent config, architecture boundaries, ruff, mypy, grouped pytest
-with **tiered coverage** on `spell_sync/` (100% lines on application + mutation paths; ≥98%
-lines on TUI/presentation/remainder; ≥90% branches on strict paths; full CI only), packaging,
-installed-wheel smoke, and headless command scenarios.
+Full ordered gate IDs: `python3 scripts/ci_runner.py --list-checks` (and the generated fence in
+`docs/DEVELOPMENT.md`). Includes environment/registry validators, `privacy.tree`, docs
+style/contract, agent config, architecture boundaries, ruff, mypy, grouped pytest with
+**tiered coverage** on `spell_sync/` (100% lines on application + mutation paths; ≥98%
+lines on TUI/presentation/remainder; ≥90% branches on strict paths; full CI only), packaging
+(`packaging.build` / `twine` / `members` / `wheel-smoke`), and headless smoke scenarios.
 
 Requires **Python 3.11+** (`pyproject.toml`).
 

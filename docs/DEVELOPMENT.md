@@ -94,14 +94,57 @@ CI_SUMMARY=<absolute path>
 CI_LOG=<absolute path>
 ```
 
-Failures print `CI_FAILED_ID=<stable check id>`. Read `CI_SUMMARY` and `CI_LOG` — do not rely
+Failures print `CI_FAILED_ID=<stable check id>` for gate failures. Other failure markers
+(`ci.internal`, `ci.tree-changed`, `ci.environment-changed`, `ci.ci-input-changed`,
+`execution.hard-timeout`) are also possible. Read `CI_SUMMARY` and `CI_LOG` — do not rely
 on manual log tailing as the primary gate.
 
-`scripts/ci.sh` delegates to `scripts/ci_runner.py`: docs style/contract, agent config, target
-capabilities, **architecture boundaries** (`scripts/check_architecture.py`), ruff, mypy,
-grouped pytest with **tiered coverage** on `spell_sync/` (100% lines on application +
-mutation paths; ≥98% on TUI/presentation/remainder; ≥90% branches on strict paths), packaging,
-installed-wheel smoke, and headless command scenarios. CI smoke uses temporary HOME and project
+`scripts/ci.sh` delegates to `scripts/ci_runner.py`. Full ordered gate IDs (SSOT:
+`python3 scripts/ci_runner.py --list-checks`):
+
+[ci-checks:start]
+| # | Check ID |
+|---|----------|
+| 1 | `bootstrap.python` |
+| 2 | `bootstrap.clean-tree` |
+| 3 | `environment.lock` |
+| 4 | `environment.check` |
+| 5 | `environment.contract` |
+| 6 | `execution-budget.registry` |
+| 7 | `dev-commands.registry` |
+| 8 | `timing.observability` |
+| 9 | `ci-impact.registry` |
+| 10 | `test-impact.registry` |
+| 11 | `docs.style` |
+| 12 | `docs.contract` |
+| 13 | `architecture.boundaries` |
+| 14 | `agent.config` |
+| 15 | `privacy.tree` |
+| 16 | `targets.capabilities` |
+| 17 | `ruff.check` |
+| 18 | `ruff.format` |
+| 19 | `mypy` |
+| 20 | `tests:tui` |
+| 21 | `tests:dev-tooling` |
+| 22 | `tests:environment` |
+| 23 | `tests:packaging` |
+| 24 | `tests:integration` |
+| 25 | `tests:rest` |
+| 26 | `coverage.policy` |
+| 27 | `packaging.build` |
+| 28 | `packaging.twine` |
+| 29 | `packaging.members` |
+| 30 | `packaging.wheel-smoke` |
+| 31 | `smoke.init` |
+| 32 | `smoke.lint` |
+| 33 | `smoke.tui` |
+[ci-checks:end]
+
+Pipeline summary: environment/registry validators, privacy tree scan, docs style/contract,
+agent config, target capabilities, architecture boundaries, ruff, mypy, grouped pytest with
+**tiered coverage** on `spell_sync/` (100% lines on application + mutation paths; ≥98% on
+TUI/presentation/remainder; ≥90% branches on strict paths), packaging (build/twine/members/
+wheel-smoke), and headless command scenarios. CI smoke uses temporary HOME and project
 directories only.
 
 Agent-oriented workflow: `docs/AGENT_DEVELOPMENT.md`.
