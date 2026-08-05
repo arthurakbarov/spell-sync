@@ -71,9 +71,12 @@ python3 scripts/check_ci_necessity.py --purpose local --explain
 Runs only:
 
 1. Changed-module / affected pytest targets **without coverage**
-2. `ruff check` / `ruff format --check` on touched Python
-3. `scripts/check_architecture.py --check` when application boundaries change
-4. Mapped validators from the test-impact registry
+2. On the **L0 edit loop**, sample fill-to-budget: must-keep affected targets, then
+   optional module tests until the ~60s estimate is used (`DEV_LOOP_SAMPLE_*`;
+   disable with `--no-sample`). Commit gate (L1) does not sample-fill.
+3. `ruff check` / `ruff format --check` on touched Python
+4. `scripts/check_architecture.py --check` when application boundaries change
+5. Mapped validators from the test-impact registry
 
 Does **not** run: full CI, packaging wheel-smoke, environment suite, entire TUI group fan-out,
 coverage policy, or mandatory pre-final polish.

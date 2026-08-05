@@ -43,9 +43,12 @@ Local commits anytime (no owner approval).
 ## Full gate (owner push / publish / final only)
 
 ```bash
-scripts/ci.sh
-python3 scripts/check_ci_evidence.py
+python3 scripts/preflight_publish.py
+# owner-approved execute:
+python3 scripts/preflight_publish.py --execute
 ```
+
+Or `scripts/ci.sh` then `python3 scripts/check_ci_evidence.py`.
 
 ## Phrase map
 
@@ -59,7 +62,9 @@ python3 scripts/check_ci_evidence.py
 ## Related
 
 - Skill `repository-workflow` — inspect → edit → checkpoint → gate
+- Skill `preflight-publish` — publish readiness
 - Skill `git-change-management` / `security-audit` — git + privacy
+- Honesty: `docs/CONTRACTS.md`, `docs/FEATURE_MATRIX.md`, `docs/INVENTORY.md`
 - Command SSOT: `config/dev-commands.json` + `config/dev-surface.json`
 - Done: `docs/ENGINEERING_COMPLETION.md` + `docs/PRODUCT_COMPLETION.md`
 - Triage: `python3 scripts/dev_runs.py failures`

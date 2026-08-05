@@ -27,7 +27,9 @@ python3 scripts/test_plan.py --dev-scope --explain
 python3 scripts/run_dev_loop.py
 ```
 
-Skip when necessity is `no-action`. Prefer exact failing nodes when reproducing a defect.
+L0 fills optional module tests toward the ~60s sample budget (`DEV_LOOP_SAMPLE_*`).
+Use `--no-sample` only when diagnosing a narrow failure. Skip when necessity is
+`no-action`. Prefer exact failing nodes when reproducing a defect.
 
 ## Checkpoint
 
@@ -36,6 +38,7 @@ python3 scripts/run_dev_loop.py --commit-gate
 ```
 
 Adds safety cluster tests when mutation paths change. Wall budget **120s**.
+Commit gate does not sample-fill.
 
 When application boundaries change:
 
@@ -45,9 +48,10 @@ python3 scripts/check_architecture.py --check
 
 ## Full gate (owner push / publish / final only)
 
-Does **not** run full CI. Owner publish uses skill `spell-sync-ci`.
+Does **not** run full CI. Owner publish uses skill `preflight-publish` or
+`spell-sync-ci`.
 
 ## Related
 
-Report mode, selected clusters, `DEV_LOOP_*` budget lines, and that full CI was deferred
-unless the owner requested publish.
+Report mode, selected clusters, `DEV_LOOP_*` / `DEV_LOOP_SAMPLE_*` lines, and that
+full CI was deferred unless the owner requested publish.

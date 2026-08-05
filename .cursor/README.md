@@ -35,6 +35,7 @@ Related              - optional cross-links
 | `agent-context` inspect | `scripts/agent_context.py` | `nx agent-context` |
 | `comments` hygiene | rule `comments.mdc` | rule `comments.mdc` |
 | after-changes ladder | rule `after-changes.mdc` | same ladder; nix rule filename keeps a check- prefix |
+| `preflight-publish` | `preflight_publish.py` (+ privacy) | `nx preflight-push` / audit-history |
 
 Naming note: spell-sync uses `after-changes.mdc` so agent-config hygiene does not treat the
 rule name as a forbidden hyphenated check- script alias. Same role as the nix rule.
@@ -79,6 +80,7 @@ keeps feature-branch + explicit-commit policy.
 | `repository-workflow` | Cross-cutting change arc |
 | `git-change-management` | Local commits anytime; push owner-gated |
 | `security-audit` | Privacy scan before share/push |
+| `preflight-publish` | Publish gate: necessity → CI → evidence → privacy |
 | `project-environment` | `.venv` / uv lifecycle |
 
 ## spell-sync specific (not shared)

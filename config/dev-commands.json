@@ -50,6 +50,13 @@
       "mutatesRepo": false,
       "network": false
     },
+    "preflight-publish": {
+      "command": "python3 scripts/preflight_publish.py",
+      "stage": "full-ci",
+      "task": "Publish readiness plan (add --execute for CI+evidence)",
+      "mutatesRepo": false,
+      "network": "maybe"
+    },
     "runs-show": {
       "command": "python3 scripts/dev_runs.py show <run-id>",
       "stage": "triage",

@@ -77,6 +77,7 @@ patterns = [
   "scripts/execution_budget_admin.py",
   "scripts/dev_runs.py",
   "scripts/agent_context.py",
+  "scripts/preflight_publish.py",
   "scripts/build_focused_plan.py",
   "scripts/build_pre_final_plan.py",
   "scripts/test_groups.py",

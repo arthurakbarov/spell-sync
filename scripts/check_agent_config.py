@@ -89,6 +89,7 @@ REQUIRED_SKILLS = (
     "repository-workflow",
     "git-change-management",
     "security-audit",
+    "preflight-publish",
 )
 
 BANNED_WORKFLOW_TERMS = [

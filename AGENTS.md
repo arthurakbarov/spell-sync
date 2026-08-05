@@ -47,6 +47,9 @@ docs/TUI_IMPLEMENTATION.md
 docs/CONFIGURATION.md
 docs/AGENT_DEVELOPMENT.md
 docs/GIT-WORKFLOW.md
+docs/CONTRACTS.md
+docs/FEATURE_MATRIX.md
+docs/INVENTORY.md
 ```
 
 ## Pull and Push
@@ -136,6 +139,7 @@ Other skills:
 - `platform-validation` — record real-application validation on a specific OS
 - `installed-wheel-smoke` — verify an installed wheel outside the source checkout
 - `release-candidate` — prepare a release candidate without publishing
+- `preflight-publish` — publish readiness: necessity → CI → evidence → privacy
 - `privacy-export` — scan artifacts and repo content before publication or sharing
 - `project-environment` — bootstrap/sync/check maintainer Python environment lifecycle
 

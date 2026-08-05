@@ -19,6 +19,8 @@ from scripts.execution_control.observe import (  # noqa: E402
 )
 from scripts.test_selection.changes import collect_changed_files  # noqa: E402
 from scripts.test_selection.planner import build_plan  # noqa: E402
+from scripts.test_selection.registry import load_registry  # noqa: E402
+from scripts.test_selection.sample_budget import apply_sample_budget  # noqa: E402
 
 ARCHITECTURE_TRIGGERS = (
     "spell_sync/application/",
@@ -66,6 +68,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--ignore-budget",
         action="store_true",
         help="Do not fail when wall time exceeds the local minimal SLA (still report status).",
+    )
+    parser.add_argument(
+        "--no-sample",
+        action="store_true",
+        help="Disable sample fill-to-budget on the L0 edit loop (must-keep only).",
     )
     return parser
 
@@ -130,13 +137,35 @@ def main(argv: list[str] | None = None) -> int:
         dev_scope=True,
         include_safety_cluster_tests=args.commit_gate,
     )
+    pytest_targets = list(plan.pytest_targets)
+    sample_enabled = gate == "L0" and not args.no_sample and args.target is None
+    if sample_enabled:
+        registry = load_registry(ROOT / "tests" / "test-impact.toml")
+        sample = apply_sample_budget(
+            root=ROOT,
+            registry=registry,
+            must_keep_targets=pytest_targets,
+            changed_files=list(plan.changed_files),
+            budget_seconds=float(budget),
+        )
+        pytest_targets = list(sample.targets)
+        print("DEV_LOOP_SAMPLE=true", flush=True)
+        print(f"DEV_LOOP_SAMPLE_SEED={sample.seed}", flush=True)
+        print(f"DEV_LOOP_SAMPLE_MUST_KEEP={len(sample.must_keep)}", flush=True)
+        print(f"DEV_LOOP_SAMPLE_FILLED={len(sample.filled)}", flush=True)
+        print(f"DEV_LOOP_SAMPLE_OMITTED={len(sample.omitted)}", flush=True)
+        print(f"DEV_LOOP_SAMPLE_USED_SECONDS={sample.used_seconds}", flush=True)
+        print(f"DEV_LOOP_SAMPLE_FILL_RATIO={sample.fill_ratio}", flush=True)
+    else:
+        print("DEV_LOOP_SAMPLE=false", flush=True)
+
     print(f"DEV_LOOP_CHANGED_FILES={len(plan.changed_files)}")
     print(f"DEV_LOOP_CLUSTERS={','.join(plan.clusters)}")
-    print(f"DEV_LOOP_TARGETS={len(plan.pytest_targets)}")
+    print(f"DEV_LOOP_TARGETS={len(pytest_targets)}")
     if args.explain:
         for reason in plan.reasons:
             print(f"DEV_LOOP_REASON={reason}")
-        for target in plan.pytest_targets:
+        for target in pytest_targets:
             print(f"DEV_LOOP_PYTEST_TARGET={target}")
 
     exit_code = 0
@@ -172,12 +201,12 @@ def main(argv: list[str] | None = None) -> int:
         code = _run(argv_cmd, label=f"validator:{script}")
         exit_code = exit_code or code
 
-    if plan.pytest_targets:
+    if pytest_targets:
         argv_cmd = [
             args.python,
             "-m",
             "pytest",
-            *plan.pytest_targets,
+            *pytest_targets,
             "-q",
             "--durations=10",
         ]

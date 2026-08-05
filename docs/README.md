@@ -23,6 +23,9 @@ in the linked canonical documents — not in implementation trackers or release 
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, CI, local validation |
 | [ENGINEERING_COMPLETION.md](ENGINEERING_COMPLETION.md) | Repo/agent done-definition |
 | [PRODUCT_COMPLETION.md](PRODUCT_COMPLETION.md) | Product UX / release readiness |
+| [CONTRACTS.md](CONTRACTS.md) | Doctor/status/TUI state vocabulary |
+| [FEATURE_MATRIX.md](FEATURE_MATRIX.md) | Feature honesty (automated vs manual) |
+| [INVENTORY.md](INVENTORY.md) | Maintainer / manual / non-repo items |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Agent workflow and evidence contracts |
 | [GIT-WORKFLOW.md](GIT-WORKFLOW.md) | Commit shape, split discipline, push policy |
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Focused test levels and selection |

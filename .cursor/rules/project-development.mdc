@@ -27,11 +27,18 @@ skill `select-and-run-tests`. Arc: skill `repository-workflow`. Safety:
 
 - ASCII only in harness / script stdout meant for terminals (no unicode ellipsis,
   em dash, or `==>` arrows; use `...` / ` - `)
+- Target about **80 columns** for default owner lines (wrap or shorten; no long
+  path dumps)
+- Prefer `KEY=value` / `key: value` field blocks; pad values within one block only
+- **No absolute filesystem paths** in default owner/agent text output; use
+  `$HOME/...` display paths, repo-relative paths, or `--json` / verbose for debug
 - Product TUI / user copy follows `product-language.mdc` (separate from harness)
 - Do not pipe CI through `tail` / `tee`
 
 ## Related
 
 - Phrase map: skills `autonomous-work` / `project-development`
+- Publish gate: skill `preflight-publish`
+- State honesty: `docs/CONTRACTS.md` + `docs/FEATURE_MATRIX.md`
 - Comments: `comments.mdc`
 - Git: `git-change-management.mdc`

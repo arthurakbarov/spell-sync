@@ -29,12 +29,15 @@ _SKILLS = (
     ".cursor/skills/select-and-run-tests/SKILL.md",
     ".cursor/skills/security-audit/SKILL.md",
     ".cursor/skills/autonomous-work/SKILL.md",
+    ".cursor/skills/preflight-publish/SKILL.md",
 )
 _DOCS = (
     "AGENTS.md",
     "docs/AGENT_DEVELOPMENT.md",
     "docs/ENGINEERING_COMPLETION.md",
     "docs/TESTING_STRATEGY.md",
+    "docs/CONTRACTS.md",
+    "docs/FEATURE_MATRIX.md",
     ".cursor/README.md",
 )
 

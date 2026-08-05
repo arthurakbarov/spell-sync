@@ -39,8 +39,7 @@ python3 scripts/check_ci_necessity.py --purpose local --explain
 ## Full gate (owner push / publish / final only)
 
 ```bash
-scripts/ci.sh
-python3 scripts/check_ci_evidence.py
+python3 scripts/preflight_publish.py --execute
 ```
 
 Then workspace snapshot for modifying tasks (`docs/AGENT_DEVELOPMENT.md`).
