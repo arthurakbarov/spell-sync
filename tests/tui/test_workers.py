@@ -39,7 +39,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
     async def test_dashboard_refresh_completes(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.screen.refresh_dashboard()
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
@@ -47,7 +47,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
     async def test_loading_state(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.screen.refresh_dashboard()
             summary = app.screen.query_one("#dashboard-summary")
@@ -57,7 +57,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
     async def test_close_screen_during_worker(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.push_screen(StatusScreen(controller))
             await pilot.pause()
@@ -82,7 +82,7 @@ class TestWorkers(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.switch_screen(StatusScreen(controller))
             content = await wait_for_text(pilot, "#status-summary", "load failed")
             text = str(content.render())

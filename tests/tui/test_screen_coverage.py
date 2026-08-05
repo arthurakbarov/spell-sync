@@ -38,7 +38,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_app_quit_hotkey(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("q")
             await pilot.pause()
@@ -131,7 +131,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(status_detail=detail), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.switch_screen(StatusScreen(controller))
             await wait_for_text(pilot, "#status-summary", "destructive")
             screen = app.screen
@@ -196,7 +196,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.switch_screen(PreviewScreen(controller))
             await wait_for_text(pilot, "#preview-content", "Skipped")
             screen = app.screen
@@ -369,7 +369,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(doctor=doctor), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.switch_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "blocking issues")
             screen = app.screen
@@ -416,7 +416,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_removals_empty_and_populated(self):
         app = SpellSyncApp(TuiController(fake_service(), CliOptions()))
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RemovalsScreen("chrome", frozenset()))
             await pilot.pause()
             app.pop_screen()

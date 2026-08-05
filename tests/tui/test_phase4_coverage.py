@@ -42,7 +42,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             preview = sample_pull_preview()
             screen = OperationScreen(controller, operation="pull", pull_preview=preview)
             app.push_screen(screen)
@@ -55,7 +55,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         controller.begin_mutation()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = OperationScreen(
                 controller,
                 operation="pull",
@@ -83,7 +83,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = OperationScreen(
                 controller,
                 operation="push",
@@ -131,14 +131,14 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             target_updates=(TargetUpdateReport("chrome", 1, 0, "Ready"),),
             recovery_required=False,
         )
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.push_screen(ReportScreen(controller, report))
             await wait_for_text(pilot, "#report-content", "stopped safely")
             await pilot.click("#btn-details")
             await pilot.pause()
             await pilot.click("#btn-rebuild")
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
 
     async def test_report_recovery_required(self):
         controller = TuiController(fake_service(), CliOptions())
@@ -150,7 +150,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             summary="incomplete",
             recovery_required=True,
         )
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ReportScreen(controller, report))
             content = await wait_for_text(pilot, "#report-content", "Rollback incomplete")
             self.assertIn("Open Recovery before another write operation", str(content.render()))
@@ -160,7 +160,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         preview = sample_preview(removals=0, plan_identifier="gone")
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PushConfirmScreen(controller, preview))
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
@@ -170,7 +170,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_push_confirm_view_removals(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PushConfirmScreen(controller, sample_preview()))
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             await pilot.click("#btn-view-removals")
@@ -181,7 +181,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         preview = sample_pull_preview(plan_identifier="gone")
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullConfirmScreen(controller, preview))
             await wait_for_text(pilot, "#confirm-summary", "Add")
             await pilot.click("#btn-run")
@@ -193,7 +193,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pull_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "unavailable")
             screen = app.screen
@@ -206,7 +206,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         preview = sample_preview(prepared=None, prepare_error=ExitCode.PUSH_ABORT)
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
             await wait_for_text(pilot, "#preview-content", "Plan blocked")
             screen = app.screen
@@ -228,9 +228,9 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             screen = app.screen
@@ -251,7 +251,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_operation_worker_poll_error(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = OperationScreen(
                 controller,
                 operation="pull",
@@ -266,7 +266,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_operation_null_result_and_bindings(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = OperationScreen(controller, operation="unknown")
             app.push_screen(screen)
             await wait_for_text(pilot, "#operation-stages-table", "no result")
@@ -283,7 +283,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_operation_callback_paths(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = OperationScreen(
                 controller,
                 operation="pull",
@@ -306,7 +306,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         controller.begin_mutation()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             app.action_quit_app()
             screen = app.screen
@@ -335,7 +335,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "custom diction")
             screen = app.screen
@@ -373,7 +373,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service.prepare_pull = lambda opts: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "load failed")
 
@@ -383,9 +383,9 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             screen = app.screen
             assert isinstance(screen, PreviewScreen)
             screen._worker = SimpleNamespace(state=WorkerState.ERROR, result=None)
@@ -402,7 +402,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         other = sample_preview(removals=0, plan_identifier="p1")
         controller._active_push_preview = other
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PushConfirmScreen(controller, preview))
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
@@ -418,7 +418,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         preview = sample_preview(removals=0)
         controller._active_push_preview = preview
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = PushConfirmScreen(controller, preview)
             app.push_screen(screen)
             await wait_for_text(pilot, "#confirm-summary", "additions")
@@ -446,7 +446,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             recovery_required=True,
             conflict_target="chrome",
         )
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ReportScreen(controller, report))
             await wait_for_text(pilot, "#report-content", "Recovery")
             await pilot.click("#btn-details")
@@ -456,7 +456,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_operation_unmounted_and_finished_guards(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             op2 = OperationScreen(controller, operation="unknown")
             app.push_screen(op2)
             await wait_for_text(pilot, "#operation-stages-table", "no result")
@@ -486,7 +486,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             op = OperationScreen(
                 controller,
                 operation="pull",
@@ -516,7 +516,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "custom diction")
             pull = app.screen
@@ -565,9 +565,9 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview_obj  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             preview = app.screen
             assert isinstance(preview, PreviewScreen)
             preview._active_token = -1
@@ -594,7 +594,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
         typed = sample_preview(removals=2, plan_identifier="typed-reject")
         controller._active_push_preview = typed
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PushConfirmScreen(controller, typed))
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             screen = app.screen
@@ -616,7 +616,7 @@ class TestPhase4Coverage(unittest.IsolatedAsyncioTestCase):
             summary="conflict",
             conflict_target="chrome",
         )
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ReportScreen(controller, report))
             await wait_for_text(pilot, "#report-content", "stopped")
             screen = app.screen

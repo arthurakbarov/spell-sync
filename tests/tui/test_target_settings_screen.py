@@ -184,7 +184,7 @@ class TestTargetSettingsScreen(unittest.IsolatedAsyncioTestCase):
         snapshot = _snapshot(_target("chrome", enabled=True))
         controller = self._controller(snapshot)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             screen = app.screen
             assert isinstance(screen, TargetSettingsScreen)

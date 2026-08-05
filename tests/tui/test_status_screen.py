@@ -21,7 +21,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
     async def test_target_rows(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("s")
             await wait_for_text(pilot, "#status-summary", "Wordlist")
@@ -50,7 +50,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(status_detail=detail), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(StatusScreen(controller))
             content = await wait_for_text(pilot, "#status-summary", "Skipped corrupt")
             self.assertIn("Skipped corrupt", str(content.render()))
@@ -61,7 +61,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_and_back(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(StatusScreen(controller))
             await wait_for_text(pilot, "#status-summary", "Wordlist")
             await pilot.press("r")
@@ -74,7 +74,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         detail = sample_status_detail(load_error="Status could not be loaded.")
         controller = TuiController(fake_service(status_detail=detail), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(StatusScreen(controller))
             content = await wait_for_text(pilot, "#status-summary", "could not be loaded")
             self.assertIn("could not be loaded", str(content.render()))
@@ -83,7 +83,7 @@ class TestStatusScreen(unittest.IsolatedAsyncioTestCase):
         detail = sample_status_detail(wordlist_error=ExitCode.PUSH_ABORT, wordlist_count=0)
         controller = TuiController(fake_service(status_detail=detail), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(StatusScreen(controller))
             content = await wait_for_text(pilot, "#status-summary", "Wordlist error")
             self.assertIn("Wordlist error", str(content.render()))

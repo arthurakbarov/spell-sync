@@ -88,7 +88,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
 
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupStorageStrategyScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -109,7 +109,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#welcome-content", "Welcome to Spell Sync")
             self.assertIsInstance(app.screen, SetupWelcomeScreen)
 
@@ -125,7 +125,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(setup_state=missing)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#welcome-content", "Welcome")
             event = MagicMock()
             event.button.id = "btn-quit"
@@ -144,7 +144,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await _advance_to_wordlist(pilot, app)
             await pilot.click("#btn-back")
             await pilot.pause()
@@ -181,7 +181,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=blocked), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Spell Sync")
             self.assertIsInstance(app.screen, DashboardScreen)
 
@@ -196,7 +196,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
@@ -216,7 +216,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(setup_state=missing)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await pilot.click("#btn-open")
             await pilot.pause()
             app.screen.query_one("#wordlist-input").value = "/tmp/existing/wordlist.txt"
@@ -235,7 +235,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await _advance_to_wordlist(pilot, app)
             app.screen.query_one("#wordlist-input").value = "   "
             await pilot.click("#btn-continue")
@@ -253,7 +253,7 @@ class TestSetupFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
@@ -271,7 +271,7 @@ class TestSetupPreviewScreen(unittest.IsolatedAsyncioTestCase):
         controller.set_setup_wordlist(Path("/tmp/new-project/wordlist.txt"))
         screen = SetupPreviewScreen(controller)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(screen)
             await pilot.pause()
             content = app.screen.query_one("#preview-content").render()
@@ -289,7 +289,7 @@ class TestSetupPreviewScreen(unittest.IsolatedAsyncioTestCase):
         service = fake_service(setup_state=missing)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await _advance_to_targets(pilot, app)
             event = MagicMock()
             event.button.id = "btn-continue"
@@ -307,7 +307,7 @@ class TestSetupWordlistInteractions(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         presets = controller.setup_wordlist_presets()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupWordlistScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -323,7 +323,7 @@ class TestSetupWordlistInteractions(unittest.IsolatedAsyncioTestCase):
     async def test_custom_preset_focuses_input(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupWordlistScreen(controller))
             await pilot.pause()
             await pilot.click("#wordlist-preset-custom")
@@ -335,7 +335,7 @@ class TestSetupWordlistInteractions(unittest.IsolatedAsyncioTestCase):
     async def test_continue_with_default_path(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupWordlistScreen(controller))
             await pilot.pause()
             await pilot.click("#btn-continue")
@@ -348,7 +348,7 @@ class TestSetupOpenProjectScreen(unittest.IsolatedAsyncioTestCase):
     async def test_back_pops_screen(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupWelcomeScreen(controller))
             await pilot.pause()
             app.push_screen(SetupOpenProjectScreen(controller))
@@ -360,7 +360,7 @@ class TestSetupOpenProjectScreen(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_path_shows_error(self):
         controller = TuiController(fake_service(setup_state=_missing_project_state()), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupOpenProjectScreen(controller))
             await pilot.pause()
             app.screen.query_one("#wordlist-input", Input).value = "   "
@@ -402,7 +402,7 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
         existing = Path("/tmp/existing-project/wordlist.txt")
         controller = TuiController(fake_service(), ProjectRef(wordlist=existing))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ChangeWordlistScreen(controller))
             await pilot.pause()
             self.assertEqual(
@@ -419,7 +419,7 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
                 ProjectRef(wordlist=Path("/tmp/old/wordlist.txt")),
             )
             app = SpellSyncApp(controller)
-            async with app.run_test(size=(100, 32)) as pilot:
+            async with app.run_test(size=(100, 48)) as pilot:
                 app.push_screen(DashboardScreen(controller))
                 await pilot.pause()
                 app.push_screen(ChangeWordlistScreen(controller))
@@ -433,7 +433,7 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_path_stays_on_screen(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ChangeWordlistScreen(controller))
             await pilot.pause()
             app.screen.query_one("#wordlist-input", Input).value = "   "
@@ -444,7 +444,7 @@ class TestChangeWordlistScreen(unittest.IsolatedAsyncioTestCase):
     async def test_back_returns_to_dashboard(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DashboardScreen(controller))
             await pilot.pause()
             app.push_screen(ChangeWordlistScreen(controller))
@@ -476,7 +476,7 @@ class TestOperationLinger(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         controller.set_setup_wordlist(Path("/tmp/linger-key/wordlist.txt"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             prepared = controller.prepare_setup_preview()
             screen = SetupPreviewScreen(controller)
             screen._prepared = prepared
@@ -499,7 +499,7 @@ class TestOperationLinger(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(service, ProjectRef())
         controller.set_setup_wordlist(Path("/tmp/linger-close/wordlist.txt"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             prepared = controller.prepare_setup_preview()
             screen = SetupPreviewScreen(controller)
             screen._prepared = prepared
@@ -514,7 +514,7 @@ class TestDoctorTechnicalLog(unittest.IsolatedAsyncioTestCase):
     async def test_technical_log_button_opens_screen(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             screen = app.screen
@@ -533,7 +533,7 @@ class TestSetupPreviewRendering(unittest.IsolatedAsyncioTestCase):
         controller.clear_setup_target_selection()
         controller.toggle_setup_target(first)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupPreviewScreen(controller))
             await pilot.pause()
             content = str(app.screen.query_one("#preview-content", Static).render())
@@ -549,7 +549,7 @@ class TestSetupPreviewRendering(unittest.IsolatedAsyncioTestCase):
             )
             controller.set_setup_wordlist(wordlist)
             app = SpellSyncApp(controller)
-            async with app.run_test(size=(100, 40)) as pilot:
+            async with app.run_test(size=(100, 48)) as pilot:
                 app.push_screen(SetupPreviewScreen(controller))
                 await pilot.pause()
                 content = str(app.screen.query_one("#preview-content", Static).render())

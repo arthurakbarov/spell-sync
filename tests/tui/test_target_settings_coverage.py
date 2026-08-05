@@ -99,7 +99,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_focus_navigation_refresh_and_escape(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -118,7 +118,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_focus_navigation_without_rows(self):
         controller = self._controller(_snapshot())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -130,7 +130,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_error_and_stale_token(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -174,7 +174,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         controller = self._controller(snapshot)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -184,7 +184,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_review_save_and_repeated_save(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsReviewScreen(controller))
             await pilot.pause()
             review = app.screen
@@ -211,7 +211,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             )
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsReviewScreen(controller))
             await pilot.pause()
             review = app.screen
@@ -221,7 +221,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_dashboard_targets_navigation(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(DashboardScreen(controller))
             await pilot.pause()
             dashboard = app.screen
@@ -254,7 +254,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             )
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(
                 OperationScreen(
                     controller,
@@ -275,7 +275,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             detail="Corrupt dictionary",
         )
         row = SetupTargetRowWidget(target, selected=True, row_index=0)
-        async with SpellSyncApp(self._controller()).run_test(size=(100, 40)) as pilot:
+        async with SpellSyncApp(self._controller()).run_test(size=(100, 48)) as pilot:
             await pilot.app.mount(row)
             await pilot.pause()
             row.on_focus()
@@ -285,7 +285,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_dashboard_targets_button(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(DashboardScreen(controller))
             await pilot.pause()
             dashboard = app.screen
@@ -317,7 +317,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_stale_token_and_error_state(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -340,7 +340,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_focus_with_active_row(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -359,7 +359,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_button_handlers(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -378,7 +378,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_rerender_on_load_error(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -410,7 +410,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             )
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsReviewScreen(controller))
             await pilot.pause()
             review = app.screen
@@ -421,7 +421,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_review_action_back(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsReviewScreen(controller))
             await pilot.pause()
             review = app.screen
@@ -431,7 +431,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_selection_screen_escape_and_running_refresh_guard(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await pilot.pause()
             screen = app.screen
@@ -444,7 +444,7 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_row_widget_checkbox_paths(self):
         target = _target("chrome", enabled=True)
         row = SetupTargetRowWidget(target, selected=False, row_index=0)
-        async with SpellSyncApp(self._controller()).run_test(size=(100, 40)) as pilot:
+        async with SpellSyncApp(self._controller()).run_test(size=(100, 48)) as pilot:
             await pilot.app.mount(row)
             await pilot.pause()
             checkbox = row.query_one("#target-checkbox-chrome")

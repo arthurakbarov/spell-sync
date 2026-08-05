@@ -27,7 +27,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "No unfinished transaction")
 
@@ -36,7 +36,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pending_recovery=True, recovery_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Recoverable files")
             await pilot.click("#btn-recover")
@@ -70,7 +70,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             content = await wait_for_text(pilot, "#recovery-content", "Pending recovery")
             self.assertIn("unfinished push journal", str(content.render()).lower())
@@ -82,7 +82,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             content = await wait_for_text(pilot, "#recovery-content", "Rollback incomplete")
             self.assertIn("Automatic rollback", str(content.render()))
@@ -98,7 +98,7 @@ class TestRecoveryFlow(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             content = await wait_for_text(pilot, "#recovery-content", "Corrupt push journal")
             self.assertIn("unsupported schema", str(content.render()))

@@ -18,11 +18,11 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
     async def test_totals_and_table(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-push")
-            summary = await wait_for_text(pilot, "#preview-content", "Total removals")
-            self.assertIn("Total additions: 2", str(summary.render()))
+            summary = await wait_for_text(pilot, "#preview-content", "Removals")
+            self.assertIn("Additions: 2", str(summary.render()))
             table = app.screen.query_one("#preview-table")
             self.assertEqual(table.row_count, 1)
 
@@ -34,7 +34,7 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
             summary = await wait_for_text(pilot, "#preview-content", "Skipped")
             text = str(summary.render())
@@ -57,9 +57,9 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total removals")
+            await wait_for_text(pilot, "#preview-content", "Removals")
             await pilot.click("#btn-view-removals")
             await pilot.pause()
             self.assertIsInstance(app.screen, RemovalsScreen)
@@ -70,12 +70,12 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             first_counter = service.preview_counter
             await pilot.click("#btn-refresh-preview")
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             self.assertGreater(service.preview_counter, first_counter)
 
     async def test_unchanged_target(self):
@@ -94,7 +94,7 @@ class TestPreviewScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
             summary = await wait_for_text(pilot, "#preview-content", "Unchanged: 1")
             self.assertIn("Unchanged: 1", str(summary.render()))

@@ -42,7 +42,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_review_start_screen(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-review-update")
             body = await wait_for_text(
@@ -59,7 +59,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             content = app.screen.query_one("#review-pull-content")
             rendered = str(content.render())
@@ -78,7 +78,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         preview = sample_pull_preview(additions=0, addition_words=frozenset())
         controller = TuiController(fake_service(pull_preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             content = await wait_for_text(
                 pilot,
@@ -94,7 +94,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             before = service.preview_counter
@@ -109,7 +109,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             session = controller.review_session()
@@ -142,7 +142,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-pull")
@@ -163,7 +163,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Targets to update: 0")
@@ -175,7 +175,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
@@ -187,7 +187,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Total removals")
@@ -221,7 +221,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Total additions")
@@ -247,7 +247,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Total additions")
@@ -265,7 +265,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_session_cleared_after_finish(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
@@ -278,7 +278,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_back_from_start_clears_session(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-review-update")
             await pilot.pause()
@@ -290,7 +290,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_back_from_pull_clears_session(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-back")
@@ -300,7 +300,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_view_additions(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-additions")
@@ -313,7 +313,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = ReviewPullScreen(controller)
             controller.begin_review_session()
             app.push_screen(screen)
@@ -327,7 +327,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
@@ -350,7 +350,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             await pilot.click("#btn-pull")
@@ -386,7 +386,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             controller.begin_review_session()
             app.push_screen(ReviewPushScreen(controller))
             await pilot.pause()
@@ -400,7 +400,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_push_back_navigation(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
@@ -411,7 +411,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_session_report_view_history(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await pilot.click("#btn-skip")
             await wait_for_text(pilot, "#review-push-content", "Fresh push preview")
@@ -427,7 +427,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await self._open_review_pull(pilot, controller)
             await wait_for_text(pilot, "#review-pull-content", "custom diction")
             preview = app.screen._preview
@@ -458,7 +458,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
             return_value=Path("/tmp/session-reports/review-report-test.json")
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(ReviewSessionReportScreen(controller))
             await pilot.click("#btn-save-report")
             await wait_for_text(pilot, "#session-report-export-status", "Report saved")
@@ -469,7 +469,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = ReviewSessionReportScreen(controller)
             screen._saved_report_path = "/tmp/already-saved.json"
             await app.push_screen(screen)
@@ -496,7 +496,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
         controller.export_review_session_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(ReviewSessionReportScreen(controller))
             await pilot.click("#btn-save-report")
             await pilot.click("#btn-save-report")
@@ -524,7 +524,7 @@ class TestReviewWorkflow(unittest.IsolatedAsyncioTestCase):
 
         controller.export_review_session_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(ReviewSessionReportScreen(controller))
             await pilot.click("#btn-save-report")
             await pilot.click("#btn-dashboard")

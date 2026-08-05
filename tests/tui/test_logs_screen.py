@@ -79,7 +79,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_logs_screen_renders_history(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             row_count = await self._wait_for_rows(pilot, app)
             self.assertEqual(row_count, 1)
@@ -87,7 +87,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_empty_history_state(self):
         controller = self._controller(records=(), malformed_lines=0)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app, minimum=0)
             status = str(app.screen.query_one("#logs-status", Static).render())
@@ -110,7 +110,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
 
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             select = app.screen.query_one("#filter-operation", Select)
@@ -123,7 +123,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_history_details_and_technical_log(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(HistoryDetailsScreen(_record()))
             await pilot.pause()
             content = str(app.screen.query_one("#details-content").render())
@@ -139,7 +139,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_technical_log_truncated_marker(self):
         controller = self._controller(truncated=True, detail="read truncated")
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(TechnicalLogScreen(controller))
             await pilot.pause()
             await pilot.pause()
@@ -158,7 +158,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             lines=(line,),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(TechnicalLogScreen(controller))
             await pilot.pause()
             await pilot.pause()
@@ -168,7 +168,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_clear_history_confirmation(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             await pilot.click("#btn-clear")
@@ -181,7 +181,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_clear_history_failure(self):
         controller = self._controller(clear_result=HistoryClearResult(ok=False, detail="denied"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             await pilot.click("#btn-clear")
@@ -193,7 +193,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_view_history_details_from_row(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             table = app.screen.query_one("#history-table", DataTable)
@@ -215,7 +215,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         service.load_operation_history = MagicMock(side_effect=RuntimeError("boom"))
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             for _ in range(20):
                 await pilot.pause()
@@ -227,7 +227,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_logs_screen_actions(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             await pilot.click("#btn-refresh")
@@ -241,7 +241,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
 
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await pilot.pause()
             await pilot.click("#btn-tech-log")
@@ -253,7 +253,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
 
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             select = app.screen.query_one("#filter-outcome", Select)
@@ -265,7 +265,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_clear_history_cancel(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             await pilot.click("#btn-clear")
@@ -287,7 +287,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
             warnings=2,
         )
         app = SpellSyncApp(self._controller())
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(HistoryDetailsScreen(record))
             await pilot.pause()
             content = str(app.screen.query_one("#details-content").render())
@@ -309,7 +309,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
         service.read_technical_log_tail = read_tail
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(TechnicalLogScreen(controller))
             for _ in range(15):
                 await pilot.pause()
@@ -322,7 +322,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_technical_log_back_button_pops_screen(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             app.push_screen(TechnicalLogScreen(controller))
@@ -341,7 +341,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_worker_error_and_stale_token_handlers(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(LogsScreen(controller))
             await self._wait_for_rows(pilot, app)
             screen = app.screen
@@ -367,7 +367,7 @@ class TestLogsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_technical_log_worker_handlers(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(TechnicalLogScreen(controller))
             await pilot.pause()
             screen = app.screen

@@ -26,7 +26,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         service.raise_on_inspect = RuntimeError("boom")
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "inspection failed")
 
@@ -35,7 +35,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pending_recovery=True, recovery_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Recoverable files")
             await pilot.click("#btn-refresh")
@@ -62,7 +62,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Only cleanup is required.")
             recover = app.screen.query_one("#btn-recover", Button)
@@ -78,7 +78,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Automatic rollback")
             await pilot.click("#btn-details")
@@ -93,7 +93,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(recovery_preview=preview), CliOptions())
         controller.set_active_recovery_preview(preview)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryConfirmScreen(controller, preview, "cleanup"))
             await wait_for_text(pilot, "#confirm-summary", "Only cleanup is required.")
             await pilot.click("#btn-cancel")
@@ -103,7 +103,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         preview = sample_recovery_preview(preview_fingerprint="gone")
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryConfirmScreen(controller, preview, "recover"))
             await wait_for_text(pilot, "#confirm-summary", "RECOVER")
             screen = app.screen
@@ -120,7 +120,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pending_recovery=True, recovery_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Recoverable files")
             await pilot.click("#btn-refresh")
@@ -135,7 +135,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pending_recovery=True, recovery_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             await wait_for_text(pilot, "#recovery-content", "Recoverable files")
             await pilot.click("#btn-recover")
@@ -150,7 +150,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_worker_error_poll(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RecoveryScreen(controller))
             screen = app.screen
             assert isinstance(screen, RecoveryScreen)
@@ -164,7 +164,7 @@ class TestPhase5Coverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service(pending_recovery=True, recovery_preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(
                 OperationScreen(controller, operation="recover", recovery_preview=preview)
             )

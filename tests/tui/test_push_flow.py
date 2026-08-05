@@ -27,9 +27,9 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service(preview=preview)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             summary = await wait_for_text(pilot, "#confirm-summary", "additions")
             self.assertIn("0 removals", str(summary.render()))
@@ -39,9 +39,9 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "Type PUSH")
             screen = app.screen
@@ -67,9 +67,9 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: prepared_preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             preview = app.screen._preview
             assert preview is not None
             await pilot.click("#btn-continue-push")
@@ -103,16 +103,16 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
             report = await wait_for_operation_report(pilot, "Preview is stale")
             self.assertIn("no conflicting file was overwritten", str(report.render()).lower())
             await pilot.click("#btn-rebuild")
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
 
     async def test_recovery_required_report(self):
         preview = sample_preview(removals=0, plan_identifier="recover-plan")
@@ -130,9 +130,9 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
@@ -158,9 +158,9 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service.load_push_preview = lambda opts: preview  # type: ignore[method-assign]
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             await pilot.click("#btn-continue-push")
             await wait_for_text(pilot, "#confirm-summary", "additions")
             await pilot.click("#btn-run")
@@ -170,14 +170,14 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             old = app.screen._preview
             assert old is not None
             old_id = old.plan_identifier
             await pilot.click("#btn-refresh-preview")
-            await wait_for_text(pilot, "#preview-content", "Total additions")
+            await wait_for_text(pilot, "#preview-content", "Additions")
             new = app.screen._preview
             assert new is not None
             self.assertNotEqual(old_id, new.plan_identifier)
@@ -198,7 +198,7 @@ class TestPushFlow(unittest.IsolatedAsyncioTestCase):
         preview = replace(sample_preview(), prepared=None, prepare_error=ExitCode.PUSH_ABORT)
         controller = TuiController(fake_service(preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
             await wait_for_text(pilot, "#preview-content", "Plan blocked")
             btn = app.screen.query_one("#btn-continue-push")

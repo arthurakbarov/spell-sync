@@ -28,7 +28,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             content = await wait_for_text(pilot, "#welcome-content", "Welcome")
             text = str(content.render()).lower()
             self.assertIn("personal words", text)
@@ -46,7 +46,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await pilot.click("#btn-setup")
             await wait_for_text(pilot, "#storage-content", "How will you keep")
             await pilot.click("#btn-continue")
@@ -66,7 +66,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await pilot.click("#btn-setup")
             content = await wait_for_text(pilot, "#storage-content", "How will you keep")
             text = str(content.render()).lower()
@@ -95,7 +95,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         controller.set_setup_wordlist(controller.setup_wordlist_default())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "wordlist ok"))
             header = await wait_for_text(pilot, "#targets-header", "custom diction")
             text = str(header.render()).lower()
@@ -105,7 +105,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
     async def test_pull_preview_mentions_custom_dictionaries(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             content = await wait_for_text(pilot, "#pull-summary", "custom diction")
             text = str(content.render()).lower()
@@ -116,7 +116,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
         preview = sample_pull_preview(additions=0)
         controller = TuiController(fake_service(pull_preview=preview), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             content = await wait_for_text(pilot, "#pull-summary", "already")
             self.assertIn("enabled custom diction", str(content.render()).lower())
@@ -124,7 +124,7 @@ class TestWordlistExplanations(unittest.IsolatedAsyncioTestCase):
     async def test_push_preview_includes_filtering_and_redundancy_notices(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PreviewScreen(controller))
             content = await wait_for_text(pilot, "#preview-content", "custom diction")
             text = str(content.render()).lower()

@@ -87,7 +87,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         discovery = _discovery(_target("chrome"), _target("firefox"))
         controller = self._controller_with_discovery(discovery)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             row = app.screen.query_one("#target-row-chrome", SetupTargetRowWidget)
@@ -98,7 +98,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         discovery = _discovery(_target("chrome"), _target("firefox"))
         controller = self._controller_with_discovery(discovery)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             row = app.screen.query_one("#target-row-firefox", SetupTargetRowWidget)
@@ -120,7 +120,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = self._controller_with_discovery(discovery)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             row = app.screen.query_one("#target-row-cursor", SetupTargetRowWidget)
@@ -134,7 +134,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         controller = self._controller_with_discovery(discovery)
         controller._setup_selection = SetupSelection(frozenset({"firefox"}))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             event = _button_event("btn-continue")
@@ -150,7 +150,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         discovery = _discovery(_target("chrome"))
         controller = self._controller_with_discovery(discovery)
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             app.screen._set_refreshing(True)
@@ -168,7 +168,7 @@ class TestSetupTargetsScreen(unittest.IsolatedAsyncioTestCase):
         controller = self._controller_with_discovery(discovery)
         controller._setup_selection = SetupSelection(frozenset({"chrome"}))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupPreviewScreen(controller))
             await pilot.pause()
             content = str(app.screen.query_one("#preview-content").render())

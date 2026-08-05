@@ -49,7 +49,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(doctor=doctor), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "blocking issues")
             table = app.screen.query_one("#doctor-table", DataTable)
@@ -66,7 +66,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
     async def test_rerun_and_back(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-run-doctor")
@@ -79,7 +79,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
         doctor = DoctorSnapshot(checks=(), has_errors=True, load_error="Doctor failed.")
         controller = TuiController(fake_service(doctor=doctor), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             content = await wait_for_text(pilot, "#doctor-summary", "Doctor failed")
             self.assertNotIn("Traceback", str(content.render()))
@@ -90,7 +90,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             return_value=Path("/tmp/support-reports/support-report-test.json")
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
@@ -104,7 +104,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             side_effect=FileExistsError("exists")
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
@@ -116,7 +116,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
             side_effect=RuntimeError("fail")
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
@@ -135,7 +135,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
 
         controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
@@ -161,7 +161,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
 
         controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")
@@ -179,7 +179,7 @@ class TestDoctorScreen(unittest.IsolatedAsyncioTestCase):
 
         controller.export_support_report = MagicMock(side_effect=slow_export)  # type: ignore[method-assign]
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(DoctorScreen(controller))
             await wait_for_text(pilot, "#doctor-summary", "Doctor")
             await pilot.click("#btn-export-support")

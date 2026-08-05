@@ -64,7 +64,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_start_screen_back_paths(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(ReviewStartScreen(controller))
             await pilot.pause()
             app.screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-back")))
@@ -77,7 +77,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             controller.begin_review_session()
             screen = ReviewPullScreen(controller)
             app.push_screen(screen)
@@ -143,7 +143,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             controller.begin_review_session()
             screen = ReviewPushScreen(controller)
             app.push_screen(screen)
@@ -222,7 +222,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_push_confirm_cancel_and_session_report_quit(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             controller.begin_review_session()
             push = ReviewPushScreen(controller)
             app.push_screen(push)
@@ -252,7 +252,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_session_report_back_on_shallow_stack(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             report = ReviewSessionReportScreen(controller)
             app.switch_screen(report)
             await pilot.pause()
@@ -262,7 +262,7 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_session_report_back_dashboard_refresh(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             controller.begin_review_session()
             report = ReviewSessionReportScreen(controller)

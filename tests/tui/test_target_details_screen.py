@@ -122,7 +122,7 @@ class TestTargetDetails(unittest.IsolatedAsyncioTestCase):
         service.load_target_settings = MagicMock(return_value=snapshot)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await app.push_screen(TargetSettingsScreen(controller))
             await app.push_screen(TargetDetailsScreen(controller, "firefox"))
             content = await wait_for_text(pilot, "#target-details-content", "Unreadable")

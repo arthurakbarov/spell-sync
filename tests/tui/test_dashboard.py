@@ -32,7 +32,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "Ready")
             text = str(summary.render())
             self.assertIn("Canonical personal wordlist", text)
@@ -59,7 +59,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "Attention")
             self.assertIn("Attention required", str(summary.render()))
             issues_widget = await wait_for_text(pilot, "#dashboard-issues", "Wordlist is empty")
@@ -83,7 +83,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             banner = await wait_for_text(pilot, "#blocking-banner", "Configuration blocked")
             self.assertIn("Invalid configuration", str(banner.render()))
             self.assertTrue(app.screen.query_one("#btn-pull").disabled)
@@ -103,14 +103,14 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             banner = await wait_for_text(pilot, "#blocking-banner", "Pending recovery")
             self.assertIn("unfinished push journal", str(banner.render()).lower())
 
     async def test_pending_recovery(self):
         controller = TuiController(fake_service(pending_recovery=True), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             banner = await wait_for_text(pilot, "#blocking-banner", "Pending recovery")
             self.assertIn("Pending recovery", str(banner.render()))
             self.assertIn("unfinished push journal", str(banner.render()))
@@ -139,7 +139,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             banner = await wait_for_text(pilot, "#blocking-banner", "Wordlist blocked")
             self.assertIn("Wordlist unreadable", str(banner.render()))
 
@@ -157,14 +157,14 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             issues_widget = await wait_for_text(pilot, "#dashboard-issues", "Operation lock")
             self.assertIn("Operation lock active", str(issues_widget.render()))
 
     async def test_no_duplicate_preview_button(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             screen = app.screen
             assert isinstance(screen, DashboardScreen)
@@ -174,7 +174,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_push_opens_preview(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-push")
             await pilot.pause()
@@ -185,7 +185,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_open_review_update_start(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-review-update")
             await pilot.pause()
@@ -199,7 +199,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_open_health(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("h")
             await pilot.pause()
@@ -208,7 +208,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_open_history(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             screen = app.screen
             assert isinstance(screen, DashboardScreen)
@@ -219,7 +219,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_open_targets(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-targets")
             await pilot.pause()
@@ -233,14 +233,14 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "Last: Push")
             self.assertIn("2 targets updated", str(summary.render()))
 
     async def test_refresh_hotkey(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("r")
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
@@ -248,7 +248,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_keyboard_navigation(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("s")
             await pilot.pause()
@@ -259,7 +259,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_status_button_opens_status_screen(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             screen = app.screen
             assert isinstance(screen, DashboardScreen)
@@ -297,7 +297,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
     async def test_health_and_history_available_during_recovery(self):
         controller = TuiController(fake_service(pending_recovery=True), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#blocking-banner", "Recovery required")
             self.assertFalse(app.screen.query_one("#btn-health").disabled)
             self.assertFalse(app.screen.query_one("#btn-history").disabled)
@@ -308,7 +308,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
         service.dashboard_state = sample_dashboard(wordlist_path=home_wordlist)
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "~/")
             self.assertIn("~/spell-words/wordlist.txt", str(summary.render()))
 
@@ -323,7 +323,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(
                 pilot,
                 "#dashboard-summary",
@@ -337,7 +337,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             summary = await wait_for_text(pilot, "#dashboard-summary", "2 unavailable")
             self.assertIn("2 unavailable", str(summary.render()))
 
@@ -347,7 +347,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#blocking-banner", "Recovery required")
             screen = app.screen
             assert isinstance(screen, DashboardScreen)
@@ -369,7 +369,7 @@ class TestDashboardScreen(unittest.IsolatedAsyncioTestCase):
             CliOptions(),
         )
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             banner = await wait_for_text(pilot, "#blocking-banner", "Corrupt push journal")
             self.assertIn("Corrupt push journal", str(banner.render()))
 

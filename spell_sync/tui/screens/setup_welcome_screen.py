@@ -59,12 +59,6 @@ def _action_buttons(*buttons: Button) -> Vertical:
     return Vertical(*buttons, id="setup-actions", classes="setup-actions")
 
 
-_PATH_COMPLETE_BINDINGS = [
-    Binding("escape", "back", "Back"),
-    Binding("tab", "complete_path", "Complete", priority=True),
-]
-
-
 class _PathCompleteMixin:
     """Tab applies the highlighted path-list row."""
 
@@ -194,7 +188,10 @@ class SetupStorageStrategyScreen(Screen[None]):
 
 
 class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
-    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("tab", "complete_path", "Complete", priority=True),
+    ]
 
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
@@ -241,7 +238,10 @@ class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
 
 
 class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
-    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("tab", "complete_path", "Complete", priority=True),
+    ]
 
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
@@ -314,7 +314,10 @@ class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
 
 
 class ChangeWordlistScreen(_PathCompleteMixin, Screen[None]):
-    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("tab", "complete_path", "Complete", priority=True),
+    ]
 
     def __init__(self, controller: TuiController) -> None:
         super().__init__()

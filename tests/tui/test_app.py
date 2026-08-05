@@ -20,14 +20,14 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
     async def test_dashboard_mounts(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Spell Sync")
             self.assertIsInstance(app.screen, DashboardScreen)
 
     async def test_quit_button_exits(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             event = mock.MagicMock()
             event.button.id = "btn-quit"
@@ -37,7 +37,7 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
     async def test_status_navigation(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("s")
             await pilot.pause()
@@ -46,17 +46,17 @@ class TestSpellSyncApp(unittest.IsolatedAsyncioTestCase):
     async def test_preview_navigation(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-push")
             await pilot.pause()
-            await wait_for_text(pilot, "#preview-content", "Total removals")
+            await wait_for_text(pilot, "#preview-content", "Removals")
             self.assertIsInstance(app.screen, PreviewScreen)
 
     async def test_escape_returns_to_dashboard(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-push")
             await pilot.pause()

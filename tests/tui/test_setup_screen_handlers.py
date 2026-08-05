@@ -26,7 +26,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
     async def test_open_project_back(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupOpenProjectScreen(controller))
             await pilot.pause()
             event = MagicMock()
@@ -37,7 +37,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
     async def test_open_project_invalid_path(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupOpenProjectScreen(controller))
             await pilot.pause()
             app.screen.query_one("#wordlist-input").value = ""
@@ -57,7 +57,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(fake_service(setup_state=missing), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupWordlistScreen(controller))
             await pilot.pause()
             app.screen.query_one("#wordlist-input").value = ""
@@ -75,7 +75,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
         screen = SetupPreviewScreen(controller)
         screen._prepared = prepared
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(screen)
             await pilot.pause()
             if prepared.can_execute:
@@ -88,7 +88,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         controller.set_setup_wordlist(Path("/tmp/handler/targets-back/wordlist.txt"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             event = MagicMock()
@@ -100,7 +100,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         controller.set_setup_wordlist(Path("/tmp/handler/targets/wordlist.txt"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupTargetsScreen(controller, "detail"))
             await pilot.pause()
             event = MagicMock()
@@ -113,7 +113,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
         controller = TuiController(fake_service(), CliOptions())
         controller.set_setup_wordlist(Path("/tmp/handler/preview/wordlist.txt"))
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(SetupPreviewScreen(controller))
             await pilot.pause()
             event = MagicMock()
@@ -129,7 +129,7 @@ class TestSetupScreenHandlers(unittest.IsolatedAsyncioTestCase):
             controller.set_setup_wordlist(wordlist)
             prepared = controller.prepare_setup_preview()
             app = SpellSyncApp(controller)
-            async with app.run_test(size=(100, 32)) as pilot:
+            async with app.run_test(size=(100, 48)) as pilot:
                 screen = SetupPreviewScreen(controller)
                 screen._prepared = prepared
                 app.push_screen(screen)

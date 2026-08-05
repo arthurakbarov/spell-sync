@@ -21,7 +21,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-pull")
             content = await wait_for_text(pilot, "#pull-summary", "custom diction")
@@ -37,7 +37,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "custom diction")
             await pilot.click("#btn-run")
@@ -50,7 +50,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "custom diction")
             await pilot.click("#btn-run")
@@ -72,7 +72,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         )
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(PullScreen(controller))
             await wait_for_text(pilot, "#pull-summary", "custom diction")
             await pilot.click("#btn-run")
@@ -83,7 +83,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
     async def test_back_navigation(self):
         controller = TuiController(fake_service(), CliOptions())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.click("#btn-pull")
             await wait_for_text(pilot, "#pull-summary", "custom diction")
@@ -95,7 +95,7 @@ class TestPullFlow(unittest.IsolatedAsyncioTestCase):
         service = fake_service()
         controller = TuiController(service, ProjectRef())
         app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 36)) as pilot:
+        async with app.run_test(size=(100, 48)) as pilot:
             screen = PullScreen(controller)
             app.push_screen(screen)
             await wait_for_text(pilot, "#pull-summary", "custom diction")
