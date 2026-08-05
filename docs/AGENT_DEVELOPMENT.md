@@ -47,22 +47,26 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 7. Make the smallest coherent change for the **current phase only**.
 8. Run **edit loop** validation: `python3 scripts/run_dev_loop.py` (no coverage).
 9. Run architecture guards when application boundaries change.
-10. Set phase status to `awaiting-approval` when implementation is complete; commit all tracked changes locally (local commits do not require owner approval).
-11. Run **commit gate**: `python3 scripts/run_dev_loop.py --commit-gate` (≤120s).
-12. Verify clean working trees (`git status --short`) in every affected repository.
-13. Final task state: `git stash list` must be empty in the public spell-sync repository.
+10. Update every affected document, test, and contract in the same task.
+11. Run **commit gate** while the tree still shows the change (or with an explicit
+    `--base` / `--files` scope): `python3 scripts/run_dev_loop.py --commit-gate` (≤120s).
+    Do not commit first and then rely on a clean-tree gate — `run_dev_loop` defaults to
+    working-tree vs HEAD, so a clean tree validates nothing.
+12. Set phase status to `awaiting-approval` when implementation is complete; **then** commit
+    all tracked changes locally (local commits do not require owner approval).
+13. Verify clean working trees (`git status --short`) in every affected repository.
+14. Final task state: `git stash list` must be empty in the public spell-sync repository.
     Do not hide unfinished work in persistent Git stash between phases; preserve separate WIP
     on a named local branch with a normal commit instead.
-14. Assess local necessity: `python3 scripts/check_ci_necessity.py --purpose local --explain`.
-15. When result is `commit-gate-sufficient` or `lightweight-sufficient` / `no-action`: **do not**
+15. Assess local necessity: `python3 scripts/check_ci_necessity.py --purpose local --explain`.
+16. When result is `commit-gate-sufficient` or `lightweight-sufficient` / `no-action`: **do not**
     run full CI. Use lightweight validation only when `lightweight-sufficient`.
-16. Run **full CI** (`scripts/ci.sh`) only for `--purpose publish` (`full-required`), explicit
+17. Run **full CI** (`scripts/ci.sh`) only for `--purpose publish` (`full-required`), explicit
     owner “final/push/release”, or `release-candidate` workflows.
-17. Verify `python3 scripts/check_ci_evidence.py` **only** after full CI (or when reusing valid
+18. Verify `python3 scripts/check_ci_evidence.py` **only** after full CI (or when reusing valid
     publish evidence). Ordinary polish tasks may finish without new full-CI evidence.
-18. On full CI failure: read `CI_LOG` / `CI_SUMMARY`; fix; focused failed-gate rerun; new commit;
+19. On full CI failure: read `CI_LOG` / `CI_SUMMARY`; fix; focused failed-gate rerun; new commit;
     clean tree; reassess with `--purpose publish`.
-19. Update every affected document, test, and contract in the same task (before step 10).
 20. On modifying tasks: workspace snapshot after commit gate success (and full CI evidence when full CI ran).
 21. Produce an evidence-based report (see **Final report contract** below).
 
@@ -226,7 +230,7 @@ Every completed phase or corrective task returns:
 
 ## 13. Scope confirmations
 - next phase not started; no push/tag/release; no unrelated product changes
-- residuals still open (prefer stable IDs from PRODUCT_COMPLETION / ENGINEERING_COMPLETION)
+- residuals still open (prefer stable IDs from PRODUCT_COMPLETION.md / ROADMAP.md)
 - no false equivalences from docs/CONTRACTS.md claimed as proven
 - validation was not re-run when the When-not-to-rerun table in docs/WORKFLOW.md forbade it
 ```

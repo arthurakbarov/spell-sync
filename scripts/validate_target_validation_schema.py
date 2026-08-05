@@ -120,10 +120,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"TARGET_VALIDATION_SCHEMA_ERROR={err}")
         return 1
     print("TARGET_VALIDATION_SCHEMA_RESULT=success")
-    print(f"TARGET_VALIDATION_SCHEMA_PATH={SCHEMA_PATH}")
-    print(f"TARGET_VALIDATION_PAYLOAD={payload_path}")
+    print("TARGET_VALIDATION_SCHEMA_PATH=docs/technical/target-validation.schema.json")
+    try:
+        rel = payload_path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        rel = payload_path.name
+    print(f"TARGET_VALIDATION_PAYLOAD={rel}")
     if EXAMPLE_PATH.is_file():
-        print(f"TARGET_VALIDATION_EXAMPLE={EXAMPLE_PATH}")
+        print("TARGET_VALIDATION_EXAMPLE=docs/examples/target-validation-entry.example.json")
     return 0
 
 

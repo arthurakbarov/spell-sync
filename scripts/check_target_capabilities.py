@@ -53,7 +53,8 @@ def _validate(data: dict[str, object]) -> list[str]:
         return errors
 
     entries = data.get("targets")
-    assert isinstance(entries, list)
+    if not isinstance(entries, list):
+        return errors
 
     _, capability_by_id_fn, registry_pairs_fn = _import_registry()
     expected_pairs = set(registry_pairs_fn())

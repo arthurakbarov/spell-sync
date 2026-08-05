@@ -24,6 +24,17 @@ def _load_matrix() -> dict:
     return json.loads((ROOT / "docs" / "target-validation.json").read_text(encoding="utf-8"))
 
 
+def test_schema_enums_match_validator_constants() -> None:
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    entry = schema["$defs"]["targetEntry"]["properties"]
+    from scripts import validate_target_validation_schema as mod
+
+    assert set(entry["platform"]["enum"]) == set(mod.PLATFORMS)
+    assert set(entry["implementation"]["enum"]) == set(mod.IMPLEMENTATION)
+    assert set(entry["automated_validation"]["enum"]) == set(mod.AUTOMATED)
+    assert set(entry["manual_validation"]["enum"]) == set(mod.MANUAL)
+
+
 def test_schema_file_is_valid_json() -> None:
     assert SCHEMA_PATH.is_file()
     payload = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))

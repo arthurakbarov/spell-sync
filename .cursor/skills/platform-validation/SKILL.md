@@ -33,9 +33,12 @@ description: >-
 10. Exercise Recovery separately on a synthetic interrupted transaction when safe.
 11. Restore or delete the throwaway profile.
 12. Record a redacted result: OS, app version, date, pass/fail — never personal words.
-13. Update `docs/target-validation.json` and regenerate docs:
+13. Update `docs/target-validation.json` to match
+    `docs/technical/target-validation.schema.json` (see
+    `docs/examples/target-validation-entry.example.json`), then regenerate docs:
 
 ```bash
+python3 scripts/validate_target_validation_schema.py
 python3 scripts/check_target_capabilities.py --write
 python3 scripts/check_target_capabilities.py --check
 ```

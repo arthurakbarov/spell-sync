@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     if not args:
         print("DOCTOR_SCHEMA_RESULT=success")
-        print(f"DOCTOR_SCHEMA_PATH={SCHEMA_PATH}")
+        print("DOCTOR_SCHEMA_PATH=docs/technical/doctor-report.schema.json")
         print("DOCTOR_SCHEMA_MODE=schema-only")
         return 0
     path = Path(args[0])
@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"DOCTOR_SCHEMA_ERROR={err}")
         return 1
     print("DOCTOR_SCHEMA_RESULT=success")
-    print(f"DOCTOR_SCHEMA_PATH={SCHEMA_PATH}")
+    print("DOCTOR_SCHEMA_PATH=docs/technical/doctor-report.schema.json")
     return 0
 
 

@@ -36,7 +36,9 @@ and `docs/target-validation.json`. Residuals: [PRODUCT_COMPLETION.md](PRODUCT_CO
 
 ### Real-app manual and interactive acceptance (R-CON)
 
-- **Real-app manual**: recorded in `docs/target-validation.json` via skill `platform-validation`.
+- **Real-app manual**: recorded in `docs/target-validation.json` via skill `platform-validation`
+  (schema: `docs/technical/target-validation.schema.json`;
+  `python3 scripts/validate_target_validation_schema.py`).
 - **Interactive acceptance**: human GUI/TUI confirmation on a real machine (separate from
   headless tests). Still mostly missing; do not equate headless TUI tests with interactive.
 - Current samples (2026-08-05): chrome/macos and macos_spelling/macos, read-only / dry-run.

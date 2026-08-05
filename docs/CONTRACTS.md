@@ -22,7 +22,7 @@ States describe **one check, target, or dashboard issue**, not the whole machine
 | **planned** | Pull/Push preview produced an immutable plan; confirmation not yet bound. |
 | **executed** | Confirmed mutation finished (success, partial, or aborted per exit code). |
 | **verified** | Automated synthetic tests or doctor/status probes passed. Not real-app acceptance. |
-| **manually-validated** | Real application sample recorded in `docs/target-validation.json` (`manual_validation: pass`). |
+| **manually-validated** | Real application sample recorded in `docs/target-validation.json` (`manual_validation: pass`; shape: `docs/technical/target-validation.schema.json`). |
 | **not-run** | Manual validation never recorded for that target/OS row. |
 | **skipped** | Check intentionally not run (wrong OS, dry-run, optional dependency). Not a failure. |
 | **failed** | Invariant broken: blocking doctor error, failed mutation, or CI gate failure. |
@@ -63,7 +63,7 @@ Scripts, docs, TUI copy, and agent claims must not imply these.
 |-------|----------|----------------|
 | Implementation | Code in repo for target | Host has the app |
 | Automated | Synthetic fixtures in CI | Real dictionary layout / app version |
-| Manual (R-CON) | `target-validation.json` | Every profile or future app release |
+| Manual (R-CON) | `target-validation.json` + `target-validation.schema.json` | Every profile or future app release |
 | Mutation sample | Owner-approved Pull/Push on throwaway profile | Primary-profile safety without care |
 
 See [FEATURE_MATRIX.md](FEATURE_MATRIX.md), [SUPPORTED_TARGETS.md](SUPPORTED_TARGETS.md), and residual R-CON in [PRODUCT_COMPLETION.md](PRODUCT_COMPLETION.md).

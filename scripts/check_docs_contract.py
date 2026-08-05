@@ -95,11 +95,7 @@ AGENT_WORKFLOW_DOCS = (
 TESTING_STRATEGY_DOC = Path("docs/TESTING_STRATEGY.md")
 PINNED_PYTHON = re.compile(r"python3\.\d+")
 DEVELOPMENT_VERSION = Path("docs/DEVELOPMENT.md")
-HISTORICAL_DOC_PATHS = frozenset(
-    {
-        "docs/MANUAL_TESTING.md",
-    }
-)
+HISTORICAL_DOC_PATHS: frozenset[str] = frozenset()
 PINNED_PYTHON_EXEMPT_PREFIXES = ("docs/decisions/",)
 PRIVATE_PATH_DOC_PATTERNS = (
     re.compile(r"~/code(?:/|\b)"),
@@ -147,6 +143,30 @@ def _tracked_markdown(root: Path) -> list[Path]:
     return paths
 
 
+def _tracked_agent_prose(root: Path) -> list[Path]:
+    """Skills and rules loaded by agents — included in stale-phrase scans only."""
+    out = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "-z",
+            ".cursor/skills/**/SKILL.md",
+            ".cursor/rules/**/*.mdc",
+            ".cursor/README.md",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    paths: list[Path] = []
+    for raw in out.stdout.split(b"\0"):
+        if not raw:
+            continue
+        paths.append(root / raw.decode("utf-8"))
+    return paths
+
+
 def _agents_cli_commands(root: Path) -> set[str]:
     agents = (root / "AGENTS.md").read_text(encoding="utf-8")
     fence = re.search(
@@ -169,6 +189,18 @@ def _line_has_historical_context(lines: list[str], line_no: int) -> bool:
     end = min(len(lines), line_no + 5)
     window = "\n".join(lines[start:end])
     return any(marker in window for marker in HISTORICAL_MARKERS)
+
+
+def _line_has_prohibition_context(lines: list[str], line_no: int) -> bool:
+    """True when the line or a nearby 'Do not' / Prohibited heading forbids the practice."""
+    if PROHIBITION_MARKERS.search(lines[line_no]):
+        return True
+    start = max(0, line_no - 8)
+    for idx in range(start, line_no + 1):
+        stripped = lines[idx].strip()
+        if stripped.startswith("Do not") or stripped.startswith("## Prohibited"):
+            return True
+    return False
 
 
 def _current_phase_body(text: str) -> tuple[int | None, str]:
@@ -975,8 +1007,34 @@ def check_repository(root: Path) -> list[ContractViolation]:
                     continue
                 if _line_has_historical_context(lines, line_no - 1):
                     continue
-                if PROHIBITION_MARKERS.search(line):
+                # Only LF/CI-in-edit-loop rules treat prohibition phrasing as intentional.
+                if check_id in {"STALE-LF-AS-EVIDENCE", "STALE-CI-IN-EDIT-LOOP"}:
+                    if _line_has_prohibition_context(lines, line_no - 1):
+                        continue
+                violations.append(
+                    ContractViolation(
+                        check_id,
+                        path,
+                        line_no,
+                        line.strip(),
+                        remediation,
+                    )
+                )
+
+    for path in _tracked_agent_prose(root):
+        rel = str(path.relative_to(root))
+        if any(part in rel for part in EXCLUDE_PATH_PARTS):
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_no, line in enumerate(lines, start=1):
+            for check_id, pattern, remediation in STALE_DOC_PATTERNS:
+                if not pattern.search(line):
                     continue
+                if _line_has_historical_context(lines, line_no - 1):
+                    continue
+                if check_id in {"STALE-LF-AS-EVIDENCE", "STALE-CI-IN-EDIT-LOOP"}:
+                    if _line_has_prohibition_context(lines, line_no - 1):
+                        continue
                 violations.append(
                     ContractViolation(
                         check_id,

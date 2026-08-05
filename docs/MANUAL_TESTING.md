@@ -19,7 +19,7 @@ reports. Shape: `docs/technical/target-validation.schema.json` (checked by
 | Safe without mutation | `check-target-capabilities`, `doctor --targets`, Targets → Details, synthetic HOME smoke |
 | Matrix default | All rows start `not-run` until owner-approved manual pass |
 
-Follow `.cursor/skills/platform-validation/SKILL.md` in the maintainer workspace when updating
+Follow `.cursor/skills/platform-validation/SKILL.md` in this repository when updating
 the matrix.
 
 ## Test environment
