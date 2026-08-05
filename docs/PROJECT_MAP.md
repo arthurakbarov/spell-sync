@@ -109,7 +109,8 @@ Technical events are privacy-safe; history stores summaries only.
 
 | Area | Module(s) |
 |------|-----------|
-| Controller / routing | `tui/controller.py` |
+| Controller | `tui/controller.py` |
+| Launch routing | `tui/routing.py` (`should_launch_tui`, non-interactive errors) |
 | Dashboard | `tui/screens/dashboard.py` |
 | Collect / Pull / Push / Preview / Confirm | `tui/screens/*` |
 | Setup wizard | `tui/screens/setup_*` |

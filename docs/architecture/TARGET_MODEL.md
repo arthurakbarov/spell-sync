@@ -27,7 +27,8 @@ Config enables targets via `[dictionaries]` boolean keys in `spell-sync.toml`.
 
 Public registry: [SUPPORTED_TARGETS.md](../SUPPORTED_TARGETS.md).
 
-Packaged validation metadata: `docs/target-validation.json` (shipped in wheel).
+Validation metadata SSOT: `docs/target-validation.json`. Wheel copy:
+`spell_sync/bundled/target-validation.json` (kept in sync by the docs contract).
 
 CI synthetic tests prove read/write/discovery code paths — they do **not** replace manual
 validation on real applications.

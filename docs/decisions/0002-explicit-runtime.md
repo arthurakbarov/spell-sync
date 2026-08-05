@@ -20,7 +20,7 @@ hard to trace and test.
 - Core receives a prepared `RuntimeContext` / `ResolvedRuntime`; low-level factories stay private to resolution paths.
 - `sync_run_for(resolved, …)` requires an explicit `ResolvedRuntime` — no config-loading fallback.
 - Mutating commands acquire a fresh resolved runtime under the operation lock via `mutation_scope_for`.
-- Prepared Pull/Push operations store a deterministic `RuntimeIdentity` at preview time. Under the operation lock, execution compares fresh identity to the preview identity before any writes. A mismatch stops safely with reason `runtime_changed_after_preview`; execution never replans automatically.
+- Prepared Pull/Push operations store a deterministic `RuntimeIdentity` at preview time. Under the operation lock, execution compares fresh identity to the preview identity before any writes. A mismatch stops safely with reason `runtime_changed` (`EventReason.RUNTIME_CHANGED`); execution never replans automatically.
 
 ## Runtime identity invariant
 

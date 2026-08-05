@@ -54,7 +54,6 @@ doctor, logs, and post-setup target settings.
 | Change wordlist | `setup_welcome_screen.py` | Path picker list, Continue, Back (from Dashboard) |
 | Targets | `setup_targets_screen.py` | Continue, Refresh, Select available, Clear, Back |
 | Setup preview | `setup_welcome_screen.py` | Create project, Back |
-| Setup confirmation | `setup_confirm_screen.py` | Create project, Back |
 | Setup operation | `operation_screen.py` | (worker) |
 | Setup report | `report_screen.py` | Dashboard |
 

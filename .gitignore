@@ -28,4 +28,3 @@ wordlist.txt
 spell-sync.toml
 lint-whitelist.txt
 !spell_sync/bundled/lint-whitelist.txt
-.git.legacy-*

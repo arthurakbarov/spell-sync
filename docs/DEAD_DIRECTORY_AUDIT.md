@@ -1,8 +1,11 @@
 # Dead directory audit
 
-Inventory of **generated and obsolete paths inside this public repository**.
-Cleanup of safe generated paths was executed 2026-08-05. Tracked product dead-code
-scan (`scripts/audit_dead_code.py`) reported **0 candidates** the same day.
+Policy for **generated and obsolete paths inside this public repository**.
+Re-run the product tiny-module scan after large deletions:
+
+```bash
+python3 scripts/audit_dead_code.py
+```
 
 Maintainer-only workspace layout and private tooling live outside this repository and are not
 inventoried here.
@@ -13,37 +16,38 @@ inventoried here.
 - Aggregated `__pycache__` trees outside `.venv`
 - Git tracked / ignored / untracked classification via `git check-ignore` and `git ls-files`
 - Product tiny-module scan: `python3 scripts/audit_dead_code.py`
-- Broader import/reference heuristics over `spell_sync/` + `tests/` + `scripts/` (no tracked
-  unreferenced modules found; nested relative imports are live)
-- `ruff` unused-import scan (`F401`/`F841`) on `spell_sync/`: clean
-- test-impact path existence: all mapped production/test/validator paths present
+- Broader import/reference heuristics over `spell_sync/` + `tests/` + `scripts/`
+- `ruff` unused-import scan (`F401`/`F841`) on `spell_sync/`
+- test-impact path existence for mapped production/test/validator paths
 
 ## Safe generated cleanup
 
-May be removed; CI and local tooling recreate them automatically.
+May be removed locally; CI and local tooling recreate them automatically. They are listed in
+`.gitignore` and must not be committed.
 
-| Path | Git | Status 2026-08-05 |
-|------|-----|-------------------|
-| `.coverage` | ignored | **deleted** |
-| `.mypy_cache/` | ignored | **deleted** |
-| `.pytest_cache/` | ignored | **deleted** |
-| `.ruff_cache/` | ignored | **deleted** |
-| `.hypothesis/` | ignored | **deleted** |
-| `**/__pycache__/` (excl. `.venv`) | ignored | **deleted** |
-| `.DS_Store` | ignored | **deleted** |
-
-Not present (no action needed): `build/`, `dist/`, `htmlcov/`, `*.egg-info/`.
+| Path | Notes |
+|------|-------|
+| `.coverage` | Coverage data file |
+| `.mypy_cache/` | mypy cache |
+| `.pytest_cache/` | pytest cache |
+| `.ruff_cache/` | ruff cache |
+| `.hypothesis/` | hypothesis examples |
+| `**/__pycache__/` (excl. `.venv`) | Bytecode |
+| `.DS_Store` | macOS folder metadata |
+| `build/`, `dist/`, `htmlcov/`, `*.egg-info/` | Packaging / HTML coverage (absent unless built) |
 
 Recreate caches by running normal checks; recreate `.venv/` only via
 `python3 scripts/project_environment.py sync` (or bootstrap).
 
 ## Obsolete after workflow removal
 
-| Path / topic | Status |
-|--------------|--------|
-| Public review-archive workflow (`scripts/review[-_]archive*`) | **Absent** |
-| `docs/UX_0_2_IMPLEMENTATION.md` | **Absent** |
-| `docs/platform-validation-readiness.md` | **Absent** |
+These paths must remain absent from the public tree (guards / history, not live code):
+
+| Path / topic | Expected status |
+|--------------|-----------------|
+| Public review-archive workflow (`scripts/review[-_]archive*`) | Absent |
+| `docs/UX_0_2_IMPLEMENTATION.md` | Absent |
+| `docs/platform-validation-readiness.md` | Absent |
 
 Maintainer review-bundle directories and scripts are out of scope for this public audit.
 
@@ -51,13 +55,14 @@ Maintainer review-bundle directories and scripts are out of scope for this publi
 
 | Check | Result |
 |-------|--------|
-| `scripts/audit_dead_code.py` | `DEAD_CODE_AUDIT_RESULT=success`, 0 candidates |
-| Unreferenced public top-level defs (heuristic) | 0 |
-| Broken `spell_sync.*` imports from tests | 0 |
-| Missing `tests/test-impact.toml` paths | 0 |
-| Untracked non-ignored files | none |
+| `scripts/audit_dead_code.py` | Expect `DEAD_CODE_AUDIT_RESULT=success` with 0 small-file candidates |
+| Unreferenced public top-level modules | Expect 0 |
+| Broken `spell_sync.*` imports from tests | Expect 0 |
+| Missing `tests/test-impact.toml` paths | Expect 0 |
+| Untracked non-ignored files | Expect none |
 
-No tracked source, test, or doc files were deleted: nothing qualified as dead.
+Symbol-level leftovers (unused helpers/constants) are removed when found; this audit does not
+claim a permanent zero for every private alias.
 
 ## Keep (active or intentional)
 
@@ -73,7 +78,7 @@ No tracked source, test, or doc files were deleted: nothing qualified as dead.
 
 ## Stashes
 
-Git stash list empty at cleanup time.
+`git stash list` must be empty at task end (agent workflow).
 
 ## Recommended next steps
 
