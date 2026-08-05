@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -36,11 +37,22 @@ ALLOWED_BASENAME_EXCEPTIONS = frozenset(
 )
 
 
+def _normalize_member(raw: str) -> str:
+    name = raw.replace("\\", "/").lstrip("./")
+    parts = name.split("/")
+    # sdists nest under spell_sync-VERSION/
+    if parts and parts[0].startswith("spell_sync-") and len(parts) > 1:
+        name = "/".join(parts[1:])
+    return name
+
+
 def package_member_violations(names: list[str]) -> list[str]:
     """Return human-readable violations for archive member paths."""
     errors: list[str] = []
     for raw in names:
-        name = raw.replace("\\", "/").lstrip("./")
+        name = _normalize_member(raw)
+        if not name or name.endswith("/"):
+            continue
         if name in ALLOWED_BASENAME_EXCEPTIONS:
             continue
         for prefix in FORBIDDEN_PREFIXES:
@@ -53,9 +65,19 @@ def package_member_violations(names: list[str]) -> list[str]:
     return errors
 
 
+def _archive_names(path: Path) -> list[str]:
+    suffix = "".join(path.suffixes).lower()
+    if suffix.endswith(".whl") or suffix.endswith(".zip"):
+        with zipfile.ZipFile(path) as archive:
+            return list(archive.namelist())
+    if suffix.endswith(".tar.gz") or suffix.endswith(".tgz") or path.suffix == ".tar":
+        with tarfile.open(path, "r:*") as archive:
+            return [member.name for member in archive.getmembers()]
+    raise ValueError(f"unsupported-archive-type:{path.name}")
+
+
 def scan_archive(path: Path) -> list[str]:
-    with zipfile.ZipFile(path) as archive:
-        return package_member_violations(archive.namelist())
+    return package_member_violations(_archive_names(path))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -83,7 +105,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"PACKAGE_MEMBERS_MISSING={archive.as_posix()}")
             failed += 1
             continue
-        errors = scan_archive(archive)
+        try:
+            errors = scan_archive(archive)
+        except (OSError, ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
+            failed += 1
+            print(f"PACKAGE_MEMBERS_ARCHIVE={archive.name}")
+            print(f"PACKAGE_MEMBERS_ERROR=unreadable:{exc}")
+            continue
         if errors:
             failed += 1
             print(f"PACKAGE_MEMBERS_ARCHIVE={archive.name}")
