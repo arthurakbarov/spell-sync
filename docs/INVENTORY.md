@@ -10,7 +10,7 @@ or manual steps change. Private wordlist content must never appear in public com
 | Canonical wordlist | private `spell-words` repo | Never copy into public tree |
 | Local `spell-sync.toml` | private project root | Effective project context from wordlist path |
 | Nested tool clone | `spell-words/spell-sync/` (gitignored) | Develop in the public clone |
-| Maintainer topology / snapshot | `spell-sync-dev` | `create-code-snapshot`; canonical `$HOME/code.zip` |
+| Maintainer topology / snapshot | `spell-sync-dev` | `create-code-snapshot`; canonical owner-home `code.zip` |
 | Daily maintainer scripts | private repos only | Do not reference `daily.sh` from public agent config |
 
 ## Manual / local-only
