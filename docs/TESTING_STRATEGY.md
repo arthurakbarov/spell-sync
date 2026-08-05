@@ -238,7 +238,7 @@ Do not, for speed:
 
 - remove assertions or lower full CI coverage thresholds
 - permanently skip safety suites after mutation changes
-- use `pytest --lf` or `pytest -x` as local minimal or full CI evidence
+- do not use `pytest --lf` or `pytest -x` as local minimal or full CI evidence
 - treat local minimal as publish validation
 - run packaging or wheel smoke during unrelated local minimal loops
 - run full CI after every polish commit

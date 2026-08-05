@@ -68,7 +68,7 @@ Do not pipe CI through `tail` / `tee`.
 | Failure was a single focused pytest node; fix landed | Rerun that node, then once the affected module/cluster — not full CI |
 | Runtime-only drift (real app open, host dictionary changed) while repo declaration correct | Rebuild product preview/doctor on the host; do not treat as a repo CI failure |
 | Full CI green and only non-CI docs/agent-prose changed with unchanged `ciInputDigest` | Prefer lightweight / evidence reuse over another full `scripts/ci.sh` |
-| Workspace snapshot already verified for this clean HEAD | Do not rebuild `$HOME/code.zip` unless the tree changed |
+| Workspace snapshot already verified for this clean HEAD | Do not rebuild the snapshot archive unless the tree changed |
 
 Identical successful commands on an unchanged tree must not be repeated. Prefer
 `python3 scripts/check_session.py` within one agent arc when available.

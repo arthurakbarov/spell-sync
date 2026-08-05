@@ -23,6 +23,41 @@ BANNED_ACTIVE = [
     (re.compile(r"\blint_request\s*\("), "lint_request()"),
 ]
 
+# Stale workflow phrasing that contradicts current local-minimal / publish CI model.
+STALE_DOC_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    (
+        "STALE-SAMPLE-2MIN",
+        re.compile(r"~2\s*min(?:ute)?s?\s+sample|sample.*~2\s*min", re.I),
+        "use the current ~60s edit-loop / ~120s commit-gate sample budgets",
+    ),
+    (
+        "STALE-GATE-PER-DIFF",
+        re.compile(
+            r"final gate\s*\(once per stable diff\)|once per stable diff.*(?:check-gate|ci\.sh)",
+            re.I,
+        ),
+        "full CI is publish/release evidence, not once-per-stable-diff",
+    ),
+    (
+        "STALE-LF-AS-EVIDENCE",
+        re.compile(
+            r"pytest\s+--lf\b.*\b(?:final|evidence|full\s*ci|commit.?gate)\b|"
+            r"\b(?:final|evidence|full\s*ci|commit.?gate)\b.*pytest\s+--lf\b",
+            re.I,
+        ),
+        "pytest --lf is diagnostic only; do not claim it as gate evidence",
+    ),
+    (
+        "STALE-CI-IN-EDIT-LOOP",
+        re.compile(
+            r"(?:edit[\s_-]*loop|during development).{0,40}scripts/ci\.sh|"
+            r"scripts/ci\.sh.{0,40}(?:edit[\s_-]*loop|every commit)",
+            re.I,
+        ),
+        "do not prescribe scripts/ci.sh inside the edit loop",
+    ),
+)
+
 EXCLUDE_PATH_PARTS = (
     ".pytest_cache/",
     "build/",
@@ -36,6 +71,11 @@ HISTORICAL_MARKERS = (
     "Historical context",
     "historical context",
     "resolved",
+)
+
+PROHIBITION_MARKERS = re.compile(
+    r"\b(?:do not|don't|must not|never|not use|forbid(?:den)?)\b",
+    re.I,
 )
 
 IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md"
@@ -928,6 +968,22 @@ def check_repository(root: Path) -> list[ContractViolation]:
                         line_no,
                         label,
                         f"use the current API or mark the section historical ({label})",
+                    )
+                )
+            for check_id, pattern, remediation in STALE_DOC_PATTERNS:
+                if not pattern.search(line):
+                    continue
+                if _line_has_historical_context(lines, line_no - 1):
+                    continue
+                if PROHIBITION_MARKERS.search(line):
+                    continue
+                violations.append(
+                    ContractViolation(
+                        check_id,
+                        path,
+                        line_no,
+                        line.strip(),
+                        remediation,
                     )
                 )
 

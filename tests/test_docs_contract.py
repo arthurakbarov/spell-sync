@@ -256,6 +256,59 @@ class TestDocsContract(unittest.TestCase):
                 msg="[DOCS-CONTRACT-013] CLI mismatch must fail",
             )
 
+    def test_stale_workflow_phrase_fails_with_path_and_line(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {"docs/EXAMPLE.md": "Use a ~2 min sample before every commit.\n"},
+            )
+            violations = mod.check_repository(root)
+            stale = [v for v in violations if v.check_id == "STALE-SAMPLE-2MIN"]
+            self.assertEqual(len(stale), 1, msg="[DOCS-CONTRACT-STALE-001] stale sample phrase")
+            self.assertEqual(stale[0].path, root / "docs/EXAMPLE.md")
+            self.assertEqual(stale[0].line_no, 1)
+
+    def test_prohibition_of_stale_phrase_allowed(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/EXAMPLE.md": (
+                        "Do not use `pytest --lf` as local minimal or full CI evidence.\n"
+                    ),
+                },
+            )
+            violations = [
+                v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")
+            ]
+            self.assertEqual(
+                violations,
+                [],
+                msg="[DOCS-CONTRACT-STALE-003] prohibition of stale phrase allowed",
+            )
+
+    def test_historical_stale_phrase_allowed(self) -> None:
+        mod = _load_docs_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_synthetic_repo(
+                root,
+                {
+                    "docs/EXAMPLE.md": (
+                        "Historical context: old workflow\n"
+                        "final gate (once per stable diff) was retired.\n"
+                    ),
+                },
+            )
+            violations = [
+                v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")
+            ]
+            self.assertEqual(violations, [], msg="[DOCS-CONTRACT-STALE-002] historical stale ok")
+
     def test_stale_active_api_fails_with_path_and_line(self) -> None:
         mod = _load_docs_contract()
         with tempfile.TemporaryDirectory() as tmp:
