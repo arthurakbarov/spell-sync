@@ -280,6 +280,7 @@ source = "bootstrap-readonly-estimate"
 "ci:docs-contract" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:architecture" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:agent-config" = { profile = "ci-validator", parent = "gate:full-ci" }
+"ci:privacy-tree" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:target-capabilities" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:unknown-check" = { profile = "unknown-check", parent = "gate:full-ci" }
 "bootstrap:python" = { profile = "bootstrap", parent = "gate:full-ci" }
@@ -308,6 +309,7 @@ source = "bootstrap-readonly-estimate"
 "ci:coverage" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:package-build" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:twine-check" = { profile = "ci-child", parent = "gate:full-ci" }
+"ci:package-members" = { profile = "ci-validator", parent = "gate:full-ci" }
 "ci:wheel-install" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:cli-smoke" = { profile = "ci-child", parent = "gate:full-ci" }
 "ci:tui-smoke" = { profile = "ci-child", parent = "gate:full-ci" }

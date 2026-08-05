@@ -260,8 +260,11 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
 
     @on(DataTable.RowSelected, "#history-table")
     def _on_history_row_selected(self, event: DataTable.RowSelected) -> None:
+        raw_key = event.row_key.value
+        if raw_key is None:
+            return
         try:
-            index = int(event.row_key.value)
+            index = int(raw_key)
         except (TypeError, ValueError):
             return
         if 0 <= index < len(self._records):
@@ -394,15 +397,15 @@ class TechnicalLogScreen(LoadTokenMixin, Screen[None]):
         table.add_columns("Time", "Level", "Event", "Message")
         fallback: list[str] = []
         for line in snapshot.lines[-_MAX_TECH_LOG_ROWS:]:
-            event = parse_technical_log_line(line)
-            if event is None:
+            parsed = parse_technical_log_line(line)
+            if parsed is None:
                 fallback.append(line[:_MAX_FALLBACK_LINE_LENGTH])
                 continue
             table.add_row(
-                event.timestamp,
-                event.severity.value,
-                event.event_id.value,
-                _technical_event_message(event),
+                parsed.timestamp,
+                parsed.severity.value,
+                parsed.event_id.value,
+                _technical_event_message(parsed),
             )
         table.display = table.row_count > 0
         fallback_static = self.query_one("#tech-log-content", Static)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
@@ -57,16 +59,18 @@ def _action_buttons(*buttons: Button) -> Vertical:
     return Vertical(*buttons, id="setup-actions", classes="setup-actions")
 
 
+_PATH_COMPLETE_BINDINGS = [
+    Binding("escape", "back", "Back"),
+    Binding("tab", "complete_path", "Complete", priority=True),
+]
+
+
 class _PathCompleteMixin:
     """Tab applies the highlighted path-list row."""
 
-    BINDINGS = [
-        Binding("escape", "back", "Back"),
-        Binding("tab", "complete_path", "Complete", priority=True),
-    ]
-
     def _path_picker(self) -> WordlistPathPicker:
-        return self.query_one(WordlistPathPicker)
+        screen = cast(Screen[None], self)
+        return screen.query_one(WordlistPathPicker)
 
     def action_complete_path(self) -> None:
         try:
@@ -190,6 +194,8 @@ class SetupStorageStrategyScreen(Screen[None]):
 
 
 class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
+    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
@@ -235,6 +241,8 @@ class SetupOpenProjectScreen(_PathCompleteMixin, Screen[None]):
 
 
 class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
+    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
@@ -306,6 +314,8 @@ class SetupWordlistScreen(_PathCompleteMixin, Screen[None]):
 
 
 class ChangeWordlistScreen(_PathCompleteMixin, Screen[None]):
+    BINDINGS = list(_PATH_COMPLETE_BINDINGS)
+
     def __init__(self, controller: TuiController) -> None:
         super().__init__()
         self._controller = controller
