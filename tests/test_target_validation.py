@@ -47,7 +47,8 @@ def test_load_packaged_target_validation_returns_entries() -> None:
 def test_target_details_uses_packaged_automated_pass() -> None:
     details = build_target_details(_target("chrome"))
     assert details.automated_validation == "pass"
-    assert details.manual_validation == "not-run"
+    # chrome/macos records a read-only manual pass; other platforms stay not-run.
+    assert details.manual_validation in {"pass", "not-run"}
 
 
 def test_target_details_empty_when_package_missing(

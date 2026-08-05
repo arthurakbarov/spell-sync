@@ -410,6 +410,7 @@ def test_recovery_discard_success_emits_terminal_event(monkeypatch) -> None:
     from spell_sync.application.requests import ProjectRef, RecoveryRequest
     from spell_sync.application.services.context import ApplicationContext
     from spell_sync.application.services.recovery import RecoveryService
+    from spell_sync.push_journal import JournalLoadStatus
     from tests.tui.fake_service import sample_recovery_preview
 
     captured: list[TechnicalEvent] = []
@@ -417,8 +418,18 @@ def test_recovery_discard_success_emits_terminal_event(monkeypatch) -> None:
         "spell_sync.application.services.recovery.make_operation_emitter",
         lambda _sink: EventEmitter(presentation_sink=None, technical_sink=captured.append),
     )
+    preview = sample_recovery_preview(
+        status=RecoveryStatus.CORRUPT_JOURNAL,
+        can_discard=True,
+        can_recover=False,
+    )
     scope = MagicMock()
     scope.context.wordlist_file = Path("/tmp/wordlist.txt")
+    scope.journal_result = MagicMock(
+        status=JournalLoadStatus.CORRUPT,
+        journal=None,
+        content_digest=preview.preview_fingerprint,
+    )
     runtime = MagicMock()
     runtime.mutation_scope.return_value.__enter__.return_value = scope
     runtime.mutation_scope.return_value.__exit__.return_value = False
@@ -428,11 +439,6 @@ def test_recovery_discard_success_emits_terminal_event(monkeypatch) -> None:
             history_store=MagicMock(),
             state_paths=MagicMock(),
         )
-    )
-    preview = sample_recovery_preview(
-        status=RecoveryStatus.CORRUPT_JOURNAL,
-        can_discard=True,
-        can_recover=False,
     )
     with patch(
         "spell_sync.application._operation_deps.safe_discard_journal_file",

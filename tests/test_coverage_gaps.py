@@ -264,6 +264,7 @@ class TestRemainingCoverage(unittest.TestCase):
                         journal_result=MagicMock(
                             status=JournalLoadStatus.VALID_IN_PROGRESS,
                             journal=MagicMock(transaction_id=preview.transaction_id),
+                            content_digest=preview.preview_fingerprint,
                         )
                     )
                     scope.return_value.__exit__.return_value = False

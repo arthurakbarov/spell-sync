@@ -156,7 +156,11 @@ class TestLineCoverageGaps(unittest.TestCase):
             )
         self.assertEqual(stale.outcome, RecoveryOutcome.FAILED)
 
-        scope.journal_result = JournalLoadResult(JournalLoadStatus.VALID_IN_PROGRESS, journal)
+        scope.journal_result = JournalLoadResult(
+            JournalLoadStatus.VALID_IN_PROGRESS,
+            journal,
+            content_digest=preview.preview_fingerprint,
+        )
         events: list = []
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
@@ -250,7 +254,13 @@ class TestLineCoverageGaps(unittest.TestCase):
         with patch(
             "spell_sync.application.runtime_resolver.RuntimeResolver.mutation_scope"
         ) as mutating:
-            mutating.return_value.__enter__.return_value = MagicMock()
+            mutating.return_value.__enter__.return_value = MagicMock(
+                context=MagicMock(wordlist_file=Path("/tmp/w.txt")),
+                journal_result=MagicMock(
+                    status=JournalLoadStatus.VALID_COMPLETED,
+                    content_digest=discard_preview.preview_fingerprint,
+                ),
+            )
             mutating.return_value.__exit__.return_value = False
             with patch("spell_sync.application._operation_deps.discard_completed_journal"):
                 discarded = service.execute_recovery_discard(
