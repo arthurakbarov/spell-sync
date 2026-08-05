@@ -619,7 +619,7 @@ class TestRemainingCoverage(unittest.TestCase):
             self.assertIsNone(count)
 
     def test_discard_txn_snapshots_none(self):
-        discard_txn_snapshots(None, wordlist=None)
+        self.assertIsNone(discard_txn_snapshots(None, wordlist=None))
 
     def test_discard_txn_snapshots_swallows_remove_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -628,7 +628,8 @@ class TestRemainingCoverage(unittest.TestCase):
             snap = wordlist.parent / ".spell-sync.txn" / "abc"
             snap.mkdir(parents=True)
             with patch("spell_sync.push_journal.remove_trusted_tree", side_effect=OSError("busy")):
-                discard_txn_snapshots(snap, wordlist=wordlist)
+                self.assertIsNone(discard_txn_snapshots(snap, wordlist=wordlist))
+            self.assertTrue(snap.is_dir())
 
     def test_safe_discard_snapshot_missing_directory(self):
         with tempfile.TemporaryDirectory() as tmp:

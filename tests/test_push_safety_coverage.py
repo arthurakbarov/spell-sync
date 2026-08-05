@@ -389,7 +389,7 @@ class TestPushJournalSchemaBranchCoverage(unittest.TestCase):
         from spell_sync.push_journal import _secure_file_mode
 
         with patch("spell_sync.push_journal.os.chmod", side_effect=OSError("nope")):
-            _secure_file_mode(Path("/tmp/x"), 0o600)
+            self.assertIsNone(_secure_file_mode(Path("/tmp/x"), 0o600))
 
 
 class TestPushTransactionChmodCoverage(unittest.TestCase):
@@ -404,6 +404,7 @@ class TestPushTransactionChmodCoverage(unittest.TestCase):
                     wordlist,
                     [Dictionary("d", str(dict_path), DictionaryFormat.TEXT)],
                 )
+            self.assertIsNotNone(tx)
             tx.close()
 
 

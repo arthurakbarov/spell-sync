@@ -42,6 +42,7 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
             await wait_for_text(pilot, "#dashboard-summary", "Ready")
             await pilot.press("q")
             await pilot.pause()
+            self.assertFalse(app.is_running)
 
     async def test_controller_status_helper(self):
         controller = TuiController(fake_service(), CliOptions())
@@ -419,10 +420,15 @@ class TestScreenCoverage(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 48)) as pilot:
             app.push_screen(RemovalsScreen("chrome", frozenset()))
             await pilot.pause()
+            self.assertIsInstance(app.screen, RemovalsScreen)
+            empty = str(app.screen.query_one("#removals-content").render())
+            self.assertTrue(empty.strip())
             app.pop_screen()
             app.push_screen(RemovalsScreen("chrome", frozenset({"alpha"})))
+            await wait_for_text(pilot, "#removals-content", "alpha")
             await pilot.press("escape")
             await pilot.pause()
+            self.assertNotIsInstance(app.screen, RemovalsScreen)
 
 
 if __name__ == "__main__":
