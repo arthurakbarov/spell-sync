@@ -198,11 +198,11 @@ production = [
 ]
 moduleTests = [
   "tests/test_recovery_discard_safety.py",
-  "tests/test_recovery_digest_coverage.py",
+  "tests/test_recovery_digest_branches.py",
 ]
 clusterTests = [
   "tests/test_recovery_discard_safety.py",
-  "tests/test_recovery_digest_coverage.py",
+  "tests/test_recovery_digest_branches.py",
   "tests/test_safe_discard_adversarial.py",
   "tests/test_tui_recovery_safety.py",
 ]
