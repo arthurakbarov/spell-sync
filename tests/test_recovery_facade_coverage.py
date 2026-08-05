@@ -305,6 +305,19 @@ class TestRecoveryFacadeCoverage(unittest.TestCase):
                 RecoveryStatus.CORRUPT_JOURNAL,
             )
 
+            unsafe = replace(
+                absent,
+                journal_result=JournalLoadResult(
+                    JournalLoadStatus.UNSAFE_ARTIFACT,
+                    None,
+                    detail="unsafe artifact",
+                    content_digest=None,
+                ),
+            )
+            unsafe_preview = build_recovery_preview(unsafe)
+            self.assertEqual(unsafe_preview.status, RecoveryStatus.CORRUPT_JOURNAL)
+            self.assertEqual(unsafe_preview.preview_fingerprint, "unsafe")
+
             unsupported = replace(
                 absent,
                 journal_result=JournalLoadResult(
