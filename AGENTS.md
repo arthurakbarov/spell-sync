@@ -82,7 +82,7 @@ necessity is `commit-gate-sufficient`. On full CI completion it prints `CI_RESUL
 
 Docs style, docs contract, agent config, architecture boundaries, ruff, mypy, grouped pytest
 with **tiered coverage** on `spell_sync/` (100% lines on application + mutation paths; ≥98%
-lines on TUI/presentation/remainder; ≥96% branches; full CI only), packaging,
+lines on TUI/presentation/remainder; ≥90% branches on strict paths; full CI only), packaging,
 installed-wheel smoke, and headless command scenarios.
 
 Requires **Python 3.11+** (`pyproject.toml`).

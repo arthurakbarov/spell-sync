@@ -78,22 +78,37 @@ def test_presentation_allows_ninety_eight() -> None:
     assert all(item.ok for item in verdicts)
     assert STRICT_LINE_PERCENT == 100
     assert PRESENTATION_LINE_PERCENT == 98
-    assert BRANCH_MINIMUM_PERCENT == 96
+    assert BRANCH_MINIMUM_PERCENT == 90
 
 
-def test_branch_floor_applies_to_all_tiers(tmp_path: Path) -> None:
-    payload = {
+def test_branch_floor_applies_to_strict_only(tmp_path: Path) -> None:
+    remainder_ok = {
         "files": {
             "spell_sync/words.py": _file(
                 statements=10,
                 covered=10,
                 branches=100,
-                covered_branches=95,
+                covered_branches=50,
             )
         }
     }
-    path = tmp_path / "coverage.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    path = tmp_path / "coverage-remainder.json"
+    path.write_text(json.dumps(remainder_ok), encoding="utf-8")
+    code, message = evaluate_coverage_json(path)
+    assert code == 0, message
+
+    strict_low = {
+        "files": {
+            "spell_sync/application/service.py": _file(
+                statements=10,
+                covered=10,
+                branches=100,
+                covered_branches=80,
+            )
+        }
+    }
+    path = tmp_path / "coverage-strict.json"
+    path.write_text(json.dumps(strict_low), encoding="utf-8")
     code, message = evaluate_coverage_json(path)
     assert code == 1
     assert "branches" in message

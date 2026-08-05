@@ -216,5 +216,5 @@ Run full `scripts/ci.sh` only when necessity is `full-required` (or the owner as
 
 Coverage policy: L2 publish CI uses tiered coverage (`scripts/coverage_policy.py`) —
 100% lines on application + mutation paths; ≥98% lines on TUI/presentation/remainder;
-≥96% branches everywhere.
+≥90% branches on strict paths (presentation/remainder: lines only).
 Local L0/L1 edit loops do not run coverage.

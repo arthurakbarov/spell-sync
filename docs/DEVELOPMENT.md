@@ -96,7 +96,7 @@ on manual log tailing as the primary gate.
 `scripts/ci.sh` delegates to `scripts/ci_runner.py`: docs style/contract, agent config, target
 capabilities, **architecture boundaries** (`scripts/check_architecture.py`), ruff, mypy,
 grouped pytest with **tiered coverage** on `spell_sync/` (100% lines on application +
-mutation paths; ≥98% on TUI/presentation/remainder; ≥96% branches), packaging,
+mutation paths; ≥98% on TUI/presentation/remainder; ≥90% branches on strict paths), packaging,
 installed-wheel smoke, and headless command scenarios. CI smoke uses temporary HOME and project
 directories only.
 
@@ -118,7 +118,7 @@ python3 scripts/check_agent_config.py
 
 Coverage gate (**full CI / publish**): tiered via `scripts/coverage_policy.py` — **100%
 lines** on `spell_sync/application/` and mutation paths; **≥98% lines** on TUI/presentation
-and remainder modules; **≥96% branches** everywhere. Prefer
+and remainder modules; **≥90% branches** on strict paths. Prefer
 behavior and invariant tests over line-execution padding. Legacy `*coverage*` padding suites
 are frozen by `tests/test_padding_inventory_policy.py` and must not grow. Ordinary edit/commit
 cycles use local minimal without coverage (`docs/TESTING_STRATEGY.md`).

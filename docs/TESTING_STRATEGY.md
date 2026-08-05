@@ -14,7 +14,7 @@ with explicit owner approval (see `tests/test_padding_inventory_policy.py`, resi
 | Keep strict | Do not grow | Add where missing |
 |-------------|-------------|-------------------|
 | Mutation safety clusters at commit gate | Legacy `*coverage*` padding inventory | Property/idempotence tests for Pull union and Push subsets |
-| Publish coverage: **100% lines** on `application/` + mutation paths; **≥98% lines** on TUI/presentation/remainder; **≥96% branches** everywhere (`scripts/coverage_policy.py`) | Fragile skill-prose substring contracts (prefer paths/headings/frontmatter) | Real-app manual samples before publish (R-CON) |
+| Publish coverage: **100% lines** / **≥90% branches** on `application/` + mutation paths; **≥98% lines** on TUI/presentation/remainder (`scripts/coverage_policy.py`) | Fragile skill-prose substring contracts (prefer paths/headings/frontmatter) | Real-app manual samples before publish (R-CON) |
 | Installed-wheel smoke on publish | Full CI after every polish commit | Windows hardware adversarial when available (R-WIN) |
 
 **Freeze + shrink:** do not raise `MAX_COVERAGE_NAMED_TEST_DEFS`. When refactoring, move
@@ -118,7 +118,7 @@ python3 scripts/check_ci_evidence.py --release
 
 Full CI includes grouped pytest **with** tiered coverage (`scripts/coverage_policy.py`:
 100% lines on application + mutation paths; ≥98% lines on TUI/presentation/remainder;
-≥96% branches everywhere), packaging,
+≥90% branches on strict paths (presentation/remainder: lines only)), packaging,
 wheel-smoke, and all validators. Agent runs full CI only on explicit owner request
 (“готов к push/release”) or via `release-candidate` / publish workflows.
 

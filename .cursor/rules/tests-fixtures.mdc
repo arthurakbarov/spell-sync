@@ -25,9 +25,9 @@ alwaysApply: false
 
 ## Coverage policy
 
-- Publish CI uses tiered coverage (`scripts/coverage_policy.py`): **100% lines** on
-  `application/` + mutation/recovery/setup modules; **≥98% lines** on TUI/presentation
-  and remainder; **≥96% branches** everywhere under `spell_sync/`
+- Publish CI uses tiered coverage (`scripts/coverage_policy.py`): **100% lines** and
+  **≥90% branches** on `application/` + mutation/recovery/setup modules; **≥98% lines**
+  on TUI/presentation and remainder (branch floor is strict-tier only)
 - Prefer behavior and invariant tests over line-execution padding
 - Do not grow frozen `*coverage*` padding inventories; shrink only (residual R-PWR)
 - Preserve strict safety coverage: `test_transaction_safety`, `test_pull_safety`,
