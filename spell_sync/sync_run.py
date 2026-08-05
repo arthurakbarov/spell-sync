@@ -116,7 +116,7 @@ class SyncRun:
 
         wordlist_words = read_text_words(self.wordlist_str)
         before = len(clean_words(wordlist_words))
-        source_groups: list[WordSet] = []
+        source_groups: list[frozenset[str]] = []
         for _dictionary, read_result in iter_wordlist_sources(
             self._ctx,
             unreadable_reason="no access — pull skipped",
