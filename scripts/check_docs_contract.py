@@ -1138,30 +1138,38 @@ def _check_manual_validation_count_honesty(root: Path) -> list[ContractViolation
     )
     total = len(targets)
     expected = f"{passed}/{total}"
-    text = tracker.read_text(encoding="utf-8")
-    # Accept **2/35** or plain 2/35 near "manual".
-    if expected not in text:
-        return [
-            ContractViolation(
-                "MANUAL-002",
-                tracker,
-                None,
-                f"expected manual validation count {expected}",
-                "sync ARCHITECTURE_0_3_IMPLEMENTATION.md with docs/target-validation.json",
+    surfaces = (
+        root / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md",
+        root / "docs" / "FEATURE_MATRIX.md",
+        root / "docs" / "PRODUCT_COMPLETION.md",
+    )
+    violations: list[ContractViolation] = []
+    for path in surfaces:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if expected not in text:
+            violations.append(
+                ContractViolation(
+                    "MANUAL-002",
+                    path,
+                    None,
+                    f"expected manual validation count {expected}",
+                    f"sync {path.relative_to(root).as_posix()} with docs/target-validation.json",
+                )
             )
-        ]
-    # Reject stale absolute zeros when passes exist.
-    if passed > 0 and re.search(r"manual target validation 0/\d+", text):
-        return [
-            ContractViolation(
-                "MANUAL-003",
-                tracker,
-                None,
-                "stale 0/N manual validation claim",
-                f"replace 0/N with {expected}",
-            )
-        ]
-    return []
+        if path.name == "ARCHITECTURE_0_3_IMPLEMENTATION.md":
+            if passed > 0 and re.search(r"manual target validation 0/\d+", text):
+                violations.append(
+                    ContractViolation(
+                        "MANUAL-003",
+                        path,
+                        None,
+                        "stale 0/N manual validation claim",
+                        f"replace 0/N with {expected}",
+                    )
+                )
+    return violations
 
 
 def _check_public_docs_hygiene(root: Path) -> list[ContractViolation]:

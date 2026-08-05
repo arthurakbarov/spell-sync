@@ -41,7 +41,8 @@ and `docs/target-validation.json`. Residuals: [PRODUCT_COMPLETION.md](PRODUCT_CO
   `python3 scripts/validate_target_validation_schema.py`).
 - **Interactive acceptance**: human GUI/TUI confirmation on a real machine (separate from
   headless tests). Still mostly missing; do not equate headless TUI tests with interactive.
-- Current samples (2026-08-05): chrome/macos and macos_spelling/macos, read-only / dry-run.
+- Current samples (2026-08-05): chrome/macos and macos_spelling/macos, read-only / dry-run
+  (`2/35` manual passes in `docs/target-validation.json`).
 - Do not claim Push "works on Chrome" without distinguishing dry-run from mutation.
 
 ### Doctor / status
