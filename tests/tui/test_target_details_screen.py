@@ -76,7 +76,8 @@ class TestTargetDetails(unittest.IsolatedAsyncioTestCase):
         details = build_target_details(target)
         text = format_target_details_text(details)
         self.assertEqual(details.automated_validation, "pass")
-        self.assertEqual(details.manual_validation, "not-run")
+        # Packaged matrix includes a chrome/macos manual sample (read-only R-CON).
+        self.assertEqual(details.manual_validation, "pass")
         self.assertIn("pass", text.lower())
 
     def test_corrupt_target_suggested_action(self) -> None:
