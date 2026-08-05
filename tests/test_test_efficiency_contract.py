@@ -69,6 +69,7 @@ def test_ci_runner_lists_diagnostic_checks() -> None:
     assert proc.returncode == 0
     ids = proc.stdout.splitlines()
     assert "ruff.format" in ids
+    assert "privacy.tree" in ids
     assert "tests:rest" in ids
     assert "tests:tui" in ids
     assert "tests:dev-tooling" in ids

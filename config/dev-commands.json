@@ -64,6 +64,13 @@
       "mutatesRepo": false,
       "network": "maybe"
     },
+    "privacy-scan": {
+      "command": "python3 scripts/scan_privacy_tree.py",
+      "stage": "full-ci",
+      "task": "Lean secrets + maintainer-path scan of tracked tree",
+      "mutatesRepo": false,
+      "network": false
+    },
     "runs-show": {
       "command": "python3 scripts/dev_runs.py show <run-id>",
       "stage": "triage",

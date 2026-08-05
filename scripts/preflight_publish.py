@@ -80,6 +80,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"PREFLIGHT_NECESSITY={necessity.result}", flush=True)
     print(f"PREFLIGHT_NECESSITY_REASON={necessity.reason}", flush=True)
 
+    print("PREFLIGHT_STAGE=privacy", flush=True)
+    code = _run([sys.executable, str(ROOT / "scripts" / "scan_privacy_tree.py")])
+    if code != 0:
+        print("PREFLIGHT_RESULT=failed", flush=True)
+        print("PREFLIGHT_REASON=privacy", flush=True)
+        return code
+    print("PREFLIGHT_PRIVACY=success", flush=True)
+
     if not args.execute:
         print(
             format_field_block(
@@ -115,8 +123,6 @@ def main(argv: list[str] | None = None) -> int:
         print("PREFLIGHT_REASON=evidence", flush=True)
         return code
 
-    print("PREFLIGHT_STAGE=privacy", flush=True)
-    print("PREFLIGHT_PRIVACY=run skill privacy-export / security-audit before share", flush=True)
     print("PREFLIGHT_RESULT=success", flush=True)
     print("PREFLIGHT_REMOTE=not-performed", flush=True)
     return 0

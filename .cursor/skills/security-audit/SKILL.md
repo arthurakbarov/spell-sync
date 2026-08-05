@@ -28,10 +28,11 @@ Follow skill `privacy-export` checklist.
 
 ```bash
 python3 scripts/check_agent_config.py
+python3 scripts/scan_privacy_tree.py
 python3 scripts/check_docs_contract.py
 ```
 
-Optional:
+Optional (already covered by `scan_privacy_tree.py`):
 
 ```bash
 rg -i 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_' .

@@ -146,6 +146,7 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
         ("docs.contract", [py, "scripts/check_docs_contract.py"]),
         ("architecture.boundaries", [py, "scripts/check_architecture.py", "--check"]),
         ("agent.config", [py, "scripts/check_agent_config.py"]),
+        ("privacy.tree", [py, "scripts/scan_privacy_tree.py"]),
         ("targets.capabilities", [py, "scripts/check_target_capabilities.py", "--check"]),
         ("ruff.check", [py, "-m", "ruff", "check", "spell_sync", "tests", "scripts"]),
         (

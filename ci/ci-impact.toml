@@ -106,6 +106,7 @@ patterns = [
   "scripts/check_target_capabilities.py",
   "scripts/check-docs-style.sh",
   "scripts/validate_*.py",
+  "scripts/scan_privacy_tree.py",
 ]
 
 [classes.documentation]

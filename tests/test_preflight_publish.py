@@ -19,11 +19,14 @@ def test_preflight_plan_mode_prints_next_steps() -> None:
         cwd=ROOT,
     )
     # Dirty trees are allowed to block (exit 2); clean trees return 0 with a plan.
+    # Privacy failures return non-zero with PREFLIGHT_REASON=privacy.
     assert proc.returncode in {0, 2}, proc.stderr + proc.stdout
     assert "PREFLIGHT_STAGE=clean-tree" in proc.stdout
-    if proc.returncode == 0:
-        assert "PREFLIGHT_RESULT=ready-plan" in proc.stdout
-        assert "PREFLIGHT_NEXT=scripts/ci.sh" in proc.stdout
-        assert "privacy-export" in proc.stdout
-    else:
+    if proc.returncode == 2:
         assert "PREFLIGHT_REASON=dirty-working-tree" in proc.stdout
+        return
+    assert "PREFLIGHT_RESULT=ready-plan" in proc.stdout
+    assert "PREFLIGHT_NEXT=scripts/ci.sh" in proc.stdout
+    assert "PREFLIGHT_STAGE=privacy" in proc.stdout
+    assert "PREFLIGHT_PRIVACY=success" in proc.stdout
+    assert "privacy-export" in proc.stdout

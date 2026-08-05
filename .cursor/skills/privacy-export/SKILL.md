@@ -55,6 +55,7 @@ substring false positives:
 
 ```bash
 python3 scripts/check_agent_config.py
+python3 scripts/scan_privacy_tree.py
 ```
 
 Policy summary:
@@ -81,6 +82,10 @@ Each hit must be fixed or justified before publication.
 
 Inspect ZIP, wheel, and sdist listings separately. Artifacts must not contain tests,
 caches, personal config, wordlist, history, journal data, or snapshots.
+
+```bash
+python3 scripts/validate_package_members.py dist/*.whl dist/*.tar.gz
+```
 
 ## Stop conditions
 
