@@ -227,7 +227,6 @@ moduleTests = [
 ]
 clusterTests = [
   "tests/tui/test_architecture.py",
-  "tests/tui/test_button_else_branches.py",
   "tests/tui/test_dashboard.py",
   "tests/tui/test_doctor_screen.py",
   "tests/tui/test_pull_flow.py",
@@ -489,7 +488,6 @@ clusterTests = [
   "tests/test_execution_hard_timeout_detached.py",
   "tests/test_execution_history.py",
   "tests/test_execution_integration.py",
-  "tests/test_execution_interrupt.py",
   "tests/test_execution_opaque_token_privacy.py",
   "tests/test_execution_parent_deadline.py",
   "tests/test_execution_parent_interrupt.py",
