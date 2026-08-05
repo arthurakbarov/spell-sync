@@ -448,3 +448,17 @@ def test_mixed_production_and_test_keeps_changed_test_file(planner_mod, registry
     assert "runtime" in plan.clusters
     assert "tests/test_runtime_architecture.py" in plan.pytest_targets
     assert any("changed test files" in reason for reason in plan.reasons)
+
+
+def test_deleted_test_files_are_not_pytest_targets(planner_mod, registry) -> None:
+    missing = "tests/test_execution_interrupt.py"
+    assert not (ROOT / missing).is_file()
+    plan = planner_mod.build_plan(
+        ROOT,
+        [missing, "tests/test_padding_inventory_policy.py"],
+        registry=registry,
+        level="module",
+    )
+    assert missing not in plan.pytest_targets
+    assert "tests/test_padding_inventory_policy.py" in plan.pytest_targets
+    assert any("missing pytest targets" in reason for reason in plan.reasons)

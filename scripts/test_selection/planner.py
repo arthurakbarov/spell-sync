@@ -118,6 +118,16 @@ def _pytest_command(targets: list[str], python: str = "python3") -> tuple[str, .
     return (python, "-m", "pytest", *targets, "-q", "--durations=10")
 
 
+def _existing_pytest_targets(root: Path, targets: list[str]) -> list[str]:
+    """Drop deleted/moved paths so planners never hand pytest missing files."""
+    existing: list[str] = []
+    for target in targets:
+        rel = target.split("::", 1)[0]
+        if (root / rel).is_file():
+            existing.append(target)
+    return existing
+
+
 def _requires_full_ci(root: Path, changed_files: list[str]) -> bool:
     """Derive plan.requires_full_ci from CI impact classes (not always True)."""
     if not changed_files:
@@ -267,6 +277,11 @@ def build_plan(
         if len(filtered) != len(pytest_targets):
             reasons.append("dev-scope: deferred wheel-smoke tests to L2")
             pytest_targets = filtered
+
+    before_existing = len(pytest_targets)
+    pytest_targets = _existing_pytest_targets(root, pytest_targets)
+    if len(pytest_targets) != before_existing:
+        reasons.append("skipped missing pytest targets (deleted or untracked paths)")
 
     if "documentation" in clusters and not pytest_targets:
         command: tuple[str, ...] = ()
