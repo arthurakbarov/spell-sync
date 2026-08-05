@@ -85,3 +85,8 @@ def test_scan_rejects_unreadable_archive(tmp_path: Path) -> None:
     except Exception:
         return
     raise AssertionError("expected scan_archive to reject a non-tar payload")
+
+
+def test_manifest_prunes_tests_from_sdist() -> None:
+    manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    assert "prune tests" in manifest
