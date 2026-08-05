@@ -1,4 +1,4 @@
-"""Targeted coverage for presentation modules that gate full CI at ≥98% lines."""
+"""Targeted coverage for presentation modules that keep presentation modules above the publish line floor."""
 
 from __future__ import annotations
 
