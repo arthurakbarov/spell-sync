@@ -70,6 +70,7 @@ def test_ci_runner_lists_diagnostic_checks() -> None:
     ids = proc.stdout.splitlines()
     assert "ruff.format" in ids
     assert "privacy.tree" in ids
+    assert "packaging.members" in ids
     assert "tests:rest" in ids
     assert "tests:tui" in ids
     assert "tests:dev-tooling" in ids

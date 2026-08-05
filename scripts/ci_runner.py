@@ -273,6 +273,13 @@ def _full_ci_preview_steps(py: str) -> tuple[tuple[str, list[str], bool, bool, b
                 False,
                 False,
             ),
+            (
+                "packaging.members",
+                [py, "scripts/validate_package_members.py"],
+                False,
+                False,
+                False,
+            ),
         ]
     )
     steps.extend(_wheel_smoke_preview_steps(py))
@@ -1487,6 +1494,25 @@ class CiRunner:
             if twine_rc != 0:
                 return self._finish_with_gate(twine_rc)
 
+            member_argv = [
+                py,
+                "scripts/validate_package_members.py",
+                *[str(path) for path in dist_artifacts],
+            ]
+            member_rc, member_out, member_timing = self._run_check(
+                "packaging.members",
+                member_argv,
+                cwd=self.root,
+            )
+            self.record(
+                "packaging.members",
+                member_rc,
+                member_out,
+                timing=member_timing,
+            )
+            if member_rc != 0:
+                return self._finish_with_gate(member_rc)
+
             version = _package_version(self.root)
             wheels = sorted(dist.glob(f"spell_sync-{version}-*.whl"))
             sdists = sorted(dist.glob(f"spell_sync-{version}.tar.gz"))
@@ -1643,6 +1669,7 @@ def main(argv: list[str] | None = None) -> int:
                 "coverage.policy",
                 "packaging.build",
                 "packaging.twine",
+                "packaging.members",
                 "packaging.wheel-smoke",
                 "smoke.init",
                 "smoke.lint",
