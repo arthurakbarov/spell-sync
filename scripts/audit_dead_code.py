@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / ".artifacts" / "quality" / "dead-code-report.json"
 # Product modules only — scripts are often CLI entry points referenced outside imports.
 SCAN_ROOTS = (ROOT / "spell_sync",)
-REFERENCE_ROOTS = (ROOT / "scripts", ROOT / "spell_sync")
+REFERENCE_ROOTS = (ROOT / "scripts", ROOT / "spell_sync", ROOT / "tests")
 # Heuristic: tiny product modules. Raised above __main__.py (~238 B) so the scan is non-vacuous.
 MAX_CANDIDATE_BYTES = 1024
 ENTRY_MARKERS = ('if __name__ == "__main__"', "if __name__ == '__main__'")

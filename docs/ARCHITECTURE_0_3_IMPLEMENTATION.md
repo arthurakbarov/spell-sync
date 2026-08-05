@@ -64,9 +64,10 @@ Open engineering residuals (not release blockers if previously accepted):
 - Real-application manual validation: **2/35** (`docs/target-validation.json`;
   chrome/macos + macos_spelling/macos recorded 2026-08-05, read-only / dry-run)
 - Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
-- Legacy `*coverage*` padding inventory frozen at ≤371 `def test_` (see
-  `tests/test_padding_inventory_policy.py`) — do not grow; shrink only; publish gate is
-  tiered (`scripts/coverage_policy.py`: 100% on application + mutation; ≥98% TUI/remainder)
+- Legacy `*coverage*` padding inventory frozen at ≤371 `def test_` with ≤53 bare
+  (no-assert) tests inside that set (see `tests/test_padding_inventory_policy.py`,
+  residual R-PWR) — do not grow; shrink only; publish gate is tiered
+  (`scripts/coverage_policy.py`: 100% on application + mutation; ≥98% TUI/remainder)
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
 maintainer snapshot tests green.
@@ -556,9 +557,19 @@ No tag, release, or publication in this phase.
 
 ### Residuals accepted by owner
 
-- R-WIN: Windows real-hardware adversarial R1–R7 (reparse/junction) not run
-- R-PWR: power-loss durability not physically proven
-- R-CON: same-user concurrent replacement outside threat model
+Open items use the IDs in [`ROADMAP.md`](ROADMAP.md):
+
+| ID | Meaning |
+|----|---------|
+| R-WIN | Windows real-hardware adversarial R1–R7 not run |
+| R-CON | Real-application manual validation samples still thin (2/35) |
+| R-PWR | Legacy `*coverage*` padding inventory: freeze + shrink only |
+| owner-publish | Tag / GitHub Release / package publish awaits explicit owner command |
+
+Historical phase-10 threat-model notes (not ROADMAP IDs; still accepted):
+
+- Power-loss durability was not physically proven
+- Same-user concurrent replacement remains outside the threat model
 
 ### Phase-specific validation (passed)
 
@@ -572,13 +583,14 @@ CI_EVIDENCE_MATCH=exact-head
 
 ## Post-0.3 ops
 
-**Status:** in progress
+**Status:** complete (engineering)
 
-Owner-initiated tracks that remain open:
+Owner-initiated tracks that remain open (SSOT: [`ROADMAP.md`](ROADMAP.md)):
 
-- GitHub Release / tag / package publish
-- Real-application manual validation matrix updates
-- Optional Windows real-hardware adversarial evidence
+- `owner-publish` — GitHub Release / tag / package publish
+- `R-CON` — real-application manual validation matrix samples
+- `R-WIN` — Windows real-hardware adversarial evidence
+- `R-PWR` — gradual retirement of legacy coverage-padding suites
 
 Delivered in this cycle (engineering polish, not release):
 
