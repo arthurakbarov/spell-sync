@@ -153,7 +153,7 @@ def _tracked_agent_prose(root: Path) -> list[Path]:
             "ls-files",
             "-z",
             ".cursor/skills/**/SKILL.md",
-            ".cursor/rules/**/*.mdc",
+            ".cursor/rules/*.mdc",
             ".cursor/README.md",
         ],
         check=True,
@@ -196,9 +196,10 @@ def _line_has_prohibition_context(lines: list[str], line_no: int) -> bool:
     if PROHIBITION_MARKERS.search(lines[line_no]):
         return True
     start = max(0, line_no - 8)
+    heading = re.compile(r"^#+\s+(Do not|Prohibited)\b", re.I)
     for idx in range(start, line_no + 1):
         stripped = lines[idx].strip()
-        if stripped.startswith("Do not") or stripped.startswith("## Prohibited"):
+        if stripped.startswith("Do not") or heading.match(stripped):
             return True
     return False
 

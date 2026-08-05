@@ -33,6 +33,9 @@ def test_schema_enums_match_validator_constants() -> None:
     assert set(entry["implementation"]["enum"]) == set(mod.IMPLEMENTATION)
     assert set(entry["automated_validation"]["enum"]) == set(mod.AUTOMATED)
     assert set(entry["manual_validation"]["enum"]) == set(mod.MANUAL)
+    assert set(schema["required"]) == set(mod.REQUIRED_ROOT)
+    assert set(schema["$defs"]["targetEntry"]["required"]) == set(mod.REQUIRED_ENTRY)
+    assert schema["properties"]["schema_version"]["const"] == 1
 
 
 def test_schema_file_is_valid_json() -> None:

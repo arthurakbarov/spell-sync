@@ -98,6 +98,14 @@ def test_cli_start_status_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert check_session.main(["finish", "--json"]) == 0
 
 
+def test_finished_session_is_not_active(tmp_path: Path) -> None:
+    base = tmp_path / "sessions"
+    sid = check_session.start_session(session_id="arc-done", base=base)
+    assert check_session.has_active_session(base=base) is True
+    check_session.finish_session(sid, base=base)
+    assert check_session.has_active_session(base=base) is False
+
+
 def test_failed_record_is_not_reusable(tmp_path: Path) -> None:
     base = tmp_path / "sessions"
     repo = tmp_path / "repo"

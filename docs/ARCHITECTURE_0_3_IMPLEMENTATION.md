@@ -61,7 +61,8 @@ Last recorded exact-head CI snapshot in this file (may lag tip by at most one do
 
 Open engineering residuals (not release blockers if previously accepted):
 
-- Real-application manual validation: **0/35** (`docs/target-validation.json`)
+- Real-application manual validation: **2/35** (`docs/target-validation.json`;
+  chrome/macos + macos_spelling/macos recorded 2026-08-05, read-only / dry-run)
 - Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
 - Legacy `*coverage*` padding inventory frozen at ≤373 `def test_` (see
   `tests/test_padding_inventory_policy.py`) — do not grow; shrink only; publish gate is
@@ -597,7 +598,7 @@ Delivered in this cycle (engineering polish, not release):
 - Core modules mapped off packaging fallback; dead-code audit non-vacuous for product modules
 - Execution-control product-path boundary scan uses real service modules
 
-Open residuals: manual target validation 0/35; Windows hardware R1–R7; gradual retirement of
+Open residuals: manual target validation 2/35; Windows hardware R1–R7; gradual retirement of
 legacy coverage-padding suites without weakening the tiered CI coverage gate
 (`scripts/coverage_policy.py`).
 

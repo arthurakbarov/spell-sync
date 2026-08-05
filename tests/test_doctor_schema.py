@@ -58,3 +58,12 @@ def test_validate_doctor_schema_script() -> None:
     schema = ROOT / "docs" / "technical" / "doctor-report.schema.json"
     assert schema.is_file()
     json.loads(schema.read_text(encoding="utf-8"))
+
+
+def test_doctor_schema_required_keys_match_validator() -> None:
+    from scripts import validate_doctor_schema as mod
+
+    schema = json.loads(
+        (ROOT / "docs" / "technical" / "doctor-report.schema.json").read_text(encoding="utf-8")
+    )
+    assert set(schema["required"]) == set(mod.REQUIRED_KEYS)

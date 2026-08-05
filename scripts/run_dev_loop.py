@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -122,12 +123,37 @@ def _needs_architecture(changed: list[str]) -> bool:
 def _ensure_check_session() -> str | None:
     """Return session id when reuse/recording should run; start one for Cursor arcs."""
     if check_session.has_active_session():
-        # Ensure ledger directory exists when env provides the id.
-        sid = check_session.resolve_session_id()
-        if os.environ.get("CURSOR_TRACE_ID") or os.environ.get("SPELL_SYNC_CHECK_SESSION_ID"):
-            return check_session.start_session(session_id=sid)
-        return sid
+        return check_session.resolve_session_id()
+    if os.environ.get("CURSOR_TRACE_ID") or os.environ.get("SPELL_SYNC_CHECK_SESSION_ID"):
+        # Finished env-bound sessions must not be silently reactivated.
+        return check_session.start_session()
     return None
+
+
+def _scoped_gate_id(
+    gate: str,
+    *,
+    changed_files: list[str],
+    sample_enabled: bool,
+    commit_gate: bool,
+    no_sample: bool,
+    cluster: str | None,
+    target: str | None,
+) -> str:
+    """Gate id that includes scope so reuse cannot cross file/cluster selections."""
+    scope = "\0".join(
+        [
+            gate,
+            "1" if commit_gate else "0",
+            "1" if sample_enabled else "0",
+            "1" if no_sample else "0",
+            cluster or "",
+            target or "",
+            *sorted(changed_files),
+        ]
+    )
+    digest = hashlib.sha256(scope.encode("utf-8")).hexdigest()[:16]
+    return f"dev-loop:{gate}:{digest}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -136,7 +162,21 @@ def main(argv: list[str] | None = None) -> int:
     gate = "L1" if args.commit_gate else "L0"
     budget = budget_seconds_for_gate(gate)
     wall_started = time.monotonic()
-    gate_id = f"dev-loop:{gate}"
+    sample_enabled = gate == "L0" and not args.no_sample and args.target is None
+    changed = collect_changed_files(
+        ROOT,
+        base=None if args.base == "HEAD" else args.base,
+        explicit_files=args.files,
+    )
+    gate_id = _scoped_gate_id(
+        gate,
+        changed_files=list(changed),
+        sample_enabled=sample_enabled,
+        commit_gate=args.commit_gate,
+        no_sample=args.no_sample,
+        cluster=args.cluster,
+        target=args.target,
+    )
     session_id = None if args.plan else _ensure_check_session()
     if session_id and not args.plan and not args.no_session_reuse:
         cached = check_session.lookup_reusable(gate_id, session_id=session_id, root=ROOT)
@@ -144,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"DEV_LOOP_GATE={gate}", flush=True)
             print("DEV_LOOP_SESSION_REUSE=true", flush=True)
             print(f"DEV_LOOP_SESSION_ID={session_id}", flush=True)
+            print(f"DEV_LOOP_CHECK_ID={gate_id}", flush=True)
             print(f"DEV_LOOP_REUSED_DURATION={cached.get('duration', 0)}", flush=True)
             print("DEV_LOOP_RESULT=success", flush=True)
             print("DEV_LOOP_EXIT=0", flush=True)
@@ -169,13 +210,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"DEV_LOOP_BUDGET_SECONDS={budget}", flush=True)
     if session_id:
         print(f"DEV_LOOP_SESSION_ID={session_id}", flush=True)
+        print(f"DEV_LOOP_CHECK_ID={gate_id}", flush=True)
         print("DEV_LOOP_SESSION_REUSE=false", flush=True)
 
-    changed = collect_changed_files(
-        ROOT,
-        base=None if args.base == "HEAD" else args.base,
-        explicit_files=args.files,
-    )
     plan = build_plan(
         ROOT,
         changed,

@@ -282,9 +282,7 @@ class TestDocsContract(unittest.TestCase):
                     ),
                 },
             )
-            violations = [
-                v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")
-            ]
+            violations = [v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")]
             self.assertEqual(
                 violations,
                 [],
@@ -304,9 +302,7 @@ class TestDocsContract(unittest.TestCase):
                     ),
                 },
             )
-            violations = [
-                v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")
-            ]
+            violations = [v for v in mod.check_repository(root) if v.check_id.startswith("STALE-")]
             self.assertEqual(violations, [], msg="[DOCS-CONTRACT-STALE-002] historical stale ok")
 
     def test_stale_active_api_fails_with_path_and_line(self) -> None:

@@ -49,9 +49,19 @@ def test_session_reuse_skips_gate(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_ID", "arc-test-reuse")
     monkeypatch.delenv("CURSOR_TRACE_ID", raising=False)
     sid = check_session.start_session(session_id="arc-test-reuse", base=base)
+    files = ["docs/WORKFLOW.md"]
+    gate_id = mod._scoped_gate_id(
+        "L0",
+        changed_files=files,
+        sample_enabled=False,
+        commit_gate=False,
+        no_sample=True,
+        cluster=None,
+        target=None,
+    )
     fp = check_session.tree_fingerprint(ROOT)
     check_session.record_check(
-        "dev-loop:L0",
+        gate_id,
         exit_code=0,
         duration=1.25,
         session_id=sid,
@@ -59,7 +69,86 @@ def test_session_reuse_skips_gate(tmp_path, monkeypatch, capsys) -> None:
         base=base,
         fingerprint=fp,
     )
-    code = mod.main(["--no-sample", "--files", "docs/WORKFLOW.md"])
+    code = mod.main(["--no-sample", "--files", *files])
     out = capsys.readouterr().out
     assert code == 0
     assert "DEV_LOOP_SESSION_REUSE=true" in out
+
+
+def test_session_reuse_does_not_cross_file_scope(tmp_path, monkeypatch, capsys) -> None:
+    mod = _load_run_dev_loop()
+    from scripts import check_session
+
+    base = tmp_path / "sessions"
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_DIR", str(base))
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_ID", "arc-scope")
+    monkeypatch.delenv("CURSOR_TRACE_ID", raising=False)
+    sid = check_session.start_session(session_id="arc-scope", base=base)
+    docs_id = mod._scoped_gate_id(
+        "L0",
+        changed_files=["docs/WORKFLOW.md"],
+        sample_enabled=False,
+        commit_gate=False,
+        no_sample=True,
+        cluster=None,
+        target=None,
+    )
+    fp = check_session.tree_fingerprint(ROOT)
+    check_session.record_check(
+        docs_id,
+        exit_code=0,
+        duration=1.0,
+        session_id=sid,
+        root=ROOT,
+        base=base,
+        fingerprint=fp,
+    )
+    code = mod.main(["--no-sample", "--files", "spell_sync/cli.py", "--plan"])
+    # plan mode never reuses; also ensure scoped ids differ
+    product_id = mod._scoped_gate_id(
+        "L0",
+        changed_files=["spell_sync/cli.py"],
+        sample_enabled=False,
+        commit_gate=False,
+        no_sample=True,
+        cluster=None,
+        target=None,
+    )
+    assert docs_id != product_id
+    assert code == 0
+    assert "DEV_LOOP_SESSION_REUSE=true" not in capsys.readouterr().out
+
+
+def test_no_session_reuse_flag_forces_run(tmp_path, monkeypatch, capsys) -> None:
+    mod = _load_run_dev_loop()
+    from scripts import check_session
+
+    base = tmp_path / "sessions"
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_DIR", str(base))
+    monkeypatch.setenv("SPELL_SYNC_CHECK_SESSION_ID", "arc-force")
+    monkeypatch.delenv("CURSOR_TRACE_ID", raising=False)
+    sid = check_session.start_session(session_id="arc-force", base=base)
+    files = ["docs/WORKFLOW.md"]
+    gate_id = mod._scoped_gate_id(
+        "L0",
+        changed_files=files,
+        sample_enabled=False,
+        commit_gate=False,
+        no_sample=True,
+        cluster=None,
+        target=None,
+    )
+    fp = check_session.tree_fingerprint(ROOT)
+    check_session.record_check(
+        gate_id,
+        exit_code=0,
+        duration=1.0,
+        session_id=sid,
+        root=ROOT,
+        base=base,
+        fingerprint=fp,
+    )
+    code = mod.main(["--no-sample", "--no-session-reuse", "--files", *files, "--plan"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "DEV_LOOP_SESSION_REUSE=true" not in out

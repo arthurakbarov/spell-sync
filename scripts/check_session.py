@@ -77,10 +77,32 @@ def tree_fingerprint(root: Path | None = None) -> str:
 
 
 def has_active_session(*, base: Path | None = None) -> bool:
-    """True when env id, Cursor trace, or current-session pointer is present."""
+    """True when a session is active (not finished) via env, Cursor trace, or pointer."""
+    base_dir = base or _base_dir()
     if os.environ.get("SPELL_SYNC_CHECK_SESSION_ID") or os.environ.get("CURSOR_TRACE_ID"):
+        sid = resolve_session_id(base=base_dir)
+        meta_path = _meta_path(base_dir, sid)
+        if meta_path.is_file():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return True
+            if isinstance(meta, dict) and meta.get("status") == "finished":
+                return False
         return True
-    return _current_file(base or _base_dir()).is_file()
+    current = _current_file(base_dir)
+    if not current.is_file():
+        return False
+    sid = _sanitize_id(current.read_text(encoding="utf-8").strip())
+    meta_path = _meta_path(base_dir, sid)
+    if meta_path.is_file():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return True
+        if isinstance(meta, dict) and meta.get("status") == "finished":
+            return False
+    return True
 
 
 def resolve_session_id(explicit: str | None = None, *, base: Path | None = None) -> str:
