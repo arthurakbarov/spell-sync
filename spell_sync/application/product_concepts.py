@@ -75,8 +75,7 @@ SETUP_START_BUTTON_LABEL = "Start here"
 REVIEW_AND_UPDATE_LABEL = "Review and update"
 
 REVIEW_AND_UPDATE_HELP = (
-    "Guided path: collect new words from your apps, then update app dictionaries. "
-    "You confirm each step after a preview."
+    "Guided path: collect words, then update apps — you confirm each preview."
 )
 
 COLLECT_WORDS_LABEL = "Collect my words"
@@ -86,9 +85,8 @@ COLLECT_WORDS_HELP = (
 
 UPDATE_APPS_LABEL = "Update my apps"
 UPDATE_APPS_HELP = (
-    "Make enabled app dictionaries match your personal word list. Words missing from "
-    "your list may be removed from custom dictionaries. Built-in dictionaries are "
-    "never changed."
+    "Match app dictionaries to your word list. Missing words may be removed from "
+    "custom dictionaries; built-in dictionaries are never changed."
 )
 
 CHECK_APPS_LABEL = "Check my apps"

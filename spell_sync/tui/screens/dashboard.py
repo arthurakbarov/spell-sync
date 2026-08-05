@@ -12,15 +12,12 @@ from textual.widgets import Button, Footer, Header, Static
 from textual.worker import WorkerState
 
 from ...application.product_concepts import (
-    CHECK_APPS_HELP,
     CHECK_APPS_LABEL,
-    COLLECT_WORDS_HELP,
     COLLECT_WORDS_TECHNICAL,
     DASHBOARD_WORDLIST_LABEL,
     DASHBOARD_WORDLIST_SUBTITLE,
     REVIEW_AND_UPDATE_HELP,
     REVIEW_AND_UPDATE_LABEL,
-    UPDATE_APPS_HELP,
     UPDATE_APPS_TECHNICAL,
 )
 from ...application.reports import DashboardSeverity
@@ -72,19 +69,16 @@ class DashboardScreen(LoadTokenMixin, Screen[None]):
                     variant="primary",
                 )
                 yield Static(REVIEW_AND_UPDATE_HELP, id="review-update-hint")
-                yield section_label("Single steps")
-                yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
-                yield Static(COLLECT_WORDS_HELP, id="collect-words-hint")
-                yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
-                yield Static(UPDATE_APPS_HELP, id="update-apps-hint")
-                yield Button(CHECK_APPS_LABEL, id="btn-status")
-                yield Static(CHECK_APPS_HELP, id="check-apps-hint")
                 yield Button(
                     "Review recovery",
                     id="btn-recovery",
                     disabled=True,
                     classes="-disabled-action",
                 )
+                yield section_label("Single steps")
+                yield Button(COLLECT_WORDS_TECHNICAL, id="btn-pull")
+                yield Button(UPDATE_APPS_TECHNICAL, id="btn-push")
+                yield Button(CHECK_APPS_LABEL, id="btn-status")
                 yield section_label("Manage")
                 yield Button("Targets", id="btn-targets")
                 yield Button("Change word list location", id="btn-change-wordlist")
