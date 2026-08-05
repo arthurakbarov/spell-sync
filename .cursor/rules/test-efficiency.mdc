@@ -15,6 +15,8 @@ alwaysApply: true
 5. Do not run another cluster without dependency or safety reason.
 6. Do not run full CI in the middle of a normal edit loop.
 7. Do not repeat an identical successful command on an unchanged tree.
+   Prefer `python3 scripts/check_session.py` (start / record / lookup / finish)
+   within one agent arc when reusing successful checks for the same fingerprint.
 8. Before selecting tests, use `scripts/test_plan.py --dev-scope` or document why.
 9. Do not use `pytest --lf` or `pytest -x` as local minimal or full CI evidence.
 10. Do not run packaging or wheel smoke in local minimal unless package boundaries changed.
@@ -36,6 +38,7 @@ alwaysApply: true
 - Plan: `python3 scripts/test_plan.py --dev-scope`
 - Necessity: `python3 scripts/check_ci_necessity.py --purpose local|publish`
 - Lightweight: `python3 scripts/run_lightweight_validation.py`
+- Session reuse: `python3 scripts/check_session.py`
 - Strategy: `docs/TESTING_STRATEGY.md`
 - Registry: `tests/test-impact.toml`, `ci/ci-impact.toml`, `ci/test-groups.toml`
 

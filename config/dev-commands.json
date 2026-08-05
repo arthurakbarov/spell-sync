@@ -8,6 +8,14 @@
       "mutatesRepo": false,
       "network": false
     },
+    "check-session": {
+      "command": "python3 scripts/check_session.py",
+      "stage": "before-work",
+      "task": "Ephemeral check-session start/status/finish/lookup/record",
+      "mutatesRepo": false,
+      "network": false
+    },
+
     "environment-check": {
       "command": "python3 scripts/project_environment.py check",
       "stage": "before-work",
