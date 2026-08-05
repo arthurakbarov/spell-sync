@@ -176,29 +176,41 @@ def collect(*, purpose: str = "local") -> dict[str, object]:
 
 
 def _print_text(payload: dict[str, object]) -> None:
-    print(f"AGENT_CONTEXT_REPOSITORY={payload['repository']}")
-    print(f"AGENT_CONTEXT_BRANCH={payload['branch']}")
-    print(f"AGENT_CONTEXT_HEAD={payload['headShort']}")
-    print(f"AGENT_CONTEXT_DIRTY={'true' if payload['dirty'] else 'false'}")
-    print(f"AGENT_CONTEXT_STAGED={payload['stagedCount']}")
-    print(f"AGENT_CONTEXT_UNSTAGED={payload['unstagedCount']}")
-    print(f"AGENT_CONTEXT_UNTRACKED={payload['untrackedCount']}")
-    print(f"AGENT_CONTEXT_NECESSITY={payload['necessityResult']}")
-    print(f"AGENT_CONTEXT_NECESSITY_REASON={payload['necessityReason']}")
-    print(f"AGENT_CONTEXT_SUGGESTED_EDIT={payload['suggestedEditLoop']}")
-    print(f"AGENT_CONTEXT_SUGGESTED_CHECKPOINT={payload['suggestedCheckpoint']}")
-    print(f"AGENT_CONTEXT_SUGGESTED_FULL_GATE={payload['suggestedFullGate']}")
+    from scripts.cli_text import format_kv_lines
+
     siblings = payload.get("workspaceRepos", [])
     assert isinstance(siblings, list)
-    print(f"AGENT_CONTEXT_WORKSPACE_REPO_COUNT={len(siblings)}")
+    pairs: list[tuple[str, str]] = [
+        ("AGENT_CONTEXT_REPOSITORY", str(payload["repository"])),
+        ("AGENT_CONTEXT_BRANCH", str(payload["branch"])),
+        ("AGENT_CONTEXT_HEAD", str(payload["headShort"])),
+        ("AGENT_CONTEXT_DIRTY", "true" if payload["dirty"] else "false"),
+        ("AGENT_CONTEXT_STAGED", str(payload["stagedCount"])),
+        ("AGENT_CONTEXT_UNSTAGED", str(payload["unstagedCount"])),
+        ("AGENT_CONTEXT_UNTRACKED", str(payload["untrackedCount"])),
+        ("AGENT_CONTEXT_NECESSITY", str(payload["necessityResult"])),
+        ("AGENT_CONTEXT_NECESSITY_REASON", str(payload["necessityReason"])),
+        ("AGENT_CONTEXT_SUGGESTED_EDIT", str(payload["suggestedEditLoop"])),
+        ("AGENT_CONTEXT_SUGGESTED_CHECKPOINT", str(payload["suggestedCheckpoint"])),
+        ("AGENT_CONTEXT_SUGGESTED_FULL_GATE", str(payload["suggestedFullGate"])),
+        ("AGENT_CONTEXT_WORKSPACE_REPO_COUNT", str(len(siblings))),
+    ]
     for item in siblings:
         assert isinstance(item, dict)
         dirty = "true" if item["dirty"] else "false"
-        print(
-            "AGENT_CONTEXT_WORKSPACE_REPO="
-            f"{item['name']} branch={item['branch']} "
-            f"head={item['headShort']} dirty={dirty}"
+        pairs.append(
+            (
+                "AGENT_CONTEXT_WORKSPACE_REPO",
+                f"{item['name']} branch={item['branch']} head={item['headShort']} dirty={dirty}",
+            )
         )
+    text = format_kv_lines(pairs)
+    # Harness contract: ASCII KEY=value, no absolute home paths in default text mode.
+    if any(ord(ch) > 127 for ch in text):
+        raise SystemExit("agent_context text mode must be ASCII")
+    if "/Users/" in text or "/home/" in text:
+        raise SystemExit("agent_context text mode must not emit absolute home paths")
+    print(text)
 
 
 def main(argv: list[str] | None = None) -> int:

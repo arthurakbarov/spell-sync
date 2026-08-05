@@ -64,6 +64,13 @@ def test_agent_context_text_keys() -> None:
     assert "AGENT_CONTEXT_NECESSITY=" in proc.stdout
     assert "AGENT_CONTEXT_SUGGESTED_CHECKPOINT=" in proc.stdout
     assert "AGENT_CONTEXT_WORKSPACE_REPO_COUNT=" in proc.stdout
+    assert all(ord(ch) < 128 for ch in proc.stdout)
+    assert "/Users/" not in proc.stdout
+    assert "/home/" not in proc.stdout
+    for line in proc.stdout.splitlines():
+        assert "=" in line
+        key, _, _value = line.partition("=")
+        assert key.startswith("AGENT_CONTEXT_")
 
 
 def test_resolve_siblings_nested_layout(tmp_path: Path, monkeypatch) -> None:
