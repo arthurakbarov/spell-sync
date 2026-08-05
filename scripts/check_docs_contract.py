@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import subprocess
 import sys
@@ -1066,7 +1067,101 @@ def check_repository(root: Path) -> list[ContractViolation]:
     violations.extend(_check_agent_workflow_docs(root))
     violations.extend(_check_testing_strategy_doc(root))
     violations.extend(_check_public_docs_hygiene(root))
+    violations.extend(_check_workflow_methodology_headings(root))
+    violations.extend(_check_manual_validation_count_honesty(root))
     return violations
+
+
+def _check_workflow_methodology_headings(root: Path) -> list[ContractViolation]:
+    workflow = root / "docs" / "WORKFLOW.md"
+    if not workflow.is_file():
+        return [
+            ContractViolation(
+                "WORKFLOW-001",
+                workflow,
+                None,
+                "missing docs/WORKFLOW.md",
+                "restore the development workflow document",
+            )
+        ]
+    text = workflow.read_text(encoding="utf-8")
+    violations: list[ContractViolation] = []
+    for heading in ("## When not to rerun", "## Agent report contract"):
+        if heading not in text:
+            violations.append(
+                ContractViolation(
+                    "WORKFLOW-002",
+                    workflow,
+                    None,
+                    heading,
+                    f"keep required methodology heading {heading!r} in docs/WORKFLOW.md",
+                )
+            )
+    agent_dev = root / "docs" / "AGENT_DEVELOPMENT.md"
+    if agent_dev.is_file():
+        agent_text = agent_dev.read_text(encoding="utf-8")
+        if "commit gate" not in agent_text.lower() or "working-tree vs HEAD" not in agent_text:
+            violations.append(
+                ContractViolation(
+                    "WORKFLOW-003",
+                    agent_dev,
+                    None,
+                    "gate-before-commit contract missing",
+                    "document that commit gate runs on dirty/scoped trees before commit",
+                )
+            )
+    return violations
+
+
+def _check_manual_validation_count_honesty(root: Path) -> list[ContractViolation]:
+    validation_path = root / "docs" / "target-validation.json"
+    tracker = root / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md"
+    if not validation_path.is_file() or not tracker.is_file():
+        return []
+    try:
+        payload = json.loads(validation_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return [
+            ContractViolation(
+                "MANUAL-001",
+                validation_path,
+                None,
+                "invalid JSON",
+                "fix docs/target-validation.json",
+            )
+        ]
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or not targets:
+        return []
+    passed = sum(
+        1 for item in targets if isinstance(item, dict) and item.get("manual_validation") == "pass"
+    )
+    total = len(targets)
+    expected = f"{passed}/{total}"
+    text = tracker.read_text(encoding="utf-8")
+    # Accept **2/35** or plain 2/35 near "manual".
+    if expected not in text:
+        return [
+            ContractViolation(
+                "MANUAL-002",
+                tracker,
+                None,
+                f"expected manual validation count {expected}",
+                "sync ARCHITECTURE_0_3_IMPLEMENTATION.md with docs/target-validation.json",
+            )
+        ]
+    # Reject stale absolute zeros when passes exist.
+    if passed > 0 and re.search(r"manual target validation 0/\d+", text):
+        return [
+            ContractViolation(
+                "MANUAL-003",
+                tracker,
+                None,
+                "stale 0/N manual validation claim",
+                f"replace 0/N with {expected}",
+            )
+        ]
+    return []
 
 
 def _check_public_docs_hygiene(root: Path) -> list[ContractViolation]:
