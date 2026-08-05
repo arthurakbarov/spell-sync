@@ -102,6 +102,17 @@ Validate recent history:
 python3 scripts/validate_commit_messages.py
 ```
 
+Optional local `commit-msg` hook (this repository only; opt-in):
+
+```bash
+python3 scripts/install_git_hooks.py install
+python3 scripts/install_git_hooks.py status
+python3 scripts/install_git_hooks.py remove
+```
+
+Use `--force` only to replace an unmanaged hook. Product doctor `install-hooks`
+actions still refer to wordlist-repository hooks, not this installer.
+
 ### Pre-commit checklist
 
 1. `python3 scripts/agent_context.py` then `git status` / `git diff`.

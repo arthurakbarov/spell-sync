@@ -78,6 +78,7 @@ patterns = [
   "scripts/dev_runs.py",
   "scripts/agent_context.py",
   "scripts/check_session.py",
+  "scripts/install_git_hooks.py",
   "scripts/preflight_publish.py",
   "scripts/cli_text.py",
   "scripts/build_focused_plan.py",

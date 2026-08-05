@@ -410,7 +410,50 @@ def validate(root: Path) -> list[str]:
             set(registry.shared_fixtures),
         )
     )
+    errors.extend(_unowned_dev_command_scripts(root, registry))
 
+    return errors
+
+
+def _dev_command_script_paths(root: Path) -> list[str]:
+    import json
+
+    path = root / "config" / "dev-commands.json"
+    if not path.is_file():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    commands = payload.get("commands", {})
+    if not isinstance(commands, dict):
+        return []
+    scripts: set[str] = set()
+    for meta in commands.values():
+        if not isinstance(meta, dict):
+            continue
+        command = meta.get("command")
+        if not isinstance(command, str):
+            continue
+        for token in command.split():
+            if token.startswith("scripts/") and token.endswith(".py"):
+                scripts.add(token)
+    return sorted(scripts)
+
+
+def _unowned_dev_command_scripts(root: Path, registry) -> list[str]:
+    errors: list[str] = []
+    for script in _dev_command_script_paths(root):
+        selected = clusters_for_file(script, registry)
+        if selected:
+            continue
+        errors.append(
+            _format_error(
+                "TEST-IMPACT-OWNER-001",
+                target=script,
+                remediation=(
+                    "map this config/dev-commands.json script into a cluster "
+                    "production list in tests/test-impact.toml"
+                ),
+            )
+        )
     return errors
 
 

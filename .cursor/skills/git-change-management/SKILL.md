@@ -53,6 +53,8 @@ See `docs/GIT-WORKFLOW.md` (same shape as nix-darwin).
 - Imperative subject ending with `.` (no `feat:` / `docs:` / `Wave E:` prefixes)
 - Optional short why-body; fold tracker/evidence notes into the producing commit
 - Check: `python3 scripts/validate_commit_messages.py`
+- Optional local hook: `python3 scripts/install_git_hooks.py install`
+  (spell-sync clone only; not wordlist-repo doctor `install-hooks`)
 
 ## Full gate (owner push / publish / final only)
 

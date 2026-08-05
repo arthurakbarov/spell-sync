@@ -92,6 +92,8 @@ def validate_history(
 
 
 def main(argv: list[str] | None = None) -> int:
+    import os
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--repo",
@@ -110,7 +112,38 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail on format/ruff/unused-import follow-up subjects",
     )
+    parser.add_argument(
+        "--from-env",
+        action="store_true",
+        help="Validate SPELL_SYNC_HOOK_SUBJECT / SPELL_SYNC_HOOK_BODY (commit-msg hook)",
+    )
+    parser.add_argument(
+        "--message-file",
+        type=Path,
+        default=None,
+        help="Validate one commit message file (hook $1)",
+    )
     args = parser.parse_args(argv)
+
+    if args.from_env or args.message_file is not None:
+        if args.message_file is not None:
+            raw = args.message_file.read_text(encoding="utf-8", errors="replace")
+            lines = raw.splitlines()
+            subject = lines[0] if lines else ""
+            body = "\n".join(lines[2:]) if len(lines) > 2 else ""
+        else:
+            subject = os.environ.get("SPELL_SYNC_HOOK_SUBJECT", "")
+            body = os.environ.get("SPELL_SYNC_HOOK_BODY", "")
+        commit = CommitMessage(sha="HOOK", subject=subject, body=body)
+        errors = validate_message(commit, check_hygiene=args.check_hygiene)
+        if errors:
+            print("COMMIT_MESSAGE_VALIDATE: fail")
+            for err in errors:
+                print(f"  - {err}")
+            return 1
+        print("COMMIT_MESSAGE_VALIDATE: ok (hook message)")
+        return 0
+
     errors = validate_history(
         args.repo.resolve(),
         limit=max(1, args.limit),
