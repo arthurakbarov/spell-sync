@@ -70,11 +70,23 @@ class InspectionService:
         )
 
     def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
+        # Expected domain / I/O failures map to a stable privacy-safe load_error.
+        expected = (OSError, ValueError, RuntimeError, TypeError, KeyError)
         try:
             run = self._ctx.runtime.sync_run(request.project)
             report = _operation_deps.build_doctor_report(run)
             return _operation_deps.build_doctor_snapshot(report)
-        except Exception:
+        except expected:
+            return DoctorSnapshot(
+                checks=(),
+                has_errors=True,
+                load_error="Doctor report could not be loaded.",
+            )
+        except Exception as exc:
+            from ...diagnostics.debug_mode import emit_debug_traceback
+
+            # Unexpected: same privacy-safe user message; optional stderr traceback.
+            emit_debug_traceback(exc)
             return DoctorSnapshot(
                 checks=(),
                 has_errors=True,

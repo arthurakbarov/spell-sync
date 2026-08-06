@@ -48,12 +48,22 @@ class EventEmitter:
         if self.technical_sink is not None:
             try:
                 self.technical_sink(event)
-            except Exception:
-                pass
+            except Exception as exc:
+                # Fail-open: a broken technical sink must not abort the product
+                # operation. Narrow suppression; observable under SPELL_SYNC_DEBUG.
+                from ..diagnostics.debug_mode import emit_debug_traceback
+
+                emit_debug_traceback(exc)
         if self.presentation_sink is not None:
             from .event_presenter import present_event
 
-            self.presentation_sink(present_event(event))
+            try:
+                self.presentation_sink(present_event(event))
+            except Exception as exc:
+                # Presentation sink failures are also fail-open for the same reason.
+                from ..diagnostics.debug_mode import emit_debug_traceback
+
+                emit_debug_traceback(exc)
 
 
 def operation_emitter(presentation_sink: PresentationEventSink | None) -> EventEmitter:
