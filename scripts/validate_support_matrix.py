@@ -97,10 +97,10 @@ def _check_support_doc() -> list[str]:
                 f"[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md missing section {section}; "
                 "remediation: add required support sections"
             )
-    for token in (">=3.11,<3.13", "3.12.13", "3.11", "3.12", "3.13"):
+    for token in (">=3.11,<3.13", "3.12.13", "3.11", "3.12", "3.13", "source-only"):
         if token not in text:
             errors.append(
-                f"[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md must mention Python {token}; "
+                f"[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md must mention {token}; "
                 "remediation: align product/tooling Python support with environment contract"
             )
     if (
@@ -250,20 +250,19 @@ def _check_workflows() -> list[str]:
     if len(experimental_jobs) != 1:
         errors.append(
             "[CI-ENVIRONMENT-011] expected exactly one Ubuntu Python 3.13 experimental job; "
-            f"found {len(experimental_jobs)}; remediation: add non-blocking experimental job"
+            f"found {len(experimental_jobs)}; remediation: add non-blocking source-only probe"
         )
     else:
         text, block = all_jobs[experimental_jobs[0]]
-        if "continue-on-error" not in block and "continue-on-error" not in text:
-            errors.append(
-                "[CI-ENVIRONMENT-011] Python 3.13 experimental job must be non-blocking; "
-                "remediation: set continue-on-error: true"
+        job_key = experimental_jobs[0]
+        errors.extend(
+            check_experimental_source_only_job(
+                block,
+                job_name=job_key,
+                python_version="3.13",
+                workflow_text=text,
             )
-        if _job_runs_full_ci(block):
-            errors.append(
-                "[CI-ENVIRONMENT-011] Python 3.13 experimental job must not run full CI; "
-                "remediation: run product compatibility subset only"
-            )
+        )
 
     combined = "\n".join(_read(path) for path in workflow_files)
     if "astral-sh/setup-uv" not in combined and "setup-uv" not in combined:
@@ -321,10 +320,14 @@ def _check_compatibility_runner() -> list[str]:
         "compatibility.wheel-origin",
         "compatibility.wheel-version",
         "compatibility.wheel-cli",
+        "--source-only",
+        "sourceOnly",
+        "compatibility.wheel-skipped-source-only",
+        "compatibility.experimental-requires-source-only",
     ):
         if marker not in text:
             errors.append(
-                f"[COMPATIBILITY-WHEEL-013] run_compatibility_checks.py must include {marker} step"
+                f"[COMPATIBILITY-WHEEL-013] run_compatibility_checks.py must include {marker}"
             )
     if "installed-wheel-import" in text:
         errors.append(
@@ -353,28 +356,148 @@ def _check_compatibility_runner() -> list[str]:
     return errors
 
 
-def _check_pyproject_python_alignment() -> list[str]:
+def check_experimental_source_only_job(
+    block: str,
+    *,
+    job_name: str,
+    python_version: str,
+    workflow_text: str = "",
+) -> list[str]:
+    """Reject experimental jobs that treat out-of-range Pythons as installable."""
+    errors: list[str] = []
+    haystack = f"{workflow_text}\n{block}"
+    if "continue-on-error" not in block and "continue-on-error" not in workflow_text:
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} must be non-blocking; "
+            "remediation: set continue-on-error: true"
+        )
+    if _job_runs_full_ci(block):
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run full CI; "
+            "remediation: run source-only product subset"
+        )
+    sync_pattern = re.compile(
+        rf"uv\s+sync\s+[^\n]*--python\s+{re.escape(python_version)}\b"
+    )
+    if sync_pattern.search(haystack):
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run "
+            f"project-level `uv sync --python {python_version}` while that version is "
+            "outside requires-python; remediation: isolate a probe venv without installing "
+            "the project"
+        )
+    if "run_compatibility_checks.py" in haystack and "--source-only" not in haystack:
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
+            "run_compatibility_checks.py with --source-only; remediation: add --source-only "
+            "and skip wheel install"
+        )
+    if "source" not in job_name.lower() and "source" not in haystack.lower():
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} should be labeled as a "
+            "source compatibility probe; remediation: rename job/name to include 'source'"
+        )
+    return errors
+
+
+def _specifier_includes_version(requires: str, version: str) -> bool | None:
+    """Return whether ``version`` satisfies ``requires``, or None if packaging is unavailable."""
+    try:
+        from packaging.specifiers import SpecifierSet
+        from packaging.version import Version
+    except ImportError:
+        return None
+    try:
+        return Version(version) in SpecifierSet(requires)
+    except Exception:
+        return None
+
+
+def check_pyproject_python_alignment(
+    *,
+    requires_python: str,
+    contract_requirement: str,
+    blocking: list[str],
+    experimental: list[str],
+    classifiers: list[str],
+) -> list[str]:
     """Public requires-python / classifiers must not claim beyond blocking support."""
     errors: list[str] = []
-    pyproject_path = ROOT / "pyproject.toml"
-    if not CONTRACT_PATH.is_file() or not pyproject_path.is_file():
-        return errors
-    contract = tomllib.loads(_read(CONTRACT_PATH))
-    project = tomllib.loads(_read(pyproject_path)).get("project", {})
-    if not isinstance(project, dict):
-        return errors
-    requires = str(project.get("requires-python", "")).strip()
-    product = contract.get("product", {})
-    compatibility = contract.get("compatibility", {})
-    expected = ""
-    if isinstance(product, dict):
-        expected = str(product.get("pythonRequirement", "")).strip()
+    requires = requires_python.strip()
+    expected = contract_requirement.strip()
     if expected and requires != expected:
         errors.append(
             "[SUPPORT-MATRIX-014] pyproject.toml requires-python must match "
             f"environment-contract product.pythonRequirement ({expected!r}); "
             f"found {requires!r}; remediation: align public install range with contract"
         )
+    claimed: list[str] = []
+    for item in classifiers:
+        text = str(item)
+        if text.startswith("Programming Language :: Python :: 3."):
+            claimed.append(text.rsplit(" :: ", 1)[-1])
+    for version in claimed:
+        if version in experimental and version not in blocking:
+            errors.append(
+                "[SUPPORT-MATRIX-014] pyproject classifiers must not claim experimental "
+                f"Python {version} as supported; remediation: keep classifiers to blocking set"
+            )
+        elif blocking and version not in blocking and version not in experimental:
+            errors.append(
+                "[SUPPORT-MATRIX-014] pyproject classifier Python "
+                f"{version} is outside contract compatibility lists; "
+                "remediation: align classifiers with environment-contract.toml"
+            )
+    for version in blocking:
+        marker = f"Programming Language :: Python :: {version}"
+        if marker not in classifiers:
+            errors.append(
+                "[SUPPORT-MATRIX-014] pyproject classifiers missing blocking Python "
+                f"{version}; remediation: list each blocking version"
+            )
+    if experimental and requires and "<" not in requires:
+        errors.append(
+            "[SUPPORT-MATRIX-014] when experimentalPython is declared, "
+            "requires-python must include an upper bound so installers do not treat "
+            "experimental runtimes as publicly supported; remediation: constrain "
+            "requires-python to the blocking range (e.g. '>=3.11,<3.13')"
+        )
+    for version in experimental:
+        included = _specifier_includes_version(requires, version)
+        if included is True:
+            errors.append(
+                "[SUPPORT-MATRIX-014] requires-python must exclude experimental Python "
+                f"{version}; remediation: tighten the public install range "
+                "(wheel Requires-Python mirrors project.requires-python; installing the "
+                "wheel on experimental interpreters is not an expected success path)"
+            )
+        elif included is None and requires and f"<{version}" not in requires:
+            # Minimal fallback without packaging: require an explicit upper bound token.
+            major_minor = version
+            next_major = version  # e.g. expect "<3.13" for experimental 3.13
+            if f"<{major_minor}" not in requires and f",<{major_minor}" not in requires:
+                errors.append(
+                    "[SUPPORT-MATRIX-014] requires-python should exclude experimental "
+                    f"Python {next_major} via an upper bound (packaging unavailable for "
+                    "precise SpecifierSet check); remediation: use e.g. '>=3.11,<3.13'"
+                )
+    return errors
+
+
+def _check_pyproject_python_alignment() -> list[str]:
+    pyproject_path = ROOT / "pyproject.toml"
+    if not CONTRACT_PATH.is_file() or not pyproject_path.is_file():
+        return []
+    contract = tomllib.loads(_read(CONTRACT_PATH))
+    project = tomllib.loads(_read(pyproject_path)).get("project", {})
+    if not isinstance(project, dict):
+        return []
+    requires = str(project.get("requires-python", "")).strip()
+    product = contract.get("product", {})
+    compatibility = contract.get("compatibility", {})
+    expected = ""
+    if isinstance(product, dict):
+        expected = str(product.get("pythonRequirement", "")).strip()
     blocking: list[str] = []
     experimental: list[str] = []
     if isinstance(compatibility, dict):
@@ -385,44 +508,15 @@ def _check_pyproject_python_alignment() -> list[str]:
         if isinstance(raw_experimental, list):
             experimental = [str(item) for item in raw_experimental]
     classifiers = project.get("classifiers", [])
-    if isinstance(classifiers, list):
-        claimed: list[str] = []
-        for item in classifiers:
-            text = str(item)
-            if text.startswith("Programming Language :: Python :: 3."):
-                claimed.append(text.rsplit(" :: ", 1)[-1])
-        for version in claimed:
-            if version in experimental and version not in blocking:
-                errors.append(
-                    "[SUPPORT-MATRIX-014] pyproject classifiers must not claim experimental "
-                    f"Python {version} as supported; remediation: keep classifiers to blocking set"
-                )
-            if blocking and version not in blocking and version not in experimental:
-                errors.append(
-                    "[SUPPORT-MATRIX-014] pyproject classifier Python "
-                    f"{version} is outside contract compatibility lists; "
-                    "remediation: align classifiers with environment-contract.toml"
-                )
-            if blocking and version not in blocking:
-                # Experimental classifiers are already reported above; other drift too.
-                if version not in experimental:
-                    pass
-        for version in blocking:
-            marker = f"Programming Language :: Python :: {version}"
-            if marker not in classifiers:
-                errors.append(
-                    "[SUPPORT-MATRIX-014] pyproject classifiers missing blocking Python "
-                    f"{version}; remediation: list each blocking version"
-                )
-    # Conservatively require an upper bound when experimental versions exist.
-    if experimental and requires and "<" not in requires:
-        errors.append(
-            "[SUPPORT-MATRIX-014] when experimentalPython is declared, "
-            "requires-python must include an upper bound so installers do not treat "
-            "experimental runtimes as publicly supported; remediation: constrain "
-            "requires-python to the blocking range (e.g. '>=3.11,<3.13')"
-        )
-    return errors
+    if not isinstance(classifiers, list):
+        classifiers = []
+    return check_pyproject_python_alignment(
+        requires_python=requires,
+        contract_requirement=expected,
+        blocking=blocking,
+        experimental=experimental,
+        classifiers=[str(item) for item in classifiers],
+    )
 
 
 def main() -> int:
