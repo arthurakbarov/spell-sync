@@ -82,7 +82,9 @@ or cleanup fails. Journal begin failure before target writes removes snapshots w
 remaining recovery materials with `recovery_required=true`.
 
 Durability: atomic visibility and process-crash safety are guaranteed; power-loss durability is best
-effort (file + directory sync). See [ADR 0005](decisions/0005-secure-internal-artifacts.md).
+effort (file + directory sync). Residual **R-DUR** tracks missing physical power-loss / fsync proof.
+See [ADR 0005](decisions/0005-secure-internal-artifacts.md). **R-PWR** is unrelated (coverage-padding
+inventory debt).
 
 ## Fail closed
 

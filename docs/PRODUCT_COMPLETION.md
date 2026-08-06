@@ -31,6 +31,7 @@ Documented and accepted for initial release; follow-up on second machine or late
 |----|-------|
 | R-WIN | Windows real-hardware adversarial validation (reparse/junction) — **not runnable on this macOS host** |
 | R-PWR | Legacy coverage padding inventory (frozen; shrink only; tiered gate allows ≥98% on TUI/presentation) |
+| R-DUR | Physical power-loss / fsync durability proof not claimed (POSIX best-effort journal sync only) |
 | R-CON | Real-application manual validation coverage (see `docs/target-validation.json` and `docs/FEATURE_MATRIX.md`) — **partial** `2/35`: chrome/macos + macos_spelling/macos recorded 2026-08-05 (read-only); Firefox + mutation samples still open |
 
 ## Second-machine follow-up

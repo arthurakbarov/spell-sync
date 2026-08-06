@@ -28,7 +28,7 @@ preview (immutable prepared plan + RuntimeIdentity)
 | Operation lock | One mutating operation per project at a time |
 | Internal artifact containment | `.spell-sync.lock`, journal, and `.spell-sync.txn` paths reject symlinks/reparse points and stay under the project root via `secure_artifacts` (best-effort on Windows reparse/junction — see R-WIN). Recovery restores use unique temps (no predictable `.recover-tmp` symlink target) |
 | Rollback precedence | Incomplete rollback preserves journal and snapshots regardless of journal update or cleanup errors |
-| Durability | Journal publication fsyncs temp file and parent directory (POSIX best effort); physical power-loss proof not claimed (R-PWR) |
+| Durability | Journal publication fsyncs temp file and parent directory (POSIX best effort); physical power-loss / fsync durability proof not claimed (R-DUR) |
 | Atomic dictionary writes | Snapshots + journal v2 + rollback paths |
 | Privacy | User words never stored in history or technical logs |
 | TUI boundary | No subprocess CLI; no direct dictionary/journal writers |

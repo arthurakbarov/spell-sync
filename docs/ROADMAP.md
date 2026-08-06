@@ -11,6 +11,7 @@ Only items that still fail a completion criterion. Done-definitions:
 | R-CON | More real-app manual samples (Firefox + mutation; other OSes) | Publish confidence, not engineering done |
 | R-WIN | Windows hardware adversarial R1–R7 | Windows threat-model claim |
 | R-PWR | Shrink legacy coverage-padding inventory over time (≤371 defs / ≤53 bare) | Hygiene only; frozen ceiling |
+| R-DUR | Physical power-loss / journal fsync durability proof | Durability claim beyond process-crash |
 
 ## Not on this roadmap
 

@@ -24,6 +24,7 @@ and `docs/target-validation.json`. Residuals: [PRODUCT_COMPLETION.md](PRODUCT_CO
 | Agent / edit loop | complete | complete | not-applicable | complete | not-applicable | not-applicable | not-applicable | complete | Sample fill uses budget; not a coverage wall |
 | Windows adversarial (R-WIN) | partial | partial | partial | partial | not-applicable | blocked | blocked | complete | Not runnable on maintainer macOS host |
 | Coverage padding (R-PWR) | partial | partial | not-applicable | complete | not-applicable | not-applicable | not-applicable | complete | Frozen inventory; shrink only |
+| Power-loss durability (R-DUR) | partial | partial | not-applicable | complete | not-applicable | missing | missing | complete | POSIX fsync best-effort; no physical proof |
 
 ## Notes
 

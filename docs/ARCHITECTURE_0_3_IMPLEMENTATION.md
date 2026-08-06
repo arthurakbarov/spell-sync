@@ -11,12 +11,12 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 ## Current phase
 
 Phase 10: version 0.3.0 — **complete** (owner-approved with documented residuals:
-R-WIN, R-PWR, R-CON). Release not performed.
+R-WIN, R-PWR, R-DUR, R-CON). Release not performed.
 
 Post-0.3 ops: **complete** (engineering). Product UX waves A–F, local two-mode
 validation, ETA/observe, agent-contract unification with nix-darwin naming, and
 engineering/product completion docs are landed. Criterion 9 (owner publish) and
-residuals R-WIN / R-PWR / R-CON remain owner-initiated only.
+residuals R-WIN / R-PWR / R-DUR / R-CON remain owner-initiated only.
 
 [architecture-status:start]
 current: owner-publish
@@ -48,7 +48,7 @@ owner-publish: not-started
 
 Public version: `0.3.0` (`pyproject.toml`).
 
-Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-CON).
+Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-DUR, R-CON).
 Phase 10 is **complete**. Post-0.3 ops is **complete** (engineering). Current tracker
 focus: `owner-publish` (**not started** — awaits explicit owner push/tag/release).
 
@@ -564,11 +564,11 @@ Open items use the IDs in [`ROADMAP.md`](ROADMAP.md):
 | R-WIN | Windows real-hardware adversarial R1–R7 not run |
 | R-CON | Real-application manual validation samples still thin (2/35) |
 | R-PWR | Legacy `*coverage*` padding inventory: freeze + shrink only |
+| R-DUR | Physical power-loss / journal fsync durability proof not claimed |
 | owner-publish | Tag / GitHub Release / package publish awaits explicit owner command |
 
 Historical phase-10 threat-model notes (not ROADMAP IDs; still accepted):
 
-- Power-loss durability was not physically proven
 - Same-user concurrent replacement remains outside the threat model
 
 ### Phase-specific validation (passed)
@@ -732,7 +732,7 @@ Phase 10 (complete, owner-approved with residuals): tip evidence authoritative v
   last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
 Post-0.3 ops (complete, engineering): waves A–F; ETA/observe; agent-contract unification
   (README, git-change-management, repository-workflow, after-changes, security-audit);
-  only owner-publish + residuals R-WIN/R-PWR/R-CON remain
+  only owner-publish + residuals R-WIN/R-PWR/R-DUR/R-CON remain
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)
