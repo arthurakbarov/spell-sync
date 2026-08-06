@@ -8,10 +8,11 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from ..application.requests import SupportReportRequest
 from ..diagnostics.paths import resolve_app_state_paths
+from ..diagnostics.types import OperationHistorySnapshot
 from ..project_setup.target_settings import load_target_settings_snapshot
 from ..push_journal import JournalLoadStatus
 from ..resolved_runtime import ResolvedRuntime
@@ -20,6 +21,12 @@ from ..settings import ConfigStatus
 from ..support.path_redaction import redact_text
 from ..sync_run import SyncRun
 from .target_details import build_target_details
+
+
+class SupportReportHistorySource(Protocol):
+    """Minimal surface used when assembling a support report."""
+
+    def load_operation_history(self, *, limit: int = 50) -> OperationHistorySnapshot: ...
 
 
 @dataclass(frozen=True)
@@ -96,7 +103,7 @@ class SupportReport:
 
 
 def build_support_report(
-    service: object,
+    service: SupportReportHistorySource,
     request: SupportReportRequest,
     *,
     resolved: ResolvedRuntime,
@@ -136,7 +143,7 @@ def build_support_report(
                 reason_code=reason,
             )
         )
-    history = service.load_operation_history(limit=5)  # type: ignore[attr-defined]
+    history = service.load_operation_history(limit=5)
     recent = tuple(
         SupportOperationSummary(
             operation=record.operation,
