@@ -92,7 +92,8 @@ Editable install for local CLI testing:
 uv tool install --editable .
 ```
 
-Python **3.11** and **3.12** are currently tested; **3.13** is experimental (see
+Python **3.11** and **3.12** are currently tested; **3.13** is an experimental
+**source-only** future-compatibility probe (outside the public install range — see
 [Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)). Product runtime does **not**
 require `uv` — `uv` is the convenient installer and the maintainer toolchain.
 

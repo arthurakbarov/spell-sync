@@ -88,8 +88,8 @@ jobs:
           uv run --python 3.12 --locked --no-sync --offline --no-python-downloads \
             python scripts/run_compatibility_checks.py --platform windows --python-version 3.12
 
-  compatibility-linux-py313-experimental:
-    name: compatibility experimental (ubuntu, py3.13)
+  source-compat-linux-py313-experimental:
+    name: source compatibility probe (ubuntu, py3.13)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -100,9 +100,16 @@ jobs:
       - uses: astral-sh/setup-uv@3b63b7d66864d0662a8a6a4870cbbb8568a81eb3 # v6.0.0
         with:
           version: "0.11.21"
-      - name: Experimental compatibility
+      - name: Source-only future compatibility probe
         run: |
+          # Public requires-python is >=3.11,<3.13 — do not uv sync / install the project
+          # or its wheel on 3.13. Probe source importability from the checkout only.
           uv lock --check
-          uv sync --python 3.13 --locked --no-python-downloads --no-default-groups --group test-core --group packaging
-          uv run --python 3.13 --locked --no-sync --offline --no-python-downloads \
-            python scripts/run_compatibility_checks.py --platform linux --python-version 3.13 --experimental
+          uv venv --python 3.13 --no-project .venv-py313-source-probe
+          uv export --frozen --no-emit-project --no-default-groups \
+            --group test-core --group packaging -o /tmp/spell-sync-py313-probe-reqs.txt
+          uv pip install --python .venv-py313-source-probe \
+            -r /tmp/spell-sync-py313-probe-reqs.txt
+          PYTHONPATH="${GITHUB_WORKSPACE}" \
+            .venv-py313-source-probe/bin/python scripts/run_compatibility_checks.py \
+            --platform linux --python-version 3.13 --experimental --source-only

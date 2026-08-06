@@ -389,15 +389,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", required=True, choices=("linux", "macos", "windows"))
     parser.add_argument("--python-version", required=True)
     parser.add_argument("--format", choices=("human", "json"), default="human")
-    parser.add_argument("--experimental", action="store_true")
+    parser.add_argument(
+        "--experimental",
+        action="store_true",
+        help="Label this cell as experimental (non-blocking). Requires --source-only.",
+    )
+    parser.add_argument(
+        "--source-only",
+        action="store_true",
+        help=(
+            "Source checkout probe: run product tests via the current interpreter/"
+            "PYTHONPATH without building or installing a wheel. Required for "
+            "interpreters outside project.requires-python."
+        ),
+    )
     args = parser.parse_args(argv)
 
     mismatch = _verify_runtime_identity(
         platform_arg=args.platform,
         python_version_arg=args.python_version,
     )
-    if mismatch is not None:
-        execution_id = f"compatibility:{args.platform}-py{args.python_version.replace('.', '')}"
+    execution_id = f"compatibility:{args.platform}-py{args.python_version.replace('.', '')}"
+    if args.experimental:
+        execution_id += "-experimental"
+    if args.source_only:
+        execution_id += "-source-only"
+
+    def _emit_failure(failed_id: str, *, exit_code: int = 1) -> int:
         payload = {
             "executionId": execution_id,
             "platform": args.platform,
@@ -405,23 +423,27 @@ def main(argv: list[str] | None = None) -> int:
             "actualPlatform": _actual_platform(),
             "actualPythonVersion": _actual_python_version(),
             "experimental": args.experimental,
-            "exitCode": 1,
-            "failedId": mismatch,
+            "sourceOnly": args.source_only,
+            "exitCode": exit_code,
+            "failedId": failed_id,
             "steps": [],
         }
         if args.format == "json":
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
-            print(f"COMPATIBILITY_FAILED_ID={mismatch}")
+            print(f"COMPATIBILITY_FAILED_ID={failed_id}")
             print("COMPATIBILITY_RESULT=failed")
-            print("COMPATIBILITY_EXIT=1")
-        return 1
+            print(f"COMPATIBILITY_EXIT={exit_code}")
+        return exit_code
+
+    if mismatch is not None:
+        return _emit_failure(mismatch)
+
+    if args.experimental and not args.source_only:
+        return _emit_failure("compatibility.experimental-requires-source-only")
 
     py = sys.executable
     uv = _resolve_uv_executable()
-    execution_id = f"compatibility:{args.platform}-py{args.python_version.replace('.', '')}"
-    if args.experimental:
-        execution_id += "-experimental"
     steps = [
         ("environment-contract", [py, "scripts/validate_environment_contract.py"]),
         ("lock-check", [uv, "lock", "--check"]),
@@ -436,7 +458,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         (
             "platform-filesystem",
-            [py, "-m", "pytest", "tests/test_edge_cases.py", "-q", "-k", "path"],
+            [py, "-m", "pytest", "tests/test_edge_cases.py", "-q"],
         ),
     ]
     if args.platform in {"linux", "macos"}:
@@ -452,11 +474,20 @@ def main(argv: list[str] | None = None) -> int:
             failed_id = f"compatibility.{step_id}-failed"
             break
     else:
-        wheel_results, wheel_rc, wheel_failed = _run_wheel_compatibility(py)
-        results.extend(wheel_results)
-        if wheel_rc != 0:
-            exit_code = wheel_rc
-            failed_id = wheel_failed
+        if args.source_only:
+            results.append(
+                {
+                    "step": "compatibility.wheel-skipped-source-only",
+                    "exitCode": 0,
+                    "outputLines": 0,
+                }
+            )
+        else:
+            wheel_results, wheel_rc, wheel_failed = _run_wheel_compatibility(py)
+            results.extend(wheel_results)
+            if wheel_rc != 0:
+                exit_code = wheel_rc
+                failed_id = wheel_failed
     payload = {
         "executionId": execution_id,
         "platform": args.platform,
@@ -464,6 +495,7 @@ def main(argv: list[str] | None = None) -> int:
         "actualPlatform": _actual_platform(),
         "actualPythonVersion": _actual_python_version(),
         "experimental": args.experimental,
+        "sourceOnly": args.source_only,
         "exitCode": exit_code,
         "failedId": failed_id,
         "steps": results,

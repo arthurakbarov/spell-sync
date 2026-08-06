@@ -13,7 +13,7 @@ dependency ownership, and platform claims: `config/environment-contract.toml`.
 |-------|---------|
 | Public requirement (`project.requires-python`) | `>=3.11,<3.13` |
 | Blocking compatibility (CI) | CPython 3.11, CPython 3.12 |
-| Experimental (non-blocking CI) | CPython 3.13 |
+| Experimental (non-blocking CI) | CPython 3.13 **source-only** future compatibility probe (not installable; outside `requires-python`) |
 | Canonical maintainer interpreter | CPython 3.12.13 (`.python-version`) |
 
 The committed `.python-version` file pins the **maintainer** interpreter. It does not replace
@@ -57,7 +57,7 @@ every target has real-application manual validation on every OS.
 |----------|---------|
 | Canonical full CI | One blocking Ubuntu + Python 3.12 job running the full `scripts/ci.sh` gate |
 | Compatibility | Narrow checks on Ubuntu 3.11, macOS 3.12, Windows 3.12 |
-| Experimental | Ubuntu + Python 3.13, `continue-on-error`, product subset only |
+| Experimental | Ubuntu + Python 3.13 source-only probe (`continue-on-error`); no project `uv sync`, no wheel install |
 
 Compatibility jobs must not duplicate the full CI gate (Ruff, mypy, full coverage, docs
 validators, packaging suite, etc.).
