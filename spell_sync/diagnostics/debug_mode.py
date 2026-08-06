@@ -7,6 +7,14 @@ import sys
 import traceback
 from typing import TextIO
 
+from .technical_event_model import (
+    EventCategory,
+    EventId,
+    EventSeverity,
+    OperationKind,
+    TechnicalEvent,
+)
+
 
 def debug_diagnostics_enabled() -> bool:
     """True when the user explicitly enabled developer diagnostics.
@@ -26,6 +34,23 @@ def emit_debug_traceback(exc: BaseException, *, stream: TextIO | None = None) ->
     traceback.print_exception(type(exc), exc, exc.__traceback__, file=out)
 
 
-def unexpected_error_category(exc: BaseException) -> str:
-    """Privacy-safe category token for structured events (type name only)."""
-    return type(exc).__name__
+def emit_boundary_technical_event(
+    event_id: EventId,
+    *,
+    operation: OperationKind,
+) -> None:
+    """Record a low-cardinality unexpected-boundary event (no exception payload)."""
+    try:
+        from .technical_event_log import write_technical_event
+
+        write_technical_event(
+            TechnicalEvent(
+                event_id=event_id,
+                operation=operation,
+                category=EventCategory.DIAGNOSTIC,
+                severity=EventSeverity.ERROR,
+            )
+        )
+    except Exception:
+        # Fail-open: diagnostics must not break the product path.
+        pass

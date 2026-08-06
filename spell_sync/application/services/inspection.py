@@ -70,8 +70,24 @@ class InspectionService:
         )
 
     def load_doctor(self, request: DoctorRequest) -> DoctorSnapshot:
-        # Expected domain / I/O failures map to a stable privacy-safe load_error.
-        expected = (OSError, ValueError, RuntimeError, TypeError, KeyError)
+        from importlib.metadata import PackageNotFoundError
+
+        from ...diagnostics.debug_mode import (
+            emit_boundary_technical_event,
+            emit_debug_traceback,
+        )
+        from ...diagnostics.technical_event_model import EventId, OperationKind
+        from ...resolved_runtime import ProjectRuntimeMismatchError
+
+        # Expected from sync_run → build_doctor_report → build_doctor_snapshot:
+        # filesystem/config I/O, decode failures, missing package metadata, identity mismatch.
+        # Programming errors (TypeError/KeyError/AssertionError/…) are unexpected.
+        expected = (
+            OSError,
+            UnicodeError,
+            PackageNotFoundError,
+            ProjectRuntimeMismatchError,
+        )
         try:
             run = self._ctx.runtime.sync_run(request.project)
             report = _operation_deps.build_doctor_report(run)
@@ -83,10 +99,11 @@ class InspectionService:
                 load_error="Doctor report could not be loaded.",
             )
         except Exception as exc:
-            from ...diagnostics.debug_mode import emit_debug_traceback
-
-            # Unexpected: same privacy-safe user message; optional stderr traceback.
             emit_debug_traceback(exc)
+            emit_boundary_technical_event(
+                EventId.DIAGNOSTICS_DOCTOR_UNEXPECTED_FAILURE,
+                operation=OperationKind.DOCTOR,
+            )
             return DoctorSnapshot(
                 checks=(),
                 has_errors=True,

@@ -76,6 +76,10 @@ _MESSAGES: dict[EventId, str] = {
     EventId.TARGETS_FAILED: "Configuration update failed",
     EventId.DIAGNOSTICS_HISTORY_WRITE_FAILED: "Operation history could not be saved",
     EventId.DIAGNOSTICS_LOGGING_SETUP_FAILED: "Technical log unavailable",
+    EventId.DIAGNOSTICS_DOCTOR_UNEXPECTED_FAILURE: "Doctor report could not be loaded",
+    EventId.DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE: "TUI failed to start",
+    EventId.DIAGNOSTICS_PRESENTATION_SINK_FAILED: "Presentation sink failed",
+    EventId.DIAGNOSTICS_TECHNICAL_SINK_FAILED: "Technical event sink failed",
 }
 
 _REASON_MESSAGES: dict[EventReason, str] = {

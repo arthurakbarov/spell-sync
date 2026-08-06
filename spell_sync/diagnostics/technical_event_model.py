@@ -114,6 +114,10 @@ class EventId(str, Enum):
 
     DIAGNOSTICS_HISTORY_WRITE_FAILED = "diagnostics.history_write_failed"
     DIAGNOSTICS_LOGGING_SETUP_FAILED = "diagnostics.logging_setup_failed"
+    DIAGNOSTICS_DOCTOR_UNEXPECTED_FAILURE = "diagnostics.doctor_unexpected_failure"
+    DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE = "diagnostics.tui_launch_unexpected_failure"
+    DIAGNOSTICS_PRESENTATION_SINK_FAILED = "diagnostics.presentation_sink_failed"
+    DIAGNOSTICS_TECHNICAL_SINK_FAILED = "diagnostics.technical_sink_failed"
 
 
 @dataclass(frozen=True, slots=True)
