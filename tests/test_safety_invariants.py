@@ -687,6 +687,54 @@ class TestWritabilityAndFingerprintCoverage(unittest.TestCase):
                     self.skipTest("Windows probe cleanup differs when os.close is patched")
                 self.assertFalse(is_path_writable(target))
 
+    def test_is_path_writable_does_not_clobber_preexisting_probe_like_file(self):
+        from spell_sync.io import is_path_writable
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            target = root / "dict.txt"
+            target.write_text("keep-me\n", encoding="utf-8")
+            preexisting = root / f".spell-sync-write-probe.{os.getpid()}.rpl"
+            marker = b"preexisting-probe-payload-do-not-touch"
+            preexisting.write_bytes(marker)
+            self.assertTrue(is_path_writable(target))
+            self.assertEqual(preexisting.read_bytes(), marker)
+            self.assertTrue(target.read_text(encoding="utf-8") == "keep-me\n")
+            leftovers = list(root.glob(".spell-sync-write-probe.*"))
+            self.assertEqual(leftovers, [preexisting])
+
+    def test_is_path_writable_does_not_replace_preexisting_symlink(self):
+        from spell_sync.io import is_path_writable
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            target = root / "dict.txt"
+            target.write_text("a\n", encoding="utf-8")
+            real = root / "real-target.txt"
+            real.write_text("real\n", encoding="utf-8")
+            link = root / f".spell-sync-write-probe.{os.getpid()}.rpl"
+            link.symlink_to(real)
+            self.assertTrue(is_path_writable(target))
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(real.read_text(encoding="utf-8"), "real\n")
+
+    def test_is_path_writable_cleans_temps_after_write_error(self):
+        from spell_sync.io import is_path_writable
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            target = root / "dict.txt"
+            target.write_text("a\n", encoding="utf-8")
+            with (
+                patch("os.write", side_effect=OSError("write fail")),
+                patch("os.close"),
+            ):
+                if sys.platform == "win32":
+                    self.skipTest("Windows probe cleanup differs when os.close is patched")
+                self.assertFalse(is_path_writable(target))
+            leftovers = list(root.glob(".spell-sync-write-probe.*"))
+            self.assertEqual(leftovers, [])
+
     def test_fingerprint_helpers(self):
         from spell_sync.read_outcome import (
             ReadStatus,

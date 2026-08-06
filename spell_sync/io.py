@@ -66,33 +66,46 @@ def is_path_readable(path: PathLike) -> bool:
 def is_path_writable(path: PathLike) -> bool:
     """Probe real write capability without altering the target dictionary.
 
-    Creates a temporary file in the parent directory and (when the target exists)
-    verifies a same-filesystem rename can succeed via a throwaway replace on a
-    temp sibling. Never overwrites or truncates ``path``.
+    Creates unique temporary files in the parent directory (``tempfile.mkstemp``)
+    and verifies a same-filesystem rename can succeed by replacing onto a second
+    unique temp that this probe created. Never overwrites an unknown existing
+    path or symlink.
     """
     target = Path(path)
     parent = target.parent if target.name else target
     try:
         if not parent.is_dir():
             return False
-        fd, temp_name = tempfile.mkstemp(
+        fd, write_name = tempfile.mkstemp(
             prefix=".spell-sync-write-probe.",
             suffix=".tmp",
             dir=str(parent),
         )
     except OSError:
         return False
-    temp = Path(temp_name)
+    write_temp = Path(write_name)
+    rename_temp: Path | None = None
     try:
         try:
             os.write(fd, b"0")
             os.fsync(fd)
         finally:
             os.close(fd)
-        probe = parent / f".spell-sync-write-probe.{os.getpid()}.rpl"
         try:
-            os.replace(temp, probe)
-            probe.unlink(missing_ok=True)
+            rename_fd, rename_name = tempfile.mkstemp(
+                prefix=".spell-sync-write-probe.",
+                suffix=".rpl",
+                dir=str(parent),
+            )
+        except OSError:
+            return False
+        os.close(rename_fd)
+        rename_temp = Path(rename_name)
+        try:
+            # Destination is only the exclusive temp we created — never an unknown path.
+            os.replace(write_temp, rename_temp)
+            write_temp = rename_temp
+            rename_temp = None
         except OSError:
             return False
         if target.exists() and target.is_symlink():
@@ -103,10 +116,13 @@ def is_path_writable(path: PathLike) -> bool:
     except OSError:  # pragma: no cover -- unexpected probe failure after temp create
         return False
     finally:
-        try:
-            temp.unlink(missing_ok=True)
-        except OSError:  # pragma: no cover -- cleanup race
-            pass
+        for leftover in (write_temp, rename_temp):
+            if leftover is None:
+                continue
+            try:
+                leftover.unlink(missing_ok=True)
+            except OSError:  # pragma: no cover -- cleanup race
+                pass
 
 
 def ensure_parent_dir(path: PathLike) -> None:
