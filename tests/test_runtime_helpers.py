@@ -54,6 +54,18 @@ class TestRuntimeHelpers(unittest.TestCase):
     def test_path_export_for_script(self):
         export = path_export_for_script(Path("/tmp/py/bin/spell-sync"))
         self.assertIn("/tmp/py/bin", export)
+        self.assertTrue(export.startswith("export PATH="))
+
+    def test_path_export_quotes_metacharacters(self):
+        import shlex
+
+        tricky = Path("/tmp/dir with $HOME and 'quotes'/bin/spell-sync")
+        export = path_export_for_script(tricky)
+        quoted = shlex.quote(tricky.parent.as_posix())
+        self.assertIn(quoted, export)
+        self.assertTrue(export.startswith(f"export PATH={quoted}:"))
+        # Unquoted interpolation of $HOME must not remain in the bindir segment.
+        self.assertNotRegex(export, r'PATH="/tmp/dir with \$HOME')
 
     def test_cli_shell_command(self):
         with patch("spell_sync.runtime.cli_argv", return_value=["spell-sync"]):
@@ -70,8 +82,17 @@ class TestRuntimeHelpers(unittest.TestCase):
             self.assertEqual(read_pyproject_version(path), "1.2.3")
 
     def test_read_pyproject_version_oserror(self):
-        with patch.object(Path, "read_text", side_effect=OSError("nope")):
+        with patch.object(Path, "read_bytes", side_effect=OSError("nope")):
             self.assertIsNone(read_pyproject_version(Path("/x/pyproject.toml")))
+
+    def test_read_pyproject_version_malformed_raises(self):
+        import tomllib
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "pyproject.toml"
+            path.write_text("version = [\n", encoding="utf-8")
+            with self.assertRaises(tomllib.TOMLDecodeError):
+                read_pyproject_version(path)
 
     def test_plan_removals_human_no_removals(self):
         with tempfile.TemporaryDirectory() as d:
@@ -98,6 +119,37 @@ class TestRuntimeHelpers(unittest.TestCase):
             ):
                 self.assertEqual(discover_pip_script(), script)
 
+    def test_discover_pip_script_numeric_version_order(self):
+        """String sort would prefer 3.9 over 3.12; numeric order must pick 3.12."""
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            python_root = home / "Library" / "Python"
+            for ver in ("3.9", "3.11", "3.12", "other", "3.10.1"):
+                script = python_root / ver / "bin" / "spell-sync"
+                script.parent.mkdir(parents=True)
+                script.write_text("#!/bin/sh\n", encoding="utf-8")
+            # Non-directory and symlink entries must be ignored.
+            (python_root / "3.99").write_text("not-a-dir\n", encoding="utf-8")
+            link = python_root / "3.8"
+            link.symlink_to(python_root / "3.9")
+            with (
+                patch("spell_sync.runtime.sys.platform", "darwin"),
+                patch("spell_sync.runtime.shutil.which", return_value=None),
+                patch("spell_sync.runtime.Path.home", return_value=home),
+            ):
+                found = discover_pip_script()
+            self.assertEqual(found, python_root / "3.12" / "bin" / "spell-sync")
+
+    def test_discover_pip_script_missing_library_python(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            with (
+                patch("spell_sync.runtime.sys.platform", "darwin"),
+                patch("spell_sync.runtime.shutil.which", return_value=None),
+                patch("spell_sync.runtime.Path.home", return_value=home),
+            ):
+                self.assertIsNone(discover_pip_script())
+
     def test_read_pyproject_version_missing_line(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "pyproject.toml"
@@ -105,8 +157,10 @@ class TestRuntimeHelpers(unittest.TestCase):
             self.assertIsNone(read_pyproject_version(path))
 
     def test_installed_package_version_pyproject_fallback(self):
+        from importlib.metadata import PackageNotFoundError
+
         with (
-            patch("spell_sync.runtime.version", side_effect=Exception("no dist")),
+            patch("spell_sync.runtime.version", side_effect=PackageNotFoundError("spell-sync")),
             patch(
                 "spell_sync.runtime.read_pyproject_version",
                 return_value="0.2.0",
@@ -115,11 +169,18 @@ class TestRuntimeHelpers(unittest.TestCase):
             self.assertEqual(installed_package_version(), "0.2.0")
 
     def test_installed_package_version_raises_when_unavailable(self):
+        from importlib.metadata import PackageNotFoundError
+
         with (
-            patch("spell_sync.runtime.version", side_effect=Exception("no dist")),
+            patch("spell_sync.runtime.version", side_effect=PackageNotFoundError("spell-sync")),
             patch("spell_sync.runtime.read_pyproject_version", return_value=None),
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(PackageNotFoundError):
+                installed_package_version()
+
+    def test_installed_package_version_does_not_mask_other_errors(self):
+        with patch("spell_sync.runtime.version", side_effect=RuntimeError("corrupt metadata")):
+            with self.assertRaises(RuntimeError):
                 installed_package_version()
 
 
