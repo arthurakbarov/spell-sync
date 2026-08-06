@@ -94,7 +94,7 @@ style/contract, agent config, architecture boundaries, ruff, mypy, grouped pytes
 lines on TUI/presentation/remainder; ≥90% branches on strict paths; full CI only), packaging
 (`packaging.build` / `twine` / `members` / `wheel-smoke`), and headless smoke scenarios.
 
-Requires **Python 3.11+** (`pyproject.toml`).
+Requires **Python 3.11+** (`pyproject.toml`; public install range `>=3.11,<3.13`).
 
 ## Critical prohibitions
 

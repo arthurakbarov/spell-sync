@@ -11,7 +11,7 @@ dependency ownership, and platform claims: `config/environment-contract.toml`.
 
 | Scope | Support |
 |-------|---------|
-| Public requirement (`project.requires-python`) | `>=3.11` |
+| Public requirement (`project.requires-python`) | `>=3.11,<3.13` |
 | Blocking compatibility (CI) | CPython 3.11, CPython 3.12 |
 | Experimental (non-blocking CI) | CPython 3.13 |
 | Canonical maintainer interpreter | CPython 3.12.13 (`.python-version`) |

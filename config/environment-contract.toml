@@ -1,7 +1,7 @@
 schemaVersion = 1
 
 [product]
-pythonRequirement = ">=3.11"
+pythonRequirement = ">=3.11,<3.13"
 
 [maintainer]
 implementation = "cpython"
@@ -34,7 +34,7 @@ linux = false
 windows = false
 
 [artifactVerifier]
-pythonRequirement = ">=3.11"
+pythonRequirement = ">=3.11,<3.13"
 uvRequired = false
 venvRequired = false
 

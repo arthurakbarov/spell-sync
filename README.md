@@ -32,7 +32,7 @@ Spell Sync.
 
 ## Install
 
-Requires **Python 3.11+**. You do not need Git for daily use after install — only if you
+Requires **Python 3.11–3.12** (`requires-python = ">=3.11,<3.13"`). You do not need Git for daily use after install — only if you
 prefer installing from a clone or keeping your word list in a private Git repo.
 
 A public PyPI package is not published yet. Install from GitHub (or a local clone) until a
