@@ -65,9 +65,25 @@ Tests: `tests/test_technical_logging.py`, `tests/test_diagnostic_redaction.py`.
 
 | Failure | Effect |
 |---------|--------|
-| Technical log write | Suppressed — Pull/Push/Recovery continue |
-| Presentation callback | Propagates to caller (TUI may wrap locally) |
+| Technical log write | Suppressed (fail-open) — Pull/Push/Recovery continue; optional `SPELL_SYNC_DEBUG` traceback on stderr |
+| Presentation callback | Fail-open — product path continues; static `diagnostics.presentation_sink_failed` may be written to the technical log only (never re-entered through the failing presentation sink) |
 | History append | Recorded via diagnostic event; operation outcome unchanged |
+
+## Developer debug (`SPELL_SYNC_DEBUG`)
+
+Opt-in maintainer/developer diagnostics. **Not** a normal user-facing setting.
+
+| Rule | Detail |
+|------|--------|
+| Enable | `SPELL_SYNC_DEBUG=1` (also `true` / `yes` / `on`) |
+| Default | Off |
+| Output | Tracebacks go **only** to `stderr` |
+| Contracts | stdout and JSON CLI payloads are unchanged |
+| Privacy | Exception messages may include local paths or other sensitive details — do **not** attach raw debug output to public issues or support reports without review |
+
+Unexpected boundary failures may also emit low-cardinality technical events such as
+`diagnostics.doctor_unexpected_failure` and `diagnostics.tui_launch_unexpected_failure`
+(no exception message or traceback in the event payload).
 
 ## Rotation and legacy parsing
 
