@@ -1,6 +1,6 @@
 # Product completion checklist (v1)
 
-Definition of done for Spell Sync 0.3.x product UX and release readiness.
+Definition of done for Spell Sync Version 1 (`1.0.0`) product UX and release readiness.
 Engineering / agent gates: [`ENGINEERING_COMPLETION.md`](ENGINEERING_COMPLETION.md).
 Residuals accepted for v1 are listed explicitly; they are not silent blockers.
 
@@ -21,7 +21,7 @@ Residuals accepted for v1 are listed explicitly; they are not silent blockers.
    Release / package publish). Agent does not push or publish without explicit owner request.
 
 Checklist status: criteria 1–9 complete; criterion 10 awaits explicit owner publish.
-Post-0.3 engineering ops are closed; tracker current focus is `owner-publish`.
+Post-v1 engineering ops are closed; tracker current focus is `owner-publish`.
 
 ## Accepted residuals (v1)
 

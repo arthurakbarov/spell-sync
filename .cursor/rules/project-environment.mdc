@@ -7,8 +7,8 @@ alwaysApply: true
 
 1. `.venv` is disposable — never commit or snapshot it.
 2. Dev dependencies live in `pyproject.toml` dependency groups + committed `uv.lock`.
-3. Canonical maintainer Python is `3.12.13` via `.python-version`.
+3. Canonical maintainer Python is `3.14.6` via `.python-version`.
 4. Python download only via `python3 scripts/project_environment.py bootstrap --allow-python-download`.
-5. Normal checks use `uv run --python 3.12.13 --locked --no-sync --offline --no-python-downloads`.
+5. Normal checks use `uv run --python 3.14.6 --locked --no-sync --offline --no-python-downloads`.
 6. Do not mutate project `.venv` with manual `pip install`.
 7. Product runtime does not require `uv`.

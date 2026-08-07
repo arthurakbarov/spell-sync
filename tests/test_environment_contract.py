@@ -35,7 +35,7 @@ def test_environment_contract_declares_product_python_requirement() -> None:
     product = data.get("product", {})
     assert isinstance(product, dict)
     requirement = str(product.get("pythonRequirement", ""))
-    assert requirement == ">=3.11,<3.13"
+    assert requirement == ">=3.14,<3.15"
 
 
 def test_pyproject_requires_python_matches_contract() -> None:
@@ -45,7 +45,7 @@ def test_pyproject_requires_python_matches_contract() -> None:
     assert isinstance(project, dict)
     requires_python = str(project.get("requires-python", ""))
     assert requires_python == contract.product_python_requirement
-    assert requires_python == ">=3.11,<3.13"
+    assert requires_python == ">=3.14,<3.15"
 
 
 def test_uv_required_version_pinned_in_pyproject_and_contract() -> None:

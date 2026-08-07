@@ -16,7 +16,7 @@ Only items that still fail a completion criterion. Done-definitions:
 ## Not on this roadmap
 
 - Architecture phases 1–10 (complete)
-- Post-0.3 engineering ops (complete)
+- Post-v1 engineering ops (complete)
 - Copying nix-darwin hosts/sops/flake/owner nx TUI
 - **Full gitleaks (or similar) CI scanner** — end users never see it; agents already have
   lean `scan_privacy_tree` + `packaging.members`. Extra scanner deps and false-positive

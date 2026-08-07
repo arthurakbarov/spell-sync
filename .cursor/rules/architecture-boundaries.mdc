@@ -14,7 +14,7 @@ alwaysApply: false
 - Application layer must not import `CliOptions`, `argparse`, `cli_request_adapter`, or Textual
 - `application/requests.py` holds UI-neutral frozen request dataclasses only
 - Focused services under `application/services/` own inspection, sync, recovery, setup, diagnostics
-- `RuntimeResolver` resolves explicit runtime; no production `ContextVar` for settings or validated runtime
+- `RuntimeResolver` resolves explicit runtime; no production `ContextVar` for settings or `ResolvedRuntime`
 - Core and `project_setup` must not import `spell_sync.application`
 - TUI service boundary: see `tui` rule.
 

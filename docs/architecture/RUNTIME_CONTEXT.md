@@ -1,7 +1,7 @@
 # Runtime context
 
-Runtime configuration and validated operation context are resolved explicitly. There is no
-production `ContextVar` for settings or validated runtime and no module-level config cache.
+Runtime configuration and operation context are resolved explicitly. There is no
+production `ContextVar` for settings or `ResolvedRuntime` and no module-level config cache.
 
 ## Resolution path
 

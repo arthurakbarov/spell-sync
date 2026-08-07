@@ -4,7 +4,7 @@ Thanks for improving spell-sync. Small, focused pull requests are easier to revi
 
 ## Setup
 
-See [Development](DEVELOPMENT.md). Requires Python **3.11+** (maintainer canonical: 3.12.13).
+See [Development](DEVELOPMENT.md). Requires Python **3.14** (maintainer canonical: 3.14.6).
 
 ```bash
 python3 scripts/project_environment.py sync --profile full-ci

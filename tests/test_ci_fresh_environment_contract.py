@@ -11,7 +11,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
 def test_full_ci_job_uses_canonical_python_and_project_environment_sync() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "full-ci" in text
-    assert 'python-version: "3.12.13"' in text
+    assert 'python-version: "3.14.6"' in text
     assert "scripts/project_environment.py sync" in text
 
 

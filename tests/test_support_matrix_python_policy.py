@@ -15,14 +15,12 @@ from scripts.validate_support_matrix import (  # noqa: E402
     check_pyproject_python_alignment,
 )
 
-
-_BLOCKING = ["3.11", "3.12"]
-_EXPERIMENTAL = ["3.13"]
+_BLOCKING = ["3.14"]
+_EXPERIMENTAL = []
 _GOOD_CLASSIFIERS = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
 ]
 
 _SIBLING_WITH_SOURCE_ONLY = """
@@ -37,33 +35,33 @@ jobs:
 
 def test_rejects_experimental_classifier() -> None:
     errors = check_pyproject_python_alignment(
-        requires_python=">=3.11,<3.13",
-        contract_requirement=">=3.11,<3.13",
+        requires_python=">=3.14,<3.15",
+        contract_requirement=">=3.14,<3.15",
         blocking=_BLOCKING,
-        experimental=_EXPERIMENTAL,
-        classifiers=[*_GOOD_CLASSIFIERS, "Programming Language :: Python :: 3.13"],
+        experimental=["3.15"],
+        classifiers=[*_GOOD_CLASSIFIERS, "Programming Language :: Python :: 3.15"],
     )
     assert any("must not claim experimental" in item for item in errors)
 
 
 def test_rejects_missing_blocking_classifier() -> None:
     errors = check_pyproject_python_alignment(
-        requires_python=">=3.11,<3.13",
-        contract_requirement=">=3.11,<3.13",
+        requires_python=">=3.14,<3.15",
+        contract_requirement=">=3.14,<3.15",
         blocking=_BLOCKING,
         experimental=_EXPERIMENTAL,
         classifiers=[
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3 :: Only",
         ],
     )
-    assert any("missing blocking Python 3.12" in item for item in errors)
+    assert any("missing blocking Python 3.14" in item for item in errors)
 
 
 def test_rejects_contract_requires_python_mismatch() -> None:
     errors = check_pyproject_python_alignment(
-        requires_python=">=3.11",
-        contract_requirement=">=3.11,<3.13",
+        requires_python=">=3.14",
+        contract_requirement=">=3.14,<3.15",
         blocking=_BLOCKING,
         experimental=_EXPERIMENTAL,
         classifiers=_GOOD_CLASSIFIERS,
@@ -73,10 +71,10 @@ def test_rejects_contract_requires_python_mismatch() -> None:
 
 def test_rejects_experimental_without_upper_bound() -> None:
     errors = check_pyproject_python_alignment(
-        requires_python=">=3.11",
-        contract_requirement=">=3.11",
+        requires_python=">=3.14",
+        contract_requirement=">=3.14",
         blocking=_BLOCKING,
-        experimental=_EXPERIMENTAL,
+        experimental=["3.15"],
         classifiers=_GOOD_CLASSIFIERS,
     )
     assert any("upper bound" in item or "must exclude experimental" in item for item in errors)
@@ -308,8 +306,8 @@ def test_rejects_source_only_on_blocking_job() -> None:
 
 def test_accepts_aligned_blocking_metadata() -> None:
     errors = check_pyproject_python_alignment(
-        requires_python=">=3.11,<3.13",
-        contract_requirement=">=3.11,<3.13",
+        requires_python=">=3.14,<3.15",
+        contract_requirement=">=3.14,<3.15",
         blocking=_BLOCKING,
         experimental=_EXPERIMENTAL,
         classifiers=_GOOD_CLASSIFIERS,
@@ -322,8 +320,8 @@ def test_public_requires_python_excludes_313_for_wheel_metadata() -> None:
     from packaging.specifiers import SpecifierSet
     from packaging.version import Version
 
-    requires = ">=3.11,<3.13"
+    requires = ">=3.14,<3.15"
     spec = SpecifierSet(requires)
-    assert Version("3.11") in spec
-    assert Version("3.12") in spec
+    assert Version("3.14") in spec
+    assert Version("3.14.6") in spec
     assert Version("3.13") not in spec

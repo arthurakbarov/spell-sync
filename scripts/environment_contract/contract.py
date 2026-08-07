@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CONTRACT_REL_PATH = Path("config") / "environment-contract.toml"
-CANONICAL_PYTHON = "3.12.13"
+CANONICAL_PYTHON = "3.14.6"
 
 
 @dataclass(frozen=True, slots=True)

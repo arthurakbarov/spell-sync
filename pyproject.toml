@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spell-sync"
-version = "0.3.0"
+version = "1.0.0"
 description = "Sync personal spell-check words across OS, browsers, editors, and Hunspell"
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.14,<3.15"
 license = "Unlicense"
 license-files = ["LICENSE"]
 authors = [{ name = "Arthur Akbarov" }]
@@ -15,8 +15,7 @@ keywords = ["spellcheck", "spell-check", "dictionary", "sync", "dotfiles", "word
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Topic :: Text Processing",
 ]
@@ -78,7 +77,7 @@ spell_sync = ["bundled/*", "tui/*.tcss"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
@@ -87,7 +86,7 @@ select = ["E", "F", "I", "W"]
 "tests/**" = ["E501"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

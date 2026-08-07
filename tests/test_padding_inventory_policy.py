@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 
-# Frozen at the post-0.3 hardening pass. Do not grow this set without owner approval.
+# Frozen at the Version 1 hardening pass. Do not grow this set without owner approval.
 ALLOWED_COVERAGE_NAMED_FILES = frozenset(
     {
         "tests/test_coverage_gaps.py",

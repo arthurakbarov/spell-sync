@@ -29,7 +29,7 @@ def test_info_reports_synced_environment_fields() -> None:
     assert "ENVIRONMENT_RESULT=success" in output
     assert "venvPresent=True" in output
     assert "metadataPresent=True" in output
-    assert "pythonVersionFile=3.12.13" in output
+    assert "pythonVersionFile=3.14.6" in output
     assert "uvVersion=0.11.21" in output
 
 

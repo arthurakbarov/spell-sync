@@ -19,7 +19,7 @@ def _minimal_payload(**overrides: object) -> dict[str, object]:
         "ok": True,
         "wordlist_path": "wordlist.txt",
         "wordlist_count": 0,
-        "version": "0.3.0",
+        "version": "1.0.0",
         "dictionaries_total": 0,
         "dictionaries_readable": 0,
         "dictionaries_writable": 0,

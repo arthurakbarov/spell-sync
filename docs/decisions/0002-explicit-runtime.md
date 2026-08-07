@@ -6,14 +6,14 @@ Accepted
 
 ## Context
 
-Spell Sync 0.2.1 resolved project settings and validated runtime through module-level
+Spell Sync 0.2.1 resolved project settings and runtime through module-level
 `ContextVar` scopes (`_active_settings`, `_active_validated`). Dictionary discovery and
 mutating command helpers read those implicit globals, which made runtime dependencies
 hard to trace and test.
 
 ## Decision
 
-- Remove production `ContextVar` usage for settings and validated runtime.
+- Remove production `ContextVar` usage for settings and `ResolvedRuntime`.
 - Introduce `RuntimeResolver` in the application layer with optional `bound` reuse.
 - Pass explicit settings dicts into dictionary discovery and config flag helpers.
 - Resolve push strict mode from explicit runtime config when available.

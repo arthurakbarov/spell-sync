@@ -11,13 +11,15 @@ dependency ownership, and platform claims: `config/environment-contract.toml`.
 
 | Scope | Support |
 |-------|---------|
-| Public requirement (`project.requires-python`) | `>=3.11,<3.13` |
-| Blocking compatibility (CI) | CPython 3.11, CPython 3.12 |
-| Experimental (non-blocking CI) | CPython 3.13 **source-only** future compatibility probe (not installable; outside `requires-python`) |
-| Canonical maintainer interpreter | CPython 3.12.13 (`.python-version`) |
+| Public requirement (`project.requires-python`) | `>=3.14,<3.15` |
+| Blocking compatibility (CI) | CPython 3.14 |
+| Canonical maintainer interpreter | CPython 3.14.6 (`.python-version`) |
+
+Version 1 supports **Python 3.14 only** (canonical maintainer pin: **3.14.6**). There is no
+3.11 / 3.12 / 3.13 multi-track for this release.
 
 The committed `.python-version` file pins the **maintainer** interpreter. It does not replace
-`requires-python` and is not the public support range.
+`requires-python` and is not a wider public support range.
 
 End users install the wheel with any PEP-compatible installer (`pip`, `uv`, etc.). Product
 runtime does **not** require `uv`.
@@ -46,7 +48,7 @@ every target has real-application manual validation on every OS.
 | Component | Requirement |
 |-----------|-------------|
 | Dependency owner | `pyproject.toml`, `uv.lock`, `uv` |
-| Canonical Python | CPython 3.12.13 via `.python-version` |
+| Canonical Python | CPython 3.14.6 via `.python-version` |
 | Virtual environment | Disposable `.venv/` (local, ignored, not snapshotted) |
 | Normal commands | Locked, offline, no implicit Python download or sync |
 | Bootstrap | Explicit `python3 scripts/project_environment.py bootstrap --allow-python-download` only |
@@ -55,9 +57,8 @@ every target has real-application manual validation on every OS.
 
 | Job kind | Purpose |
 |----------|---------|
-| Canonical full CI | One blocking Ubuntu + Python 3.12 job running the full `scripts/ci.sh` gate |
-| Compatibility | Narrow checks on Ubuntu 3.11, macOS 3.12, Windows 3.12 |
-| Experimental | Ubuntu + Python 3.13 source-only probe (`continue-on-error`); no project `uv sync`, no wheel install |
+| Canonical full CI | One blocking Ubuntu + Python 3.14 job running the full `scripts/ci.sh` gate |
+| Compatibility | Narrow checks on supported platforms with Python 3.14 |
 
 Compatibility jobs must not duplicate the full CI gate (Ruff, mypy, full coverage, docs
 validators, packaging suite, etc.).
@@ -83,15 +84,15 @@ execution-control SQLite history.
 
 ### Portable artifact verifier
 
-Structural snapshot verification requires only stdlib Python `>=3.11` and Git where
+Structural snapshot verification requires only stdlib Python `>=3.14` and Git where
 required. It does not require `uv`, a synchronized `.venv`, or network access.
 
 ## Upgrade policies
 
 | Change | Scope | Required follow-up |
 |--------|-------|--------------------|
-| Python patch (e.g. 3.12.13 → 3.12.x) | Maintainer only | Update `.python-version`, environment contract, recreate `.venv`, invalidate environment fingerprint, run focused tests and CI necessity |
-| Python minor (e.g. 3.12 → 3.13) | Separate arc | Contract, lock, matrix, support policy, full CI |
+| Python patch (e.g. 3.14.6 → 3.14.x) | Maintainer only | Update `.python-version`, environment contract, recreate `.venv`, invalidate environment fingerprint, run focused tests and CI necessity |
+| Python minor (e.g. 3.14 → 3.15) | Separate arc | Contract, lock, matrix, support policy, full CI |
 | `uv` version | Toolchain commit | Pin in `pyproject.toml`, `[tool.uv]`, contract, lock check, environment recreate |
 | Dependency mutation | Declarations | `uv add`/`uv remove`, review lock, sync, check, focused tests |
 
@@ -99,6 +100,6 @@ Do not run `uv self update` in project automation.
 
 ## Related documents
 
-- `config/environment-contract.toml` — maintainer contract SSOT
-- `docs/DEVELOPMENT.md` — contributor setup overview
-- `docs/AGENT_DEVELOPMENT.md` — agent workflow and workspace snapshot procedure
+- [Development](DEVELOPMENT.md)
+- [Manual testing](MANUAL_TESTING.md)
+- [Agent development](AGENT_DEVELOPMENT.md)

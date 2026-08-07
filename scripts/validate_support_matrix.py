@@ -21,9 +21,9 @@ REQUIRED_DOC_SECTIONS = (
 )
 
 COMPATIBILITY_EXPECTATIONS = (
-    ("ubuntu-latest", "3.11"),
-    ("macos-latest", "3.12"),
-    ("windows-latest", "3.12"),
+    ("ubuntu-latest", "3.14"),
+    ("macos-latest", "3.14"),
+    ("windows-latest", "3.14"),
 )
 
 
@@ -97,7 +97,7 @@ def _check_support_doc() -> list[str]:
                 f"[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md missing section {section}; "
                 "remediation: add required support sections"
             )
-    for token in (">=3.11,<3.13", "3.12.13", "3.11", "3.12", "3.13", "source-only"):
+    for token in (">=3.14,<3.15", "3.14.6", "3.14"):
         if token not in text:
             errors.append(
                 f"[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md must mention {token}; "
@@ -178,13 +178,13 @@ def _check_workflows() -> list[str]:
         for key, (_, block) in all_jobs.items()
         if _job_runs_full_ci(block)
         and "ubuntu-latest" in _job_runs_on(block)
-        and "3.12.13" in _job_python_versions(block)
+        and "3.14.6" in _job_python_versions(block)
         and "matrix:" not in block.split("runs-on:", 1)[0]
     ]
     if len(canonical_jobs) != 1:
         errors.append(
             "[CI-ENVIRONMENT-011] expected exactly one canonical Ubuntu Python "
-            "3.12.13 full CI job; "
+            "3.14.6 full CI job; "
             f"found {len(canonical_jobs)}; remediation: split canonical full gate from matrix jobs"
         )
 
@@ -195,10 +195,10 @@ def _check_workflows() -> list[str]:
                     "[CI-ENVIRONMENT-012] canonical full CI must run project_environment.py sync; "
                     f"job {key} missing canonical environment sync"
                 )
-            if re.search(r'python-version:\s*"3\.12"\s*$', block, flags=re.MULTILINE):
+            if re.search(r'python-version:\s*"3\.14"\s*$', block, flags=re.MULTILINE):
                 errors.append(
-                    "[CI-ENVIRONMENT-012] canonical full CI must pin exact Python patch 3.12.13; "
-                    f"job {key} uses floating 3.12"
+                    "[CI-ENVIRONMENT-012] canonical full CI must pin exact Python patch 3.14.6; "
+                    f"job {key} uses floating 3.14"
                 )
             if "uv sync" in block and "project_environment.py sync" not in block:
                 errors.append(
@@ -245,29 +245,61 @@ def _check_workflows() -> list[str]:
     experimental_jobs = [
         key
         for key, (text, block) in all_jobs.items()
-        if "ubuntu-latest" in _job_runs_on(block) and "3.13" in _job_python_versions(block)
+        if "ubuntu-latest" in _job_runs_on(block)
+        and any(
+            version.startswith("3.") and version not in {"3.14", "3.14.6"}
+            for version in _job_python_versions(block)
+        )
+        and (
+            "experimental" in key
+            or "source-only" in block
+            or "continue-on-error" in block
+        )
     ]
-    if len(experimental_jobs) != 1:
-        errors.append(
-            "[CI-ENVIRONMENT-011] expected exactly one Ubuntu Python 3.13 experimental job; "
-            f"found {len(experimental_jobs)}; remediation: add non-blocking source-only probe"
-        )
-    else:
-        text, block = all_jobs[experimental_jobs[0]]
-        job_key = experimental_jobs[0]
-        errors.extend(
-            check_experimental_source_only_job(
-                block,
-                job_name=job_key,
-                python_version="3.13",
+    contract = tomllib.loads(_read(CONTRACT_PATH)) if CONTRACT_PATH.is_file() else {}
+    compatibility = contract.get("compatibility", {}) if isinstance(contract, dict) else {}
+    experimental_pythons = []
+    if isinstance(compatibility, dict):
+        raw_experimental = compatibility.get("experimentalPython", [])
+        if isinstance(raw_experimental, list):
+            experimental_pythons = [str(item) for item in raw_experimental]
+
+    if not experimental_pythons:
+        if experimental_jobs:
+            errors.append(
+                "[CI-ENVIRONMENT-011] experimentalPython is empty but experimental/"
+                f"source-only jobs remain: {', '.join(experimental_jobs)}; "
+                "remediation: remove obsolete experimental jobs"
             )
-        )
+    else:
+        expected_exp = experimental_pythons[0]
+        matched_exp = [
+            key
+            for key, (_, block) in all_jobs.items()
+            if "ubuntu-latest" in _job_runs_on(block)
+            and expected_exp in _job_python_versions(block)
+        ]
+        if len(matched_exp) != 1:
+            errors.append(
+                "[CI-ENVIRONMENT-011] expected exactly one Ubuntu Python "
+                f"{expected_exp} experimental job; found {len(matched_exp)}; "
+                "remediation: add non-blocking source-only probe"
+            )
+        else:
+            text, block = all_jobs[matched_exp[0]]
+            errors.extend(
+                check_experimental_source_only_job(
+                    block,
+                    job_name=matched_exp[0],
+                    python_version=expected_exp,
+                )
+            )
 
     for key, (_, block) in all_jobs.items():
         versions = _job_python_versions(block)
         if not _job_runs_compatibility_runner(block):
             continue
-        if "3.13" in versions:
+        if experimental_pythons and any(v in versions for v in experimental_pythons):
             continue
         errors.extend(check_blocking_job_forbids_source_only(block, job_name=key))
 

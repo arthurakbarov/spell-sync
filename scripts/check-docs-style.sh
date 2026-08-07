@@ -21,13 +21,13 @@ if [ -n "$html" ]; then
 fi
 
 if grep -q 'requires-python = ">=3\\.[0-9]"' pyproject.toml 2>/dev/null; then
-  echo "requires-python must be >=3.11." >&2
+  echo "requires-python must use an upper bound (e.g. >=3.14,<3.15)." >&2
   fail=1
 fi
 
 for doc in docs/DEVELOPMENT.md docs/CONTRIBUTING.md; do
-  if [ -f "$doc" ] && ! grep -q '3\.11+' "$doc"; then
-    echo "Expected Python 3.11+ in $doc." >&2
+  if [ -f "$doc" ] && ! grep -q '3\.14' "$doc"; then
+    echo "Expected Python 3.14 in $doc." >&2
     fail=1
   fi
 done

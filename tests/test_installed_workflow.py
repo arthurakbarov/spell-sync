@@ -153,7 +153,7 @@ def test_installed_wheel_full_workflow(installed_spell_sync, tmp_path: Path) -> 
 
     version_result = _run(venv_python, home=home, cwd=outside_repo, args=["version"])
     assert version_result.returncode == 0
-    assert "0.3.0" in version_result.stdout
+    assert "1.0.0" in version_result.stdout
 
     init_result = _run(
         venv_python,

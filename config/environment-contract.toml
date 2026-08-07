@@ -1,11 +1,11 @@
 schemaVersion = 1
 
 [product]
-pythonRequirement = ">=3.11,<3.13"
+pythonRequirement = ">=3.14,<3.15"
 
 [maintainer]
 implementation = "cpython"
-canonicalPython = "3.12.13"
+canonicalPython = "3.14.6"
 pythonProvider = "uv-managed"
 dependencyManager = "uv"
 environmentDirectory = ".venv"
@@ -15,8 +15,8 @@ normalCommands = "forbidden"
 bootstrapCommand = "allowed"
 
 [compatibility]
-blockingPython = ["3.11", "3.12"]
-experimentalPython = ["3.13"]
+blockingPython = ["3.14"]
+experimentalPython = []
 
 [platforms.product]
 macos = true
@@ -34,16 +34,16 @@ linux = false
 windows = false
 
 [artifactVerifier]
-pythonRequirement = ">=3.11,<3.13"
+pythonRequirement = ">=3.14,<3.15"
 uvRequired = false
 venvRequired = false
 
 [toolchain]
 uvRequiredVersion = "0.11.21"
-canonicalMaintainerPython = "3.12.13"
+canonicalMaintainerPython = "3.14.6"
 
 [commands]
 bootstrap = "python3 scripts/project_environment.py bootstrap --allow-python-download"
 sync = "python3 scripts/project_environment.py sync"
 check = "python3 scripts/project_environment.py check"
-normalUvRun = "uv run --python 3.12.13 --locked --no-sync --offline --no-python-downloads"
+normalUvRun = "uv run --python 3.14.6 --locked --no-sync --offline --no-python-downloads"

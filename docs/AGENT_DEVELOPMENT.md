@@ -177,8 +177,8 @@ Document only the supported Cursor Agent workflow and public processes.
 
 Current package version comes from `pyproject.toml`. Architecture migration phases 1–10 are
 **complete** (see `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`). The tracker current focus is
-`post-0.3-ops` (release, manual validation, and related owner-initiated work — not a new
-architecture migration).
+`owner-publish` (release, manual validation, and related owner-initiated work — not a new
+architecture migration). Post-v1 engineering ops are complete.
 
 ## Final report contract
 

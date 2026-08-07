@@ -1,4 +1,4 @@
-"""Coverage tests for Spell Sync 0.3.0 transparency features."""
+"""Coverage tests for Spell Sync 1.0.0 transparency features."""
 
 from __future__ import annotations
 
@@ -147,11 +147,11 @@ def test_support_report_export_text_and_errors(tmp_path: Path) -> None:
     report = SupportReport(
         schema_version=1,
         generated_at=datetime.now(timezone.utc),
-        spell_sync_version="0.3.0",
+        spell_sync_version="1.0.0",
         python_version="3.11",
         operating_system="test",
         architecture="arm64",
-        installation=InstallationInfo("0.3.0", "test"),
+        installation=InstallationInfo("1.0.0", "test"),
         project=ProjectSupportState(True, 1, False),
         targets=(),
         recovery=RecoverySupportState(False, "absent"),
@@ -310,7 +310,7 @@ def test_session_export_unsupported_format(tmp_path: Path) -> None:
     export = SessionReportExport(
         schema_version=1,
         generated_at="2026-01-01T00:00:00+00:00",
-        spell_sync_version="0.3.0",
+        spell_sync_version="1.0.0",
         pull_status="Skipped",
         push_status="Skipped",
         recovery_note="None.",
@@ -392,7 +392,7 @@ def test_session_export_text_and_recovery() -> None:
     export = SessionReportExport(
         schema_version=1,
         generated_at="2026-01-01T00:00:00+00:00",
-        spell_sync_version="0.3.0",
+        spell_sync_version="1.0.0",
         pull_status="Skipped",
         push_status="Recovery required",
         recovery_note="Pending.",
@@ -422,12 +422,12 @@ def test_support_report_cmd_json_output(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setattr(
         "spell_sync.application.support_report.build_support_report",
         lambda *_a, **_k: MagicMock(
-            spell_sync_version="0.3.0",
+            spell_sync_version="1.0.0",
             generated_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
             python_version="3.11",
             operating_system="test",
             architecture="arm64",
-            installation=MagicMock(package_version="0.3.0", installation_type="test"),
+            installation=MagicMock(package_version="1.0.0", installation_type="test"),
             project=MagicMock(config_valid=True, wordlist_count=1, pending_recovery=False),
             targets=(),
             recovery=MagicMock(pending_recovery=False, journal_status="absent"),

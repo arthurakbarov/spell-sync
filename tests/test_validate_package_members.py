@@ -23,7 +23,7 @@ def test_clean_wheel_members_pass() -> None:
         "spell_sync/__init__.py",
         "spell_sync/bundled/lint-whitelist.txt",
         "spell_sync/bundled/wordlist.txt.example",
-        "spell_sync-0.3.0.dist-info/METADATA",
+        "spell_sync-1.0.0.dist-info/METADATA",
     ]
     assert package_member_violations(names) == []
 
@@ -42,9 +42,9 @@ def test_sdist_nested_prefix_stripped_for_rules() -> None:
     """sdists nest under spell_sync-VERSION/; rules must still see tests/."""
     errors = package_member_violations(
         [
-            "spell_sync-0.3.0/spell_sync/cli.py",
-            "spell_sync-0.3.0/tests/test_foo.py",
-            "spell_sync-0.3.0/spell_sync/bundled/lint-whitelist.txt",
+            "spell_sync-1.0.0/spell_sync/cli.py",
+            "spell_sync-1.0.0/tests/test_foo.py",
+            "spell_sync-1.0.0/spell_sync/bundled/lint-whitelist.txt",
         ]
     )
     assert any("forbidden-prefix:tests/" in err for err in errors)
@@ -63,13 +63,13 @@ def test_scan_archive_roundtrip(tmp_path: Path) -> None:
 
 
 def test_scan_sdist_tar_gz(tmp_path: Path) -> None:
-    archive = tmp_path / "spell_sync-0.3.0.tar.gz"
+    archive = tmp_path / "spell_sync-1.0.0.tar.gz"
     with tarfile.open(archive, "w:gz") as tf:
-        info = tarfile.TarInfo(name="spell_sync-0.3.0/spell_sync/cli.py")
+        info = tarfile.TarInfo(name="spell_sync-1.0.0/spell_sync/cli.py")
         payload = b"x\n"
         info.size = len(payload)
         tf.addfile(info, io.BytesIO(payload))
-        bad = tarfile.TarInfo(name="spell_sync-0.3.0/tests/leak.py")
+        bad = tarfile.TarInfo(name="spell_sync-1.0.0/tests/leak.py")
         bad_payload = b"y\n"
         bad.size = len(bad_payload)
         tf.addfile(bad, io.BytesIO(bad_payload))

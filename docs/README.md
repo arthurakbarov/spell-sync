@@ -50,7 +50,7 @@ in the linked canonical documents — not in implementation trackers or release 
 | [TUI_LAYOUT.md](TUI_LAYOUT.md) | Shared TUI shell, actions, tables, duration hints |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
 
-Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md).
+Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md) (Version 1 architecture).
 
 ## Safety and recovery
 
@@ -84,7 +84,7 @@ Implementation phase tracker (maintainer/architect use): [ARCHITECTURE_0_3_IMPLE
 |----------|----------|
 | [EXECUTION_TIME_CONTROL.md](EXECUTION_TIME_CONTROL.md) | CI timing and admission |
 | [AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md) | Evidence, snapshot, agent rules |
-| [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md) | 0.3 migration tracker |
+| [ARCHITECTURE_0_3_IMPLEMENTATION.md](ARCHITECTURE_0_3_IMPLEMENTATION.md) | Version 1 architecture tracker |
 | [DEAD_DIRECTORY_AUDIT.md](DEAD_DIRECTORY_AUDIT.md) | Maintainer workspace dead-path inventory (report only) |
 
 Private maintainer tooling and snapshot policy live in the separate `spell-sync-dev`

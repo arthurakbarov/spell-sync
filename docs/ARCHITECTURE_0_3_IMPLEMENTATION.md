@@ -1,8 +1,8 @@
-# Spell Sync 0.3 architecture implementation
+# Spell Sync Version 1 architecture implementation
 
 ## Goal
 
-Prepare architectural release 0.3.0: typed application requests, explicit runtime
+Prepare Spell Sync Version 1 (`1.0.0`): typed application requests, explicit runtime
 context, thin facade with focused services, structured technical events, current
 documentation, and architecture validation guards.
 
@@ -10,10 +10,10 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 
 ## Current phase
 
-Phase 10: version 0.3.0 — **complete** (owner-approved with documented residuals:
+Version 1 (public package 1.0.0) — **complete** (owner-approved with documented residuals:
 R-WIN, R-PWR, R-DUR, R-CON). Release not performed.
 
-Post-0.3 ops: **complete** (engineering). Product UX waves A–F, local two-mode
+Post-v1 ops: **complete** (engineering). Product UX waves A–F, local two-mode
 validation, ETA/observe, agent-contract unification with nix-darwin naming, and
 engineering/product completion docs are landed. Criterion 9 (owner publish) and
 residuals R-WIN / R-PWR / R-DUR / R-CON remain owner-initiated only.
@@ -34,7 +34,7 @@ phase-7: complete
 phase-8: complete
 phase-9: complete
 phase-10: complete
-post-0.3-ops: complete
+post-v1-ops: complete
 owner-publish: not-started
 [architecture-status:end]
 
@@ -46,10 +46,10 @@ owner-publish: not-started
 | spell-sync-dev | maintainer tooling | Tip HEAD via `git -C ../spell-sync-dev rev-parse HEAD` (layout-dependent); owner dossier records maintainerHead. |
 | spell-words | private data | Unchanged by this readiness cycle unless noted in dossier. |
 
-Public version: `0.3.0` (`pyproject.toml`).
+Public version: `1.0.0` (`pyproject.toml`).
 
 Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-DUR, R-CON).
-Phase 10 is **complete**. Post-0.3 ops is **complete** (engineering). Current tracker
+Phase 10 is **complete**. Post-v1 ops is **complete** (engineering). Current tracker
 focus: `owner-publish` (**not started** — awaits explicit owner push/tag/release).
 
 Release: **not performed** (no tag, no GitHub Release, no package publish).
@@ -116,7 +116,7 @@ Runtime resolution invariants:
 
 - Application facade owns runtime resolution; CLI and TUI do not construct runtime independently.
 - `_runtime_factory` is private to resolution paths.
-- No production `ContextVar` for settings or validated runtime.
+- No production `ContextVar` for settings or `ResolvedRuntime`.
 - No module-level config cache.
 - No hidden mutation runtime reused from preview time; execution resolves fresh state under lock.
 - Changed runtime after preview blocks execution; no automatic replanning.
@@ -130,16 +130,15 @@ Runtime resolution invariants:
 Removed in Phase 3 (must not reappear):
 
 - `_settings_cache`, `_settings_cache_key` (settings module cache)
-- `ContextVar` runtime scope for settings or validated runtime
+- `ContextVar` runtime scope for settings or `ResolvedRuntime`
 - bound mutation runtime reuse across preview and execution
 - stale preview runtime carried into execution
 
-No production `ContextVar` for settings or validated runtime.
+No production `ContextVar` for settings or `ResolvedRuntime`.
 No module-level config cache in `settings.py`.
 No hidden mutation runtime; fresh resolution under the operation lock via
 `mutation_scope_for` / `RuntimeResolver.mutation_scope`.
-`ResolvedRuntime` is the canonical resolved bundle (the former `ValidatedRuntime` alias was
-removed).
+`ResolvedRuntime` is the only resolved-runtime type.
 
 ## Service responsibility inventory
 
@@ -208,15 +207,15 @@ blocking, and privacy rules.
 7. Documentation reorganization + ADRs
 8. Agent config refresh
 9. ~~Dead directory audit~~ done
-10. ~~Version 0.3.0~~ done (approved with documented residuals)
+10. ~~Version 1.0.0~~ done (approved with documented residuals)
 
 ## Phase 3 — Explicit runtime (complete)
 
 ### Goal
 
-Replace implicit ContextVar-based settings and validated runtime with explicit resolution
-through `RuntimeResolver`, runtime identity binding for preview/execution consistency,
-and commit-bound final CI evidence.
+Replace implicit ContextVar-based settings and runtime resolution with explicit
+`ResolvedRuntime` via `RuntimeResolver`, runtime identity binding for preview/execution
+consistency, and commit-bound final CI evidence.
 
 ### Scope (delivered)
 
@@ -229,7 +228,7 @@ and commit-bound final CI evidence.
 
 ### Required outcomes (delivered)
 
-- No production `ContextVar` for settings or validated runtime
+- No production `ContextVar` for settings or `ResolvedRuntime`
 - No module-level config cache
 - `RuntimeResolver` resolves `ProjectRef` → `ResolvedRuntime` explicitly
 - Fresh mutation resolution under the operation lock; no hidden reuse of preview runtime
@@ -341,7 +340,7 @@ Unchanged:
 Do not start:
 
 - structured technical events (Phase 5);
-- version `0.3.0`;
+- version `1.0.0`;
 - CLI redesign;
 - TUI redesign;
 - release / tag / publication;
@@ -481,8 +480,8 @@ full final CI on committed clean HEAD 9a08a7e
 
 ### Goal
 
-Refresh public agent configuration (rules, skills, `AGENTS.md`, validator) for the 0.3
-architecture without handoff or reviewer-specific workflow language.
+Refresh public agent configuration (rules, skills, `AGENTS.md`, validator) for the
+Version 1 architecture without handoff or reviewer-specific workflow language.
 
 ### Delivered
 
@@ -502,7 +501,7 @@ full final CI on committed clean HEAD 3c6bc35
 
 ### Owner acceptance (recorded)
 
-- agent rules, skills, `AGENTS.md`, and validator refreshed for 0.3 architecture;
+- agent rules, skills, `AGENTS.md`, and validator refreshed for Version 1 architecture;
 - final CI evidence bound to HEAD `3c6bc35`, run `20260731T104234.254905Z`;
 - package version remains `0.2.1`.
 
@@ -537,18 +536,18 @@ python3 scripts/check_ci_evidence.py
 - lightweight validation and CI evidence reuse bound to HEAD `7d11b45`;
 - package version remains `0.2.1` until Phase 10.
 
-## Phase 10 — Version 0.3.0
+## Phase 10 — Version 1.0.0
 
 **Status:** complete (owner-approved with documented residuals)
 
 ### Goal
 
-Bump public package version to `0.3.0` reflecting the completed 0.3 architecture migration.
+Bump public package version to `1.0.0` reflecting the completed Version 1 architecture migration.
 No tag, release, or publication in this phase.
 
 ### Delivered
 
-- `pyproject.toml` and `uv.lock` — `0.3.0`
+- `pyproject.toml` and `uv.lock` — `1.0.0`
 - Compatibility and installed-wheel tests aligned; `run_compatibility_checks.py` reads version from `pyproject.toml`
 - `check_docs_contract.py` — stale-version guard covers `0.2.0`/`0.2.1`; ADRs exempt
 - Post-review corrective: ARCH-DEP-001 relative-import enforcement, ARCH-RT-001 package-wide
@@ -577,11 +576,11 @@ Historical phase-10 threat-model notes (not ROADMAP IDs; still accepted):
 python3 scripts/check_docs_contract.py
 python3 scripts/check_agent_config.py
 full final CI on committed clean HEAD 03adfea
-spell-sync version → 0.3.0
+spell-sync version → 1.0.0
 CI_EVIDENCE_MATCH=exact-head
 ```
 
-## Post-0.3 ops
+## Post-v1 ops
 
 **Status:** complete (engineering)
 
@@ -596,7 +595,7 @@ Delivered in this cycle (engineering polish, not release):
 
 - README Install / Quick start moved above conceptual sections; environments honesty link
 - Troubleshooting contents index; Recovery beginner landing
-- DEVELOPMENT execution-time control + Python 3.13 experimental note
+- DEVELOPMENT execution-time control + Python 3.14-only Version 1 support note
 - AGENT_DEVELOPMENT phase boundaries updated past Phase 3
 - Single shared coverage policy script in `ci_runner.py`
 - Docs contract hygiene: no `python3.N` commands and no maintainer topology paths in public docs
@@ -605,7 +604,7 @@ Delivered in this cycle (engineering polish, not release):
 - Guided TUI / docs product labels aligned to Collect my words / Update my apps
 - Test-impact mappings expanded off packaging fallback; dead-code audit fail-closed
 - `EventLevel` alias retired; CI necessity ladder wording synced in agent docs
-- `ValidatedRuntime` shim removed; maintainer absolute paths scrubbed from scripts/tests
+- `ResolvedRuntime` is the only resolved-runtime type; maintainer absolute paths scrubbed from scripts/tests
 - Agent-config scan for maintainer-home paths in `scripts/` and `tests/`
 - Core modules mapped off packaging fallback; dead-code audit non-vacuous for product modules
 - Execution-control product-path boundary scan uses real service modules
@@ -729,8 +728,8 @@ Summary:
 
 ```text
 Phase 10 (complete, owner-approved with residuals): tip evidence authoritative via check-ci-evidence;
-  last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 0.3.0; release not performed
-Post-0.3 ops (complete, engineering): waves A–F; ETA/observe; agent-contract unification
+  last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 1.0.0; release not performed
+Post-v1 ops (complete, engineering): waves A–F; ETA/observe; agent-contract unification
   (README, git-change-management, repository-workflow, after-changes, security-audit);
   only owner-publish + residuals R-WIN/R-PWR/R-DUR/R-CON remain
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
@@ -744,7 +743,7 @@ Phase 3 (accepted): HEAD 1ba73ba; full CI finalEvidence=true (20260721T040009.37
 
 ## Remaining work
 
-0.3 architecture migration **complete**. Post-0.3 ops **complete** (engineering).
+Version 1 architecture migration **complete**. Post-v1 ops **complete** (engineering).
 Current: `owner-publish` (**not started**). Release/tag/publication, real-app manual
 validation, and Windows hardware adversarial evidence remain owner-initiated only.
 

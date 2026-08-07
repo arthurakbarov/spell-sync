@@ -4,10 +4,8 @@ Package version source of truth: `project.version` in `pyproject.toml`.
 
 ## Setup
 
-Requires **Python 3.11+**.
-
-Python **3.11** and **3.12** are tested in CI. Python **3.13** is experimental
-(`continue-on-error` compatibility job). See [Supported environments](SUPPORTED_ENVIRONMENTS.md).
+Requires **Python 3.14** (canonical maintainer: **3.14.6**). Version 1 supports
+Python 3.14 only — see [Supported environments](SUPPORTED_ENVIRONMENTS.md).
 
 ```bash
 git clone https://github.com/arthurakbarov/spell-sync.git

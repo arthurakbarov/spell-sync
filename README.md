@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml/badge.svg)](https://github.com/arthurakbarov/spell-sync/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/arthurakbarov/spell-sync)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 
 You teach a browser or editor a personal word — then another app has it underlined again.
 **Spell Sync** stores those words in **one private list** on your computer and helps you
@@ -32,7 +32,9 @@ Spell Sync.
 
 ## Install
 
-Requires **Python 3.11–3.12** (`requires-python = ">=3.11,<3.13"`). You do not need Git for daily use after install — only if you
+Requires **Python 3.14** (`requires-python = ">=3.14,<3.15"`). Version 1 supports Python
+3.14 only (canonical maintainer pin: 3.14.6). You do not need Git for daily use after
+install — only if you
 prefer installing from a clone or keeping your word list in a private Git repo.
 
 A public PyPI package is not published yet. Install from GitHub (or a local clone) until a
@@ -92,8 +94,7 @@ Editable install for local CLI testing:
 uv tool install --editable .
 ```
 
-Python **3.11** and **3.12** are currently tested; **3.13** is an experimental
-**source-only** future-compatibility probe (outside the public install range — see
+Version 1 supports **Python 3.14 only** (canonical maintainer pin: **3.14.6** — see
 [Supported environments](docs/SUPPORTED_ENVIRONMENTS.md)). Product runtime does **not**
 require `uv` — `uv` is the convenient installer and the maintainer toolchain.
 

@@ -35,7 +35,7 @@ python3 scripts/project_environment.py check
 python3 scripts/project_environment.py sync
 ```
 
-Preconditions: `uv` `0.11.21` on PATH; Python `3.12.13`
+Preconditions: `uv` `0.11.21` on PATH; Python `3.14.6`
 (`.python-version`, `config/environment-contract.toml`).
 
 ## Checkpoint

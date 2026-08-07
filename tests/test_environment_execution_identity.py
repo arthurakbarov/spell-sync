@@ -22,7 +22,7 @@ from scripts.execution_control.identity import build_workload_payload, workload_
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _base_probe(*, python_version: str = "3.12.13") -> InterpreterProbe:
+def _base_probe(*, python_version: str = "3.14.6") -> InterpreterProbe:
     manifest = InstalledManifest(
         schema_version=1,
         distributions=(
@@ -41,7 +41,7 @@ def _base_probe(*, python_version: str = "3.12.13") -> InterpreterProbe:
 
 
 def _fingerprint_for_lock(
-    root: Path, lock_bytes: bytes, *, python_version: str = "3.12.13"
+    root: Path, lock_bytes: bytes, *, python_version: str = "3.14.6"
 ) -> EnvironmentFingerprint:
     lock_path = root / "uv.lock"
     lock_path.write_bytes(lock_bytes)
@@ -122,16 +122,16 @@ def test_python_patch_affects_environment_fingerprint(tmp_path: Path) -> None:
 
     patch_12 = build_environment_fingerprint_from_probe(
         tmp_path,
-        _base_probe(python_version="3.12.13"),
+        _base_probe(python_version="3.14.6"),
         uv_version="0.11.21",
     )
     patch_12_other = build_environment_fingerprint_from_probe(
         tmp_path,
-        _base_probe(python_version="3.12.14"),
+        _base_probe(python_version="3.14.7"),
         uv_version="0.11.21",
     )
-    assert patch_12.python_version == "3.12.13"
-    assert patch_12_other.python_version == "3.12.14"
+    assert patch_12.python_version == "3.14.6"
+    assert patch_12_other.python_version == "3.14.7"
     assert patch_12.signature() != patch_12_other.signature()
     assert (
         file_digest(tmp_path / "uv.lock")
