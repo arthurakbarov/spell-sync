@@ -88,7 +88,7 @@ def cmd_show(run_id: str, *, as_json: bool) -> int:
     for path in _ci_summaries():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             continue
         if not isinstance(data, dict):
             continue

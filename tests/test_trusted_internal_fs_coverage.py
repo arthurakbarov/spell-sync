@@ -376,7 +376,7 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
             fifo = root / "fifo"
             try:
                 os.mkfifo(fifo)
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 self.skipTest("mkfifo unavailable")
             with self.assertRaises(TrustedFsError) as ctx:
                 trusted.open_regular_file("fifo")
@@ -540,7 +540,7 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
                 fifo = root / "tree4"
                 fifo.mkdir()
                 os.mkfifo(fifo / "pipe")
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 self.skipTest("mkfifo unavailable")
             sub = trusted.open_child_directory("tree4")
             with self.assertRaises(TrustedFsError) as ctx:

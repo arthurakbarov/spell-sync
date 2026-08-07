@@ -18,7 +18,7 @@ def _resolved_under(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
         return True
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 

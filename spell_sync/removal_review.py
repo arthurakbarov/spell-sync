@@ -56,7 +56,7 @@ def review_removals_interactive(
 
     try:
         answer = input("Continue push? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nCancelled.")
         return None
     return answer in CONFIRM_YES
@@ -82,7 +82,7 @@ def review_removals_for_preview(
         return True
     try:
         answer = input("Continue push? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nCancelled.")
         return None
     return answer in CONFIRM_YES

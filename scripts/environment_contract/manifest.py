@@ -80,7 +80,7 @@ def build_installed_manifest(
         try:
             if not Path(dist_path).resolve().is_relative_to(purelib):
                 continue
-        except (OSError, ValueError):
+        except OSError, ValueError:
             continue
         name = dist.metadata.get("Name")
         version = dist.version

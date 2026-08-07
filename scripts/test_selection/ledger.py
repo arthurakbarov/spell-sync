@@ -81,7 +81,7 @@ def _parse_step(item: object) -> StepResult | None:
             exit_code=int(item.get("exitCode", 1)),
             duration_seconds=float(item.get("durationSeconds", 0.0)),
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -109,7 +109,7 @@ def _parse_record(payload: dict[str, object]) -> TestRunRecord | None:
             tree_digest=str(payload.get("treeDigest", "")),
             steps=tuple(steps),
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -124,7 +124,7 @@ class TestRunLedger:
             return {"schemaVersion": LEDGER_SCHEMA_VERSION, "records": {}, "order": []}
         try:
             payload = json.loads(self.index_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return {"schemaVersion": LEDGER_SCHEMA_VERSION, "records": {}, "order": []}
         if not isinstance(payload, dict):
             return {"schemaVersion": LEDGER_SCHEMA_VERSION, "records": {}, "order": []}

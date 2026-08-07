@@ -71,7 +71,7 @@ def _recovery_snapshot(path: Path, snapshot_dir: Path, *, root: Path, label: str
             base_name=target.name,
             source=target,
         )
-    except (OSError, SecureArtifactError):
+    except OSError, SecureArtifactError:
         log.warn(f"backup skipped {path}: recovery snapshot not created")
         return _FileBackup(path, None, True, label)
     create_bak_backup(target)
@@ -194,7 +194,7 @@ def discard_txn_snapshots(
         parent = snapshot_dir.parent
         if parent.name == ".spell-sync.txn" and parent.is_dir() and not any(parent.iterdir()):
             parent.rmdir()
-    except (SecureArtifactError, OSError):
+    except SecureArtifactError, OSError:
         pass
 
 

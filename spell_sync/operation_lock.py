@@ -114,7 +114,7 @@ def _read_lock_info_fd(fd: int) -> OperationLockInfo | None:
             command=str(data["command"]),
             wordlist=str(data["wordlist"]),
         )
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+    except OSError, json.JSONDecodeError, KeyError, TypeError, ValueError:
         return None
 
 

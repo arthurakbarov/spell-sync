@@ -438,7 +438,7 @@ class TestRemainingCoverageGaps(unittest.TestCase):
                 os.mkfifo(fifo)
                 with self.assertRaises(SecureArtifactError):
                     _reject_unsafe_component(fifo)
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 self.skipTest("mkfifo unavailable")
 
     def test_fsync_fd_enosys_ignored(self) -> None:

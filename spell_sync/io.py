@@ -59,7 +59,7 @@ def is_path_readable(path: PathLike) -> bool:
         with open(target, "rb") as handle:
             handle.read(1)
         return True
-    except (PermissionError, OSError):
+    except PermissionError, OSError:
         return False
 
 
@@ -137,7 +137,7 @@ def detect_encoding_from_bytes(sample: bytes) -> str | None:
         try:
             sample.decode(encoding)
             return encoding
-        except (UnicodeError, LookupError):
+        except UnicodeError, LookupError:
             continue
     return None
 
@@ -149,7 +149,7 @@ def detect_encoding(path: PathLike) -> str | None:
         return None
     try:
         sample = target.read_bytes()[:_DETECT_SAMPLE_BYTES]
-    except (PermissionError, OSError):
+    except PermissionError, OSError:
         return None
     return detect_encoding_from_bytes(sample)
 
@@ -574,7 +574,7 @@ def _jetbrains_component_name(path: PathLike) -> str:
         return "CachedDictionaryState"
     try:
         text = target.read_text(encoding="utf-8", errors="ignore")
-    except (PermissionError, OSError):
+    except PermissionError, OSError:
         return "CachedDictionaryState"
     _, component_name, parsed = _jetbrains_words_from_xml(text)
     if parsed and component_name:

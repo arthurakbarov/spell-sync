@@ -365,7 +365,7 @@ def confirm_push_removals_for_preview(
         return False
     try:
         answer = input("Continue push? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nCancelled.")
         return None
     return answer in CONFIRM_YES
@@ -395,7 +395,7 @@ def confirm_push_removals(
         return False
     try:
         answer = input("Continue push? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nCancelled.")
         return None
     return answer in CONFIRM_YES

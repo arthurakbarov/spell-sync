@@ -140,7 +140,7 @@ class TestSecureArtifactsCoverage(unittest.TestCase):
             fifo = root / "fifo"
             try:
                 os.mkfifo(fifo)
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 self.skipTest("mkfifo unavailable")
             with self.assertRaises(SecureArtifactError):
                 open_trusted_regular_file(fifo, root=root, create=False)

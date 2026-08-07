@@ -198,7 +198,7 @@ def cmd_recover(opts: CliOptions) -> int:
                 answer = input(
                     "Restore wordlist and dictionaries from .bak backups? [y/N] "
                 ).strip()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 print("\nCancelled.")
                 return int(ExitCode.CANCELLED)
             if answer.lower() not in CONFIRM_YES:

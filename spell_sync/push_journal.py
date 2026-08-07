@@ -622,7 +622,7 @@ class PushJournalSession:
     def discard(self) -> None:
         try:
             remove_trusted_file(self._path, root=trusted_project_root(self._wordlist))
-        except (SecureArtifactError, OSError):
+        except SecureArtifactError, OSError:
             pass
 
 
@@ -850,7 +850,7 @@ def discard_txn_snapshots(
                 remove_empty_trusted_directory(txn_parent, root=root)
             except SecureArtifactError:
                 pass
-    except (SecureArtifactError, OSError):
+    except SecureArtifactError, OSError:
         pass
 
 

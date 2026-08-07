@@ -77,7 +77,7 @@ def _uv_version() -> str:
 def _capture_environment_identity(root: Path) -> dict[str, object]:
     try:
         fingerprint = resolve_project_environment_fingerprint(root, uv_version=_uv_version())
-    except (OSError, RuntimeError, ValueError):
+    except OSError, RuntimeError, ValueError:
         fingerprint = None
     if fingerprint is None:
         return {

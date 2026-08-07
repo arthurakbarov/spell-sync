@@ -113,9 +113,7 @@ def test_presentation_sink_fail_open_keeps_technical_delivery(
     original = _sample_event()
     emitter.emit(original)
     assert seen == [original]
-    assert any(
-        event.event_id is EventId.DIAGNOSTICS_PRESENTATION_SINK_FAILED for event in recorded
-    )
+    assert any(event.event_id is EventId.DIAGNOSTICS_PRESENTATION_SINK_FAILED for event in recorded)
     captured = capsys.readouterr()
     assert SENSITIVE not in captured.out
     assert SENSITIVE not in captured.err

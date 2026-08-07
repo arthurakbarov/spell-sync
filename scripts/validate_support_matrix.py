@@ -250,11 +250,7 @@ def _check_workflows() -> list[str]:
             version.startswith("3.") and version not in {"3.14", "3.14.6"}
             for version in _job_python_versions(block)
         )
-        and (
-            "experimental" in key
-            or "source-only" in block
-            or "continue-on-error" in block
-        )
+        and ("experimental" in key or "source-only" in block or "continue-on-error" in block)
     ]
     contract = tomllib.loads(_read(CONTRACT_PATH)) if CONTRACT_PATH.is_file() else {}
     compatibility = contract.get("compatibility", {}) if isinstance(contract, dict) else {}
@@ -466,9 +462,7 @@ def check_experimental_source_only_job(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run full CI; "
             "remediation: run source-only product subset"
         )
-    sync_pattern = re.compile(
-        rf"uv\s+sync\s+[^\n]*--python\s+{re.escape(python_version)}\b"
-    )
+    sync_pattern = re.compile(rf"uv\s+sync\s+[^\n]*--python\s+{re.escape(python_version)}\b")
     if sync_pattern.search(block):
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run "
