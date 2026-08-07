@@ -113,7 +113,7 @@ def scan_privacy_tree(root: Path | None = None) -> list[PrivacyHit]:
         rel = path.relative_to(base).as_posix()
         try:
             text = path.read_text(encoding="utf-8")
-        except OSError, UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         for line_no, line in enumerate(text.splitlines(), start=1):
             if ALLOW_LINE.search(line):

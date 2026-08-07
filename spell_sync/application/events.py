@@ -50,11 +50,23 @@ class EventEmitter:
                 self.technical_sink(event)
             except Exception as exc:
                 # Fail-open: a broken technical sink must not abort the product
-                # operation. Narrow suppression; observable under SPELL_SYNC_DEBUG.
-                # Do not re-emit through the same failing sink.
+                # operation. Best-effort secondary write records the failure
+                # without re-entering this presentation path.
                 from ..diagnostics.debug_mode import emit_debug_traceback
+                from ..diagnostics.technical_event_log import write_technical_event
 
                 emit_debug_traceback(exc)
+                try:
+                    write_technical_event(
+                        TechnicalEvent(
+                            event_id=EventId.DIAGNOSTICS_TECHNICAL_SINK_FAILED,
+                            operation=event.operation,
+                            category=EventCategory.DIAGNOSTIC,
+                            severity=EventSeverity.WARNING,
+                        )
+                    )
+                except Exception:
+                    pass
         if self.presentation_sink is not None:
             from .event_presenter import present_event
 

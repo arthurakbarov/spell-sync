@@ -67,7 +67,7 @@ def _path_within(child: Path, parent: Path) -> bool:
         parent_real = Path(os.path.realpath(parent))
         child_real.relative_to(parent_real)
         return True
-    except ValueError, OSError:
+    except (ValueError, OSError):
         return False
 
 
@@ -339,7 +339,7 @@ def _run_wheel_compatibility(host_python: str) -> tuple[list[dict[str, object]],
             return results, rc, "compatibility.wheel-origin-failed"
         try:
             probe = json.loads(output.strip().splitlines()[-1])
-        except json.JSONDecodeError, IndexError:
+        except (json.JSONDecodeError, IndexError):
             return results, 1, "compatibility.wheel-origin-failed"
         if not isinstance(probe, dict):
             return results, 1, "compatibility.wheel-origin-failed"

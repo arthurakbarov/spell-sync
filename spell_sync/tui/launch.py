@@ -26,7 +26,14 @@ def run_ui(project: ProjectRef) -> int:
         )
         log.error("TUI failed to start.")
         return 1
-    except _EXPECTED_LAUNCH_ERRORS:
+    except _EXPECTED_LAUNCH_ERRORS as exc:
+        # Still record a boundary event: OSError is the common launch failure
+        # (tty/permissions) and must remain diagnosable in support reports.
+        emit_debug_traceback(exc)
+        emit_boundary_technical_event(
+            EventId.DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE,
+            operation=OperationKind.STATUS,
+        )
         log.error("TUI failed to start.")
         return 1
     except Exception as exc:

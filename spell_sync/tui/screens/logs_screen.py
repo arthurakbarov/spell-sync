@@ -265,7 +265,7 @@ class LogsScreen(LoadTokenMixin, Screen[None]):
             return
         try:
             index = int(raw_key)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         if 0 <= index < len(self._records):
             self.app.push_screen(HistoryDetailsScreen(self._records[index]))

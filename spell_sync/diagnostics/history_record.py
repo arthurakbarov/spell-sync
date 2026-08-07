@@ -121,5 +121,5 @@ class OperationHistoryRecord:
                 sources_used=_clamp_count(int(data.get("sources_used", 0))),
                 sources_skipped=_clamp_count(int(data.get("sources_skipped", 0))),
             )
-        except KeyError, TypeError, ValueError:
+        except (KeyError, TypeError, ValueError):
             return None

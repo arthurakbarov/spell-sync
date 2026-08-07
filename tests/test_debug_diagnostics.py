@@ -91,15 +91,36 @@ def test_event_emitter_fail_open_suppresses_sink_errors(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+    recorded: list[TechnicalEvent] = []
 
     def boom(_event: TechnicalEvent) -> None:
         raise OSError(SENSITIVE)
 
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.technical_event_log.write_technical_event",
+        recorded.append,
+    )
     emitter = EventEmitter(presentation_sink=None, technical_sink=boom)
     emitter.emit(_sample_event())
     out = capsys.readouterr()
     assert SENSITIVE not in out.out
     assert SENSITIVE not in out.err
+    assert any(event.event_id is EventId.DIAGNOSTICS_TECHNICAL_SINK_FAILED for event in recorded)
+
+
+def test_emit_debug_traceback_fail_open_on_broken_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SPELL_SYNC_DEBUG", "1")
+
+    class BrokenStream:
+        def write(self, _data: str) -> int:
+            raise OSError("stderr closed")
+
+        def flush(self) -> None:
+            raise OSError("stderr closed")
+
+    emit_debug_traceback(RuntimeError(SENSITIVE), stream=BrokenStream())  # type: ignore[arg-type]
 
 
 def test_event_emitter_debug_shows_sink_failure_on_stderr(
@@ -228,7 +249,7 @@ def test_run_ui_value_error_debug_off_privacy_safe(
     assert "TUI failed to start" in captured.out
 
 
-def test_run_ui_oserror_expected_no_debug_leak(
+def test_run_ui_oserror_records_boundary_without_debug_leak(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
@@ -249,7 +270,7 @@ def test_run_ui_oserror_expected_no_debug_leak(
     assert SENSITIVE not in captured.out
     assert SENSITIVE not in captured.err
     assert "TUI failed to start" in captured.out
-    assert events == []
+    assert events == [EventId.DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE]
 
 
 def test_run_ui_unexpected_stays_privacy_safe(

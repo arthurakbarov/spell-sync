@@ -50,7 +50,7 @@ def _windows_exe_running(exe_name: str) -> RunningState:
                 log.detail(f"tasklist failed: {err}")
             return None
         return exe_name.lower() in (result.stdout or "").lower()
-    except OSError, subprocess.TimeoutExpired:
+    except (OSError, subprocess.TimeoutExpired):
         return None
 
 
@@ -62,7 +62,7 @@ def _macos_pgrep_exact(process_name: str) -> RunningState:
             timeout=5,
         )
         return _pgrep_running(result.returncode)
-    except OSError, subprocess.TimeoutExpired:
+    except (OSError, subprocess.TimeoutExpired):
         return None
 
 
@@ -80,7 +80,7 @@ def _macos_pgrep_first_running(*patterns: str) -> RunningState:
                 return True
             if state is None:
                 saw_unknown = True
-        except OSError, subprocess.TimeoutExpired:
+        except (OSError, subprocess.TimeoutExpired):
             saw_unknown = True
     if saw_unknown:
         return None
@@ -101,7 +101,7 @@ def _linux_pgrep_first_resolved(*names: str) -> RunningState:
                 return True
             if state is None:
                 saw_unknown = True
-        except OSError, subprocess.TimeoutExpired:
+        except (OSError, subprocess.TimeoutExpired):
             saw_unknown = True
     if saw_unknown:
         return None
@@ -171,7 +171,7 @@ def _confirm_risky_push(*, interactive: bool, reason: str, close_hint: str) -> O
         return True
     try:
         answer = input("Continue push? [y/N] ").strip().lower()
-    except EOFError, KeyboardInterrupt:
+    except (EOFError, KeyboardInterrupt):
         print("\nCancelled.")
         return None
     return answer in CONFIRM_YES

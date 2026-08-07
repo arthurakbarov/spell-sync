@@ -115,14 +115,11 @@ class TestRuntimeHelpers(unittest.TestCase):
             ):
                 self.assertIsNone(discover_pip_script())
 
-    def test_read_pyproject_version_malformed_raises(self):
-        import tomllib
-
+    def test_read_pyproject_version_malformed_returns_none(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "pyproject.toml"
             path.write_text("version = [\n", encoding="utf-8")
-            with self.assertRaises(tomllib.TOMLDecodeError):
-                read_pyproject_version(path)
+            self.assertIsNone(read_pyproject_version(path))
 
     def test_plan_removals_human_no_removals(self):
         with tempfile.TemporaryDirectory() as d:
@@ -198,15 +195,14 @@ class TestRuntimeHelpers(unittest.TestCase):
         ):
             self.assertEqual(installed_package_version(), "0.2.0")
 
-    def test_installed_package_version_raises_when_unavailable(self):
+    def test_installed_package_version_unknown_when_unavailable(self):
         from importlib.metadata import PackageNotFoundError
 
         with (
             patch("spell_sync.runtime.version", side_effect=PackageNotFoundError("spell-sync")),
             patch("spell_sync.runtime.read_pyproject_version", return_value=None),
         ):
-            with self.assertRaises(PackageNotFoundError):
-                installed_package_version()
+            self.assertEqual(installed_package_version(), "0+unknown")
 
     def test_installed_package_version_does_not_mask_other_errors(self):
         with patch("spell_sync.runtime.version", side_effect=RuntimeError("corrupt metadata")):

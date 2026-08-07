@@ -82,7 +82,7 @@ def _collect_ppid_map() -> dict[int, int]:
     ):
         try:
             output = subprocess.check_output(argv, text=True, timeout=1.0)
-        except subprocess.SubprocessError, OSError:
+        except (subprocess.SubprocessError, OSError):
             continue
         for line in output.splitlines():
             parts = line.strip().split()
@@ -106,7 +106,7 @@ def read_process_identity(pid: int) -> ProcessIdentity | None:
     ):
         try:
             output = subprocess.check_output(argv, text=True, timeout=0.5).strip()
-        except subprocess.SubprocessError, OSError:
+        except (subprocess.SubprocessError, OSError):
             continue
         parts = output.split(maxsplit=1)
         if len(parts) != 2:

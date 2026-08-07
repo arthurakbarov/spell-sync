@@ -52,6 +52,7 @@ every target has real-application manual validation on every OS.
 | Virtual environment | Disposable `.venv/` (local, ignored, not snapshotted) |
 | Normal commands | Locked, offline, no implicit Python download or sync |
 | Bootstrap | Explicit `python3 scripts/project_environment.py bootstrap --allow-python-download` only |
+| Ruff syntax floor | `[tool.ruff] target-version = "py313"` keeps multi-exception handlers parenthesized so maintainer scripts remain parseable by older bootstrap `python3` before the canonical 3.14 interpreter is on `PATH` |
 
 ### CI architecture
 

@@ -272,7 +272,7 @@ def _validate_lightweight_receipt(root: Path, head: str, *, paths: EnvironmentPa
         return "ci-evidence.lightweight-evidence-missing"
     try:
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return "ci-evidence.lightweight-evidence-stale"
     if not isinstance(receipt, dict):
         return "ci-evidence.lightweight-evidence-stale"
@@ -490,7 +490,7 @@ def verify_ci_evidence(
 
     try:
         payload = json.loads(summary.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return _reject(
             "ci-evidence.schema",
             head=head,

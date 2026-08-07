@@ -82,15 +82,15 @@ def cli_shell_command(subcommand: str) -> str:
 
 
 def read_pyproject_version(pyproject: Path) -> str | None:
-    """Return ``project.version`` from a ``pyproject.toml``, or ``None`` if missing/unreadable.
-
-    Malformed TOML raises ``tomllib.TOMLDecodeError`` (not swallowed).
-    """
+    """Return ``project.version`` from a ``pyproject.toml``, or ``None`` if missing/unreadable."""
     try:
         raw = pyproject.read_bytes()
     except OSError:
         return None
-    data = tomllib.loads(raw.decode("utf-8"))
+    try:
+        data = tomllib.loads(raw.decode("utf-8"))
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError):
+        return None
     project = data.get("project")
     if not isinstance(project, dict):
         return None
@@ -100,8 +100,11 @@ def read_pyproject_version(pyproject: Path) -> str | None:
     return None
 
 
+_UNKNOWN_PACKAGE_VERSION = "0+unknown"
+
+
 def installed_package_version() -> str:
-    """Installed package version, or pyproject.toml when running from a checkout."""
+    """Installed package version, pyproject.toml in a checkout, or a safe unknown marker."""
     try:
         return version("spell-sync")
     except PackageNotFoundError:
@@ -110,4 +113,4 @@ def installed_package_version() -> str:
     from_pyproject = read_pyproject_version(source_root / "pyproject.toml")
     if from_pyproject:
         return from_pyproject
-    return version("spell-sync")
+    return _UNKNOWN_PACKAGE_VERSION

@@ -30,8 +30,12 @@ def emit_debug_traceback(exc: BaseException, *, stream: TextIO | None = None) ->
     """Print a traceback to stderr when debug diagnostics are enabled."""
     if not debug_diagnostics_enabled():
         return
-    out = sys.stderr if stream is None else stream
-    traceback.print_exception(type(exc), exc, exc.__traceback__, file=out)
+    try:
+        out = sys.stderr if stream is None else stream
+        traceback.print_exception(type(exc), exc, exc.__traceback__, file=out)
+    except Exception:
+        # Fail-open: a broken stderr must not abort the product path.
+        pass
 
 
 def emit_boundary_technical_event(
