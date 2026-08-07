@@ -36,6 +36,36 @@ def _sample_event() -> TechnicalEvent:
     )
 
 
+def test_emit_boundary_technical_event_fail_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spell_sync.diagnostics.debug_mode import emit_boundary_technical_event
+
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.technical_event_log.write_technical_event",
+        lambda *_a, **_k: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    emit_boundary_technical_event(
+        EventId.DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE,
+        operation=OperationKind.STATUS,
+    )
+
+
+def test_presentation_sink_failed_secondary_write_fail_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.technical_event_log.write_technical_event",
+        lambda *_a, **_k: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    emitter = EventEmitter(
+        presentation_sink=lambda _e: (_ for _ in ()).throw(RuntimeError(SENSITIVE)),
+        technical_sink=lambda _e: None,
+    )
+    emitter.emit(_sample_event())
+
+
 def test_debug_diagnostics_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
     assert debug_diagnostics_enabled() is False

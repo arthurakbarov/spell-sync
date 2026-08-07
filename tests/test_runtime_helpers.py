@@ -75,6 +75,10 @@ class TestRuntimeHelpers(unittest.TestCase):
         with patch("spell_sync.runtime.shutil.which", return_value="/usr/bin/spell-sync"):
             self.assertEqual(cli_argv(), ["/usr/bin/spell-sync"])
 
+    def test_cli_argv_falls_back_to_module(self):
+        with patch("spell_sync.runtime.shutil.which", return_value=None):
+            self.assertEqual(cli_argv(), [__import__("sys").executable, "-m", "spell_sync"])
+
     def test_read_pyproject_version_found(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "pyproject.toml"
@@ -84,6 +88,32 @@ class TestRuntimeHelpers(unittest.TestCase):
     def test_read_pyproject_version_oserror(self):
         with patch.object(Path, "read_bytes", side_effect=OSError("nope")):
             self.assertIsNone(read_pyproject_version(Path("/x/pyproject.toml")))
+
+    def test_read_pyproject_version_project_not_dict(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "pyproject.toml"
+            path.write_text('project = "nope"\n', encoding="utf-8")
+            self.assertIsNone(read_pyproject_version(path))
+
+    def test_discover_pip_script_darwin_iterdir_oserror(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            py_lib = home / "Library" / "Python"
+            py_lib.mkdir(parents=True)
+            real_iterdir = Path.iterdir
+
+            def flaky_iterdir(self: Path):
+                if self == py_lib:
+                    raise OSError("denied")
+                return real_iterdir(self)
+
+            with (
+                patch("spell_sync.runtime.sys.platform", "darwin"),
+                patch("spell_sync.runtime.shutil.which", return_value=None),
+                patch("spell_sync.runtime.Path.home", return_value=home),
+                patch.object(Path, "iterdir", flaky_iterdir),
+            ):
+                self.assertIsNone(discover_pip_script())
 
     def test_read_pyproject_version_malformed_raises(self):
         import tomllib
