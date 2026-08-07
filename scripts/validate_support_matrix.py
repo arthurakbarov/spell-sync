@@ -364,6 +364,38 @@ def _check_compatibility_runner() -> list[str]:
     return errors
 
 
+def _job_continue_on_error_is_true(block: str) -> bool | None:
+    """Return whether this job block enables ``continue-on-error: true``.
+
+    ``True`` — a non-comment line sets ``continue-on-error: true``.
+    ``False`` — a non-comment line sets ``continue-on-error: false`` (or another
+    non-true scalar) without an enabling ``true`` line.
+    ``None`` — key absent from the job block.
+
+    Scoped to ``block`` only. Intentionally regex/text based (no YAML AST): a
+    commented line ``# continue-on-error: true`` does not count.
+    """
+    true_re = re.compile(
+        r"^[ \t]*continue-on-error:[ \t]*true[ \t]*(?:#.*)?$",
+        flags=re.MULTILINE,
+    )
+    false_re = re.compile(
+        r"^[ \t]*continue-on-error:[ \t]*false[ \t]*(?:#.*)?$",
+        flags=re.MULTILINE,
+    )
+    other_re = re.compile(
+        r"^[ \t]*continue-on-error:[ \t]*\S+",
+        flags=re.MULTILINE,
+    )
+    if true_re.search(block):
+        return True
+    if false_re.search(block):
+        return False
+    if other_re.search(block):
+        return False
+    return None
+
+
 def check_experimental_source_only_job(
     block: str,
     *,
@@ -379,15 +411,24 @@ def check_experimental_source_only_job(
 
     Limitation: job text comes from a regex YAML splitter and checks are substring
     matches. A comment containing ``--source-only`` can still false-positive; this
-    validator does not build a YAML AST.
+    validator does not build a YAML AST. ``continue-on-error`` specifically requires
+    a non-comment ``continue-on-error: true`` line in this job block.
     """
     del workflow_text  # intentionally unused — do not scan sibling jobs
     errors: list[str] = []
-    if "continue-on-error" not in block:
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} must be non-blocking; "
-            "remediation: set continue-on-error: true on this job"
-        )
+    continue_on_error = _job_continue_on_error_is_true(block)
+    if continue_on_error is not True:
+        if continue_on_error is False:
+            errors.append(
+                f"[CI-ENVIRONMENT-015] experimental job {job_name} must set "
+                "continue-on-error: true (false or other values are rejected); "
+                "remediation: set continue-on-error: true on this job"
+            )
+        else:
+            errors.append(
+                f"[CI-ENVIRONMENT-015] experimental job {job_name} must be non-blocking; "
+                "remediation: set continue-on-error: true on this job"
+            )
     if _job_runs_full_ci(block):
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run full CI; "

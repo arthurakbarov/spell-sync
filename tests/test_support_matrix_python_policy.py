@@ -156,7 +156,83 @@ def test_rejects_when_continue_on_error_only_in_sibling_job() -> None:
         python_version="3.13",
         workflow_text=_SIBLING_WITH_SOURCE_ONLY,
     )
-    assert any("non-blocking" in item for item in errors)
+    assert any("non-blocking" in item or "continue-on-error: true" in item for item in errors)
+
+
+def test_accepts_continue_on_error_true() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+    )
+    assert not any("continue-on-error" in item for item in errors)
+    assert errors == []
+
+
+def test_rejects_continue_on_error_false() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+    )
+    assert any("continue-on-error: true" in item and "false" in item for item in errors)
+
+
+def test_rejects_missing_continue_on_error() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+    )
+    assert any("continue-on-error: true" in item for item in errors)
+
+
+def test_commented_continue_on_error_true_does_not_count() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    # continue-on-error: true
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+    )
+    assert any("continue-on-error: true" in item for item in errors)
 
 
 def test_rejects_experimental_job_without_compatibility_runner() -> None:
