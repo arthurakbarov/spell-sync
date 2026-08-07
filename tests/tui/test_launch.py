@@ -18,7 +18,8 @@ from tests.tui.fake_service import fake_service
 
 class TestLaunch(unittest.TestCase):
     def test_cmd_ui_delegates_to_run_app(self):
-        with patch("spell_sync.tui.launch.run_app", return_value=0) as run_app_fn:
+        # run_app is imported inside _run_ui_impl; patch the app module attribute.
+        with patch("spell_sync.tui.app.run_app", return_value=0) as run_app_fn:
             code = cmd_ui(CliOptions())
         run_app_fn.assert_called_once()
         controller = run_app_fn.call_args.args[0]
@@ -26,7 +27,7 @@ class TestLaunch(unittest.TestCase):
         self.assertEqual(code, 0)
 
     def test_cmd_ui_logs_and_returns_one_on_failure(self):
-        with patch("spell_sync.tui.launch.run_app", side_effect=RuntimeError("boom")):
+        with patch("spell_sync.tui.app.run_app", side_effect=RuntimeError("boom")):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = cmd_ui(CliOptions())
@@ -42,7 +43,7 @@ class TestLaunch(unittest.TestCase):
 
     def test_run_ui_builds_controller_with_project_ref(self):
         project = ProjectRef(wordlist=ProjectRef.__dataclass_fields__["wordlist"].default)
-        with patch("spell_sync.tui.launch.run_app", return_value=0) as run_app_fn:
+        with patch("spell_sync.tui.app.run_app", return_value=0) as run_app_fn:
             code = run_ui(project)
         self.assertEqual(code, 0)
         controller = run_app_fn.call_args.args[0]
