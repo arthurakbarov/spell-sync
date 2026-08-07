@@ -108,6 +108,22 @@ def test_event_emitter_fail_open_suppresses_sink_errors(
     assert any(event.event_id is EventId.DIAGNOSTICS_TECHNICAL_SINK_FAILED for event in recorded)
 
 
+def test_technical_sink_failed_secondary_write_fail_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+
+    def boom(_event: TechnicalEvent) -> None:
+        raise OSError(SENSITIVE)
+
+    monkeypatch.setattr(
+        "spell_sync.diagnostics.technical_event_log.write_technical_event",
+        lambda *_a, **_k: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    emitter = EventEmitter(presentation_sink=None, technical_sink=boom)
+    emitter.emit(_sample_event())
+
+
 def test_emit_debug_traceback_fail_open_on_broken_stream(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
