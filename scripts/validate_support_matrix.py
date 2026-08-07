@@ -578,7 +578,7 @@ def check_pyproject_python_alignment(
             "[SUPPORT-MATRIX-014] when experimentalPython is declared, "
             "requires-python must include an upper bound so installers do not treat "
             "experimental runtimes as publicly supported; remediation: constrain "
-            "requires-python to the blocking range (e.g. '>=3.11,<3.13')"
+            "requires-python to the blocking range (e.g. '>=3.14,<3.15')"
         )
     for version in experimental:
         included = _specifier_includes_version(requires, version)
@@ -592,12 +592,12 @@ def check_pyproject_python_alignment(
         elif included is None and requires and f"<{version}" not in requires:
             # Minimal fallback without packaging: require an explicit upper bound token.
             major_minor = version
-            next_major = version  # e.g. expect "<3.13" for experimental 3.13
+            next_major = version  # e.g. expect "<3.15" for experimental 3.15
             if f"<{major_minor}" not in requires and f",<{major_minor}" not in requires:
                 errors.append(
                     "[SUPPORT-MATRIX-014] requires-python should exclude experimental "
                     f"Python {next_major} via an upper bound (packaging unavailable for "
-                    "precise SpecifierSet check); remediation: use e.g. '>=3.11,<3.13'"
+                    "precise SpecifierSet check); remediation: use e.g. '>=3.14,<3.15'"
                 )
     return errors
 

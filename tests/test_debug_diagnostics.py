@@ -24,7 +24,6 @@ from spell_sync.diagnostics.technical_event_model import (
 )
 from spell_sync.tui import launch as launch_mod
 
-
 SENSITIVE = "SECRET_WORDLIST_TOKEN_xyz"
 
 
