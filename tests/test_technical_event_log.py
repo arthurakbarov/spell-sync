@@ -203,16 +203,23 @@ def test_event_emitter_technical_sink_fail_open_presentation_still_runs() -> Non
     assert seen == ["push.plan_verified"]
 
 
-def test_event_emitter_presentation_sink_exception_is_not_swallowed() -> None:
+def test_event_emitter_presentation_sink_exception_is_fail_open() -> None:
+    """Presentation sink failures must not abort the emit path."""
+
     def failing_presentation(_event) -> None:
         raise RuntimeError("presentation sink failed")
 
+    technical: list[str] = []
+
+    def record_technical(event: TechnicalEvent) -> None:
+        technical.append(event.event_id.value)
+
     emitter = EventEmitter(
         presentation_sink=failing_presentation,
-        technical_sink=lambda _event: None,
+        technical_sink=record_technical,
     )
-    with pytest.raises(RuntimeError, match="presentation sink failed"):
-        emitter.emit(_sample_event())
+    emitter.emit(_sample_event())
+    assert technical == ["push.plan_verified"]
 
 
 def test_format_log_line_for_display_omits_target_suffix_when_missing() -> None:

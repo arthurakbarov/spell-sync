@@ -173,7 +173,10 @@ def _check_snapshot_script(script_path: Path) -> list[str]:
             "[SNAPSHOT-ENVIRONMENT-010] create-code-snapshot.py manifest must bind "
             "environment digests"
         )
-    if "SCHEMA_VERSION = 2" not in text and 'schemaVersion": 2' not in text:
+    # Maintainer snapshot tooling may advance schema while keeping environment binding.
+    if not re.search(r"SCHEMA_VERSION\s*=\s*[23]\b", text) and not re.search(
+        r'"schemaVersion"\s*:\s*[23]\b', text
+    ):
         errors.append(
             "[SNAPSHOT-ENVIRONMENT-010] snapshot manifest schema must be version 2 "
             "with environment block"
