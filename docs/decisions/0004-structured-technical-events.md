@@ -168,4 +168,4 @@ draft).
 ## Compliance
 
 Verified by focused technical-event, privacy, architecture, and safety suites; full CI evidence
-recorded in `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` after Phase 5 corrective commits.
+recorded in `docs/ARCHITECTURE_V1_IMPLEMENTATION.md` after Phase 5 corrective commits.

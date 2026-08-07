@@ -24,7 +24,7 @@ Read:
 - `AGENTS.md`
 - `docs/AGENT_DEVELOPMENT.md`
 - applicable `.cursor/rules/**`
-- `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` (current phase + status block)
+- `docs/ARCHITECTURE_V1_IMPLEMENTATION.md` (current phase + status block)
 - related ADRs under `docs/decisions/`
 - affected source, tests, and contracts
 

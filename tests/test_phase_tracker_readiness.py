@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import check_docs_contract as docs_contract  # noqa: E402
 
-TRACKER = ROOT / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md"
+TRACKER = ROOT / "docs" / "ARCHITECTURE_V1_IMPLEMENTATION.md"
 
 
 def test_p1_corrective_not_in_progress() -> None:

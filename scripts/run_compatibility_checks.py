@@ -389,20 +389,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", required=True, choices=("linux", "macos", "windows"))
     parser.add_argument("--python-version", required=True)
     parser.add_argument("--format", choices=("human", "json"), default="human")
-    parser.add_argument(
-        "--experimental",
-        action="store_true",
-        help="Label this cell as experimental (non-blocking). Requires --source-only.",
-    )
-    parser.add_argument(
-        "--source-only",
-        action="store_true",
-        help=(
-            "Source checkout probe: run product tests via the current interpreter/"
-            "PYTHONPATH without building or installing a wheel. Required for "
-            "interpreters outside project.requires-python."
-        ),
-    )
     args = parser.parse_args(argv)
 
     mismatch = _verify_runtime_identity(
@@ -410,10 +396,6 @@ def main(argv: list[str] | None = None) -> int:
         python_version_arg=args.python_version,
     )
     execution_id = f"compatibility:{args.platform}-py{args.python_version.replace('.', '')}"
-    if args.experimental:
-        execution_id += "-experimental"
-    if args.source_only:
-        execution_id += "-source-only"
 
     def _emit_failure(failed_id: str, *, exit_code: int = 1) -> int:
         payload = {
@@ -422,8 +404,6 @@ def main(argv: list[str] | None = None) -> int:
             "pythonVersion": args.python_version,
             "actualPlatform": _actual_platform(),
             "actualPythonVersion": _actual_python_version(),
-            "experimental": args.experimental,
-            "sourceOnly": args.source_only,
             "exitCode": exit_code,
             "failedId": failed_id,
             "steps": [],
@@ -438,11 +418,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if mismatch is not None:
         return _emit_failure(mismatch)
-
-    if args.experimental and not args.source_only:
-        return _emit_failure("compatibility.experimental-requires-source-only")
-    if args.source_only and not args.experimental:
-        return _emit_failure("compatibility.source-only-requires-experimental")
 
     py = sys.executable
     uv = _resolve_uv_executable()
@@ -476,28 +451,17 @@ def main(argv: list[str] | None = None) -> int:
             failed_id = f"compatibility.{step_id}-failed"
             break
     else:
-        if args.source_only:
-            results.append(
-                {
-                    "step": "compatibility.wheel-skipped-source-only",
-                    "exitCode": 0,
-                    "outputLines": 0,
-                }
-            )
-        else:
-            wheel_results, wheel_rc, wheel_failed = _run_wheel_compatibility(py)
-            results.extend(wheel_results)
-            if wheel_rc != 0:
-                exit_code = wheel_rc
-                failed_id = wheel_failed
+        wheel_results, wheel_rc, wheel_failed = _run_wheel_compatibility(py)
+        results.extend(wheel_results)
+        if wheel_rc != 0:
+            exit_code = wheel_rc
+            failed_id = wheel_failed
     payload = {
         "executionId": execution_id,
         "platform": args.platform,
         "pythonVersion": args.python_version,
         "actualPlatform": _actual_platform(),
         "actualPythonVersion": _actual_python_version(),
-        "experimental": args.experimental,
-        "sourceOnly": args.source_only,
         "exitCode": exit_code,
         "failedId": failed_id,
         "steps": results,

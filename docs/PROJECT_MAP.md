@@ -173,7 +173,7 @@ Run grouped CI via `scripts/ci_runner.py` or `scripts/ci.sh`.
 | Structured technical event | `diagnostics/technical_event_model.py`, `event_presenter.py` | privacy tests, ADR if contract changes |
 | Agent workflow / CI | `scripts/ci_runner.py`, `.cursor/skills/` | `docs/AGENT_DEVELOPMENT.md`, validators |
 
-See also `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`, `docs/TESTING_STRATEGY.md`, and ADRs under
+See also `docs/ARCHITECTURE_V1_IMPLEMENTATION.md`, `docs/TESTING_STRATEGY.md`, and ADRs under
 `docs/decisions/`.
 
 ## Execution control (toolchain)

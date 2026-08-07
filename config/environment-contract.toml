@@ -16,6 +16,7 @@ bootstrapCommand = "allowed"
 
 [compatibility]
 blockingPython = ["3.14"]
+# Version 1: must remain empty (experimental probes unsupported).
 experimentalPython = []
 
 [platforms.product]

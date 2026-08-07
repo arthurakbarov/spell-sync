@@ -151,7 +151,7 @@ Other skills:
 
 See also `.cursor/README.md` for shared vs project-specific agent contracts.
 
-Architecture tracker: `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md` (`[architecture-status:start]` block).
+Architecture tracker: `docs/ARCHITECTURE_V1_IMPLEMENTATION.md` (`[architecture-status:start]` block).
 
 Engineering rules and skills are self-contained in this repository. Maintainer topology and
 publication workflows live only in the private maintainer workspace (not shipped here).

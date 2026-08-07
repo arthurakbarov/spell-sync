@@ -15,8 +15,8 @@ R-WIN, R-PWR, R-DUR, R-CON). Release not performed.
 
 Post-v1 ops: **complete** (engineering). Product UX waves A–F, local two-mode
 validation, ETA/observe, agent-contract unification with nix-darwin naming, and
-engineering/product completion docs are landed. Criterion 9 (owner publish) and
-residuals R-WIN / R-PWR / R-DUR / R-CON remain owner-initiated only.
+engineering/product completion docs are landed. Product criterion 10 (owner publish)
+and residuals R-WIN / R-PWR / R-DUR / R-CON remain owner-initiated only.
 
 [architecture-status:start]
 current: owner-publish

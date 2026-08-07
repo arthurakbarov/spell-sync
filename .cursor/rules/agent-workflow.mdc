@@ -7,7 +7,7 @@ alwaysApply: true
 
 1. Read `AGENTS.md`. For phase work or safety/mutation changes also read
    `docs/AGENT_DEVELOPMENT.md` and the architecture status block in
-   `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
+   `docs/ARCHITECTURE_V1_IMPLEMENTATION.md`.
 2. Prefer the matching `.cursor/skills/**` for this task
    (`execute-current-phase`, `repository-workflow`, `select-and-run-tests`,
    `spell-sync-ci`, etc.) — do not load every skill up front.

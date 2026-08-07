@@ -79,7 +79,7 @@ PROHIBITION_MARKERS = re.compile(
     re.I,
 )
 
-IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md"
+IMPLEMENTATION_TRACKER = "docs/ARCHITECTURE_V1_IMPLEMENTATION.md"
 CURRENT_PHASE_HEADING = "## Current phase"
 ARCHITECTURE_STATUS_START = "[architecture-status:start]"
 ARCHITECTURE_STATUS_END = "[architecture-status:end]"
@@ -261,7 +261,7 @@ def _check_current_phase_section(root: Path) -> list[ContractViolation]:
                 tracker,
                 None,
                 "implementation tracker missing",
-                "restore docs/ARCHITECTURE_0_3_IMPLEMENTATION.md",
+                "restore docs/ARCHITECTURE_V1_IMPLEMENTATION.md",
             )
         ]
     text = tracker.read_text(encoding="utf-8")
@@ -1115,7 +1115,7 @@ def _check_workflow_methodology_headings(root: Path) -> list[ContractViolation]:
 
 def _check_manual_validation_count_honesty(root: Path) -> list[ContractViolation]:
     validation_path = root / "docs" / "target-validation.json"
-    tracker = root / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md"
+    tracker = root / "docs" / "ARCHITECTURE_V1_IMPLEMENTATION.md"
     if not validation_path.is_file() or not tracker.is_file():
         return []
     try:
@@ -1139,7 +1139,7 @@ def _check_manual_validation_count_honesty(root: Path) -> list[ContractViolation
     total = len(targets)
     expected = f"{passed}/{total}"
     surfaces = (
-        root / "docs" / "ARCHITECTURE_0_3_IMPLEMENTATION.md",
+        root / "docs" / "ARCHITECTURE_V1_IMPLEMENTATION.md",
         root / "docs" / "FEATURE_MATRIX.md",
         root / "docs" / "PRODUCT_COMPLETION.md",
     )
@@ -1158,7 +1158,7 @@ def _check_manual_validation_count_honesty(root: Path) -> list[ContractViolation
                     f"sync {path.relative_to(root).as_posix()} with docs/target-validation.json",
                 )
             )
-        if path.name == "ARCHITECTURE_0_3_IMPLEMENTATION.md":
+        if path.name == "ARCHITECTURE_V1_IMPLEMENTATION.md":
             if passed > 0 and re.search(r"manual target validation 0/\d+", text):
                 violations.append(
                     ContractViolation(

@@ -146,14 +146,6 @@ def _check_contract_doc_alignment() -> list[str]:
                         "[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md must mention blocking "
                         f"Python {item}; remediation: update compatibility section"
                     )
-        experimental = compatibility.get("experimentalPython", [])
-        if isinstance(experimental, list):
-            for item in experimental:
-                if str(item) not in doc:
-                    errors.append(
-                        "[SUPPORT-MATRIX-010] docs/SUPPORTED_ENVIRONMENTS.md must mention "
-                        f"experimental Python {item}; remediation: update compatibility section"
-                    )
     return errors
 
 
@@ -242,9 +234,25 @@ def _check_workflows() -> list[str]:
                 f"{os_name} Python {python_version}; remediation: add narrow compatibility job"
             )
 
+    contract = tomllib.loads(_read(CONTRACT_PATH)) if CONTRACT_PATH.is_file() else {}
+    compatibility = contract.get("compatibility", {}) if isinstance(contract, dict) else {}
+    experimental_pythons: list[str] = []
+    if isinstance(compatibility, dict):
+        raw_experimental = compatibility.get("experimentalPython", [])
+        if isinstance(raw_experimental, list):
+            experimental_pythons = [str(item) for item in raw_experimental]
+
+    # Version 1 is Python 3.14-only: experimental probes are not supported.
+    if experimental_pythons:
+        errors.append(
+            "[CI-ENVIRONMENT-011] experimentalPython must be empty for the 3.14-only "
+            f"release; found {experimental_pythons!r}; remediation: clear "
+            "compatibility.experimentalPython in environment-contract.toml"
+        )
+
     experimental_jobs = [
         key
-        for key, (text, block) in all_jobs.items()
+        for key, (_text, block) in all_jobs.items()
         if "ubuntu-latest" in _job_runs_on(block)
         and any(
             version.startswith("3.") and version not in {"3.14", "3.14.6"}
@@ -252,50 +260,14 @@ def _check_workflows() -> list[str]:
         )
         and ("experimental" in key or "source-only" in block or "continue-on-error" in block)
     ]
-    contract = tomllib.loads(_read(CONTRACT_PATH)) if CONTRACT_PATH.is_file() else {}
-    compatibility = contract.get("compatibility", {}) if isinstance(contract, dict) else {}
-    experimental_pythons = []
-    if isinstance(compatibility, dict):
-        raw_experimental = compatibility.get("experimentalPython", [])
-        if isinstance(raw_experimental, list):
-            experimental_pythons = [str(item) for item in raw_experimental]
-
-    if not experimental_pythons:
-        if experimental_jobs:
-            errors.append(
-                "[CI-ENVIRONMENT-011] experimentalPython is empty but experimental/"
-                f"source-only jobs remain: {', '.join(experimental_jobs)}; "
-                "remediation: remove obsolete experimental jobs"
-            )
-    else:
-        expected_exp = experimental_pythons[0]
-        matched_exp = [
-            key
-            for key, (_, block) in all_jobs.items()
-            if "ubuntu-latest" in _job_runs_on(block)
-            and expected_exp in _job_python_versions(block)
-        ]
-        if len(matched_exp) != 1:
-            errors.append(
-                "[CI-ENVIRONMENT-011] expected exactly one Ubuntu Python "
-                f"{expected_exp} experimental job; found {len(matched_exp)}; "
-                "remediation: add non-blocking source-only probe"
-            )
-        else:
-            text, block = all_jobs[matched_exp[0]]
-            errors.extend(
-                check_experimental_source_only_job(
-                    block,
-                    job_name=matched_exp[0],
-                    python_version=expected_exp,
-                )
-            )
+    if experimental_jobs:
+        errors.append(
+            "[CI-ENVIRONMENT-011] experimental/source-only jobs are not supported: "
+            f"{', '.join(experimental_jobs)}; remediation: remove obsolete experimental jobs"
+        )
 
     for key, (_, block) in all_jobs.items():
-        versions = _job_python_versions(block)
         if not _job_runs_compatibility_runner(block):
-            continue
-        if experimental_pythons and any(v in versions for v in experimental_pythons):
             continue
         errors.extend(check_blocking_job_forbids_source_only(block, job_name=key))
 
@@ -355,11 +327,6 @@ def _check_compatibility_runner() -> list[str]:
         "compatibility.wheel-origin",
         "compatibility.wheel-version",
         "compatibility.wheel-cli",
-        "--source-only",
-        "sourceOnly",
-        "compatibility.wheel-skipped-source-only",
-        "compatibility.experimental-requires-source-only",
-        "compatibility.source-only-requires-experimental",
     ):
         if marker not in text:
             errors.append(
@@ -392,137 +359,14 @@ def _check_compatibility_runner() -> list[str]:
     return errors
 
 
-def _job_continue_on_error_is_true(block: str) -> bool | None:
-    """Return whether this job block enables ``continue-on-error: true``.
-
-    ``True`` — a non-comment line sets ``continue-on-error: true``.
-    ``False`` — a non-comment line sets ``continue-on-error: false`` (or another
-    non-true scalar) without an enabling ``true`` line.
-    ``None`` — key absent from the job block.
-
-    Scoped to ``block`` only. Intentionally regex/text based (no YAML AST): a
-    commented line ``# continue-on-error: true`` does not count.
-    """
-    true_re = re.compile(
-        r"^[ \t]*continue-on-error:[ \t]*true[ \t]*(?:#.*)?$",
-        flags=re.MULTILINE,
-    )
-    false_re = re.compile(
-        r"^[ \t]*continue-on-error:[ \t]*false[ \t]*(?:#.*)?$",
-        flags=re.MULTILINE,
-    )
-    other_re = re.compile(
-        r"^[ \t]*continue-on-error:[ \t]*\S+",
-        flags=re.MULTILINE,
-    )
-    if true_re.search(block):
-        return True
-    if false_re.search(block):
-        return False
-    if other_re.search(block):
-        return False
-    return None
-
-
-def check_experimental_source_only_job(
-    block: str,
-    *,
-    job_name: str,
-    python_version: str,
-    workflow_text: str = "",
-) -> list[str]:
-    """Reject experimental jobs that treat out-of-range Pythons as installable.
-
-    Semantic requirements are evaluated **only** against ``block`` (this job body).
-    ``workflow_text`` is ignored for token presence so sibling jobs cannot satisfy
-    ``--source-only``, ``continue-on-error``, or related flags.
-
-    Limitation: job text comes from a regex YAML splitter and checks are substring
-    matches. A comment containing ``--source-only`` can still false-positive; this
-    validator does not build a YAML AST. ``continue-on-error`` specifically requires
-    a non-comment ``continue-on-error: true`` line in this job block.
-    """
-    del workflow_text  # intentionally unused — do not scan sibling jobs
-    errors: list[str] = []
-    continue_on_error = _job_continue_on_error_is_true(block)
-    if continue_on_error is not True:
-        if continue_on_error is False:
-            errors.append(
-                f"[CI-ENVIRONMENT-015] experimental job {job_name} must set "
-                "continue-on-error: true (false or other values are rejected); "
-                "remediation: set continue-on-error: true on this job"
-            )
-        else:
-            errors.append(
-                f"[CI-ENVIRONMENT-015] experimental job {job_name} must be non-blocking; "
-                "remediation: set continue-on-error: true on this job"
-            )
-    if _job_runs_full_ci(block):
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run full CI; "
-            "remediation: run source-only product subset"
-        )
-    sync_pattern = re.compile(rf"uv\s+sync\s+[^\n]*--python\s+{re.escape(python_version)}\b")
-    if sync_pattern.search(block):
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run "
-            f"project-level `uv sync --python {python_version}` while that version is "
-            "outside requires-python; remediation: isolate a probe venv without installing "
-            "the project"
-        )
-    if "run_compatibility_checks.py" not in block:
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
-            "scripts/run_compatibility_checks.py; remediation: call the source-only runner"
-        )
-    else:
-        if "--source-only" not in block:
-            errors.append(
-                f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
-                "run_compatibility_checks.py with --source-only; remediation: add --source-only "
-                "and skip wheel install"
-            )
-        if "--experimental" not in block:
-            errors.append(
-                f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
-                "run_compatibility_checks.py with --experimental; remediation: pass both "
-                "--experimental and --source-only"
-            )
-    if "--no-python-downloads" not in block:
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} must pass "
-            "--no-python-downloads to uv commands in this job; remediation: forbid implicit "
-            "Python downloads (interpreter comes from setup-python)"
-        )
-    if "source" not in job_name.lower() and "source" not in block.lower():
-        errors.append(
-            f"[CI-ENVIRONMENT-015] experimental job {job_name} should be labeled as a "
-            "source compatibility probe; remediation: rename job/name to include 'source'"
-        )
-    return errors
-
-
 def check_blocking_job_forbids_source_only(block: str, *, job_name: str) -> list[str]:
     """Blocking compatibility jobs must keep the wheel install flow."""
     if "--source-only" not in block:
         return []
     return [
         f"[CI-ENVIRONMENT-015] blocking compatibility job {job_name} must not use "
-        "--source-only; remediation: reserve source-only for experimental probes"
+        "--source-only; remediation: remove --source-only (experimental probes unsupported)"
     ]
-
-
-def _specifier_includes_version(requires: str, version: str) -> bool | None:
-    """Return whether ``version`` satisfies ``requires``, or None if packaging is unavailable."""
-    try:
-        from packaging.specifiers import SpecifierSet
-        from packaging.version import Version
-    except ImportError:
-        return None
-    try:
-        return Version(version) in SpecifierSet(requires)
-    except Exception:
-        return None
 
 
 def check_pyproject_python_alignment(
@@ -530,10 +374,9 @@ def check_pyproject_python_alignment(
     requires_python: str,
     contract_requirement: str,
     blocking: list[str],
-    experimental: list[str],
     classifiers: list[str],
 ) -> list[str]:
-    """Public requires-python / classifiers must not claim beyond blocking support."""
+    """Public requires-python / classifiers must match blocking support only."""
     errors: list[str] = []
     requires = requires_python.strip()
     expected = contract_requirement.strip()
@@ -549,12 +392,7 @@ def check_pyproject_python_alignment(
         if text.startswith("Programming Language :: Python :: 3."):
             claimed.append(text.rsplit(" :: ", 1)[-1])
     for version in claimed:
-        if version in experimental and version not in blocking:
-            errors.append(
-                "[SUPPORT-MATRIX-014] pyproject classifiers must not claim experimental "
-                f"Python {version} as supported; remediation: keep classifiers to blocking set"
-            )
-        elif blocking and version not in blocking and version not in experimental:
+        if blocking and version not in blocking:
             errors.append(
                 "[SUPPORT-MATRIX-014] pyproject classifier Python "
                 f"{version} is outside contract compatibility lists; "
@@ -567,32 +405,6 @@ def check_pyproject_python_alignment(
                 "[SUPPORT-MATRIX-014] pyproject classifiers missing blocking Python "
                 f"{version}; remediation: list each blocking version"
             )
-    if experimental and requires and "<" not in requires:
-        errors.append(
-            "[SUPPORT-MATRIX-014] when experimentalPython is declared, "
-            "requires-python must include an upper bound so installers do not treat "
-            "experimental runtimes as publicly supported; remediation: constrain "
-            "requires-python to the blocking range (e.g. '>=3.14,<3.15')"
-        )
-    for version in experimental:
-        included = _specifier_includes_version(requires, version)
-        if included is True:
-            errors.append(
-                "[SUPPORT-MATRIX-014] requires-python must exclude experimental Python "
-                f"{version}; remediation: tighten the public install range "
-                "(wheel Requires-Python mirrors project.requires-python; installing the "
-                "wheel on experimental interpreters is not an expected success path)"
-            )
-        elif included is None and requires and f"<{version}" not in requires:
-            # Minimal fallback without packaging: require an explicit upper bound token.
-            major_minor = version
-            next_major = version  # e.g. expect "<3.15" for experimental 3.15
-            if f"<{major_minor}" not in requires and f",<{major_minor}" not in requires:
-                errors.append(
-                    "[SUPPORT-MATRIX-014] requires-python should exclude experimental "
-                    f"Python {next_major} via an upper bound (packaging unavailable for "
-                    "precise SpecifierSet check); remediation: use e.g. '>=3.14,<3.15'"
-                )
     return errors
 
 
@@ -611,14 +423,10 @@ def _check_pyproject_python_alignment() -> list[str]:
     if isinstance(product, dict):
         expected = str(product.get("pythonRequirement", "")).strip()
     blocking: list[str] = []
-    experimental: list[str] = []
     if isinstance(compatibility, dict):
         raw_blocking = compatibility.get("blockingPython", [])
-        raw_experimental = compatibility.get("experimentalPython", [])
         if isinstance(raw_blocking, list):
             blocking = [str(item) for item in raw_blocking]
-        if isinstance(raw_experimental, list):
-            experimental = [str(item) for item in raw_experimental]
     classifiers = project.get("classifiers", [])
     if not isinstance(classifiers, list):
         classifiers = []
@@ -626,7 +434,6 @@ def _check_pyproject_python_alignment() -> list[str]:
         requires_python=requires,
         contract_requirement=expected,
         blocking=blocking,
-        experimental=experimental,
         classifiers=[str(item) for item in classifiers],
     )
 

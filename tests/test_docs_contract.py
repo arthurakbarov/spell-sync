@@ -118,7 +118,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Phase 3 explicit runtime is active.",
                         status_block=status,
                     ),
@@ -145,7 +145,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Phase 3 complete; planning Phase 4.",
                         status_block=status,
                     ),
@@ -167,7 +167,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Future phase planning.",
                         status_block=status,
                     ),
@@ -185,7 +185,7 @@ class TestDocsContract(unittest.TestCase):
                 "[architecture-status:start]\ncurrent: phase-1\nphase-1: complete\n"
                 "[architecture-status:end]\n"
             )
-            _init_synthetic_repo(root, {"docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": tracker})
+            _init_synthetic_repo(root, {"docs/ARCHITECTURE_V1_IMPLEMENTATION.md": tracker})
             violations = mod.check_repository(root)
             self.assertTrue(
                 any(v.check_id == "PHASE-002" for v in violations),
@@ -200,7 +200,7 @@ class TestDocsContract(unittest.TestCase):
                 "## Current phase\n\n\n[architecture-status:start]\n"
                 "current: phase-1\nphase-1: complete\n[architecture-status:end]\n"
             )
-            _init_synthetic_repo(root, {"docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": tracker})
+            _init_synthetic_repo(root, {"docs/ARCHITECTURE_V1_IMPLEMENTATION.md": tracker})
             violations = mod.check_repository(root)
             self.assertTrue(
                 any(v.check_id == "PHASE-003" for v in violations),
@@ -215,7 +215,7 @@ class TestDocsContract(unittest.TestCase):
                 body="Bad status.",
                 status_block="current: phase-1\nphase-1: finished",
             )
-            _init_synthetic_repo(root, {"docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": tracker})
+            _init_synthetic_repo(root, {"docs/ARCHITECTURE_V1_IMPLEMENTATION.md": tracker})
             violations = mod.check_repository(root)
             self.assertTrue(
                 any(v.check_id == "PHASE-008" for v in violations),
@@ -375,7 +375,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Invalid current pointer.",
                         status_block=status,
                     ),
@@ -398,7 +398,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Phase 3 is next.",
                         status_block=status,
                     ),
@@ -451,7 +451,7 @@ class TestDocsContract(unittest.TestCase):
             _init_synthetic_repo(
                 root,
                 {
-                    "docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
+                    "docs/ARCHITECTURE_V1_IMPLEMENTATION.md": TRACKER_TEMPLATE.format(
                         body="Invalid awaiting on non-current.",
                         status_block=status,
                     ),
@@ -475,7 +475,7 @@ class TestDocsContract(unittest.TestCase):
                 "## Phase 4 — Focused application services and thin facade\n\n"
                 "Duplicate.\n"
             )
-            _init_synthetic_repo(root, {"docs/ARCHITECTURE_0_3_IMPLEMENTATION.md": tracker})
+            _init_synthetic_repo(root, {"docs/ARCHITECTURE_V1_IMPLEMENTATION.md": tracker})
             violations = mod.check_repository(root)
             self.assertTrue(
                 any(v.check_id == "PHASE-013" for v in violations),

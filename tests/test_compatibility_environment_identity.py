@@ -62,78 +62,27 @@ def test_rejects_wrong_python_version_argument() -> None:
     assert payload.get("failedId") == "compatibility.environment-mismatch"
 
 
-def test_experimental_without_source_only_is_rejected() -> None:
+def test_rejects_removed_source_only_flag() -> None:
     actual_platform, major_minor = _platform_and_python()
-    code, payload = _run_compatibility(
-        "--platform",
-        actual_platform,
-        "--python-version",
-        major_minor,
-        "--experimental",
-    )
-    assert code == 1
-    assert payload.get("failedId") == "compatibility.experimental-requires-source-only"
-    assert payload.get("sourceOnly") is False
-    assert payload.get("experimental") is True
-
-
-def test_source_only_without_experimental_is_rejected() -> None:
-    actual_platform, major_minor = _platform_and_python()
-    code, payload = _run_compatibility(
-        "--platform",
-        actual_platform,
-        "--python-version",
-        major_minor,
-        "--source-only",
-    )
-    assert code == 1
-    assert payload.get("failedId") == "compatibility.source-only-requires-experimental"
-    assert payload.get("sourceOnly") is True
-    assert payload.get("experimental") is False
-
-
-def test_source_only_payload_skips_wheel_steps(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Source-only mode must not invoke the wheel compatibility path."""
-    import scripts.run_compatibility_checks as compat
-
-    actual_platform, major_minor = _platform_and_python()
-
-    def fake_run(command, **_kwargs):  # type: ignore[no-untyped-def]
-        return 0, "ok"
-
-    def boom_wheels(_host_python: str):  # type: ignore[no-untyped-def]
-        raise AssertionError("wheel path must not run in source-only mode")
-
-    monkeypatch.setattr(compat, "_run", fake_run)
-    monkeypatch.setattr(compat, "_run_wheel_compatibility", boom_wheels)
-    code = compat.main(
+    proc = subprocess.run(
         [
+            sys.executable,
+            str(ROOT / "scripts" / "run_compatibility_checks.py"),
             "--platform",
             actual_platform,
             "--python-version",
             major_minor,
-            "--experimental",
             "--source-only",
             "--format",
             "json",
-        ]
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
     )
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload.get("sourceOnly") is True
-    assert payload.get("experimental") is True
-    assert "source-only" in str(payload.get("executionId"))
-    steps = payload.get("steps") or []
-    assert any(
-        isinstance(step, dict) and step.get("step") == "compatibility.wheel-skipped-source-only"
-        for step in steps
-    )
-    assert not any(
-        isinstance(step, dict) and str(step.get("step", "")).startswith("compatibility.wheel-build")
-        for step in steps
-    )
+    assert proc.returncode != 0
+    assert "unrecognized arguments" in proc.stderr or "source-only" in proc.stderr
 
 
 def test_blocking_path_invokes_wheel_flow(
@@ -161,5 +110,8 @@ def test_blocking_path_invokes_wheel_flow(
     assert code == 0
     wheel_calls.assert_called_once()
     payload = json.loads(capsys.readouterr().out)
-    assert payload.get("sourceOnly") is False
-    assert payload.get("experimental") is False
+    assert "sourceOnly" not in payload
+    assert "experimental" not in payload
+    assert payload.get("executionId") == (
+        f"compatibility:{actual_platform}-py{major_minor.replace('.', '')}"
+    )

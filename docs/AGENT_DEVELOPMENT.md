@@ -37,7 +37,7 @@ Skills live under `.cursor/skills/`. Canonical process detail is in this documen
 ## Standard workflow
 
 1. Read `AGENTS.md` and applicable `.cursor/rules/**` / `.cursor/skills/**`.
-2. Read the architecture status block in `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`.
+2. Read the architecture status block in `docs/ARCHITECTURE_V1_IMPLEMENTATION.md`.
 3. Capture Git baseline for all three workspace repositories (`HEAD`, branch, `git status --porcelain=v2 --untracked-files=all`).
 4. Inspect rollup: `python3 scripts/agent_context.py` (optional `--json`) for product
    branch/dirty/necessity/suggested runners and sibling workspace repos when present
@@ -176,7 +176,7 @@ Document only the supported Cursor Agent workflow and public processes.
 ## Phase boundaries
 
 Current package version comes from `pyproject.toml`. Architecture migration phases 1–10 are
-**complete** (see `docs/ARCHITECTURE_0_3_IMPLEMENTATION.md`). The tracker current focus is
+**complete** (see `docs/ARCHITECTURE_V1_IMPLEMENTATION.md`). The tracker current focus is
 `owner-publish` (release, manual validation, and related owner-initiated work — not a new
 architecture migration). Post-v1 engineering ops are complete.
 
