@@ -141,6 +141,90 @@ def test_presentation_sink_debug_traceback_stderr_only(
     assert SENSITIVE in captured.err
 
 
+def test_run_ui_runtime_error_debug_off_privacy_safe(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+    events: list[EventId] = []
+
+    def capture_event(event_id: EventId, **_kwargs) -> None:
+        events.append(event_id)
+
+    monkeypatch.setattr(launch_mod, "emit_boundary_technical_event", capture_event)
+    monkeypatch.setattr(
+        launch_mod,
+        "_run_ui_impl",
+        lambda _project: (_ for _ in ()).throw(RuntimeError(SENSITIVE)),
+    )
+    code = launch_mod.run_ui(ProjectRef())
+    assert code == 1
+    captured = capsys.readouterr()
+    assert SENSITIVE not in captured.out
+    assert SENSITIVE not in captured.err
+    assert "TUI failed to start" in captured.out
+    assert EventId.DIAGNOSTICS_TUI_LAUNCH_UNEXPECTED_FAILURE in events
+
+
+def test_run_ui_runtime_error_debug_on_stderr_only(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SPELL_SYNC_DEBUG", "1")
+    monkeypatch.setattr(launch_mod, "emit_boundary_technical_event", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        launch_mod,
+        "_run_ui_impl",
+        lambda _project: (_ for _ in ()).throw(RuntimeError(SENSITIVE)),
+    )
+    code = launch_mod.run_ui(ProjectRef())
+    assert code == 1
+    captured = capsys.readouterr()
+    assert SENSITIVE not in captured.out
+    assert "RuntimeError" in captured.err
+    assert SENSITIVE in captured.err
+
+
+def test_run_ui_value_error_debug_off_privacy_safe(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+    monkeypatch.setattr(launch_mod, "emit_boundary_technical_event", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        launch_mod,
+        "_run_ui_impl",
+        lambda _project: (_ for _ in ()).throw(ValueError(SENSITIVE)),
+    )
+    code = launch_mod.run_ui(ProjectRef())
+    assert code == 1
+    captured = capsys.readouterr()
+    assert SENSITIVE not in captured.out
+    assert SENSITIVE not in captured.err
+    assert "TUI failed to start" in captured.out
+
+
+def test_run_ui_oserror_expected_no_debug_leak(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("SPELL_SYNC_DEBUG", raising=False)
+    events: list[EventId] = []
+
+    def capture_event(event_id: EventId, **_kwargs) -> None:
+        events.append(event_id)
+
+    monkeypatch.setattr(launch_mod, "emit_boundary_technical_event", capture_event)
+    monkeypatch.setattr(
+        launch_mod,
+        "_run_ui_impl",
+        lambda _project: (_ for _ in ()).throw(OSError(SENSITIVE)),
+    )
+    code = launch_mod.run_ui(ProjectRef())
+    assert code == 1
+    captured = capsys.readouterr()
+    assert SENSITIVE not in captured.out
+    assert SENSITIVE not in captured.err
+    assert "TUI failed to start" in captured.out
+    assert events == []
+
+
 def test_run_ui_unexpected_stays_privacy_safe(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

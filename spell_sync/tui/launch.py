@@ -4,16 +4,14 @@ from __future__ import annotations
 
 from ..application import SpellSyncService
 from ..application.requests import ProjectRef
-from ..diagnostics.debug_mode import emit_debug_traceback, emit_boundary_technical_event
+from ..diagnostics.debug_mode import emit_boundary_technical_event, emit_debug_traceback
 from ..diagnostics.technical_event_model import EventId, OperationKind
 from ..log import log
 
-# Expected launch-time failures after TUI modules are importable.
-_EXPECTED_LAUNCH_ERRORS = (
-    OSError,
-    RuntimeError,
-    ValueError,
-)
+# Expected environment/I/O failures after TUI modules import successfully.
+# Generic RuntimeError/ValueError from controller/app internals are unexpected so
+# SPELL_SYNC_DEBUG can surface them on stderr.
+_EXPECTED_LAUNCH_ERRORS = (OSError,)
 
 
 def run_ui(project: ProjectRef) -> int:
