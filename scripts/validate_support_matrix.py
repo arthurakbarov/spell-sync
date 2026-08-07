@@ -260,9 +260,16 @@ def _check_workflows() -> list[str]:
                 block,
                 job_name=job_key,
                 python_version="3.13",
-                workflow_text=text,
             )
         )
+
+    for key, (_, block) in all_jobs.items():
+        versions = _job_python_versions(block)
+        if not _job_runs_compatibility_runner(block):
+            continue
+        if "3.13" in versions:
+            continue
+        errors.extend(check_blocking_job_forbids_source_only(block, job_name=key))
 
     combined = "\n".join(_read(path) for path in workflow_files)
     if "astral-sh/setup-uv" not in combined and "setup-uv" not in combined:
@@ -324,6 +331,7 @@ def _check_compatibility_runner() -> list[str]:
         "sourceOnly",
         "compatibility.wheel-skipped-source-only",
         "compatibility.experimental-requires-source-only",
+        "compatibility.source-only-requires-experimental",
     ):
         if marker not in text:
             errors.append(
@@ -363,13 +371,22 @@ def check_experimental_source_only_job(
     python_version: str,
     workflow_text: str = "",
 ) -> list[str]:
-    """Reject experimental jobs that treat out-of-range Pythons as installable."""
+    """Reject experimental jobs that treat out-of-range Pythons as installable.
+
+    Semantic requirements are evaluated **only** against ``block`` (this job body).
+    ``workflow_text`` is ignored for token presence so sibling jobs cannot satisfy
+    ``--source-only``, ``continue-on-error``, or related flags.
+
+    Limitation: job text comes from a regex YAML splitter and checks are substring
+    matches. A comment containing ``--source-only`` can still false-positive; this
+    validator does not build a YAML AST.
+    """
+    del workflow_text  # intentionally unused — do not scan sibling jobs
     errors: list[str] = []
-    haystack = f"{workflow_text}\n{block}"
-    if "continue-on-error" not in block and "continue-on-error" not in workflow_text:
+    if "continue-on-error" not in block:
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must be non-blocking; "
-            "remediation: set continue-on-error: true"
+            "remediation: set continue-on-error: true on this job"
         )
     if _job_runs_full_ci(block):
         errors.append(
@@ -379,25 +396,53 @@ def check_experimental_source_only_job(
     sync_pattern = re.compile(
         rf"uv\s+sync\s+[^\n]*--python\s+{re.escape(python_version)}\b"
     )
-    if sync_pattern.search(haystack):
+    if sync_pattern.search(block):
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must not run "
             f"project-level `uv sync --python {python_version}` while that version is "
             "outside requires-python; remediation: isolate a probe venv without installing "
             "the project"
         )
-    if "run_compatibility_checks.py" in haystack and "--source-only" not in haystack:
+    if "run_compatibility_checks.py" not in block:
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
-            "run_compatibility_checks.py with --source-only; remediation: add --source-only "
-            "and skip wheel install"
+            "scripts/run_compatibility_checks.py; remediation: call the source-only runner"
         )
-    if "source" not in job_name.lower() and "source" not in haystack.lower():
+    else:
+        if "--source-only" not in block:
+            errors.append(
+                f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
+                "run_compatibility_checks.py with --source-only; remediation: add --source-only "
+                "and skip wheel install"
+            )
+        if "--experimental" not in block:
+            errors.append(
+                f"[CI-ENVIRONMENT-015] experimental job {job_name} must invoke "
+                "run_compatibility_checks.py with --experimental; remediation: pass both "
+                "--experimental and --source-only"
+            )
+    if "--no-python-downloads" not in block:
+        errors.append(
+            f"[CI-ENVIRONMENT-015] experimental job {job_name} must pass "
+            "--no-python-downloads to uv commands in this job; remediation: forbid implicit "
+            "Python downloads (interpreter comes from setup-python)"
+        )
+    if "source" not in job_name.lower() and "source" not in block.lower():
         errors.append(
             f"[CI-ENVIRONMENT-015] experimental job {job_name} should be labeled as a "
             "source compatibility probe; remediation: rename job/name to include 'source'"
         )
     return errors
+
+
+def check_blocking_job_forbids_source_only(block: str, *, job_name: str) -> list[str]:
+    """Blocking compatibility jobs must keep the wheel install flow."""
+    if "--source-only" not in block:
+        return []
+    return [
+        f"[CI-ENVIRONMENT-015] blocking compatibility job {job_name} must not use "
+        "--source-only; remediation: reserve source-only for experimental probes"
+    ]
 
 
 def _specifier_includes_version(requires: str, version: str) -> bool | None:

@@ -5,13 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.validate_support_matrix import (  # noqa: E402
+    check_blocking_job_forbids_source_only,
     check_experimental_source_only_job,
     check_pyproject_python_alignment,
 )
@@ -25,6 +24,15 @@ _GOOD_CLASSIFIERS = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
+
+_SIBLING_WITH_SOURCE_ONLY = """
+jobs:
+  other-job:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: echo --source-only --experimental --no-python-downloads
+"""
 
 
 def test_rejects_experimental_classifier() -> None:
@@ -76,11 +84,12 @@ def test_rejects_experimental_without_upper_bound() -> None:
 
 def test_rejects_py313_job_with_uv_sync() -> None:
     block = """
+    name: source compatibility probe (ubuntu, py3.13)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - run: |
-          uv sync --python 3.13 --locked
+          uv sync --python 3.13 --locked --no-python-downloads
           python scripts/run_compatibility_checks.py --platform linux --python-version 3.13 --experimental --source-only
     """
     errors = check_experimental_source_only_job(
@@ -93,22 +102,83 @@ def test_rejects_py313_job_with_uv_sync() -> None:
 
 def test_rejects_py313_runner_without_source_only() -> None:
     block = """
+    name: source compatibility probe (ubuntu, py3.13)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - run: |
-          uv venv --python 3.13 --no-project .venv-probe
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
           PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py --platform linux --python-version 3.13 --experimental
     """
     errors = check_experimental_source_only_job(
         block,
         job_name="source-compat-linux-py313-experimental",
         python_version="3.13",
+        workflow_text=_SIBLING_WITH_SOURCE_ONLY,
     )
     assert any("--source-only" in item for item in errors)
 
 
-def test_accepts_correct_source_only_job() -> None:
+def test_rejects_when_source_only_only_in_sibling_job() -> None:
+    """Sibling job tokens must not satisfy this job's --source-only requirement."""
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+        workflow_text=_SIBLING_WITH_SOURCE_ONLY,
+    )
+    assert any("with --source-only" in item for item in errors)
+
+
+def test_rejects_when_continue_on_error_only_in_sibling_job() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          PYTHONPATH=$PWD .venv-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+        workflow_text=_SIBLING_WITH_SOURCE_ONLY,
+    )
+    assert any("non-blocking" in item for item in errors)
+
+
+def test_rejects_experimental_job_without_compatibility_runner() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-probe
+          echo probe-without-runner
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
+        workflow_text="run_compatibility_checks.py --source-only --experimental",
+    )
+    assert any("must invoke scripts/run_compatibility_checks.py" in item for item in errors)
+
+
+def test_rejects_experimental_job_without_no_python_downloads() -> None:
     block = """
     name: source compatibility probe (ubuntu, py3.13)
     runs-on: ubuntu-latest
@@ -123,8 +193,41 @@ def test_accepts_correct_source_only_job() -> None:
         block,
         job_name="source-compat-linux-py313-experimental",
         python_version="3.13",
+        workflow_text="uv sync --no-python-downloads",
+    )
+    assert any("--no-python-downloads" in item for item in errors)
+
+
+def test_accepts_correct_source_only_job() -> None:
+    block = """
+    name: source compatibility probe (ubuntu, py3.13)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: |
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-py313-source-probe
+          PYTHONPATH=$PWD .venv-py313-source-probe/bin/python scripts/run_compatibility_checks.py \\
+            --platform linux --python-version 3.13 --experimental --source-only
+    """
+    errors = check_experimental_source_only_job(
+        block,
+        job_name="source-compat-linux-py313-experimental",
+        python_version="3.13",
     )
     assert errors == []
+
+
+def test_rejects_source_only_on_blocking_job() -> None:
+    block = """
+    runs-on: ubuntu-latest
+    steps:
+      - run: python scripts/run_compatibility_checks.py --platform linux --python-version 3.11 --source-only
+    """
+    errors = check_blocking_job_forbids_source_only(
+        block,
+        job_name="compatibility-linux-py311",
+    )
+    assert any("must not use --source-only" in item for item in errors)
 
 
 def test_accepts_aligned_blocking_metadata() -> None:

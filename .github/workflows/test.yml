@@ -105,10 +105,10 @@ jobs:
           # Public requires-python is >=3.11,<3.13 — do not uv sync / install the project
           # or its wheel on 3.13. Probe source importability from the checkout only.
           uv lock --check
-          uv venv --python 3.13 --no-project .venv-py313-source-probe
+          uv venv --python 3.13 --no-project --no-python-downloads .venv-py313-source-probe
           uv export --frozen --no-emit-project --no-default-groups \
             --group test-core --group packaging -o /tmp/spell-sync-py313-probe-reqs.txt
-          uv pip install --python .venv-py313-source-probe \
+          uv pip install --python .venv-py313-source-probe --no-python-downloads \
             -r /tmp/spell-sync-py313-probe-reqs.txt
           PYTHONPATH="${GITHUB_WORKSPACE}" \
             .venv-py313-source-probe/bin/python scripts/run_compatibility_checks.py \

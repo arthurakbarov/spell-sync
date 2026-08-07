@@ -441,6 +441,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.experimental and not args.source_only:
         return _emit_failure("compatibility.experimental-requires-source-only")
+    if args.source_only and not args.experimental:
+        return _emit_failure("compatibility.source-only-requires-experimental")
 
     py = sys.executable
     uv = _resolve_uv_executable()
