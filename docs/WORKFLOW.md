@@ -11,6 +11,16 @@ Done: [ENGINEERING_COMPLETION.md](ENGINEERING_COMPLETION.md) +
 ```bash
 python3 scripts/agent_context.py
 python3 scripts/project_environment.py check
+python3 scripts/run_recovery_smoke.py   # or: ss recovery-smoke
+```
+
+Maintainer dispatcher (aliases `scripts/ss` / `scripts/dev`):
+
+```bash
+python3 scripts/ss.py --list
+ss edit-loop
+ss commit-gate
+ss runs-index
 ```
 
 ## Edit loop (~60s sample)
@@ -53,7 +63,8 @@ Or `scripts/ci.sh` then `python3 scripts/check_ci_evidence.py`.
 ## Triage
 
 ```bash
-python3 scripts/dev_runs.py index
+python3 scripts/dev_runs.py index          # also appends CI rows to .artifacts/ci/runs-index.jsonl
+python3 scripts/dev_runs.py index --no-persist
 python3 scripts/dev_runs.py failures
 python3 scripts/dev_runs.py show <run-id>
 ```

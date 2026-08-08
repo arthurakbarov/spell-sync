@@ -16,6 +16,8 @@ if str(ROOT) not in sys.path:
 from scripts.execution_control.history import HistoryStore  # noqa: E402
 from scripts.execution_control.state_paths import history_database_path  # noqa: E402
 
+DEFAULT_RUNS_JOURNAL = ROOT / ".artifacts" / "ci" / "runs-index.jsonl"
+
 _FAILURE_STATUSES = frozenset(
     {
         "failed",
@@ -145,7 +147,44 @@ def cmd_list(*, limit: int, as_json: bool) -> int:
     return 0
 
 
-def cmd_index(*, limit: int, as_json: bool) -> int:
+def _append_journal(journal: Path, entries: list[dict[str, object]]) -> int:
+    """Append unique CI runIds to a JSONL journal; return newly written lines."""
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = set()
+    if journal.is_file():
+        for line in journal.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and row.get("kind") == "ci":
+                run_id = row.get("runId")
+                if isinstance(run_id, str) and run_id:
+                    seen.add(run_id)
+    written = 0
+    with journal.open("a", encoding="utf-8") as handle:
+        for item in entries:
+            if item.get("kind") != "ci":
+                continue
+            run_id = item.get("runId")
+            if not isinstance(run_id, str) or not run_id or run_id in seen:
+                continue
+            handle.write(json.dumps(item, sort_keys=True) + "\n")
+            seen.add(run_id)
+            written += 1
+    return written
+
+
+def cmd_index(
+    *,
+    limit: int,
+    as_json: bool,
+    journal: Path | None,
+    persist: bool,
+) -> int:
     """Chronological index of CI summaries plus recent execution spans."""
     entries: list[dict[str, object]] = []
     for path in _ci_summaries()[:limit]:
@@ -184,17 +223,31 @@ def cmd_index(*, limit: int, as_json: bool) -> int:
             }
         )
     entries = entries[:limit]
+    journal_path = journal or DEFAULT_RUNS_JOURNAL
+    written = 0
+    if persist:
+        written = _append_journal(journal_path, entries)
     if as_json:
-        print(json.dumps({"index": entries}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "index": entries,
+                    "journalPath": str(journal_path),
+                    "journalAppended": written,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
     print(f"DEV_RUNS_INDEX={len(entries)}")
+    print(f"DEV_RUNS_JOURNAL={journal_path}")
+    print(f"DEV_RUNS_JOURNAL_APPENDED={written}")
     for item in entries:
         kind = item.get("kind")
         if kind == "ci":
-            print(
-                f"ci\t{item.get('runId')}\t{item.get('result')}\t"
-                f"{item.get('gitHead', '')[:12]}\t{item.get('path')}"
-            )
+            head = str(item.get("gitHead") or "")
+            print(f"ci\t{item.get('runId')}\t{item.get('result')}\t{head[:12]}\t{item.get('path')}")
         else:
             print(
                 f"span\t{item.get('runId')}\t{item.get('executionId')}\t"
@@ -222,6 +275,17 @@ def main(argv: list[str] | None = None) -> int:
     index = sub.add_parser("index", help="Chronological CI + span index")
     index.add_argument("--limit", type=int, default=40)
     index.add_argument("--json", action="store_true")
+    index.add_argument(
+        "--journal",
+        type=Path,
+        default=None,
+        help=f"JSONL journal path (default: {DEFAULT_RUNS_JOURNAL})",
+    )
+    index.add_argument(
+        "--no-persist",
+        action="store_true",
+        help="Do not append CI rows to the JSONL journal",
+    )
 
     args = parser.parse_args(argv)
     if args.command == "failures":
@@ -231,7 +295,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "list":
         return cmd_list(limit=args.limit, as_json=args.json)
     if args.command == "index":
-        return cmd_index(limit=args.limit, as_json=args.json)
+        return cmd_index(
+            limit=args.limit,
+            as_json=args.json,
+            journal=args.journal,
+            persist=not args.no_persist,
+        )
     return 2
 
 

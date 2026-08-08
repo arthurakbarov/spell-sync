@@ -27,6 +27,7 @@ Operator command table (SSOT: `config/dev-commands.json`):
 | Ephemeral check-session start/status/finish/lookup/record | `python3 scripts/check_session.py` | before-work |
 | Verify maintainer environment | `python3 scripts/project_environment.py check` | before-work |
 | Opt-in commit-msg hook for spell-sync message shape | `python3 scripts/install_git_hooks.py install` | before-work |
+| Non-mutating recover --dry-run smoke (absent journal OK) | `python3 scripts/run_recovery_smoke.py` | before-work |
 | Assess local CI necessity | `python3 scripts/check_ci_necessity.py --purpose local --explain` | commit-gate |
 | Commit gate (≤120s + safety clusters) | `python3 scripts/run_dev_loop.py --commit-gate` | commit-gate |
 | Local minimal validation (≤60s) | `python3 scripts/run_dev_loop.py` | edit-loop |
@@ -35,6 +36,7 @@ Operator command table (SSOT: `config/dev-commands.json`):
 | Publish readiness plan (add --execute for CI+evidence) | `python3 scripts/preflight_publish.py` | full-ci |
 | Lean secrets + maintainer-path scan of tracked tree | `python3 scripts/scan_privacy_tree.py` | full-ci |
 | List recent failed execution spans | `python3 scripts/dev_runs.py failures` | triage |
+| Chronological CI + span index (persists jsonl journal) | `python3 scripts/dev_runs.py index` | triage |
 | Show one execution/CI run | `python3 scripts/dev_runs.py show <run-id>` | triage |
 | Timing / budget history report | `python3 scripts/execution_budget_report.py` | triage |
 [dev-commands:end]

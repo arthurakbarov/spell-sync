@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Maintainer alias (same as ss): dev <dev-command> […]
+root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+exec python3 "$root/scripts/ss.py" "$@"

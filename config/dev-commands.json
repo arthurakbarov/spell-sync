@@ -92,6 +92,20 @@
       "mutatesRepo": false,
       "network": false
     },
+    "runs-index": {
+      "command": "python3 scripts/dev_runs.py index",
+      "stage": "triage",
+      "task": "Chronological CI + span index (persists jsonl journal)",
+      "mutatesRepo": false,
+      "network": false
+    },
+    "recovery-smoke": {
+      "command": "python3 scripts/run_recovery_smoke.py",
+      "stage": "before-work",
+      "task": "Non-mutating recover --dry-run smoke (absent journal OK)",
+      "mutatesRepo": false,
+      "network": false
+    },
     "timing-report": {
       "command": "python3 scripts/execution_budget_report.py",
       "stage": "triage",
