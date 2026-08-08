@@ -1,0 +1,35 @@
+{
+  "contractId": "status-contract-v1",
+  "schemaVersion": 1,
+  "description": "Named exit-code binding for doctor/status/support-report honesty.",
+  "exitCodes": {
+    "0": {
+      "name": "OK",
+      "meaning": "No blocking errors for the command scope."
+    },
+    "1": {
+      "name": "PUSH_ABORT",
+      "meaning": "Blocking doctor errors or mutation abort."
+    },
+    "2": {
+      "name": "LINT_FAILED",
+      "meaning": "Required next-step actions without blocking errors (doctor --health-check)."
+    },
+    "3": {
+      "name": "UNKNOWN_COMMAND",
+      "meaning": "Unrecognized CLI command."
+    }
+  },
+  "boundCommands": [
+    "doctor",
+    "status",
+    "support-report",
+    "config-check",
+    "lint"
+  ],
+  "ssot": [
+    "spell_sync/exit_codes.py",
+    "docs/CONTRACTS.md",
+    "docs/technical/doctor-report.schema.json"
+  ]
+}

@@ -1,15 +1,18 @@
 ---
-description: Never use Cursor Canvas for text, reviews, or tables — reply in chat
+description: Absolute ban on Cursor Canvas during project development
 alwaysApply: true
 ---
 
-# No Canvas for text or tables
+# No Canvas (absolute for project work)
 
-Do **not** create or use a Cursor Canvas (`.canvas.tsx`) for reviews, status reports,
-dossiers, prose, or tabular data. Put that content in the **chat reply** as markdown.
+Do **not** create, edit, open, or use a Cursor Canvas (`.canvas.tsx`) for any
+project development work — reviews, status reports, dossiers, plans, comparisons,
+methodology analyses, architecture notes, security notes, or tabular data.
 
-Canvas only if the user explicitly asks for one, or the deliverable is inherently
-visual (interactive charts / live diagrams) and chat text would be clearly worse.
+Put deliverables in the **chat reply** as markdown. Delete leftover project
+`canvases/*.canvas.tsx` files when found during a task.
 
-SSOT for this preference also lives in the global Cursor rule
-`~/.cursor/rules/no-canvas-for-text.mdc`.
+No exception for agent convenience. Only when the user **explicitly** asks for a
+canvas in the same message.
+
+Also: `~/.cursor/rules/no-canvas-for-text.mdc`.

@@ -56,6 +56,23 @@ Scripts, docs, TUI copy, and agent claims must not imply these.
 | **full CI green = publish done** | Publish still needs owner push/tag/release and privacy scan. |
 | **local minimal = full CI** | `run_dev_loop.py` has no coverage wall; `scripts/ci.sh` does. |
 | **TUI Ready = no advisories** | Warnings may still show; Ready means not blocked for writes. |
+| **gate evidence reuse = archive ready** | Digest reuse may skip another full CI for push planning; review/full archives still bind exact HEAD / clean trees as documented. |
+| **budget exceeded = functional failure** | Edit-loop exit `2` (`DEV_LOOP_BUDGET_STATUS=exceeded`) means shrink scope — not that product code failed. |
+
+## Evidence levels
+
+Honesty ladder for agent and docs claims. State only the highest level actually held.
+
+| Level | Meaning |
+|-------|---------|
+| declared | Documented / listed in support matrix or registry only |
+| implemented | Code present in the repository |
+| unit-tested | Focused pytest covers the behavior |
+| integration-tested | Cross-module, architecture, or safety-cluster coverage |
+| CLI-contract-tested | CLI/TUI exit codes and JSON envelopes (`doctor` / `status` / support-report) |
+| package-smoked | Installed-wheel smoke outside the checkout |
+| manually-validated | Real-application sample in `docs/target-validation.json` (R-CON) |
+| released | Owner-approved push / tag / publish on the agreed remote |
 
 ## Validation honesty layers
 
@@ -67,6 +84,8 @@ Scripts, docs, TUI copy, and agent claims must not imply these.
 | Mutation sample | Owner-approved Pull/Push on throwaway profile | Primary-profile safety without care |
 
 See [FEATURE_MATRIX.md](FEATURE_MATRIX.md), [SUPPORTED_TARGETS.md](SUPPORTED_TARGETS.md), and residual R-CON in [PRODUCT_COMPLETION.md](PRODUCT_COMPLETION.md).
+Agent report honesty: cite the highest evidence level above in Baseline / Validation
+([AGENT_DEVELOPMENT.md](AGENT_DEVELOPMENT.md)).
 
 ## Usage
 

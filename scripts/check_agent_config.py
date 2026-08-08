@@ -28,6 +28,9 @@ STALE_PATTERNS = [
     (re.compile(r"ContextVar\).*0\.2\.1", re.I), "stale ContextVar runtime claim"),
     (re.compile(r"ARCHITECTURE_0_3_IMPLEMENTATION", re.I), "stale architecture tracker filename"),
     (re.compile(r"ValidatedRuntime"), "stale ValidatedRuntime identifier"),
+    (re.compile(r"Python\s+3\.12", re.I), "stale Python 3.12 policy"),
+    (re.compile(r"\b0\.3\.0\b"), "stale version 0.3.0"),
+    (re.compile(r"pip install -e", re.I), "stale editable pip install guidance"),
 ]
 PRIVATE_PATH_PATTERNS = [
     re.compile(r"~/code/"),
@@ -74,6 +77,7 @@ REQUIRED_RULES = (
     "architecture-boundaries.mdc",
     "tests-fixtures.mdc",
     "test-efficiency.mdc",
+    "no-canvas-for-text.mdc",
 )
 
 REQUIRED_SKILLS = (

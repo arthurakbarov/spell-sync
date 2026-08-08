@@ -145,6 +145,64 @@ def cmd_list(*, limit: int, as_json: bool) -> int:
     return 0
 
 
+def cmd_index(*, limit: int, as_json: bool) -> int:
+    """Chronological index of CI summaries plus recent execution spans."""
+    entries: list[dict[str, object]] = []
+    for path in _ci_summaries()[:limit]:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        entries.append(
+            {
+                "kind": "ci",
+                "runId": data.get("runId"),
+                "result": data.get("result"),
+                "gitHead": data.get("gitHead"),
+                "startedAt": data.get("startedAt"),
+                "completedAt": data.get("completedAt"),
+                "path": str(path),
+                "logPath": data.get("logPath"),
+            }
+        )
+    store = HistoryStore.open()
+    try:
+        spans = store.fetch_report_spans(limit=limit)
+    finally:
+        store.close()
+    for row in spans:
+        entries.append(
+            {
+                "kind": "span",
+                "runId": row.get("run_id"),
+                "executionId": row.get("execution_id"),
+                "status": row.get("status"),
+                "startedAt": row.get("start_time"),
+                "durationSeconds": row.get("duration_seconds"),
+            }
+        )
+    entries = entries[:limit]
+    if as_json:
+        print(json.dumps({"index": entries}, indent=2, sort_keys=True))
+        return 0
+    print(f"DEV_RUNS_INDEX={len(entries)}")
+    for item in entries:
+        kind = item.get("kind")
+        if kind == "ci":
+            print(
+                f"ci\t{item.get('runId')}\t{item.get('result')}\t"
+                f"{item.get('gitHead', '')[:12]}\t{item.get('path')}"
+            )
+        else:
+            print(
+                f"span\t{item.get('runId')}\t{item.get('executionId')}\t"
+                f"{item.get('status')}\t{item.get('durationSeconds')}"
+            )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Triage execution and CI runs.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -161,6 +219,10 @@ def main(argv: list[str] | None = None) -> int:
     listing.add_argument("--limit", type=int, default=30)
     listing.add_argument("--json", action="store_true")
 
+    index = sub.add_parser("index", help="Chronological CI + span index")
+    index.add_argument("--limit", type=int, default=40)
+    index.add_argument("--json", action="store_true")
+
     args = parser.parse_args(argv)
     if args.command == "failures":
         return cmd_failures(limit=args.limit, as_json=args.json)
@@ -168,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_show(args.run_id, as_json=args.json)
     if args.command == "list":
         return cmd_list(limit=args.limit, as_json=args.json)
+    if args.command == "index":
+        return cmd_index(limit=args.limit, as_json=args.json)
     return 2
 
 

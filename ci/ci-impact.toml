@@ -3,6 +3,12 @@ schemaVersion = 1
 [meta]
 registryPath = "ci/ci-impact.toml"
 impactModule = "scripts/ci_impact"
+# Fail-closed: every tracked path must match a class or allowedUnclassified
+# (validate_ci_impact / CI-IMPACT-UNKNOWN-001). Dirty UNKNOWN paths force
+# necessity result full-required (reason unknown-change). First matching class
+# wins via CLASS_PRIORITY in scripts/ci_impact/constants.py.
+# documentation + agentWorkflow are non-CI for digest reuse; product/tests/build/
+# toolchain/packageData/validators/unknown force full CI classes.
 
 [excluded]
 patterns = [
@@ -108,6 +114,7 @@ patterns = [
   "scripts/check-docs-style.sh",
   "scripts/validate_*.py",
   "scripts/scan_privacy_tree.py",
+  "scripts/contracts/**",
 ]
 
 [classes.documentation]

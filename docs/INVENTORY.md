@@ -37,3 +37,16 @@ or manual steps change. Private wordlist content must never appear in public com
 Hosts/sops/flake/brew, shell-runtime roles, owner nx TUI menu, rebuild/runtime-verify, and
 "no commits on main" policy stay nix-only. Spell-sync allows local commits on any branch;
 push remains owner-gated ([GIT-WORKFLOW.md](GIT-WORKFLOW.md)).
+
+## Ported from nix-darwin methodology (shape only)
+
+| Item | Where |
+|------|-------|
+| Evidence ladder | `docs/CONTRACTS.md` |
+| When-not-to-rerun | `docs/WORKFLOW.md` |
+| Fail-closed change classes | `ci/ci-impact.toml` + necessity `unknown-change` |
+| Status-contract binding | `scripts/contracts/status-contract.json` |
+| Methodology reuse tests | `tests/test_methodology_reuse.py` |
+| Run triage index | `scripts/dev_runs.py index` |
+| Absolute no-canvas rule | `.cursor/rules/no-canvas-for-text.mdc` |
+| Recovery archive + source identity | spell-sync-dev snapshot profiles |

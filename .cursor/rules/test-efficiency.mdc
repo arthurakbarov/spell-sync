@@ -17,6 +17,7 @@ alwaysApply: true
 7. Do not repeat an identical successful command on an unchanged tree.
    Prefer `python3 scripts/check_session.py` (start / record / lookup / finish)
    within one agent arc when reusing successful checks for the same fingerprint.
+   Follow `docs/WORKFLOW.md` § When not to rerun before any extra gate.
 8. Before selecting tests, use `scripts/test_plan.py --dev-scope` or document why.
 9. Do not use `pytest --lf` or `pytest -x` as local minimal or full CI evidence.
 10. Do not run packaging or wheel smoke in local minimal unless package boundaries changed.

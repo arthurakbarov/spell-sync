@@ -141,6 +141,7 @@ def _build_check_steps(py: str) -> list[tuple[str, list[str]]]:
         ("dev-commands.registry", [py, "scripts/validate_dev_commands.py", "--check"]),
         ("timing.observability", [py, "scripts/validate_timing_observability.py"]),
         ("ci-impact.registry", [py, "scripts/validate_ci_impact.py"]),
+        ("status-contract.registry", [py, "scripts/validate_status_contract.py"]),
         ("test-impact.registry", [py, "scripts/validate_test_impact.py"]),
         ("docs.style", ["bash", "scripts/check-docs-style.sh"]),
         ("docs.contract", [py, "scripts/check_docs_contract.py"]),

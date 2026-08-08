@@ -53,6 +53,7 @@ Or `scripts/ci.sh` then `python3 scripts/check_ci_evidence.py`.
 ## Triage
 
 ```bash
+python3 scripts/dev_runs.py index
 python3 scripts/dev_runs.py failures
 python3 scripts/dev_runs.py show <run-id>
 ```

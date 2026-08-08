@@ -189,12 +189,14 @@ Every completed phase or corrective task returns:
 
 ## 1. Baseline
 - starting HEAD, package version, clean status, baseline validators, baseline CI
+- highest evidence level already held (from `docs/CONTRACTS.md` § Evidence levels)
 
 ## 2. Current phase
 - phase ID, starting status, goal, scope
 
 ## 3. Inventory
 - affected modules, dependency paths, contracts, risks
+- residual IDs in play (from PRODUCT_COMPLETION / ROADMAP) when relevant
 
 ## 4. Implementation
 - files changed, APIs changed, architecture decisions, removed legacy paths
@@ -209,9 +211,11 @@ Every completed phase or corrective task returns:
 - changed scope, clusters, skipped duplicate commands, reused run keys
 - Local minimal budget: wall vs 60s/120s (`DEV_LOOP_BUDGET_STATUS`); full CI: expected/soft vs actual
 - full CI runs attempted (expected: 0 for polish, 1 before push/release) and reason for any additional run
+- evidence level reached by this validation (must not exceed what commands support)
 
 ## 7. Full CI
 - CI_RESULT, CI_EXIT, CI_FAILED_ID, CI_SUMMARY, CI_LOG
+- triage: `python3 scripts/dev_runs.py index` / `show <run-id>` when useful
 
 ## 8. Packaging
 - wheel/sdist, installed-wheel smoke, package version, import origin when applicable

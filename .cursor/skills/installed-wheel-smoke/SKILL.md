@@ -16,7 +16,7 @@ description: >-
 
 ## Do not use
 
-- Editable install (`pip install -e .`) as the only packaging check — CI wheel smoke is minimal
+- Editable install as the only packaging check — CI wheel smoke is minimal
 - Real application dictionaries or maintainer wordlist
 
 ## Workflow
