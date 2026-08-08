@@ -23,12 +23,10 @@ from spell_sync.tui.screens.review_update_screen import (
     ReviewPullScreen,
     ReviewPushScreen,
     ReviewSessionReportScreen,
-    ReviewStartScreen,
     _format_pull_preview,
     _format_push_preview,
 )
 from tests.tui.fake_service import fake_service, sample_preview, sample_pull_preview
-from tests.tui.test_helpers import wait_for_text
 
 
 class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
@@ -60,18 +58,6 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
             OperationReport("push", OperationOutcome.COMPLETED, "t", "s")
         )
         self.assertIsNone(controller.review_session())
-
-    async def test_start_screen_back_paths(self):
-        controller = TuiController(fake_service(), CliOptions())
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(ReviewStartScreen(controller))
-            await pilot.pause()
-            app.screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-back")))
-            await pilot.pause()
-            app.push_screen(ReviewStartScreen(controller))
-            await pilot.pause()
-            app.screen.action_back()
 
     async def test_pull_screen_edge_paths(self):
         service = fake_service()
@@ -248,28 +234,6 @@ class TestReviewCoverage(unittest.IsolatedAsyncioTestCase):
                 report.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="btn-quit")))
                 exit_app.assert_called_once_with(0)
             await pilot.pause()
-
-    async def test_session_report_back_on_shallow_stack(self):
-        controller = TuiController(fake_service(), CliOptions())
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            report = ReviewSessionReportScreen(controller)
-            app.switch_screen(report)
-            await pilot.pause()
-            report.action_back_dashboard()
-            await pilot.pause()
-
-    async def test_session_report_back_dashboard_refresh(self):
-        controller = TuiController(fake_service(), CliOptions())
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            await wait_for_text(pilot, "#dashboard-summary", "Ready")
-            controller.begin_review_session()
-            report = ReviewSessionReportScreen(controller)
-            app.push_screen(report)
-            await pilot.pause()
-            report.action_back_dashboard()
-            await wait_for_text(pilot, "#dashboard-summary", "Ready")
 
     async def test_prepare_review_pull_stores_prior_push_plan(self):
         service = fake_service()

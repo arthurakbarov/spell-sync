@@ -6,19 +6,21 @@ Canonical guide for selecting validation during spell-sync development.
 **publish/release** property, not an every-commit property.
 
 Prefer **behavioral and invariant tests** over line-execution padding. When a new line is
-uncovered, add or extend a non-`*coverage*` test first; grow frozen `*coverage*` suites only
-with explicit owner approval (see `tests/test_padding_inventory_policy.py`, residual R-PWR).
+uncovered, add or extend a non-`*coverage*` test first; new `*coverage*` / `*coverage_gaps*`
+files are forbidden except the frozen allowlist in `tests/test_padding_inventory_policy.py`
+(R-PWR retired).
 
 ## Coverage and suite shape
 
 | Keep strict | Do not grow | Add where missing |
 |-------------|-------------|-------------------|
-| Mutation safety clusters at commit gate | Legacy `*coverage*` padding inventory | Property/idempotence tests for Pull union and Push subsets |
+| Mutation safety clusters at commit gate | New `*coverage*` / `*coverage_gaps*` files (frozen allowlist only) | Property/idempotence tests for Pull union and Push subsets |
 | Publish coverage: **100% lines** / **≥90% branches** on `application/` + mutation paths; **≥98% lines** on TUI/presentation/remainder (`scripts/coverage_policy.py`) | Fragile skill-prose substring contracts (prefer paths/headings/frontmatter) | Real-app manual samples before publish (R-CON) |
 | Installed-wheel smoke on publish | Full CI after every polish commit | Windows hardware adversarial when available (R-WIN) |
 
-**Freeze + shrink:** do not raise `MAX_COVERAGE_NAMED_TEST_DEFS`. When refactoring, move
-coverage into behavioral modules and delete padding tests so the ceiling can drop later.
+**Frozen allowlist:** do not add new `*coverage*` / `*coverage_gaps*` files. Bare (no-assert)
+tests inside the allowlist are forbidden (`MAX_BARE_COVERAGE_TESTS = 0`). When refactoring,
+move coverage into behavioral modules and shrink the allowlist count.
 
 **Property tests:** `tests/test_sync_invariants_property.py` (Hypothesis) covers casefold
 Pull union absorption/commutativity/associativity, Push subset filters, and synthetic

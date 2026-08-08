@@ -543,7 +543,8 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
         )
         app = SpellSyncApp(controller)
         async with app.run_test(size=(100, 36)) as pilot:
-            await wait_for_text(pilot, "#blocking-banner", "Corrupt recovery journal")
+            content = await wait_for_text(pilot, "#blocking-banner", "Corrupt recovery journal")
+            self.assertIn("Corrupt", str(content.render()))
 
     async def test_recovery_screen_guards_and_callbacks(self):
         preview = sample_recovery_preview()
@@ -600,7 +601,8 @@ class TestLineCoverageGapsUi(unittest.IsolatedAsyncioTestCase):
             app.push_screen(
                 OperationScreen(controller, operation="cleanup", recovery_preview=preview)
             )
-            await wait_for_operation_report(pilot, "cleanup")
+            content = await wait_for_operation_report(pilot, "cleanup")
+            self.assertIn("artifacts", str(content.render()).lower())
 
     async def test_recovery_screen_worker_poll_paths(self):
         preview = sample_recovery_preview(

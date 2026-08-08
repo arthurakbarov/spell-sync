@@ -10,8 +10,13 @@ Only items that still fail a completion criterion. Done-definitions:
 | owner-publish | Explicit owner tag / GitHub Release / package publish after preflight | Product criterion 10 |
 | R-CON | More real-app manual samples (Firefox + mutation; other OSes) | Publish confidence, not engineering done |
 | R-WIN | Windows hardware adversarial R1–R7 | Windows threat-model claim |
-| R-PWR | Shrink legacy coverage-padding inventory over time (≤371 defs / ≤53 bare) | Hygiene only; frozen ceiling |
 | R-DUR | Physical power-loss / journal fsync durability proof | Durability claim beyond process-crash |
+
+## Retired residuals
+
+| ID | Item | Notes |
+|----|------|-------|
+| R-PWR | Legacy coverage-padding inventory retired | Zero bare tests; frozen allowlist only (`tests/test_padding_inventory_policy.py`) |
 
 ## Not on this roadmap
 

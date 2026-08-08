@@ -1,4 +1,4 @@
-"""Stable pytest groups must cover the full suite."""
+"""Pytest group union policy — not a coverage-padding suite."""
 
 from __future__ import annotations
 

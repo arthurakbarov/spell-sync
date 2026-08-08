@@ -11,12 +11,12 @@ Remove obsolete private maintainer export workflow (completed in spell-sync-dev)
 ## Current phase
 
 Version 1 (public package 1.0.0) — **complete** (owner-approved with documented residuals:
-R-WIN, R-PWR, R-DUR, R-CON). Release not performed.
+R-WIN, R-DUR, R-CON; R-PWR retired). Release not performed.
 
 Post-v1 ops: **complete** (engineering). Product UX waves A–F, local two-mode
 validation, ETA/observe, agent-contract unification with nix-darwin naming, and
 engineering/product completion docs are landed. Product criterion 10 (owner publish)
-and residuals R-WIN / R-PWR / R-DUR / R-CON remain owner-initiated only.
+and residuals R-WIN / R-DUR / R-CON remain owner-initiated only.
 
 [architecture-status:start]
 current: owner-publish
@@ -48,7 +48,8 @@ owner-publish: not-started
 
 Public version: `1.0.0` (`pyproject.toml`).
 
-Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-PWR, R-DUR, R-CON).
+Owner approval: **recorded** (`APPROVE_WITH_DOCUMENTED_RESIDUALS` — R-WIN, R-DUR, R-CON;
+R-PWR retired).
 Phase 10 is **complete**. Post-v1 ops is **complete** (engineering). Current tracker
 focus: `owner-publish` (**not started** — awaits explicit owner push/tag/release).
 
@@ -64,9 +65,8 @@ Open engineering residuals (not release blockers if previously accepted):
 - Real-application manual validation: **2/35** (`docs/target-validation.json`;
   chrome/macos + macos_spelling/macos recorded 2026-08-05, read-only / dry-run)
 - Windows real-hardware adversarial R1–R7 (reparse/junction): residual **R-WIN**
-- Legacy `*coverage*` padding inventory frozen at ≤371 `def test_` with ≤53 bare
-  (no-assert) tests inside that set (see `tests/test_padding_inventory_policy.py`,
-  residual R-PWR) — do not grow; shrink only; publish gate is tiered
+- Legacy `*coverage*` padding inventory retired (R-PWR): frozen allowlist, zero bare tests
+  (`tests/test_padding_inventory_policy.py`); publish gate remains tiered
   (`scripts/coverage_policy.py`: 100% on application + mutation; ≥98% TUI/remainder)
 
 Corrective security evidence: R1–R7 `7/7`, safe_discard `9/9`, handoff integrity H1–H11 green,
@@ -562,8 +562,8 @@ Open items use the IDs in [`ROADMAP.md`](ROADMAP.md):
 |----|---------|
 | R-WIN | Windows real-hardware adversarial R1–R7 not run |
 | R-CON | Real-application manual validation samples still thin (2/35) |
-| R-PWR | Legacy `*coverage*` padding inventory: freeze + shrink only |
 | R-DUR | Physical power-loss / journal fsync durability proof not claimed |
+| R-PWR | Legacy coverage-padding inventory retired (frozen allowlist; zero bare tests) |
 | owner-publish | Tag / GitHub Release / package publish awaits explicit owner command |
 
 Historical phase-10 threat-model notes (not ROADMAP IDs; still accepted):
@@ -589,7 +589,6 @@ Owner-initiated tracks that remain open (SSOT: [`ROADMAP.md`](ROADMAP.md)):
 - `owner-publish` — GitHub Release / tag / package publish
 - `R-CON` — real-application manual validation matrix samples
 - `R-WIN` — Windows real-hardware adversarial evidence
-- `R-PWR` — gradual retirement of legacy coverage-padding suites
 
 Delivered in this cycle (engineering polish, not release):
 
@@ -600,7 +599,7 @@ Delivered in this cycle (engineering polish, not release):
 - Single shared coverage policy script in `ci_runner.py`
 - Docs contract hygiene: no `python3.N` commands and no maintainer topology paths in public docs
 - Canonical `spell_sync/operation_reports.py` — diagnostics no longer depends on application
-- Coverage-padding inventory frozen (`tests/test_padding_inventory_policy.py`)
+- Coverage-padding inventory retired (`tests/test_padding_inventory_policy.py`; R-PWR)
 - Guided TUI / docs product labels aligned to Collect my words / Update my apps
 - Test-impact mappings expanded off packaging fallback; dead-code audit fail-closed
 - `EventLevel` alias retired; CI necessity ladder wording synced in agent docs
@@ -609,9 +608,8 @@ Delivered in this cycle (engineering polish, not release):
 - Core modules mapped off packaging fallback; dead-code audit non-vacuous for product modules
 - Execution-control product-path boundary scan uses real service modules
 
-Open residuals: manual target validation 2/35; Windows hardware R1–R7; gradual retirement of
-legacy coverage-padding suites without weakening the tiered CI coverage gate
-(`scripts/coverage_policy.py`).
+Open residuals: manual target validation 2/35; Windows hardware R1–R7. Coverage-padding
+inventory retired (R-PWR); tiered CI coverage gate unchanged (`scripts/coverage_policy.py`).
 
 Not an architecture migration phase. Do not publish without an explicit owner command.
 
@@ -731,7 +729,7 @@ Phase 10 (complete, owner-approved with residuals): tip evidence authoritative v
   last recorded exact-head in baseline section; R1–R7 7/7; safe_discard 9/9; version 1.0.0; release not performed
 Post-v1 ops (complete, engineering): waves A–F; ETA/observe; agent-contract unification
   (README, git-change-management, repository-workflow, after-changes, security-audit);
-  only owner-publish + residuals R-WIN/R-PWR/R-DUR/R-CON remain
+  only owner-publish + residuals R-WIN/R-DUR/R-CON remain
 Phase 10 historical (version bump): HEAD e46ce45; CI 20260731T110156.184380Z
 Phase 9 (accepted): HEAD 7d11b45; lightweight validation; CI_EVIDENCE_MATCH=reused-non-ci-change
 Phase 8 (accepted): HEAD 3c6bc35; full CI finalEvidence=true (20260731T104234.254905Z)

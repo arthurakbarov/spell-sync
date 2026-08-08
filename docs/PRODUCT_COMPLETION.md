@@ -23,6 +23,12 @@ Residuals accepted for v1 are listed explicitly; they are not silent blockers.
 Checklist status: criteria 1–9 complete; criterion 10 awaits explicit owner publish.
 Post-v1 engineering ops are closed; tracker current focus is `owner-publish`.
 
+## Retired residuals
+
+| ID | Topic |
+|----|-------|
+| R-PWR | Legacy coverage-padding inventory retired (zero bare tests; frozen allowlist only) |
+
 ## Accepted residuals (v1)
 
 Documented and accepted for initial release; follow-up on second machine or later cycle:
@@ -30,7 +36,6 @@ Documented and accepted for initial release; follow-up on second machine or late
 | ID | Topic |
 |----|-------|
 | R-WIN | Windows real-hardware adversarial validation (reparse/junction) — **not runnable on this macOS host** |
-| R-PWR | Legacy coverage padding inventory (frozen; shrink only; tiered gate allows ≥98% on TUI/presentation) |
 | R-DUR | Physical power-loss / fsync durability proof not claimed (POSIX best-effort journal sync only) |
 | R-CON | Real-application manual validation coverage (see `docs/target-validation.json` and `docs/FEATURE_MATRIX.md`) — **partial** `2/35`: chrome/macos + macos_spelling/macos recorded 2026-08-05 (read-only); Firefox + mutation samples still open |
 

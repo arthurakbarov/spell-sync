@@ -20,7 +20,7 @@ def test_roadmap_assigns_distinct_residual_meanings() -> None:
     assert "| R-DUR |" in roadmap
     pwr_lines = [line for line in roadmap.splitlines() if "| R-PWR |" in line]
     dur_lines = [line for line in roadmap.splitlines() if "| R-DUR |" in line]
-    assert pwr_lines and "coverage-padding" in pwr_lines[0]
+    assert pwr_lines and "retired" in pwr_lines[0].lower()
     assert dur_lines and "power-loss" in dur_lines[0].lower()
 
 

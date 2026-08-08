@@ -230,58 +230,6 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertIsInstance(app.screen, TargetSettingsScreen)
 
-    async def test_operation_targets_flow(self):
-        prepared = PreparedTargetSettingsUpdate(
-            update_id="update-1",
-            config_path=Path("/tmp/project/spell-sync.toml"),
-            wordlist_path=Path("/tmp/project/wordlist.txt"),
-            selected_target_ids=frozenset({"edge"}),
-            previous_target_ids=frozenset({"chrome"}),
-            enabled_target_ids=frozenset({"edge"}),
-            disabled_target_ids=frozenset({"chrome"}),
-            rendered_config_bytes=b"[dictionaries]\n",
-            config_fingerprint_before="abc",
-            warnings=(),
-            can_execute=True,
-        )
-        controller = self._controller()
-        controller._service.build_target_settings_report = MagicMock(
-            return_value=OperationReport(
-                operation="targets",
-                outcome=OperationOutcome.COMPLETED,
-                title="Configuration updated",
-                summary="Enabled: Edge",
-            )
-        )
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            await app.push_screen(
-                OperationScreen(
-                    controller,
-                    operation="targets",
-                    target_settings_prepared=prepared,
-                )
-            )
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.pause()
-
-    async def test_row_widget_meta_lines(self):
-        target = _target(
-            "broken",
-            selectable=False,
-            enabled=True,
-            status="corrupt",
-            detail="Corrupt dictionary",
-        )
-        row = SetupTargetRowWidget(target, selected=True, row_index=0)
-        async with SpellSyncApp(self._controller()).run_test(size=(100, 48)) as pilot:
-            await pilot.app.mount(row)
-            await pilot.pause()
-            row.on_focus()
-            row.on_blur()
-            row.set_selected(False)
-
     async def test_dashboard_targets_button(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
@@ -441,29 +389,6 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.on_button_pressed(_button_event("btn-back"))
             screen.action_back()
 
-    async def test_row_widget_checkbox_paths(self):
-        target = _target("chrome", enabled=True)
-        row = SetupTargetRowWidget(target, selected=False, row_index=0)
-        async with SpellSyncApp(self._controller()).run_test(size=(100, 48)) as pilot:
-            await pilot.app.mount(row)
-            await pilot.pause()
-            checkbox = row.query_one("#target-checkbox-chrome")
-            checkbox.value = True
-            row._on_checkbox_changed(type("E", (), {"checkbox": checkbox})())
-            corrupt = _target(
-                "bad",
-                selectable=False,
-                enabled=True,
-                status="corrupt",
-                detail="Corrupt dictionary",
-            )
-            bad_row = SetupTargetRowWidget(corrupt, selected=True, row_index=1)
-            await pilot.app.mount(bad_row)
-            await pilot.pause()
-            bad_checkbox = bad_row.query_one("#target-checkbox-bad")
-            bad_checkbox.value = False
-            bad_row._on_checkbox_changed(type("E", (), {"checkbox": bad_checkbox})())
-
     async def test_row_widget_meta_without_path(self):
         target = SetupTarget(
             identifier="missing",
@@ -483,6 +408,50 @@ class TestTargetSettingsScreenCoverage(unittest.IsolatedAsyncioTestCase):
         )
         row = SetupTargetRowWidget(target, selected=False, row_index=0)
         self.assertIn("Not detected", "\n".join(row._meta_lines()))
+
+    async def test_target_settings_operation_and_row_handlers(self):
+        prepared = PreparedTargetSettingsUpdate(
+            update_id="update-1",
+            config_path=Path("/tmp/project/spell-sync.toml"),
+            wordlist_path=Path("/tmp/project/wordlist.txt"),
+            selected_target_ids=frozenset({"edge"}),
+            previous_target_ids=frozenset({"chrome"}),
+            enabled_target_ids=frozenset({"edge"}),
+            disabled_target_ids=frozenset({"chrome"}),
+            rendered_config_bytes=b"[dictionaries]\n",
+            config_fingerprint_before="abc",
+            warnings=(),
+            can_execute=True,
+        )
+        controller = self._controller()
+        controller._service.build_target_settings_report = MagicMock(
+            return_value=OperationReport(
+                operation="targets",
+                outcome=OperationOutcome.COMPLETED,
+                title="Configuration updated",
+                summary="Enabled: Edge",
+            )
+        )
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 48)) as pilot:
+            await app.push_screen(
+                OperationScreen(
+                    controller,
+                    operation="targets",
+                    target_settings_prepared=prepared,
+                )
+            )
+            await pilot.pause()
+            self.assertFalse(controller.mutation_active)
+        target = _target("chrome", enabled=True)
+        row = SetupTargetRowWidget(target, selected=True, row_index=0)
+        async with SpellSyncApp(self._controller()).run_test(size=(100, 48)) as pilot:
+            await pilot.app.mount(row)
+            await pilot.pause()
+            checkbox = row.query_one("#target-checkbox-chrome")
+            checkbox.value = False
+            row._on_checkbox_changed(type("E", (), {"checkbox": checkbox})())
+            self.assertFalse(checkbox.value)
 
 
 if __name__ == "__main__":

@@ -84,4 +84,4 @@ claim a permanent zero for every private alias.
 
 1. Re-run `python3 scripts/audit_dead_code.py` after large product deletions.
 2. Do **not** delete `.artifacts/` until CI evidence is refreshed and snapshot policy satisfied.
-3. Shrink legacy coverage-padding tests only under residual R-PWR policy (not bulk-deleted here).
+3. Shrink legacy coverage-padding tests only under the retired R-PWR policy (frozen allowlist; no new padding files).

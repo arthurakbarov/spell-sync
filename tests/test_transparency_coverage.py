@@ -353,7 +353,8 @@ def test_doctor_export_file_exists() -> None:
         async with app.run_test(size=(100, 32)) as pilot:
             await app.push_screen(DoctorScreen(controller))
             await pilot.click("#btn-export-support")
-            await wait_for_text(pilot, "#doctor-export-status", "exists")
+            status = await wait_for_text(pilot, "#doctor-export-status", "exists")
+            assert "exists" in str(status.render()).lower()
 
     asyncio.run(_run())
 
@@ -583,10 +584,18 @@ def test_target_details_validation_linux_platform(
 
 
 def test_target_settings_open_details_without_focus() -> None:
-    controller = TuiController(fake_service(), CliOptions())
-    screen = TargetSettingsScreen(controller)
-    screen.focused = None
-    screen.action_open_details()
+    async def _run() -> None:
+        controller = TuiController(fake_service(), CliOptions())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 32)) as pilot:
+            screen = TargetSettingsScreen(controller)
+            await pilot.app.mount(screen)
+            screen.focused = None
+            with patch.object(screen.app, "push_screen") as push_screen:
+                screen.action_open_details()
+                push_screen.assert_not_called()
+
+    asyncio.run(_run())
 
 
 def test_doctor_export_generic_failure() -> None:
@@ -597,7 +606,8 @@ def test_doctor_export_generic_failure() -> None:
         async with app.run_test(size=(100, 32)) as pilot:
             await app.push_screen(DoctorScreen(controller))
             await pilot.click("#btn-export-support")
-            await wait_for_text(pilot, "#doctor-export-status", "could not be exported")
+            status = await wait_for_text(pilot, "#doctor-export-status", "could not be exported")
+            assert "could not be exported" in str(status.render())
 
     asyncio.run(_run())
 
@@ -631,7 +641,8 @@ def test_review_save_report_already_saved_message() -> None:
             screen._saved_report_path = "/tmp/already-saved.json"
             await app.push_screen(screen)
             await pilot.click("#btn-save-report")
-            await wait_for_text(pilot, "#session-report-export-status", "Report already saved")
+            status = await wait_for_text(pilot, "#session-report-export-status", "Report already saved")
+            assert "already saved" in str(status.render()).lower()
 
     asyncio.run(_run())
 

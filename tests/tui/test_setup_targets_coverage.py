@@ -86,72 +86,6 @@ class TestSetupTargetsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertIn("chrome", controller.setup_selected_targets)
 
-    async def test_focus_navigation_without_rows(self):
-        controller = self._controller(SetupTargetDiscovery(targets=(), default_enabled=()))
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            screen = app.screen
-            screen.action_focus_next()
-            screen.action_focus_previous()
-            screen.action_toggle_focused()
-
-    async def test_checkbox_changed_and_disabled_toggle(self):
-        controller = self._controller()
-        discovery = SetupTargetDiscovery(
-            targets=(
-                _target("chrome"),
-                SetupTarget(
-                    identifier="cursor",
-                    display_name="Cursor",
-                    path=Path("/tmp/cursor.txt"),
-                    format_name="text",
-                    detected=True,
-                    available=False,
-                    readable=False,
-                    supported=True,
-                    enabled_by_default=False,
-                    selectable=False,
-                    word_count=None,
-                    status="corrupt",
-                    detail="Corrupt dictionary",
-                ),
-                _target("jetbrains", selectable=False, detected=False, status="missing"),
-            ),
-            default_enabled=("chrome",),
-        )
-        controller._setup_discovery = discovery
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            row = app.screen.query_one("#target-row-chrome", SetupTargetRowWidget)
-            row.post_message(SetupTargetRowWidget.Toggled("chrome"))
-            corrupt = app.screen.query_one("#target-row-cursor", SetupTargetRowWidget)
-            corrupt.post_message(SetupTargetRowWidget.Toggled("cursor"))
-            corrupt.key_space()
-            wrong_event = MagicMock()
-            wrong_event.checkbox = MagicMock(id="target-checkbox-other")
-            row._on_checkbox_changed(wrong_event)
-            corrupt_checkbox = corrupt.query_one("#target-checkbox-cursor")
-            blocked_event = MagicMock()
-            blocked_event.checkbox = corrupt_checkbox
-            corrupt_checkbox.value = True
-            corrupt._on_checkbox_changed(blocked_event)
-            await pilot.pause()
-
-    async def test_button_handlers(self):
-        controller = self._controller()
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            screen = app.screen
-            for button_id in ("btn-refresh", "btn-clear", "btn-continue"):
-                screen.on_button_pressed(_button_event(button_id))
-            await pilot.pause()
-
     async def test_refresh_worker_error_and_stale_token(self):
         controller = self._controller()
         app = SpellSyncApp(controller)
@@ -176,66 +110,8 @@ class TestSetupTargetsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen._on_refresh_worker_state(Worker.StateChanged(worker, WorkerState.SUCCESS))
             worker.result = screen._refresh_token
             screen._on_refresh_worker_state(Worker.StateChanged(worker, WorkerState.SUCCESS))
-            await pilot.pause()
-
-    async def test_focus_from_button(self):
-        from textual.widgets import Button
-
-        controller = self._controller()
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            screen = app.screen
-            screen.action_focus_next()
-            screen.action_focus_previous()
-            screen.query_one("#btn-back", Button).focus()
-            screen.action_focus_next()
-            screen.action_focus_previous()
-            row = screen.query_one("#target-row-chrome", SetupTargetRowWidget)
-            row.focus()
-            screen.action_toggle_focused()
-            await pilot.pause()
-
-    async def test_focused_property_branches(self):
-        controller = self._controller()
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            screen = app.screen
-            row = screen.query_one("#target-row-chrome", SetupTargetRowWidget)
-            with patch.object(type(screen), "focused", new_callable=PropertyMock) as focused:
-                focused.return_value = None
-                screen.action_focus_previous()
-                screen.action_focus_next()
-                focused.return_value = screen.query_one("#btn-back")
-                screen.action_focus_previous()
-                screen.action_focus_next()
-                focused.return_value = row
-                screen.action_toggle_focused()
-                row.focus()
-                screen.action_focus_next()
-                screen.action_focus_previous()
-            screen.on_button_pressed(_button_event("btn-select-available"))
-            worker = MagicMock()
-            worker.result = 1
-            screen._refresh_worker = worker
-            screen._refresh_token = 99
-            with patch.object(screen, "_is_current_load", return_value=False):
-                screen._on_refresh_worker_state(Worker.StateChanged(worker, WorkerState.SUCCESS))
-            await pilot.pause()
-
-    async def test_key_space_on_selectable_row(self):
-        controller = self._controller()
-        controller._setup_selection = SetupSelection(frozenset())
-        app = SpellSyncApp(controller)
-        async with app.run_test(size=(100, 48)) as pilot:
-            app.push_screen(SetupTargetsScreen(controller, "detail"))
-            await pilot.pause()
-            row = app.screen.query_one("#target-row-chrome", SetupTargetRowWidget)
-            row.key_space()
-            await pilot.pause()
+            worker.result = 999
+            screen._on_refresh_worker_state(Worker.StateChanged(worker, WorkerState.SUCCESS))
             await pilot.pause()
 
     async def test_preview_shows_none_enabled(self):
@@ -251,6 +127,92 @@ class TestSetupTargetsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             content = str(app.screen.query_one("#preview-content").render())
             self.assertIn("(none)", content)
+
+    async def test_setup_targets_widget_handlers(self):
+        discovery = SetupTargetDiscovery(
+            targets=(
+                _target("chrome"),
+                SetupTarget(
+                    identifier="cursor",
+                    display_name="Cursor",
+                    path=Path("/tmp/cursor.txt"),
+                    format_name="text",
+                    detected=True,
+                    available=False,
+                    readable=False,
+                    supported=True,
+                    enabled_by_default=False,
+                    selectable=False,
+                    word_count=None,
+                    status="corrupt",
+                    detail="Corrupt dictionary",
+                ),
+            ),
+            default_enabled=("chrome",),
+        )
+        controller = self._controller(discovery)
+        controller._setup_selection = SetupSelection(frozenset())
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 48)) as pilot:
+            app.push_screen(SetupTargetsScreen(controller, "detail"))
+            await pilot.pause()
+            screen = app.screen
+            screen.action_focus_next()
+            screen.action_focus_previous()
+            row = screen.query_one("#target-row-chrome", SetupTargetRowWidget)
+            row.post_message(SetupTargetRowWidget.Toggled("chrome"))
+            corrupt = screen.query_one("#target-row-cursor", SetupTargetRowWidget)
+            corrupt_checkbox = corrupt.query_one("#target-checkbox-cursor")
+            corrupt_checkbox.value = True
+            corrupt._on_checkbox_changed(
+                type("E", (), {"checkbox": corrupt_checkbox})()
+            )
+            row.key_space()
+            for button_id in ("btn-refresh", "btn-clear", "btn-continue"):
+                screen.on_button_pressed(_button_event(button_id))
+            await pilot.pause()
+            self.assertFalse(corrupt_checkbox.value)
+            self.assertIsNotNone(screen.query_one("#targets-status"))
+
+    async def test_focus_navigation_without_rows(self):
+        controller = self._controller(SetupTargetDiscovery(targets=(), default_enabled=()))
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 48)) as pilot:
+            app.push_screen(SetupTargetsScreen(controller, "detail"))
+            await pilot.pause()
+            screen = app.screen
+            screen.action_focus_next()
+            screen.action_focus_previous()
+            screen.action_toggle_focused()
+            self.assertEqual(len(list(screen.query(SetupTargetRowWidget))), 0)
+
+    async def test_focused_property_and_wrong_checkbox(self):
+        from textual.widgets import Button
+
+        controller = self._controller()
+        app = SpellSyncApp(controller)
+        async with app.run_test(size=(100, 48)) as pilot:
+            app.push_screen(SetupTargetsScreen(controller, "detail"))
+            await pilot.pause()
+            screen = app.screen
+            row = screen.query_one("#target-row-chrome", SetupTargetRowWidget)
+            with patch.object(type(screen), "focused", new_callable=PropertyMock) as focused:
+                focused.return_value = None
+                screen.action_focus_previous()
+                screen.action_focus_next()
+                focused.return_value = screen.query_one("#btn-back", Button)
+                screen.action_focus_previous()
+                screen.action_focus_next()
+                focused.return_value = row
+                row.focus()
+                screen.action_focus_next()
+                screen.action_focus_previous()
+                screen.action_toggle_focused()
+            wrong_event = MagicMock()
+            wrong_event.checkbox = MagicMock(id="target-checkbox-other")
+            row._on_checkbox_changed(wrong_event)
+            screen.on_button_pressed(_button_event("btn-select-available"))
+            self.assertIn("chrome", controller.setup_selected_targets)
 
 
 class TestControllerSetupCoverage(unittest.TestCase):

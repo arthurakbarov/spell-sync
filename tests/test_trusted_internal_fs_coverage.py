@@ -90,16 +90,22 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
                 with tempfile.NamedTemporaryFile(dir=tmp, delete=False) as temp:
                     file_fd = temp.fileno()
                     tif._fchmod_private_fd(file_fd)
+                    mode = stat.S_IMODE(os.fstat(file_fd).st_mode)
                 tif._fchmod_private_dir_fd(dir_fd)
+                dir_mode = stat.S_IMODE(os.fstat(dir_fd).st_mode)
             finally:
                 os.close(dir_fd)
+            self.assertEqual(mode, 0o600)
+            self.assertEqual(dir_mode, 0o700)
 
     def test_fchmod_win32_noop(self) -> None:
         import spell_sync.trusted_internal_fs as tif
 
         with patch.object(tif.sys, "platform", "win32"):
-            tif._fchmod_private_fd(1)
-            tif._fchmod_private_dir_fd(1)
+            with patch("spell_sync.trusted_internal_fs.os.fchmod") as fchmod_mock:
+                tif._fchmod_private_fd(1)
+                tif._fchmod_private_dir_fd(1)
+                fchmod_mock.assert_not_called()
 
     def test_fchmod_and_fsync_helpers(self) -> None:
         with patch("spell_sync.trusted_internal_fs.sys.platform", "win32"):
@@ -142,6 +148,7 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
                             side_effect=OSError(errno.EINVAL, "bad"),
                         ):
                             _flush_file(fd)
+                            fake_ctypes.windll.kernel32.FlushFileBuffers.assert_called_once()
             finally:
                 os.close(fd)
 
@@ -323,6 +330,7 @@ class TestTrustedInternalFsCoverage(unittest.TestCase):
                 side_effect=ExistError("exists"),
             ):
                 child = trusted.ensure_child_directory("exists")
+                self.assertIsNotNone(child)
                 child.close()
             trusted.close()
 
@@ -759,7 +767,9 @@ class TestSecureArtifactsRemainingGaps(unittest.TestCase):
 
     def test_fchmod_private_win32(self) -> None:
         with patch.object(sys, "platform", "win32"):
-            _fchmod_private(1)
+            with patch("spell_sync.secure_artifacts.os.fchmod") as fchmod_mock:
+                _fchmod_private(1)
+                fchmod_mock.assert_not_called()
 
     def test_copy_snapshot_error_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -822,8 +832,8 @@ class TestSecureArtifactsRemainingGaps(unittest.TestCase):
             file_path.write_text("x", encoding="utf-8")
             dir_path = root / "dir"
             dir_path.mkdir()
-            _reject_unsafe_component(file_path)
-            _reject_unsafe_component(dir_path)
+            assert _reject_unsafe_component(file_path) is None
+            assert _reject_unsafe_component(dir_path) is None
 
     def test_read_trusted_regular_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

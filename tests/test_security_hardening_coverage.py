@@ -303,7 +303,7 @@ class TestPushTransactionBranches(unittest.TestCase):
 
 class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
     def test_reject_unsafe_nonexistent(self) -> None:
-        _reject_unsafe_component(Path("/nonexistent-path-xyz"))
+        assert _reject_unsafe_component(Path("/nonexistent-path-xyz")) is None
 
     def test_is_reparse_point_windows_attrs(self) -> None:
         with patch.object(sys, "platform", "win32"):
@@ -394,9 +394,9 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "win32", "Windows-only branches")
     def test_windows_private_helpers(self) -> None:
-        _chmod_private_dir(Path("."))
-        _fsync_directory(Path("."))
-        _flush_file_windows(1)
+        assert _chmod_private_dir(Path(".")) is None
+        assert _fsync_directory(Path(".")) is None
+        assert _flush_file_windows(1) is None
 
     def test_windows_branches_via_platform_patch(self) -> None:
         fake_msvcrt = MagicMock()
@@ -412,7 +412,7 @@ class TestSecureArtifactsRemainingCoverage(unittest.TestCase):
                     sys.modules,
                     {"msvcrt": fake_msvcrt, "ctypes": fake_ctypes},
                 ):
-                    _flush_file_windows(1)
+                    assert _flush_file_windows(1) is None
 
 
 class TestRemainingCoverageGaps(unittest.TestCase):
@@ -444,8 +444,9 @@ class TestRemainingCoverageGaps(unittest.TestCase):
     def test_fsync_fd_enosys_ignored(self) -> None:
         with patch(
             "spell_sync.secure_artifacts.os.fsync", side_effect=OSError(errno.ENOSYS, "nosys")
-        ):
+        ) as fsync_mock:
             _fsync_fd(1)
+            fsync_mock.assert_called_once_with(1)
 
     def test_flush_windows_nested_oserror(self) -> None:
         fake_msvcrt = MagicMock()
@@ -455,7 +456,8 @@ class TestRemainingCoverageGaps(unittest.TestCase):
                 "spell_sync.trusted_internal_fs.os.fsync", side_effect=OSError(errno.EINVAL, "bad")
             ):
                 with patch.dict(sys.modules, {"msvcrt": fake_msvcrt}):
-                    _flush_file_windows(1)
+                    assert _flush_file_windows(1) is None
+            fake_msvcrt.get_osfhandle.assert_called_once()
 
     def test_ensure_directory_mkdir_failed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -546,6 +548,7 @@ class TestRemainingCoverageGaps(unittest.TestCase):
                 side_effect=SecureArtifactError("bad", "bad"),
             ):
                 discard_txn_snapshots(snap, wordlist=wordlist, transaction_id="tid")
+            self.assertTrue(snap.exists())
 
     def test_artifact_root_from_txn_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

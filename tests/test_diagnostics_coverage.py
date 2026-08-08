@@ -134,7 +134,7 @@ def test_compaction_write_failure(tmp_path: Path, monkeypatch, history_record_ca
         return original_replace(self, target)
 
     monkeypatch.setattr(Path, "replace", fail_replace)
-    store.append(
+    result = store.append(
         OperationHistoryRecord(
             schema_version=1,
             record_id="trigger-compact",
@@ -144,6 +144,7 @@ def test_compaction_write_failure(tmp_path: Path, monkeypatch, history_record_ca
             duration_ms=1,
         )
     )
+    assert result.ok
 
 
 def test_history_record_optional_fields() -> None:
@@ -306,7 +307,8 @@ def test_service_log_setup_warning(tmp_path: Path, monkeypatch) -> None:
         "spell_sync.application.service.configure_file_logging",
         lambda _paths: LoggingSetupResult(ok=False, detail="nope"),
     )
-    SpellSyncService(state_paths=_paths(tmp_path), enable_file_logging=True)
+    service = SpellSyncService(state_paths=_paths(tmp_path), enable_file_logging=True)
+    assert service is not None
 
 
 def test_lazy_spell_sync_service_export() -> None:
@@ -415,6 +417,7 @@ def test_compaction_read_failure(tmp_path: Path, monkeypatch, history_record_cap
 
     monkeypatch.setattr(Path, "read_text", fail_on_compact)
     store._maybe_compact_unlocked()
+    assert store.paths.history_file.is_file()
 
 
 def test_compaction_temp_unlink_failure(
@@ -441,7 +444,7 @@ def test_compaction_temp_unlink_failure(
 
     monkeypatch.setattr(Path, "replace", fail_replace)
     monkeypatch.setattr(Path, "unlink", fail_unlink)
-    store.append(
+    result = store.append(
         OperationHistoryRecord(
             schema_version=1,
             record_id="trigger-temp-fail",
@@ -451,6 +454,7 @@ def test_compaction_temp_unlink_failure(
             duration_ms=1,
         )
     )
+    assert result.ok
 
 
 def test_read_technical_log_byte_truncation(tmp_path: Path) -> None:
@@ -502,7 +506,7 @@ def test_lock_close_failure(tmp_path: Path, monkeypatch) -> None:
         raise OSError("close failed")
 
     monkeypatch.setattr(os, "close", fail_close)
-    store.append(
+    result = store.append(
         OperationHistoryRecord(
             schema_version=1,
             record_id="close-fail",
@@ -512,6 +516,7 @@ def test_lock_close_failure(tmp_path: Path, monkeypatch) -> None:
             duration_ms=1,
         )
     )
+    assert result.ok
 
 
 def test_history_record_clamps_negative_and_overflow_counts() -> None:
@@ -631,6 +636,7 @@ def test_compaction_cleanup_unlink_failure(
     monkeypatch.setattr(Path, "replace", fail_replace)
     monkeypatch.setattr(Path, "unlink", fail_unlink)
     store._maybe_compact_unlocked()
+    assert paths.history_file.is_file()
 
 
 def test_logging_rejects_symlink_log_directory(tmp_path: Path) -> None:

@@ -45,7 +45,6 @@ python3 scripts/execution_budget_report.py --execution-id gate:full-ci
 
 - Real-application manual matrix (R-CON)
 - Windows hardware adversarial suite (R-WIN)
-- Coverage-padding retirement beyond the frozen R-PWR ceiling (shrink-only hygiene)
 - Owner push/tag/publish
 - Full gitleaks / `subsystems.json` rewrite / unified generated-docs pipeline
   (see [`ROADMAP.md`](ROADMAP.md) § Not on this roadmap)

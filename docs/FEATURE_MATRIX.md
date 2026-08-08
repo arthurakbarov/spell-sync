@@ -23,7 +23,7 @@ and `docs/target-validation.json`. Residuals: [PRODUCT_COMPLETION.md](PRODUCT_CO
 | Packaging / wheel | complete | complete | not-applicable | complete | not-applicable | missing | not-applicable | complete | Installed-wheel outside checkout before publish |
 | Agent / edit loop | complete | complete | not-applicable | complete | not-applicable | not-applicable | not-applicable | complete | Sample fill uses budget; not a coverage wall |
 | Windows adversarial (R-WIN) | partial | partial | partial | partial | not-applicable | blocked | blocked | complete | Not runnable on maintainer macOS host |
-| Coverage padding (R-PWR) | partial | partial | not-applicable | complete | not-applicable | not-applicable | not-applicable | complete | Frozen inventory; shrink only |
+| Coverage padding (R-PWR) | complete | complete | not-applicable | complete | not-applicable | not-applicable | not-applicable | complete | Retired — frozen allowlist only |
 | Power-loss durability (R-DUR) | partial | partial | not-applicable | complete | not-applicable | missing | missing | complete | POSIX fsync best-effort; no physical proof |
 
 ## Notes
@@ -56,5 +56,5 @@ and `docs/target-validation.json`. Residuals: [PRODUCT_COMPLETION.md](PRODUCT_CO
 ### How to use this table
 
 - Before claiming a feature "works", check Real-app manual **and** Interactive acceptance.
-- Prefer closing R-CON samples over growing legacy coverage padding (R-PWR).
+- Prefer closing R-CON samples over adding new `*coverage*` padding suites.
 - Update this table when support matrix, residuals, or safety clusters change.
