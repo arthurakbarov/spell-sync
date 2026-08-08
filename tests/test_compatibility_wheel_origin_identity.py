@@ -35,8 +35,8 @@ def test_global_site_packages_origin_rejected(tmp_path: Path) -> None:
         "executable": str(venv / "bin" / "python"),
         "sysPrefix": str(venv),
         "basePrefix": str(venv),
-        "purelib": str(venv / "lib/python3.12/site-packages"),
-        "platlib": str(venv / "lib/python3.12/site-packages"),
+        "purelib": str(venv / "lib/python3.14/site-packages"),
+        "platlib": str(venv / "lib/python3.14/site-packages"),
         "version": "1.0.0",
     }
     assert (
@@ -48,7 +48,7 @@ def test_global_site_packages_origin_rejected(tmp_path: Path) -> None:
 def test_wrong_sys_prefix_rejected(tmp_path: Path) -> None:
     mod = _load_compat_mod()
     venv = tmp_path / "venv"
-    site = venv / "lib/python3.12/site-packages"
+    site = venv / "lib/python3.14/site-packages"
     origin = site / "spell_sync" / "__init__.py"
     origin.parent.mkdir(parents=True)
     origin.write_text("# stub\n", encoding="utf-8")
@@ -72,7 +72,7 @@ def test_wrong_sys_prefix_rejected(tmp_path: Path) -> None:
 def test_origin_outside_purelib_rejected(tmp_path: Path) -> None:
     mod = _load_compat_mod()
     venv = tmp_path / "venv"
-    site = venv / "lib/python3.12/site-packages"
+    site = venv / "lib/python3.14/site-packages"
     site.mkdir(parents=True)
     origin = venv / "outside" / "spell_sync" / "__init__.py"
     origin.parent.mkdir(parents=True)
@@ -97,7 +97,7 @@ def test_origin_outside_purelib_rejected(tmp_path: Path) -> None:
 def test_temporary_venv_origin_accepted(tmp_path: Path) -> None:
     mod = _load_compat_mod()
     venv = tmp_path / "venv"
-    site = venv / "lib/python3.12/site-packages"
+    site = venv / "lib/python3.14/site-packages"
     origin = site / "spell_sync" / "__init__.py"
     origin.parent.mkdir(parents=True)
     origin.write_text("# stub\n", encoding="utf-8")

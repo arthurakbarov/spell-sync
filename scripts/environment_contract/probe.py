@@ -128,7 +128,7 @@ class InterpreterProbe:
 
 
 def venv_python(venv_dir: Path) -> Path | None:
-    for name in ("python", "python3", "python3.12"):
+    for name in ("python", "python3", "python3.14"):
         candidate = venv_dir / "bin" / name
         if candidate.is_file():
             return candidate

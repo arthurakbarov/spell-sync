@@ -95,7 +95,7 @@ def _ci_tree_digest(root: Path) -> str:
 
 
 def _project_python(root: Path, fallback: str) -> str:
-    for name in ("python", "python3", "python3.12"):
+    for name in ("python", "python3", "python3.14"):
         candidate = root / ".venv" / "bin" / name
         if candidate.is_file():
             return str(candidate)

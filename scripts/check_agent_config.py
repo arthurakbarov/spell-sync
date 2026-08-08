@@ -23,10 +23,11 @@ STALE_PATTERNS = [
     (re.compile(r"CLI only", re.I), "stale CLI-only public interface claim"),
     (re.compile(r"daily\.sh"), "maintainer daily.sh reference"),
     (re.compile(r"sync-tool\.sh"), "maintainer sync-tool.sh reference"),
-    (re.compile(r"first stable.*1\.0\.0", re.I), "stale 1.0.0 release plan"),
     (re.compile(r"explicit runtime is Phase", re.I), "stale explicit-runtime deferral"),
     (re.compile(r"still implicit in 0\.2\.1", re.I), "stale implicit runtime claim"),
     (re.compile(r"ContextVar\).*0\.2\.1", re.I), "stale ContextVar runtime claim"),
+    (re.compile(r"ARCHITECTURE_0_3_IMPLEMENTATION", re.I), "stale architecture tracker filename"),
+    (re.compile(r"ValidatedRuntime"), "stale ValidatedRuntime identifier"),
 ]
 PRIVATE_PATH_PATTERNS = [
     re.compile(r"~/code/"),
