@@ -641,7 +641,9 @@ def test_review_save_report_already_saved_message() -> None:
             screen._saved_report_path = "/tmp/already-saved.json"
             await app.push_screen(screen)
             await pilot.click("#btn-save-report")
-            status = await wait_for_text(pilot, "#session-report-export-status", "Report already saved")
+            status = await wait_for_text(
+                pilot, "#session-report-export-status", "Report already saved"
+            )
             assert "already saved" in str(status.render()).lower()
 
     asyncio.run(_run())

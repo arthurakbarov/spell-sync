@@ -195,16 +195,19 @@ production = [
   "spell_sync/application/services/recovery.py",
   "spell_sync/push_journal.py",
   "spell_sync/recover*.py",
+  "scripts/run_recovery_smoke.py",
 ]
 moduleTests = [
   "tests/test_recovery_discard_safety.py",
   "tests/test_recovery_digest_branches.py",
+  "tests/test_run_recovery_smoke.py",
 ]
 clusterTests = [
   "tests/test_recovery_discard_safety.py",
   "tests/test_recovery_digest_branches.py",
   "tests/test_safe_discard_adversarial.py",
   "tests/test_tui_recovery_safety.py",
+  "tests/test_run_recovery_smoke.py",
 ]
 validators = [
   "scripts/check_architecture.py --check",
@@ -335,6 +338,10 @@ production = [
   "scripts/coverage_policy.py",
   "scripts/documentation_state.py",
   "scripts/dev_runs.py",
+  "scripts/ss.py",
+  "scripts/ss",
+  "scripts/dev",
+  "scripts/run_recovery_smoke.py",
   "scripts/install_git_hooks.py",
   "scripts/lib/git-commit.sh",
   "scripts/preflight_publish.py",
@@ -365,6 +372,9 @@ moduleTests = [
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
+  "tests/test_ss_dispatcher.py",
+  "tests/test_dev_runs_journal.py",
+  "tests/test_run_recovery_smoke.py",
 ]
 clusterTests = [
   "tests/test_agent_config_validator.py",
@@ -387,6 +397,9 @@ clusterTests = [
   "tests/test_preflight_publish.py",
   "tests/test_run_dev_loop_budget.py",
   "tests/test_validate_commit_messages.py",
+  "tests/test_ss_dispatcher.py",
+  "tests/test_dev_runs_journal.py",
+  "tests/test_run_recovery_smoke.py",
 ]
 validators = [
   "scripts/check_agent_config.py",

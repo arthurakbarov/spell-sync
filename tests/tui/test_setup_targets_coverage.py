@@ -164,9 +164,7 @@ class TestSetupTargetsScreenCoverage(unittest.IsolatedAsyncioTestCase):
             corrupt = screen.query_one("#target-row-cursor", SetupTargetRowWidget)
             corrupt_checkbox = corrupt.query_one("#target-checkbox-cursor")
             corrupt_checkbox.value = True
-            corrupt._on_checkbox_changed(
-                type("E", (), {"checkbox": corrupt_checkbox})()
-            )
+            corrupt._on_checkbox_changed(type("E", (), {"checkbox": corrupt_checkbox})())
             row.key_space()
             for button_id in ("btn-refresh", "btn-clear", "btn-continue"):
                 screen.on_button_pressed(_button_event(button_id))
