@@ -1,0 +1,246 @@
+/* Full-bleed shell: body scroll spans the terminal so the scrollbar sits on the
+   right edge. Content children are capped/centered (max-width 100). */
+Screen {
+    layout: vertical;
+}
+
+/* Shared shell — all product screens */
+.screen-body,
+.setup-body {
+    height: 1fr;
+    width: 100%;
+    align: center top;
+    /* Bottom pad so the last control is not flush with the Footer keybinding bar. */
+    padding: 1 2 1 2;
+}
+
+/* Content column inside the full-width scroll (not the scroll itself). */
+.screen-body > *,
+.setup-body > *,
+#confirm-body > * {
+    width: 100%;
+    max-width: 100;
+}
+
+.screen-prose,
+.setup-prose {
+    height: auto;
+    max-width: 100;
+    margin-bottom: 1;
+}
+
+/* Inline action stack — last child of the body scroll (never dock: bottom). */
+.screen-actions,
+.setup-actions,
+.targets-inline-actions,
+.dashboard-menu {
+    height: auto;
+    width: 100%;
+    max-width: 100;
+    padding: 1 2 1 2;
+    margin-top: 1;
+    layout: vertical;
+}
+
+/* Dashboard menu: separate role from status summary (not a muted footnote to it).
+   Keep bottom pad — menu-items have no margin-bottom (unlike .screen-actions buttons). */
+.dashboard-menu {
+    padding: 0 0 1 0;
+    /* Clear band after Status / issues before the first action section. */
+    margin-top: 2;
+}
+
+.screen-actions Button,
+.setup-actions Button,
+.targets-inline-actions Button,
+.dashboard-menu Button {
+    width: 36;
+    min-width: 36;
+    max-width: 36;
+    margin: 0 0 1 0;
+}
+
+/* Dashboard: button + caption as one unit. Button stays 36; caption may be wider. */
+.dashboard-menu .menu-item {
+    height: auto;
+    width: auto;
+    max-width: 72;
+    /* Uniform gap above each item (after section labels and between items). */
+    margin: 1 0 0 0;
+    layout: vertical;
+    border-left: tall transparent;
+}
+
+.dashboard-menu .menu-item:focus-within {
+    /* Accent only — a surface fill washes out primary blue on Review and update. */
+    border-left: tall $accent;
+}
+
+.dashboard-menu .menu-item Button {
+    margin: 0 0 0 0;
+}
+
+.dashboard-menu .menu-item-hint {
+    height: auto;
+    width: 72;
+    max-width: 72;
+    margin: 0;
+    color: $text-muted;
+}
+
+.dashboard-menu .menu-item:focus-within .menu-item-hint {
+    color: $text;
+}
+
+.action-status {
+    height: auto;
+    max-width: 100;
+    margin: 0 0 1 0;
+    color: $text-muted;
+}
+
+.targets-inline-actions > .action-status {
+    width: 36;
+    max-width: 36;
+}
+
+.section-label {
+    height: auto;
+    width: 72;
+    max-width: 72;
+    /* Space before a section; gap to first button comes from .menu-item margin-top. */
+    margin: 2 0 0 0;
+    text-style: bold;
+    /* Full text — muted reads as a caption glued to the summary above. */
+    color: $text;
+}
+
+.dashboard-menu .section-label:first-child {
+    /* Top gap owned by .dashboard-menu margin-top (summary → actions role break). */
+    margin-top: 0;
+}
+
+.duration-hint {
+    height: auto;
+    margin: 0 0 1 0;
+    color: $text-muted;
+}
+
+/* Summary blocks */
+#dashboard-summary,
+#status-summary,
+#doctor-summary,
+#pull-summary,
+#preview-content,
+#recovery-content,
+#removals-summary,
+#narrow-warning,
+#dashboard-issues,
+#blocking-banner,
+#targets-header,
+.targets-setup-header,
+#targets-status,
+#operation-title,
+#operation-details,
+#operation-stages,
+#report-content,
+#logs-title,
+#logs-privacy,
+#logs-status,
+#review-title,
+#review-body,
+#review-pull-content,
+#review-pull-complete,
+#review-push-content,
+#review-session-report,
+#change-wordlist-hint {
+    height: auto;
+    padding: 0;
+    margin-bottom: 1;
+}
+
+/* Tables — height grows with rows; never reserve empty min-height (see TUI_LAYOUT.md). */
+DataTable,
+#preview-table,
+#status-table,
+#doctor-table,
+#pull-table,
+#recovery-table,
+#review-push-table,
+#history-table,
+#operation-stages-table,
+#tech-log-table {
+    height: auto;
+    min-height: 0;
+    max-height: 14;
+    margin: 0 0 1 0;
+    border: solid $surface-lighten-2;
+}
+
+/* After sync_data_table_rows(): keep a stable height once rows exist. */
+DataTable.-populated {
+    min-height: 6;
+}
+
+#tech-log-summary,
+#tech-log-content {
+    height: auto;
+    padding: 0;
+    margin-bottom: 1;
+}
+
+/* Setup: RadioSet (recent/preset chooser) must not sit flush on the next field label. */
+.setup-body RadioSet {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+/* Setup / Targets: one page scroll (header + rows + actions). */
+.targets-setup-body {
+    height: 1fr;
+    layout: vertical;
+}
+
+.targets-setup-header {
+    height: auto;
+    max-height: 3;
+    overflow-y: hidden;
+    margin-bottom: 0;
+}
+
+#targets-list,
+.targets-setup-list {
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: none;
+}
+
+.setup-target-row {
+    padding: 0;
+    height: auto;
+    min-height: 1;
+    border: none;
+}
+
+.setup-target-row:focus {
+    background: $surface-lighten-1;
+    border-left: tall $accent;
+}
+
+.setup-targets-empty {
+    height: auto;
+    margin: 1 0;
+    color: $text-muted;
+}
+
+Button:disabled {
+    opacity: 0.45;
+}
+
+#confirm-body {
+    width: 100%;
+    align: center top;
+    padding: 1 2;
+    height: auto;
+}

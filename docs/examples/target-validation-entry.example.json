@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "target_id": "chrome",
+      "platform": "macos",
+      "implementation": "implemented",
+      "automated_validation": "pass",
+      "manual_validation": "pass",
+      "application_version": "Google Chrome 0.0.0",
+      "tested_on": "2026-01-01",
+      "notes": "Example only: read-only doctor discovery and push plan --json dry-run. No mutation.",
+      "evidence": "example only; dry-run"
+    }
+  ]
+}

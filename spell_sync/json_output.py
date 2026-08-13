@@ -1,0 +1,57 @@
+"""JSON output for --json."""
+
+import json
+import sys
+from typing import Any
+
+from .sync_run import DictionaryDiff, PushResult
+
+SCHEMA_VERSION = 1
+
+_json_emitted = False
+
+
+def reset_json_emission() -> None:
+    global _json_emitted
+    _json_emitted = False
+
+
+def json_emitted() -> bool:
+    return _json_emitted
+
+
+def emit_json(payload: dict[str, Any]) -> None:
+    global _json_emitted
+    if "command" not in payload or "exit" not in payload:
+        missing = [k for k in ("command", "exit") if k not in payload]
+        raise ValueError(f"JSON payload missing keys: {', '.join(missing)}")
+    _json_emitted = True
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
+    sys.stdout.write("\n")
+
+
+def base_payload(command: str, *, exit: int) -> dict[str, Any]:
+    """Common JSON keys shared by all commands."""
+    return {"schema_version": SCHEMA_VERSION, "command": command, "exit": exit}
+
+
+def push_result_payload(result: PushResult) -> dict[str, Any]:
+    return {
+        "word_count": result.word_count,
+        "written": list(result.written),
+        "skipped": list(result.skipped),
+        "skipped_reasons": dict(result.skipped_reasons),
+        "skipped_details": dict(result.skipped_details),
+    }
+
+
+def dictionary_diff_payload(diff: DictionaryDiff) -> dict[str, Any]:
+    return {
+        "name": diff.name,
+        "target_count": diff.target_count,
+        "local_count": diff.local_count,
+        "to_add": diff.to_add,
+        "to_remove": diff.to_remove,
+        "add_words": list(diff.add_words),
+        "remove_words": list(diff.remove_words),
+    }

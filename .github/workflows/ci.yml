@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.11.21"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14.6"
+      - name: Sync
+        run: uv sync --locked --all-groups
+      - name: Architecture
+        run: uv run python scripts/check_architecture.py --check
+      - name: Consistency
+        run: uv run python scripts/validate_repository_consistency.py
+      - name: Privacy
+        run: uv run python scripts/scan_privacy_tree.py
+      - name: Fresh project
+        run: uv run python scripts/scan_fresh_project.py
+      - name: Dead code
+        run: uv run python scripts/audit_dead_code.py
+      - name: Target capabilities
+        run: uv run python scripts/check_target_capabilities.py --check
+      - name: Doctor schema
+        run: uv run python scripts/validate_doctor_schema.py
+      - name: Target-validation schema
+        run: uv run python scripts/validate_target_validation_schema.py
+      - name: Ruff
+        run: uv run ruff check spell_sync tests && uv run ruff format --check spell_sync tests
+      - name: Mypy
+        run: uv run mypy spell_sync
+      - name: Pytest
+        run: uv run pytest tests -q --tb=line
+      - name: Wheel smoke
+        run: |
+          uv build
+          uv venv /tmp/spell-sync-wheel
+          uv pip install --python /tmp/spell-sync-wheel dist/*.whl
+          /tmp/spell-sync-wheel/bin/spell-sync version

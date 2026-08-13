@@ -1,0 +1,9 @@
+# Sdist contents: package + release metadata only.
+# Development trees (tests, tooling, docs) stay in the Git checkout.
+
+include LICENSE
+include README.md
+include pyproject.toml
+graft spell_sync
+prune tests
+global-exclude *.py[cod] __pycache__ .DS_Store

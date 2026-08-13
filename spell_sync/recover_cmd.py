@@ -1,0 +1,318 @@
+"""Recover from an interrupted push using the on-disk journal."""
+
+import sys
+from typing import Any
+
+from .application import SpellSyncService
+from .cli_options import CliOptions
+from .cli_request_adapter import recovery_request
+from .command_helpers import quiet_json_output
+from .config import CONFIRM_YES
+from .exit_codes import ExitCode
+from .json_output import base_payload, emit_json
+from .log import log
+from .operation_presenter import OperationSession, OperationSpec, operation_session
+from .operation_reports import RecoveryOutcome, RecoveryStatus
+from .push_journal import RecoverResult
+
+_SERVICE = SpellSyncService(enable_file_logging=False)
+
+
+def _history_duration_ms(session: OperationSession | None) -> int:
+    return session.elapsed_ms if session is not None else 0
+
+
+def _emit_recover_text(
+    result: RecoverResult,
+    *,
+    dry_run: bool,
+    session: OperationSession | None,
+) -> int:
+    if result.failed or result.conflicts:
+        parts = []
+        if result.failed:
+            parts.append(f"failed: {', '.join(result.failed)}")
+        if result.conflicts:
+            parts.append(f"conflicts: {', '.join(result.conflicts)}")
+        message = f"recover incomplete — {'; '.join(parts)}"
+        if session is not None:
+            session.abort(message)
+        else:
+            log.abort(message)
+        return int(ExitCode.PUSH_ABORT)
+    if dry_run:
+        if result.restored:
+            message = f"recover dry-run would restore: {', '.join(result.restored)}"
+            if session is not None:
+                session.succeed(message)
+            else:
+                log.done(message)
+        elif session is not None:
+            session.succeed("recover dry-run: nothing to restore from journal backups")
+        else:
+            log.detail("recover dry-run: nothing to restore from journal backups")
+    elif result.restored:
+        message = f"recover restored: {', '.join(result.restored)}"
+        if session is not None:
+            session.succeed(message)
+        else:
+            log.done(message)
+    elif session is not None:
+        session.succeed("nothing to restore from journal backups")
+    else:
+        log.detail("recover: nothing to restore from journal backups")
+    return int(ExitCode.OK)
+
+
+def _exit_from_recovery_execution(execution: object) -> int:
+    result = getattr(execution, "result", None)
+    outcome = getattr(execution, "outcome", None)
+    if isinstance(result, ExitCode):
+        return int(result)
+    if isinstance(result, RecoverResult):
+        if result.failed or result.conflicts:
+            return int(ExitCode.PUSH_ABORT)
+        return int(ExitCode.OK)
+    if outcome in (
+        RecoveryOutcome.RECOVERED,
+        RecoveryOutcome.RECOVERED_WITH_WARNINGS,
+        RecoveryOutcome.CLEANUP_COMPLETED,
+        RecoveryOutcome.DISCARDED,
+    ):
+        return int(ExitCode.OK)
+    return int(ExitCode.PUSH_ABORT)
+
+
+def cmd_recover(opts: CliOptions) -> int:
+    with quiet_json_output(opts):
+        dry_run = opts.dry_run
+        mode = " (dry-run)" if dry_run else ""
+        with operation_session(
+            OperationSpec(
+                key="recover",
+                title=f"recover{mode}: restore from unfinished push journal",
+                descriptions=(
+                    "Restore wordlist and dictionaries from recovery snapshots "
+                    "after an interrupted update.",
+                ),
+                activity="Recovery",
+            ),
+            enabled=not opts.json_output,
+        ) as session:
+            return _cmd_recover_body(opts, dry_run=dry_run, session=session)
+
+
+def _cmd_recover_body(
+    opts: CliOptions,
+    *,
+    dry_run: bool,
+    session: OperationSession | None,
+) -> int:
+    request = recovery_request(opts)
+    preview = _SERVICE.inspect_recovery(request)
+
+    if preview.status is RecoveryStatus.ABSENT:
+        if opts.json_output:
+            emit_json(
+                {
+                    **base_payload("recover", exit=int(ExitCode.OK)),
+                    "dry_run": dry_run,
+                    "action": "none",
+                    "restored": [],
+                    "skipped": [],
+                    "failed": [],
+                }
+            )
+        if session is not None:
+            session.succeed("no unfinished push journal found")
+        else:
+            log.detail("recover: no unfinished push journal found")
+        return int(ExitCode.OK)
+
+    if preview.status is RecoveryStatus.COMPLETED_CLEANUP_PENDING:
+        if dry_run:
+            if opts.json_output:
+                emit_json(
+                    {
+                        **base_payload("recover", exit=int(ExitCode.OK)),
+                        "dry_run": True,
+                        "action": "cleanup",
+                        "restored": [],
+                        "skipped": [],
+                        "failed": [],
+                    }
+                )
+            if session is not None:
+                session.succeed("completed journal would be cleaned up")
+            else:
+                log.detail("recover: completed journal would be cleaned up")
+            return int(ExitCode.OK)
+        execution = _SERVICE.execute_recovery_cleanup(
+            request,
+            preview,
+            confirmed_transaction_id=preview.preview_fingerprint,
+            event_sink=session,
+        )
+        _SERVICE.build_recovery_report(execution, duration_ms=_history_duration_ms(session))
+        exit_code = _exit_from_recovery_execution(execution)
+        if opts.json_output:
+            emit_json(
+                {
+                    **base_payload("recover", exit=exit_code),
+                    "dry_run": False,
+                    "action": "cleanup",
+                    "restored": [],
+                    "skipped": [],
+                    "failed": [],
+                    "outcome": execution.outcome.value,
+                }
+            )
+        if exit_code == int(ExitCode.OK):
+            if session is not None:
+                session.succeed("completed journal cleaned up")
+            else:
+                log.detail("recover: completed journal cleaned up")
+        elif session is not None:
+            session.abort(execution.message or "recover cleanup failed.")
+        else:
+            log.abort(execution.message or "recover cleanup failed.")
+        return exit_code
+
+    if preview.status in (RecoveryStatus.CORRUPT_JOURNAL, RecoveryStatus.UNSUPPORTED_SCHEMA):
+        detail = preview.detail or preview.status.value
+        if opts.discard_corrupt_journal and not dry_run:
+            execution = _SERVICE.execute_recovery_discard(
+                request,
+                preview,
+                confirmed_transaction_id=preview.preview_fingerprint,
+                event_sink=session,
+            )
+            _SERVICE.build_recovery_report(execution, duration_ms=_history_duration_ms(session))
+            exit_code = _exit_from_recovery_execution(execution)
+            if opts.json_output:
+                emit_json(
+                    {
+                        **base_payload("recover", exit=exit_code),
+                        "dry_run": dry_run,
+                        "action": "discarded_corrupt_journal",
+                        "detail": detail,
+                        "outcome": execution.outcome.value,
+                    }
+                )
+            if exit_code == int(ExitCode.OK):
+                if session is not None:
+                    session.warn_outcome(f"discarded corrupt journal ({detail})")
+                else:
+                    log.warn(f"recover: discarded corrupt journal ({detail})")
+            elif session is not None:
+                session.abort(execution.message or "recover discard failed.")
+            else:
+                log.abort(execution.message or "recover discard failed.")
+            return exit_code
+        if opts.json_output:
+            emit_json(
+                {
+                    **base_payload("recover", exit=int(ExitCode.PUSH_ABORT)),
+                    "reason": "corrupt_journal",
+                    "detail": detail,
+                }
+            )
+        message = (
+            "recover aborted — push journal is corrupt or unsupported "
+            f"({detail}). Pass `--discard-corrupt-journal` only if you intend "
+            "to remove the damaged journal without restoring."
+        )
+        if session is not None:
+            session.abort(message)
+        else:
+            log.abort(message)
+        return int(ExitCode.PUSH_ABORT)
+
+    if not preview.can_recover:
+        if opts.json_output:
+            emit_json(
+                {
+                    **base_payload("recover", exit=int(ExitCode.PUSH_ABORT)),
+                    "reason": preview.status.value,
+                    "detail": preview.detail,
+                }
+            )
+        message = "recover aborted — recovery is not available for this journal."
+        if session is not None:
+            session.abort(message)
+        else:
+            log.abort(message)
+        return int(ExitCode.PUSH_ABORT)
+
+    if not dry_run and not opts.yes:
+        interactive = sys.stdin.isatty() and not opts.json_output
+        if not interactive:
+            if opts.json_output:
+                emit_json(
+                    {
+                        **base_payload("recover", exit=int(ExitCode.PUSH_ABORT)),
+                        "reason": "confirmation_required",
+                        "journal": preview.journal_summary,
+                    }
+                )
+                return int(ExitCode.PUSH_ABORT)
+            message = (
+                "recover aborted — unfinished push journal found. "
+                "Pass `--yes` to restore from backups in non-interactive mode."
+            )
+            if session is not None:
+                session.abort(message)
+            else:
+                log.abort(message)
+            return int(ExitCode.PUSH_ABORT)
+        log.warn(
+            f"unfinished push journal from {preview.started_at} "
+            f"({preview.command}, transaction {preview.transaction_id})"
+        )
+        try:
+            answer = input("Restore wordlist and dictionaries from .bak backups? [y/N] ").strip()
+        except EOFError, KeyboardInterrupt:
+            log.write("\nCancelled.")
+            return int(ExitCode.CANCELLED)
+        if answer.lower() not in CONFIRM_YES:
+            log.write("Cancelled.")
+            return int(ExitCode.CANCELLED)
+
+    execution = _SERVICE.execute_recovery(
+        request,
+        preview,
+        confirmed_transaction_id=preview.preview_fingerprint,
+        dry_run=dry_run,
+        event_sink=session,
+    )
+    if not dry_run:
+        _SERVICE.build_recovery_report(execution, duration_ms=_history_duration_ms(session))
+
+    result: Any = execution.result
+    exit_code = _exit_from_recovery_execution(execution)
+
+    if opts.json_output:
+        payload: dict[str, object] = {
+            **base_payload("recover", exit=exit_code),
+            "dry_run": dry_run,
+            "restored": list(execution.restored),
+            "skipped": list(execution.skipped),
+            "failed": list(execution.failed),
+            "conflicts": list(execution.conflicts),
+        }
+        if preview.transaction_state == "rollback_incomplete":
+            payload["reason"] = "rollback_incomplete"
+        if isinstance(result, RecoverResult):
+            payload["journal"] = preview.journal_summary
+        emit_json(payload)
+        return exit_code
+
+    if isinstance(result, RecoverResult):
+        return _emit_recover_text(result, dry_run=dry_run, session=session)
+    if isinstance(result, ExitCode):
+        if session is not None:
+            session.abort(execution.message or "recover aborted.")
+        else:
+            log.abort(execution.message or "recover aborted.")
+        return int(result)
+    return exit_code
