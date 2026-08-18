@@ -1,0 +1,19 @@
+{
+  "command": "doctor",
+  "exit": 0,
+  "ok": true,
+  "wordlist_path": "wordlist.txt",
+  "wordlist_count": 0,
+  "version": "1.0.0",
+  "dictionaries_total": 0,
+  "dictionaries_readable": 0,
+  "dictionaries_writable": 0,
+  "required_action_count": 0,
+  "actions": [],
+  "checks": [
+    {
+      "level": "info",
+      "message": "example doctor payload for schema validation"
+    }
+  ]
+}

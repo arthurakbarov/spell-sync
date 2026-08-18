@@ -1,0 +1,29 @@
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.json
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Runtime artifacts (rotating *.bak / *.1.bak, temps, lock, journal, txn)
+*.bak
+*.tmp
+.spell-sync.lock
+.spell-sync.journal.json
+.spell-sync.txn/
+.artifacts/
+.DS_Store
+
+# Local project files (created by spell-sync init — never commit)
+wordlist.txt
+spell-sync.toml
+lint-whitelist.txt
+!spell_sync/bundled/lint-whitelist.txt

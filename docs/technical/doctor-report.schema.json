@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spell-sync.local/schemas/doctor-report.json",
+  "title": "Spell Sync doctor JSON payload",
+  "type": "object",
+  "required": [
+    "command",
+    "exit",
+    "ok",
+    "wordlist_path",
+    "wordlist_count",
+    "version",
+    "dictionaries_total",
+    "dictionaries_readable",
+    "dictionaries_writable",
+    "actions",
+    "checks",
+    "required_action_count"
+  ],
+  "properties": {
+    "command": { "const": "doctor" },
+    "exit": { "type": "integer", "minimum": 0 },
+    "ok": { "type": "boolean" },
+    "wordlist_path": { "type": "string" },
+    "wordlist_count": { "type": ["integer", "null"], "minimum": 0 },
+    "version": { "type": "string", "minLength": 1 },
+    "dictionaries_total": { "type": "integer", "minimum": 0 },
+    "dictionaries_readable": { "type": "integer", "minimum": 0 },
+    "dictionaries_writable": { "type": "integer", "minimum": 0 },
+    "max_drift_add": { "type": "integer" },
+    "max_drift_remove": { "type": "integer" },
+    "required_action_count": { "type": "integer", "minimum": 0 },
+    "skipped_unreadable": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reason", "optional"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string" },
+          "optional": { "type": "boolean" },
+          "command": { "type": "string" },
+          "shell": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "message"],
+        "properties": {
+          "level": { "type": "string", "enum": ["info", "warn", "error", "detail"] },
+          "message": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "cli": { "type": "object" },
+    "git_hooks": { "type": ["object", "null"] },
+    "action_count": { "type": "integer", "minimum": 0 },
+    "targets": { "type": "boolean" },
+    "count": { "type": "integer" },
+    "targets_list": { "type": "array" }
+  },
+  "additionalProperties": true
+}

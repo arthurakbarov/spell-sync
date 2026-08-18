@@ -1,0 +1,39 @@
+# Stable pytest groups for CI timing and selection.
+# Union of all groups must equal `python -m pytest tests` (minus explicit real_home/slow exclusions).
+
+[[groups]]
+id = "tests:tui"
+executionId = "tests:tui"
+description = "TUI screens, navigation, wizard, and smoke tests"
+patterns = [
+  "tests/tui/**",
+  "tests/test_gui_smoke.py",
+  "tests/test_tui_*.py",
+]
+
+[[groups]]
+id = "tests:packaging"
+executionId = "tests:packaging"
+description = "Wheel install, packaging, and installed smoke"
+patterns = [
+  "tests/test_installed_workflow.py",
+]
+
+[[groups]]
+id = "tests:integration"
+executionId = "tests:integration"
+description = "Slow multi-step and subprocess integration flows"
+patterns = [
+  "tests/test_*integration*.py",
+  "tests/test_*workflow*.py",
+]
+
+[[groups]]
+id = "tests:rest"
+executionId = "tests:rest"
+description = "Unclaimed remainder tests (fallback group)"
+fallback = true
+patterns = [
+  "tests/test_*.py",
+  "tests/*_test.py",
+]

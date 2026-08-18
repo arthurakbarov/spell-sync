@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/arthurakbarov/spell-sync/discussions
+    about: Questions, ideas, and show-and-tell
+  - name: Documentation
+    url: https://github.com/arthurakbarov/spell-sync/tree/main/docs
+    about: Guides for setup, workflows, and configuration
+  - name: Contributing guide
+    url: https://github.com/arthurakbarov/spell-sync/blob/main/docs/CONTRIBUTING.md
+    about: Setup, CI, and PR expectations
+  - name: Code of conduct
+    url: https://github.com/arthurakbarov/spell-sync/blob/main/.github/CODE_OF_CONDUCT.md
+    about: Community standards

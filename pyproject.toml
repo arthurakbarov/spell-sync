@@ -1,0 +1,135 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spell-sync"
+version = "1.0.0"
+description = "Sync personal spell-check words across OS, browsers, editors, and Hunspell"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = "Unlicense"
+license-files = ["LICENSE"]
+authors = [{ name = "Arthur Akbarov" }]
+keywords = ["spellcheck", "spell-check", "dictionary", "sync", "dotfiles", "wordlist", "custom-words"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "textual>=8.2.8,<9",
+]
+
+[dependency-groups]
+test-core = [
+  "pytest>=9,<10",
+  "hypothesis>=6.135,<7",
+]
+coverage = [
+  "pytest-cov>=7,<8",
+]
+quality = [
+  "ruff>=0.15,<1",
+  "mypy>=2,<3",
+]
+packaging = [
+  "build>=1,<2",
+  "wheel>=0.47,<1",
+  "setuptools>=77",
+]
+dev = [
+  { include-group = "test-core" },
+  { include-group = "coverage" },
+  { include-group = "quality" },
+]
+
+[project.urls]
+Homepage = "https://github.com/arthurakbarov/spell-sync"
+Repository = "https://github.com/arthurakbarov/spell-sync"
+Issues = "https://github.com/arthurakbarov/spell-sync/issues"
+
+[tool.pytest.ini_options]
+markers = [
+  "real_home: tests that intentionally use the real HOME directory",
+  "core: core domain and application tests",
+  "tui: Textual UI tests",
+  "environment: environment contract tests",
+  "packaging: wheel and packaging tests",
+  "integration: slow integration tests",
+]
+addopts = "--strict-config --strict-markers"
+
+[project.scripts]
+spell-sync = "spell_sync.cli:entry_point"
+
+[tool.setuptools.packages.find]
+include = ["spell_sync*"]
+
+[tool.setuptools.package-data]
+spell_sync = ["bundled/*", "tui/*.tcss"]
+
+[tool.ruff]
+line-length = 100
+# Prefer parenthesized except-groups so bootstrap Python can parse tooling before
+# PATH resolves to the required 3.14 runtime.
+# Runtime still requires Python 3.14 via project.requires-python.
+target-version = "py314"
+
+[tool.ruff.lint]
+# Beyond pycodestyle/Pyflakes/isort: a hand-picked, false-positive-free subset of
+# flake8-bugbear/comprehensions/simplify/pyupgrade/perf/ruff-specific checks.
+# Deliberately excluded (checked periodically, not enforced): RUF001-003 (ambiguous
+# unicode — flags intentional ×/✓/· status glyphs), RUF012 (mutable class default —
+# flags Textual's required BINDINGS = [...] idiom and read-only test constants),
+# C408 (dict() call — reads better than a quoted-key literal in wide fixture builders),
+# SIM114 (if-branches with same body — sometimes coincidental, not interchangeable),
+# SIM117 (nested with — collapsing unittest.mock.patch chains produces large,
+# low-value reformatting diffs).
+select = [
+    "E",
+    "F",
+    "I",
+    "W",
+    "B009",
+    "B017",
+    "B905",
+    "C416",
+    "C420",
+    "PERF401",
+    "RUF059",
+    "RUF100",
+    "SIM101",
+    "SIM102",
+    "SIM103",
+    "SIM105",
+    "UP017",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+files = ["spell_sync"]
+# check_untyped_defs remains on; a full annotation pass can enable disallow_untyped_defs later.
+
+[tool.coverage.run]
+source = ["spell_sync"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 98
+skip_covered = true
+
+[tool.uv]
+required-version = "==0.11.21"
+default-groups = ["dev"]
+python-downloads = "manual"
